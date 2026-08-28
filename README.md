@@ -7,7 +7,7 @@ Pensada para ir sumando el resto de indicadores del marco ELI5 (gasto por provee
 ## Cómo usarla
 
 1. Abre `index.html` (doble clic, se abre en tu navegador) o entra al link público de GitHub Pages.
-2. Clic en "Cargar Reporte Maestro.xlsx" y selecciona el archivo de tu carpeta Master Data.
+2. Clic en "Cargar archivos (hasta 4)" y selecciona uno o varios de los 4 Excel de tu carpeta Master Data (Reporte Maestro.xlsx, Consulta.xlsx, Reporte Almacen.xlsx, PedidoSinReq.xlsx). Por ahora los indicadores solo usan Reporte Maestro.xlsx — los otros 3 quedan cargados y confirmados en la lista, listos para cuando se sumen sus indicadores.
 3. Revisa las pestañas: Resumen, Por mes, Por familia, Por producto, Cumplimiento por Proyecto.
 
 No necesitas internet para usarla, salvo la primera carga de la página (trae una librería pequeña, SheetJS, desde un CDN).
