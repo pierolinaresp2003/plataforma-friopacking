@@ -16,12 +16,13 @@ No necesitas internet para usarla, salvo la primera carga de la página (trae un
 
 Por defecto, cada persona que abre el link tiene que cargar su propio Excel — nadie ve los datos de otra persona, porque todo el cálculo pasa en su propio navegador.
 
-Si quieres que alguien que abra el link vea exactamente los mismos números que tú acabas de calcular (sin que esa persona tenga que cargar el Excel), usa el botón **"📤 Guardar y compartir"** que aparece junto al botón de carga, después de subir tu archivo:
+Junto al botón de carga vas a ver siempre tres botones más: **"🔑 Conectar GitHub"**, **"☁ Guardar y compartir"** y **"🔄 Actualizar"**.
 
-1. La primera vez que lo uses, te va a pedir tu **token de GitHub** (uno de acceso solo a este repositorio — pégalo una vez y el navegador lo recuerda para la próxima).
-2. Al hacer clic, publica un resumen de tus datos (`data.json`) directo al repositorio de GitHub — no tu Excel completo, solo las cifras ya calculadas (promedios, totales por mes/familia/producto/proyecto).
+1. **Conectar GitHub** (una sola vez): pide tu **token de GitHub** (uno de acceso solo a este repositorio) y lo guarda en este navegador. Verás un aviso "🔑 GitHub conectado" cuando esté listo.
+2. **Guardar y compartir** (se habilita después de cargar tu Excel): publica un resumen de tus datos (`data.json`) directo al repositorio de GitHub — no tu Excel completo, solo las cifras ya calculadas (promedios, totales por mes/familia/producto/proyecto).
 3. Cualquiera que abra el link público después de eso ve automáticamente esa versión publicada, con un aviso arriba indicando la fecha de publicación. Puede seguir cargando su propio archivo si quiere ver otra cosa, sin afectar lo que ya publicaste.
-4. El token queda guardado solo en tu propio navegador (nunca se envía a Claude ni a ningún otro servidor) — si algún día deja de funcionar (por ejemplo, si expiró), la plataforma te va a pedir que ingreses uno nuevo.
+4. **Actualizar**: por si alguien más ya publicó una versión nueva y quieres traerla sin recargar toda la página.
+5. El token queda guardado solo en tu propio navegador (nunca se envía a Claude ni a ningún otro servidor) — si algún día deja de funcionar (por ejemplo, si expiró), la plataforma te va a pedir que ingreses uno nuevo la próxima vez que uses "Guardar y compartir" o "Conectar GitHub".
 
 ## Subirla a GitHub (para tenerla ahí además de tu escritorio)
 

@@ -31,6 +31,9 @@
   .btn:hover{background:#0b8fb9;}
   .btn.secondary{background:#eef2f6;color:var(--brand);}
   .btn.secondary:hover{background:#e3e9ef;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn:disabled:hover{background:#eef2f6;}
+  #ghStatus{margin-top:4px;}
   #status{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
   #status.err{color:var(--red);}
   #status.ok{color:var(--green);}
@@ -87,13 +90,16 @@
 
   <div class="card upload-card">
     <div class="txt">
-      <h2>Cargar datos</h2>
-      <p>Selecciona tu <b>Reporte Maestro.xlsx</b> actualizado (carpeta Master Data). Todo el cálculo se hace en tu navegador — no se sube nada a internet ni consume tokens. Cuando quieras que otra persona vea estos mismos números al abrir el link, usa "Guardar y compartir".</p>
+      <h2>Cargar y compartir datos</h2>
+      <p>Selecciona tu <b>Reporte Maestro.xlsx</b> actualizado (carpeta Master Data). Todo el cálculo se hace en tu navegador — no se sube nada a internet ni consume tokens. Para que otra persona vea estos mismos números al abrir el link: conecta GitHub una vez y luego usa "Guardar y compartir".</p>
       <p id="status">Ningún archivo cargado todavía.</p>
+      <p id="ghStatus">🔒 GitHub no conectado — conéctalo para poder guardar y compartir.</p>
     </div>
     <label class="btn" for="fileInput">📂 Cargar Reporte Maestro.xlsx</label>
     <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
-    <button class="btn secondary" id="btnPublish" style="display:none;">📤 Guardar y compartir</button>
+    <button class="btn secondary" id="btnConnect">🔑 Conectar GitHub</button>
+    <button class="btn secondary" id="btnPublish" disabled title="Primero carga tu Reporte Maestro.xlsx arriba.">☁ Guardar y compartir</button>
+    <button class="btn secondary" id="btnRefresh">🔄 Actualizar</button>
   </div>
 
   <div id="publishBanner" class="note" style="display:none;"></div>
@@ -288,6 +294,31 @@ function utf8ToBase64(str){
   return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
 }
 
+function updateGhStatus(){
+  const el = document.getElementById('ghStatus');
+  if(!el) return;
+  if(getGhToken()){
+    el.textContent = "🔑 GitHub conectado en este navegador — listo para guardar y compartir.";
+    el.style.color = "var(--green)";
+  } else {
+    el.textContent = "🔒 GitHub no conectado — conéctalo para poder guardar y compartir.";
+    el.style.color = "var(--ink-soft)";
+  }
+}
+function connectGithub(){
+  if(getGhToken()){
+    if(!confirm("Ya tienes un token de GitHub guardado en este navegador. ¿Quieres reemplazarlo por uno nuevo?")) return;
+  }
+  const t = askGhToken();
+  if(t) showPublishBanner("🔑 Token de GitHub guardado en este navegador.", false);
+  updateGhStatus();
+}
+function updateActionButtons(){
+  const btn = document.getElementById('btnPublish');
+  btn.disabled = !DATA;
+  btn.title = DATA ? "" : "Primero carga tu Reporte Maestro.xlsx arriba.";
+}
+
 function buildSnapshot(){
   return {
     publishedAt: new Date().toISOString(),
@@ -383,14 +414,18 @@ function showPublishBanner(msg, isError){
   el.innerHTML = msg;
 }
 
-async function tryLoadPublishedSnapshot(){
+async function loadPublishedSnapshot(manual){
   try{
     const res = await fetch('./' + SNAPSHOT_PATH + '?_=' + Date.now());
-    if(!res.ok) return;
+    if(!res.ok){
+      if(manual) showPublishBanner('Todavía no hay ninguna versión publicada en este link. Carga tu archivo arriba y usa "Guardar y compartir" para ser el primero.', true);
+      return;
+    }
     const snap = await res.json();
     loadFromSnapshot(snap);
   }catch(e){
     // sin snapshot publicado (o abierto como archivo local file://) — se queda en el estado vacío normal
+    if(manual) showPublishBanner("No pude conectar con GitHub para buscar la última versión. Revisa tu conexión a internet.", true);
   }
 }
 
@@ -409,12 +444,16 @@ function loadFromSnapshot(snap){
   };
   setStatus("Viendo datos publicados de " + (snap.filename || "un archivo") + ".", "ok");
   showPublishBanner("📌 Estás viendo la última versión publicada, del " + new Date(snap.publishedAt).toLocaleString('es-PE') + ". Puedes cargar tu propio archivo arriba para ver una versión más nueva antes de compartirla.", false);
-  document.getElementById('btnPublish').style.display = 'none';
+  updateActionButtons();
   render();
 }
 
+document.getElementById('btnConnect').addEventListener('click', connectGithub);
 document.getElementById('btnPublish').addEventListener('click', publishSnapshot);
-tryLoadPublishedSnapshot();
+document.getElementById('btnRefresh').addEventListener('click', function(){ loadPublishedSnapshot(true); });
+updateGhStatus();
+updateActionButtons();
+loadPublishedSnapshot(false);
 
 document.getElementById('fileInput').addEventListener('change', function(e){
   const file = e.target.files[0];
@@ -543,7 +582,7 @@ function processWorkbook(wb, filename){
     : "";
   setStatus("Cargado: " + filename + " · " + orders.length.toLocaleString('es-PE') + " órdenes nacionales válidas (de " + totalRows.toLocaleString('es-PE') + " con OC nacional detectada)" + cumpMsg + ".", "ok");
   document.getElementById('publishBanner').style.display = 'none';
-  document.getElementById('btnPublish').style.display = 'inline-flex';
+  updateActionButtons();
   render();
 }
 
