@@ -88,12 +88,15 @@
   <div class="card upload-card">
     <div class="txt">
       <h2>Cargar datos</h2>
-      <p>Selecciona tu <b>Reporte Maestro.xlsx</b> actualizado (carpeta Master Data). Todo el cálculo se hace en tu navegador — no se sube nada a internet ni consume tokens.</p>
+      <p>Selecciona tu <b>Reporte Maestro.xlsx</b> actualizado (carpeta Master Data). Todo el cálculo se hace en tu navegador — no se sube nada a internet ni consume tokens. Cuando quieras que otra persona vea estos mismos números al abrir el link, usa "Guardar y compartir".</p>
       <p id="status">Ningún archivo cargado todavía.</p>
     </div>
     <label class="btn" for="fileInput">📂 Cargar Reporte Maestro.xlsx</label>
     <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    <button class="btn secondary" id="btnPublish" style="display:none;">📤 Guardar y compartir</button>
   </div>
+
+  <div id="publishBanner" class="note" style="display:none;"></div>
 
   <div id="emptyState" class="card empty">
     <div>Carga el archivo para ver el análisis de lead time de compras nacionales.</div>
@@ -261,7 +264,157 @@ function setStatus(msg, cls){
   el.className = cls || "";
 }
 
-let DATA = null; // { orders: [...], corte: Date, excluded: n, totalRows: n }
+let DATA = null; // { orders: [...], corte: Date, excluded: n, totalRows: n, fromSnapshot: bool }
+
+// ---------- Guardar y compartir (snapshot publicado en el mismo repo de GitHub) ----------
+const GH_OWNER = "pierolinaresp2003";
+const GH_REPO = "plataforma-friopacking";
+const GH_BRANCH = "main";
+const SNAPSHOT_PATH = "data.json";
+const TOKEN_KEY = "fp_platform_gh_token";
+
+function getGhToken(){
+  return localStorage.getItem(TOKEN_KEY) || "";
+}
+function askGhToken(){
+  const t = prompt("Pega tu token de GitHub (el que empieza con github_pat_...). Solo se guarda en este navegador, en esta computadora.");
+  if(t && t.trim()){
+    localStorage.setItem(TOKEN_KEY, t.trim());
+    return t.trim();
+  }
+  return "";
+}
+function utf8ToBase64(str){
+  return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
+}
+
+function buildSnapshot(){
+  return {
+    publishedAt: new Date().toISOString(),
+    filename: DATA.filename,
+    corte: DATA.corte ? DATA.corte.toISOString() : null,
+    excluded: DATA.excluded,
+    totalRows: DATA.totalRows,
+    leadTime: {
+      n: DATA.orders.length,
+      productos: new Set(DATA.orders.map(o=>o.idProducto)).size,
+      medReal: median(DATA.orders.map(o=>o.real)),
+      medTol: median(DATA.orders.map(o=>o.tolerancia)),
+      pctTardio: DATA.orders.filter(o=>o.tardio).length / DATA.orders.length * 100,
+      nWarn: DATA.orders.filter(o=>o.regularizacion).length,
+      porMes: buildMesRows(),
+      porFamilia: buildFamiliaRows(),
+      porProducto: buildProductoRows(),
+    },
+    cumplimiento: {
+      usedV3: DATA.hasFechaSalidaCol,
+      porProyecto: DATA.projectRows && DATA.projectRows.length ? buildProyectoAgg() : [],
+    }
+  };
+}
+
+async function publishSnapshot(){
+  if(!DATA){ return; }
+  let token = getGhToken();
+  if(!token) token = askGhToken();
+  if(!token) return;
+
+  const btn = document.getElementById('btnPublish');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Publicando...";
+
+  try{
+    const snapshot = buildSnapshot();
+    const jsonStr = JSON.stringify(snapshot);
+    const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${SNAPSHOT_PATH}`;
+
+    // 1) obtener el sha actual del archivo (si existe)
+    let sha = undefined;
+    const getRes = await fetch(apiUrl + `?ref=${GH_BRANCH}`, {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
+    });
+    if(getRes.ok){
+      const getJson = await getRes.json();
+      sha = getJson.sha;
+    } else if(getRes.status !== 404){
+      throw new Error("No pude leer el archivo actual (HTTP " + getRes.status + "). Revisa que el token siga siendo válido.");
+    }
+
+    // 2) crear/actualizar el archivo
+    const putRes = await fetch(apiUrl, {
+      method: "PUT",
+      headers: {
+        "Authorization": "Bearer " + token,
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: "Publicar datos: " + (DATA.filename || "reporte") + " (" + new Date().toLocaleString('es-PE') + ")",
+        content: utf8ToBase64(jsonStr),
+        branch: GH_BRANCH,
+        sha: sha
+      })
+    });
+
+    if(!putRes.ok){
+      const errBody = await putRes.text();
+      if(putRes.status === 401 || putRes.status === 403){
+        localStorage.removeItem(TOKEN_KEY);
+        throw new Error("El token no tiene permiso o venció. Se borró de este navegador — vuelve a hacer clic en \"Guardar y compartir\" para ingresar uno nuevo.");
+      }
+      throw new Error("GitHub respondió " + putRes.status + ": " + errBody.slice(0,200));
+    }
+
+    showPublishBanner("✅ Publicado el " + new Date().toLocaleString('es-PE') + " — cualquiera que abra el link ahora va a ver estos datos.", false);
+  }catch(err){
+    console.error(err);
+    showPublishBanner("❌ No se pudo publicar: " + err.message, true);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
+}
+
+function showPublishBanner(msg, isError){
+  const el = document.getElementById('publishBanner');
+  el.style.display = 'block';
+  el.className = 'note' + (isError ? ' warn' : '');
+  el.innerHTML = msg;
+}
+
+async function tryLoadPublishedSnapshot(){
+  try{
+    const res = await fetch('./' + SNAPSHOT_PATH + '?_=' + Date.now());
+    if(!res.ok) return;
+    const snap = await res.json();
+    loadFromSnapshot(snap);
+  }catch(e){
+    // sin snapshot publicado (o abierto como archivo local file://) — se queda en el estado vacío normal
+  }
+}
+
+function loadFromSnapshot(snap){
+  DATA = {
+    fromSnapshot: true,
+    filename: snap.filename,
+    corte: snap.corte ? new Date(snap.corte) : null,
+    excluded: snap.excluded || 0,
+    totalRows: snap.totalRows || 0,
+    leadTime: snap.leadTime,
+    hasFechaSalidaCol: !!(snap.cumplimiento && snap.cumplimiento.usedV3),
+    cumplimiento: snap.cumplimiento || { porProyecto: [] },
+    orders: [], // no se usa en modo snapshot, las tablas leen de leadTime/cumplimiento directamente
+    projectRows: [], // idem
+  };
+  setStatus("Viendo datos publicados de " + (snap.filename || "un archivo") + ".", "ok");
+  showPublishBanner("📌 Estás viendo la última versión publicada, del " + new Date(snap.publishedAt).toLocaleString('es-PE') + ". Puedes cargar tu propio archivo arriba para ver una versión más nueva antes de compartirla.", false);
+  document.getElementById('btnPublish').style.display = 'none';
+  render();
+}
+
+document.getElementById('btnPublish').addEventListener('click', publishSnapshot);
+tryLoadPublishedSnapshot();
 
 document.getElementById('fileInput').addEventListener('change', function(e){
   const file = e.target.files[0];
@@ -384,11 +537,13 @@ function processWorkbook(wb, filename){
     }
   }
 
-  DATA = { orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol };
+  DATA = { fromSnapshot: false, orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol };
   const cumpMsg = projectRows.length
     ? (" · " + new Set(projectRows.map(p=>p.proyecto)).size.toLocaleString('es-PE') + " proyectos para cumplimiento de entrega")
     : "";
   setStatus("Cargado: " + filename + " · " + orders.length.toLocaleString('es-PE') + " órdenes nacionales válidas (de " + totalRows.toLocaleString('es-PE') + " con OC nacional detectada)" + cumpMsg + ".", "ok");
+  document.getElementById('publishBanner').style.display = 'none';
+  document.getElementById('btnPublish').style.display = 'inline-flex';
   render();
 }
 
@@ -410,6 +565,7 @@ function semaforo(pct){
   return 'red';
 }
 function buildProyectoAgg(){
+  if(DATA.fromSnapshot) return (DATA.cumplimiento && DATA.cumplimiento.porProyecto) || [];
   const groups = {};
   for(const r of DATA.projectRows){
     (groups[r.proyecto] = groups[r.proyecto] || []).push(r);
@@ -425,7 +581,10 @@ function buildProyectoAgg(){
 }
 let cumpListenersBound = false;
 function renderCumplimiento(){
-  if(!DATA.projectRows || DATA.projectRows.length === 0){
+  const hasCumpData = DATA.fromSnapshot
+    ? !!(DATA.cumplimiento && DATA.cumplimiento.porProyecto && DATA.cumplimiento.porProyecto.length)
+    : !!(DATA.projectRows && DATA.projectRows.length);
+  if(!hasCumpData){
     document.getElementById('kpiGridCump').innerHTML = '';
     document.getElementById('cumpDefNote').innerHTML = '<b>No se pudo calcular este indicador:</b> no encontré las columnas NombreProyecto / EstadoRequerimiento en la hoja cargada.';
     document.getElementById('chartCump').innerHTML = '';
@@ -508,30 +667,38 @@ function pillFor(o){
 }
 
 function renderResumen(){
-  const orders = DATA.orders;
-  const productos = new Set(orders.map(o=>o.idProducto)).size;
-  const medReal = median(orders.map(o=>o.real));
-  const medTol = median(orders.map(o=>o.tolerancia));
-  const pctTardio = orders.filter(o=>o.tardio).length / orders.length * 100;
-  const nWarn = orders.filter(o=>o.regularizacion).length;
+  let n, productos, medReal, medTol, pctTardio, nWarn;
+  if(DATA.fromSnapshot){
+    const lt = DATA.leadTime;
+    n = lt.n; productos = lt.productos; medReal = lt.medReal; medTol = lt.medTol; pctTardio = lt.pctTardio; nWarn = lt.nWarn;
+  } else {
+    const orders = DATA.orders;
+    n = orders.length;
+    productos = new Set(orders.map(o=>o.idProducto)).size;
+    medReal = median(orders.map(o=>o.real));
+    medTol = median(orders.map(o=>o.tolerancia));
+    pctTardio = orders.filter(o=>o.tardio).length / orders.length * 100;
+    nWarn = orders.filter(o=>o.regularizacion).length;
+  }
 
   document.getElementById('kpiGrid').innerHTML = `
-    <div class="card kpi"><div class="label">Órdenes analizadas</div><div class="value">${orders.length.toLocaleString('es-PE')}</div><div class="sub">${productos.toLocaleString('es-PE')} productos distintos</div></div>
+    <div class="card kpi"><div class="label">Órdenes analizadas</div><div class="value">${n.toLocaleString('es-PE')}</div><div class="sub">${productos.toLocaleString('es-PE')} productos distintos</div></div>
     <div class="card kpi"><div class="label">Lead time real (mediana)</div><div class="value">${medReal.toFixed(1)} d.h.</div><div class="sub">Aprobación OC → Recepción</div></div>
     <div class="card kpi"><div class="label">Tolerancia planeada (mediana)</div><div class="value">${medTol.toFixed(1)} d.h.</div><div class="sub">Fecha orden → Fecha comprometida</div></div>
     <div class="card kpi"><div class="label">% llegó después de lo planeado</div><div class="value">${pctTardio.toFixed(1)}%</div><div class="sub">real &gt; tolerancia</div></div>
-    <div class="card kpi"><div class="label">Posible regularización</div><div class="value">${nWarn.toLocaleString('es-PE')}</div><div class="sub">${(nWarn/orders.length*100).toFixed(1)}% del total — revisar caso por caso</div></div>
+    <div class="card kpi"><div class="label">Posible regularización</div><div class="value">${nWarn.toLocaleString('es-PE')}</div><div class="sub">${(nWarn/n*100).toFixed(1)}% del total — revisar caso por caso</div></div>
   `;
   document.getElementById('corteNote').innerHTML = `<b>Corte de datos:</b> ${fmtDate(DATA.corte)} · Archivo: ${DATA.filename} · ${DATA.excluded.toLocaleString('es-PE')} filas con OC nacional excluidas del cálculo (fechas incompletas, recepción antes que aprobación, fecha comprometida antes de la orden, o tolerancia &gt; 120 días hábiles).`;
 }
 
-function renderMes(){
+function buildMesRows(){
+  if(DATA.fromSnapshot) return (DATA.leadTime && DATA.leadTime.porMes) || [];
   const groups = {};
   for(const o of DATA.orders){
     (groups[o.mesKey] = groups[o.mesKey] || []).push(o);
   }
   const keys = Object.keys(groups).sort();
-  const rows = keys.map(k=>{
+  return keys.map(k=>{
     const g = groups[k];
     const [y,m] = k.split("-");
     const label = new Date(Date.UTC(+y, +m-1, 1)).toLocaleDateString('es-PE', {month:'long', year:'numeric', timeZone:'UTC'});
@@ -543,6 +710,9 @@ function renderMes(){
       nWarn: g.filter(o=>o.regularizacion).length,
     };
   });
+}
+function renderMes(){
+  const rows = buildMesRows();
   const table = document.getElementById('tableMes');
   table.querySelector('thead').innerHTML = `<tr><th>Mes</th><th>Órdenes</th><th>Real (mediana)</th><th>Tolerancia (mediana)</th><th>% tardío</th><th>Posible regularización</th></tr>`;
   table.querySelector('tbody').innerHTML = rows.map(r => `
@@ -557,6 +727,7 @@ function renderMes(){
 }
 
 function buildFamiliaRows(){
+  if(DATA.fromSnapshot) return (DATA.leadTime && DATA.leadTime.porFamilia) || [];
   const groups = {};
   for(const o of DATA.orders){
     (groups[o.familia] = groups[o.familia] || []).push(o);
@@ -592,6 +763,7 @@ function drawFamilia(){
 
 let productoLimit = 300;
 function buildProductoRows(){
+  if(DATA.fromSnapshot) return (DATA.leadTime && DATA.leadTime.porProducto) || [];
   const groups = {};
   for(const o of DATA.orders){
     const key = (o.idProducto||"") + "||" + o.producto;
