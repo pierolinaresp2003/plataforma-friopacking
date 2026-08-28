@@ -66,6 +66,11 @@
   .empty svg{opacity:.35;margin-bottom:10px;}
   footer{max-width:1180px;margin:0 auto;padding:0 20px 40px;font-size:12px;color:#8b98a4;line-height:1.6;}
   .badge-count{background:#eef2f6;color:var(--ink-soft);border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:700;margin-left:6px;}
+  .bar-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12.5px;}
+  .bar-row .bar-label{width:230px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
+  .bar-row .bar-track{flex:1;background:#eef2f6;border-radius:6px;height:16px;overflow:hidden;}
+  .bar-row .bar-fill{height:100%;border-radius:6px;transition:width .3s;}
+  .bar-row .bar-pct{width:46px;text-align:right;flex-shrink:0;font-weight:700;color:var(--ink-soft);}
 </style>
 </head>
 <body>
@@ -73,8 +78,8 @@
 <header>
   <img src="data:image/jpeg;base64,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" alt="Grupo Friopacking">
   <div class="titles">
-    <h1>Plataforma de Indicadores — Grupo Friopacking</h1>
-    <p>Reporte activo: Lead Time de Compras Nacionales · más indicadores se irán sumando aquí</p>
+    <h1>Plataforma de Reportes — Grupo Friopacking</h1>
+    <p>Reportes activos: Lead Time de Compras Nacionales · Cumplimiento de Entrega por Proyecto · más indicadores se irán sumando aquí</p>
   </div>
 </header>
 
@@ -101,6 +106,7 @@
       <div class="tab" data-view="mes">Por mes</div>
       <div class="tab" data-view="familia">Por familia</div>
       <div class="tab" data-view="producto">Por producto</div>
+      <div class="tab" data-view="cumplimiento">Cumplimiento por Proyecto</div>
     </div>
 
     <div id="view-resumen" class="view active">
@@ -136,12 +142,35 @@
       <div class="more" id="productoMore" style="display:none;"><button class="btn secondary" id="btnMoreProducto">Mostrar más</button></div>
     </div>
 
+    <div id="view-cumplimiento" class="view">
+      <div class="kpi-grid" id="kpiGridCump"></div>
+      <div class="note" id="cumpDefNote"></div>
+      <div class="toolbar">
+        <input type="search" id="searchCump" placeholder="Buscar proyecto...">
+        <select id="filterCumpSemaforo">
+          <option value="all">Todos los semáforos</option>
+          <option value="green">Verde (≥80%)</option>
+          <option value="amber">Ámbar (50-79%)</option>
+          <option value="red">Rojo (&lt;50%)</option>
+        </select>
+        <label style="font-size:13px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;white-space:nowrap;">
+          <input type="checkbox" id="hideSmallCump"> Ocultar proyectos con menos de 15 requerimientos
+        </label>
+      </div>
+      <div class="card" style="padding:18px 20px 8px;margin-bottom:18px;">
+        <div id="chartCump"></div>
+      </div>
+      <div class="table-card card"><table id="tableCump"><thead></thead><tbody></tbody></table></div>
+    </div>
+
   </div>
 
 </div>
 
 <footer>
-  Metodología: días hábiles entre <b>FechaAprobacionOC → FechaRecepcion</b> (real) comparado contra <b>FechaOrden → ParaFechaOrden</b> (tolerancia comprometida en la orden). Solo órdenes de compra nacionales (código con prefijo "0001"). Se excluyen registros con recepción anterior a la aprobación, con fecha comprometida anterior a la fecha de orden, y con tolerancia planeada mayor a 120 días hábiles (errores de digitación). Estadístico usado: mediana. Feriados considerados: calendario oficial de Perú 2026 (16 feriados nacionales). Si cargas datos de otro año, esos feriados no estarán excluidos — solo se resta fines de semana.
+  <b>Lead Time de Compras Nacionales</b> — Metodología: días hábiles entre <b>FechaAprobacionOC → FechaRecepcion</b> (real) comparado contra <b>FechaOrden → ParaFechaOrden</b> (tolerancia comprometida en la orden). Solo órdenes de compra nacionales (código con prefijo "0001"). Se excluyen registros con recepción anterior a la aprobación, con fecha comprometida anterior a la fecha de orden, y con tolerancia planeada mayor a 120 días hábiles (errores de digitación). Estadístico usado: mediana. Feriados considerados: calendario oficial de Perú 2026 (16 feriados nacionales). Si cargas datos de otro año, esos feriados no estarán excluidos — solo se resta fines de semana.
+  <br><br>
+  <b>Cumplimiento de Entrega por Proyecto</b> — Agrupado por <b>NombreProyecto</b> (cliente/obra). "Entregado" = <code>Recibido en Obra</code>, o <code>Enviado a Obra</code> con <code>FechaSalida</code> registrada. Se excluyen del total las líneas <code>Archivado</code>. % cumplimiento = entregados / requerimientos activos. Usa todas las líneas del archivo (nacionales e importadas), a diferencia del Lead Time que solo mira nacionales.
 </footer>
 
 <script>
@@ -281,6 +310,9 @@ function processWorkbook(wb, filename){
     producto: findCol(headerRow, ["Producto"]),
     familia: findCol(headerRow, ["NombreFamilia","Familia"]),
     proveedor: findCol(headerRow, ["NombreProveedor","Proveedor"]),
+    nombreProyecto: findCol(headerRow, ["NombreProyecto"]),
+    estadoReq: findCol(headerRow, ["EstadoRequerimiento"]),
+    fechaSalida: findCol(headerRow, ["FechaSalida"]),
   };
 
   const dataRows = rows.slice(headerRowIdx+1);
@@ -330,8 +362,33 @@ function processWorkbook(wb, filename){
     return;
   }
 
-  DATA = { orders, corte, excluded, totalRows, filename };
-  setStatus("Cargado: " + filename + " · " + orders.length.toLocaleString('es-PE') + " órdenes nacionales válidas (de " + totalRows.toLocaleString('es-PE') + " con OC nacional detectada).", "ok");
+  // ---- Segundo dataset: cumplimiento por proyecto (usa TODAS las líneas de requerimiento, nacionales e importadas) ----
+  const hasFechaSalidaCol = col.fechaSalida !== -1;
+  const projectRows = [];
+  if(col.estadoReq !== -1){
+    for(const r of dataRows){
+      if(!r || r.every(c => c==null || c==="")) continue;
+      const estado = (r[col.estadoReq]||"").toString().trim();
+      if(!estado) continue;
+      const nombreProyectoRaw = col.nombreProyecto!==-1 ? (r[col.nombreProyecto]||"").toString().trim() : "";
+      const proyecto = nombreProyectoRaw || "SIN PROYECTO (compra de almacén)";
+      const archivado = estado.toLowerCase() === "archivado";
+      let entregado;
+      if(hasFechaSalidaCol){
+        const fSalida = parseExcelDate(r[col.fechaSalida]);
+        entregado = estado === "Recibido en Obra" || (estado === "Enviado a Obra" && !!fSalida);
+      } else {
+        entregado = estado === "Recibido en Obra" || estado === "Enviado a Obra";
+      }
+      projectRows.push({ proyecto, estado, archivado, entregado });
+    }
+  }
+
+  DATA = { orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol };
+  const cumpMsg = projectRows.length
+    ? (" · " + new Set(projectRows.map(p=>p.proyecto)).size.toLocaleString('es-PE') + " proyectos para cumplimiento de entrega")
+    : "";
+  setStatus("Cargado: " + filename + " · " + orders.length.toLocaleString('es-PE') + " órdenes nacionales válidas (de " + totalRows.toLocaleString('es-PE') + " con OC nacional detectada)" + cumpMsg + ".", "ok");
   render();
 }
 
@@ -342,6 +399,106 @@ function render(){
   renderMes();
   renderFamilia();
   renderProducto();
+  renderCumplimiento();
+}
+
+// ---------- Cumplimiento por Proyecto ----------
+function semaforo(pct){
+  if(pct == null) return 'na';
+  if(pct >= 80) return 'green';
+  if(pct >= 50) return 'amber';
+  return 'red';
+}
+function buildProyectoAgg(){
+  const groups = {};
+  for(const r of DATA.projectRows){
+    (groups[r.proyecto] = groups[r.proyecto] || []).push(r);
+  }
+  return Object.entries(groups).map(([proyecto, rows])=>{
+    const archivados = rows.filter(r=>r.archivado).length;
+    const activos = rows.length - archivados;
+    const entregados = rows.filter(r=>!r.archivado && r.entregado).length;
+    const pendientes = activos - entregados;
+    const pct = activos > 0 ? (entregados/activos*100) : null;
+    return { proyecto, total: rows.length, archivados, activos, entregados, pendientes, pct };
+  }).filter(p => p.activos > 0);
+}
+let cumpListenersBound = false;
+function renderCumplimiento(){
+  if(!DATA.projectRows || DATA.projectRows.length === 0){
+    document.getElementById('kpiGridCump').innerHTML = '';
+    document.getElementById('cumpDefNote').innerHTML = '<b>No se pudo calcular este indicador:</b> no encontré las columnas NombreProyecto / EstadoRequerimiento en la hoja cargada.';
+    document.getElementById('chartCump').innerHTML = '';
+    document.querySelector('#tableCump thead').innerHTML = '';
+    document.querySelector('#tableCump tbody').innerHTML = '';
+    return;
+  }
+  const agg = buildProyectoAgg();
+  const totalActivos = agg.reduce((s,p)=>s+p.activos,0);
+  const totalEntregados = agg.reduce((s,p)=>s+p.entregados,0);
+  const globalPct = totalActivos>0 ? (totalEntregados/totalActivos*100) : 0;
+  const nGreen = agg.filter(p=>semaforo(p.pct)==='green').length;
+  const nAmber = agg.filter(p=>semaforo(p.pct)==='amber').length;
+  const nRed = agg.filter(p=>semaforo(p.pct)==='red').length;
+
+  document.getElementById('kpiGridCump').innerHTML = `
+    <div class="card kpi"><div class="label">Cumplimiento global</div><div class="value">${globalPct.toFixed(1)}%</div><div class="sub">${totalEntregados.toLocaleString('es-PE')} de ${totalActivos.toLocaleString('es-PE')} requerimientos activos</div></div>
+    <div class="card kpi"><div class="label">Proyectos</div><div class="value">${agg.length}</div><div class="sub">con requerimientos activos</div></div>
+    <div class="card kpi"><div class="label" style="color:var(--green)">En buen ritmo</div><div class="value" style="color:var(--green)">${nGreen}</div><div class="sub">≥80% de cumplimiento</div></div>
+    <div class="card kpi"><div class="label" style="color:var(--amber)">Atención</div><div class="value" style="color:var(--amber)">${nAmber}</div><div class="sub">50-79% de cumplimiento</div></div>
+    <div class="card kpi"><div class="label" style="color:var(--red)">Crítico</div><div class="value" style="color:var(--red)">${nRed}</div><div class="sub">menos de 50% de cumplimiento</div></div>
+  `;
+
+  document.getElementById('cumpDefNote').innerHTML = DATA.hasFechaSalidaCol
+    ? `<b>Definición usada:</b> "entregado" = línea con <code>EstadoRequerimiento = "Recibido en Obra"</code>, o <code>"Enviado a Obra"</code> con <code>FechaSalida</code> ya registrada (salió del almacén aunque falte confirmar en el sistema). Se excluyen del total las líneas "Archivado". % cumplimiento = entregados / requerimientos activos.`
+    : `<b>Definición usada (simplificada):</b> no encontré la columna <code>FechaSalida</code> en este archivo, así que "entregado" = línea con estado <code>"Enviado a Obra"</code> o <code>"Recibido en Obra"</code>, tal cual. Se excluyen del total las líneas "Archivado". Esta versión puede dar un % algo distinto a la versión completa — no es un error, es una definición más simple por falta de esa columna.`;
+
+  if(!cumpListenersBound){
+    document.getElementById('searchCump').addEventListener('input', drawCumplimiento);
+    document.getElementById('filterCumpSemaforo').addEventListener('change', drawCumplimiento);
+    document.getElementById('hideSmallCump').addEventListener('change', drawCumplimiento);
+    cumpListenersBound = true;
+  }
+  drawCumplimiento();
+}
+function drawCumplimiento(){
+  const q = (document.getElementById('searchCump').value||"").toLowerCase();
+  const semFilter = document.getElementById('filterCumpSemaforo').value;
+  const hideSmall = document.getElementById('hideSmallCump').checked;
+
+  let agg = buildProyectoAgg();
+  if(hideSmall) agg = agg.filter(p=>p.total>=15);
+  if(q) agg = agg.filter(p=>p.proyecto.toLowerCase().includes(q));
+  if(semFilter !== 'all') agg = agg.filter(p=>semaforo(p.pct)===semFilter);
+  agg.sort((a,b)=>(b.pct==null?-1:b.pct)-(a.pct==null?-1:a.pct));
+
+  const colorFor = s => s==='green' ? 'var(--green)' : s==='amber' ? 'var(--amber)' : s==='red' ? 'var(--red)' : '#c7d0d9';
+
+  document.getElementById('chartCump').innerHTML = agg.map(p=>{
+    const s = semaforo(p.pct);
+    const pct = p.pct==null ? 0 : p.pct;
+    return `<div class="bar-row">
+      <div class="bar-label" title="${p.proyecto}">${p.proyecto}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${colorFor(s)}"></div></div>
+      <div class="bar-pct">${p.pct==null?'—':pct.toFixed(0)+'%'}</div>
+    </div>`;
+  }).join("") || `<div style="color:#8b98a4;text-align:center;padding:20px;">Sin resultados</div>`;
+
+  const table = document.getElementById('tableCump');
+  table.querySelector('thead').innerHTML = `<tr><th>Proyecto</th><th>Activos</th><th>Entregados</th><th>Pendientes</th><th>% Cumplimiento</th><th>Estado</th></tr>`;
+  table.querySelector('tbody').innerHTML = agg.map(p=>{
+    const s = semaforo(p.pct);
+    const pillClass = s==='green' ? 'ok' : s==='amber' ? 'late' : s==='red' ? 'warn' : '';
+    const label = s==='green' ? 'Buen ritmo' : s==='amber' ? 'Atención' : s==='red' ? 'Crítico' : '—';
+    return `<tr>
+      <td style="white-space:normal;min-width:200px;">${p.proyecto}</td>
+      <td>${p.activos.toLocaleString('es-PE')}</td>
+      <td>${p.entregados.toLocaleString('es-PE')}</td>
+      <td>${p.pendientes.toLocaleString('es-PE')}</td>
+      <td>${p.pct==null?'—':p.pct.toFixed(1)+'%'}</td>
+      <td>${p.pct==null?'—':`<span class="pill ${pillClass}">${label}</span>`}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="6" style="color:#8b98a4;text-align:center;padding:24px;">Sin resultados</td></tr>`;
 }
 
 function pillFor(o){
