@@ -8,17 +8,40 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  // Aplica el tema guardado ANTES de pintar la página, para que no haya parpadeo.
+  (function(){
+    try{
+      const saved = localStorage.getItem("fp-theme");
+      if(saved === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    }catch(e){}
+  })();
+</script>
 <style>
   :root{
     --bg:#f4f6f8; --card:#ffffff; --ink:#1c2733; --ink-soft:#5b6b7a; --border:#e2e8ee;
-    --brand:#0a1e64; --brand-2:#3ec6ac; --brand-2-dark:#2fa48d;
+    --surface-2:#eef2f6; --surface-3:#fbfcfd; --th-bg:#f7f9fb; --row-hover:#f9fbfd;
+    --input-bg:#ffffff; --muted:#8b98a4; --track-empty:#c7d0d9; --surface-2-hover:#e3e9ef; --amber-ink:#8a5a06;
+    --brand:#0a1e64; --brand-ink:#0a1e64; --brand-2:#3ec6ac; --brand-2-dark:#2fa48d;
     --green:#0ca30c; --green-bg:#e7f7e7;
     --amber:#e2960a; --amber-bg:#fdf1dd;
     --red:#d03b3b; --red-bg:#fbe8e8;
     --shadow: 0 1px 3px rgba(20,30,45,0.08), 0 1px 2px rgba(20,30,45,0.06);
+    color-scheme: light;
+  }
+  html[data-theme="dark"]{
+    --bg:#0e1520; --card:#161f2e; --ink:#e7edf5; --ink-soft:#9aabc0; --border:#2a3547;
+    --surface-2:#1f2937; --surface-3:#111927; --th-bg:#1a2333; --row-hover:#1c2740;
+    --input-bg:#111927; --muted:#7c8ba0; --track-empty:#2a3547; --surface-2-hover:#28344a; --amber-ink:#f0ad3e;
+    --brand-ink:#6fb6ff; --brand-2:#4fd8bd; --brand-2-dark:#3ec6ac;
+    --green:#3fd15c; --green-bg:rgba(63,209,92,.14);
+    --amber:#f0ad3e; --amber-bg:rgba(240,173,62,.14);
+    --red:#f0665f; --red-bg:rgba(240,102,95,.14);
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.24);
+    color-scheme: dark;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;transition:background .2s,color .2s;}
   header{background:var(--brand);color:#fff;padding:16px 28px 22px;}
   .header-top{display:flex;align-items:center;justify-content:space-between;gap:12px 24px;flex-wrap:wrap;margin-bottom:20px;}
   .brand-mini{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;}
@@ -26,7 +49,10 @@
   .header-main{min-width:0;}
   .header-main h1{margin:0;font-size:26px;font-weight:800;line-height:1.3;}
   .header-main p{margin:6px 0 0;font-size:13px;color:#a9c2e0;}
+  .report-badge{display:inline-flex;align-items:center;gap:6px;margin-top:12px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#dbe6f5;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:5px 12px;border-radius:20px;font-family:"SF Mono",Consolas,monospace;}
   .header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .theme-toggle{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.3);padding:10px 14px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .theme-toggle:hover{background:rgba(255,255,255,.24);}
   .wrap{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
   .card{background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
   .upload-card{padding:16px 20px;margin-bottom:18px;}
@@ -35,10 +61,10 @@
   input[type=file]{display:none;}
   .btn{display:inline-flex;align-items:center;gap:8px;background:var(--brand-2);color:#08281f;border:none;padding:10px 16px;border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
   .btn:hover{background:var(--brand-2-dark);color:#fff;}
-  .btn.secondary{background:#eef2f6;color:var(--brand);}
-  .btn.secondary:hover{background:#e3e9ef;}
+  .btn.secondary{background:var(--surface-2);color:var(--brand-ink);}
+  .btn.secondary:hover{background:var(--surface-2-hover);}
   .btn:disabled{opacity:.5;cursor:not-allowed;}
-  .btn:disabled:hover{background:#eef2f6;}
+  .btn:disabled:hover{background:var(--surface-2);}
   .header-actions .btn{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.3);}
   .header-actions .btn:hover{background:rgba(255,255,255,.24);color:#fff;}
   .header-actions .btn:disabled{opacity:.4;}
@@ -54,27 +80,27 @@
   .filelist li .ic{flex-shrink:0;}
   .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
   .tab{padding:10px 16px;font-size:13.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;}
-  .tab.active{color:var(--brand);border-bottom-color:var(--brand-2);}
+  .tab.active{color:var(--brand-ink);border-bottom-color:var(--brand-2);}
   .tab.disabled{opacity:.45;cursor:not-allowed;}
   .view{display:none;}
   .view.active{display:block;}
   .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px;}
   .kpi{padding:16px 18px;}
   .kpi .label{font-size:12px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
-  .kpi .value{font-size:26px;font-weight:800;margin-top:6px;color:var(--brand);}
+  .kpi .value{font-size:26px;font-weight:800;margin-top:6px;color:var(--brand-ink);}
   .kpi .sub{font-size:12px;color:var(--ink-soft);margin-top:4px;}
-  .note{padding:14px 16px;font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:18px;background:#fbfcfd;}
+  .note{padding:14px 16px;font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:18px;background:var(--surface-3);}
   .note b{color:var(--ink);}
-  .note.warn{background:var(--amber-bg);color:#8a5a06;}
+  .note.warn{background:var(--amber-bg);color:var(--amber-ink);}
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
-  .toolbar input[type=search], .toolbar select{padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:#fff;}
+  .toolbar input[type=search], .toolbar select{padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--ink);}
   .toolbar input[type=search]{flex:1;min-width:180px;}
   .table-card{overflow-x:auto;padding:0;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
   th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
-  th{background:#f7f9fb;color:var(--ink-soft);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.02em;cursor:pointer;position:sticky;top:0;}
+  th{background:var(--th-bg);color:var(--ink-soft);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.02em;cursor:pointer;position:sticky;top:0;}
   th.sorted::after{content:" ▾";}
-  tr:hover td{background:#f9fbfd;}
+  tr:hover td{background:var(--row-hover);}
   .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;}
   .pill.ok{background:var(--green-bg);color:var(--green);}
   .pill.late{background:var(--amber-bg);color:var(--amber);}
@@ -82,11 +108,11 @@
   .more{padding:14px;text-align:center;}
   .empty{padding:60px 20px;text-align:center;color:var(--ink-soft);}
   .empty svg{opacity:.35;margin-bottom:10px;}
-  footer{max-width:1180px;margin:0 auto;padding:0 20px 40px;font-size:12px;color:#8b98a4;line-height:1.6;}
-  .badge-count{background:#eef2f6;color:var(--ink-soft);border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:700;margin-left:6px;}
+  footer{max-width:1180px;margin:0 auto;padding:0 20px 40px;font-size:12px;color:var(--muted);line-height:1.6;}
+  .badge-count{background:var(--surface-2);color:var(--ink-soft);border-radius:20px;padding:2px 9px;font-size:11.5px;font-weight:700;margin-left:6px;}
   .bar-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12.5px;}
   .bar-row .bar-label{width:230px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink);}
-  .bar-row .bar-track{flex:1;background:#eef2f6;border-radius:6px;height:16px;overflow:hidden;}
+  .bar-row .bar-track{flex:1;background:var(--surface-2);border-radius:6px;height:16px;overflow:hidden;}
   .bar-row .bar-fill{height:100%;border-radius:6px;transition:width .3s;}
   .bar-row .bar-pct{width:46px;text-align:right;flex-shrink:0;font-weight:700;color:var(--ink-soft);}
 </style>
@@ -105,11 +131,13 @@
       <button class="btn" id="btnConnect">🔑 Conectar GitHub</button>
       <button class="btn" id="btnPublish" disabled title="Primero carga tu Reporte Maestro.xlsx arriba.">☁ Guardar y compartir</button>
       <button class="btn" id="btnRefresh">🔄 Actualizar</button>
+      <button class="theme-toggle" id="btnTheme" type="button" title="Cambiar entre modo claro y oscuro">☀️ Claro</button>
     </div>
   </div>
   <div class="header-main">
     <h1>Plataforma de Reportes — Grupo Friopacking</h1>
     <p>Reportes activos: Lead Time de Compras Nacionales · Cumplimiento de Entrega por Proyecto · más indicadores se irán sumando aquí</p>
+    <span class="report-badge">📊 Reporte gerencial · Área Logística</span>
   </div>
 </header>
 
@@ -482,6 +510,19 @@ function loadFromSnapshot(snap){
 document.getElementById('btnConnect').addEventListener('click', connectGithub);
 document.getElementById('btnPublish').addEventListener('click', publishSnapshot);
 document.getElementById('btnRefresh').addEventListener('click', function(){ loadPublishedSnapshot(true); });
+
+function applyThemeLabel(){
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('btnTheme').textContent = isDark ? '🌙 Oscuro' : '☀️ Claro';
+}
+document.getElementById('btnTheme').addEventListener('click', function(){
+  const root = document.documentElement;
+  const isDark = root.getAttribute('data-theme') === 'dark';
+  if(isDark){ root.removeAttribute('data-theme'); } else { root.setAttribute('data-theme','dark'); }
+  try{ localStorage.setItem('fp-theme', isDark ? 'light' : 'dark'); }catch(e){}
+  applyThemeLabel();
+});
+applyThemeLabel();
 updateGhStatus();
 updateActionButtons();
 loadPublishedSnapshot(false);
@@ -737,7 +778,7 @@ function drawCumplimiento(){
   if(semFilter !== 'all') agg = agg.filter(p=>semaforo(p.pct)===semFilter);
   agg.sort((a,b)=>(b.pct==null?-1:b.pct)-(a.pct==null?-1:a.pct));
 
-  const colorFor = s => s==='green' ? 'var(--green)' : s==='amber' ? 'var(--amber)' : s==='red' ? 'var(--red)' : '#c7d0d9';
+  const colorFor = s => s==='green' ? 'var(--green)' : s==='amber' ? 'var(--amber)' : s==='red' ? 'var(--red)' : 'var(--track-empty)';
 
   document.getElementById('chartCump').innerHTML = agg.map(p=>{
     const s = semaforo(p.pct);
@@ -747,7 +788,7 @@ function drawCumplimiento(){
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${colorFor(s)}"></div></div>
       <div class="bar-pct">${p.pct==null?'—':pct.toFixed(0)+'%'}</div>
     </div>`;
-  }).join("") || `<div style="color:#8b98a4;text-align:center;padding:20px;">Sin resultados</div>`;
+  }).join("") || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
 
   const table = document.getElementById('tableCump');
   table.querySelector('thead').innerHTML = `<tr><th>Proyecto</th><th>Activos</th><th>Entregados</th><th>Pendientes</th><th>% Cumplimiento</th><th>Estado</th></tr>`;
@@ -763,7 +804,7 @@ function drawCumplimiento(){
       <td>${p.pct==null?'—':p.pct.toFixed(1)+'%'}</td>
       <td>${p.pct==null?'—':`<span class="pill ${pillClass}">${label}</span>`}</td>
     </tr>`;
-  }).join("") || `<tr><td colspan="6" style="color:#8b98a4;text-align:center;padding:24px;">Sin resultados</td></tr>`;
+  }).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
 }
 
 function pillFor(o){
@@ -864,7 +905,7 @@ function drawFamilia(){
       <td>${r.medTol.toFixed(1)} d.h.</td>
       <td>${r.pctTardio.toFixed(1)}%</td>
       <td>${r.nWarn}</td>
-    </tr>`).join("") || `<tr><td colspan="6" style="color:#8b98a4;text-align:center;padding:24px;">Sin resultados</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
 }
 
 let productoLimit = 300;
@@ -912,14 +953,14 @@ function drawProducto(){
   document.querySelector('#tableProducto tbody').innerHTML = shown.map(r => `
     <tr>
       <td>${r.idProducto||"—"}</td>
-      <td style="white-space:normal;min-width:220px;">${r.producto}${r.lowSampleWarn?' <span style="color:#8b98a4;font-size:11px;">(muestra chica)</span>':''}</td>
+      <td style="white-space:normal;min-width:220px;">${r.producto}${r.lowSampleWarn?' <span style="color:var(--muted);font-size:11px;">(muestra chica)</span>':''}</td>
       <td>${r.familia}</td>
       <td>${r.n}</td>
       <td>${r.medReal.toFixed(1)} d.h.</td>
       <td>${r.medTol.toFixed(1)} d.h.</td>
       <td>${r.pctTardio.toFixed(0)}%</td>
       <td>${r.nWarn>0 ? '<span class="pill warn">⚠ Posible regularización</span>' : (r.pctTardio>50 ? '<span class="pill late">Mayoría tardía</span>' : '<span class="pill ok">Mayoría a tiempo</span>')}</td>
-    </tr>`).join("") || `<tr><td colspan="8" style="color:#8b98a4;text-align:center;padding:24px;">Sin resultados</td></tr>`;
+    </tr>`).join("") || `<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
   document.getElementById('productoMore').style.display = rows.length > productoLimit ? 'block' : 'none';
 }
 
