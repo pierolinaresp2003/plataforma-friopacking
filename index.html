@@ -187,25 +187,24 @@
   .trend-svg .tr-line-comp{stroke:var(--ink-soft);stroke-width:2;stroke-dasharray:5 3;fill:none;}
   .trend-svg .tr-dot-real{fill:var(--brand-2-dark);cursor:pointer;}
   .trend-svg .tr-dot-comp{fill:var(--card);stroke:var(--ink-soft);stroke-width:1.5;cursor:pointer;}
-  .trend-svg text{font-size:10.5px;fill:var(--ink-soft);}
-  .trend-svg .tr-meta-label{fill:var(--ink-soft);font-size:10px;}
+  .trend-svg text{font-size:11.5px;fill:var(--ink-soft);}
+  .trend-svg .tr-meta-label{fill:var(--ink-soft);font-size:11px;font-weight:600;}
 
   .proc-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
   @media (max-width:960px){ .proc-kpi-grid{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:640px){ .proc-kpi-grid{grid-template-columns:1fr;} }
-  .proc-kpi{padding:14px 16px;cursor:pointer;border:2px solid transparent;position:relative;transition:border-color .15s,transform .1s;}
+  .proc-kpi{padding:16px 18px;cursor:pointer;border:2px solid transparent;position:relative;transition:border-color .15s,transform .1s;}
   .proc-kpi:hover{border-color:var(--border);}
   .proc-kpi.selected{border-color:var(--brand-2);box-shadow:0 0 0 1px var(--brand-2);}
+  .proc-kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
   .proc-kpi .proc-num{font-family:"SF Mono",Consolas,monospace;font-size:11px;color:var(--muted);font-weight:700;}
   .proc-kpi .proc-name{font-size:13.5px;font-weight:800;color:var(--ink);margin-top:2px;}
-  .proc-kpi .proc-metrics{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;}
-  .proc-kpi .proc-metrics div{font-size:11.5px;color:var(--ink-soft);}
-  .proc-kpi .proc-metrics b{display:block;font-size:15px;color:var(--ink);font-weight:800;}
-  .proc-kpi .proc-foot{margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-  .proc-kpi .proc-cumple{font-size:11.5px;font-weight:700;}
-  .proc-kpi .proc-cumple.good{color:var(--green);}
-  .proc-kpi .proc-cumple.bad{color:var(--red);}
-  .proc-kpi .proc-cumple.mid{color:var(--amber);}
+  .proc-kpi .proc-headline{font-size:28px;font-weight:800;color:var(--ink);margin-top:10px;line-height:1;}
+  .proc-kpi .proc-headline .unit{font-size:14px;font-weight:700;color:var(--ink-soft);margin-left:3px;}
+  .proc-kpi .proc-headline.muted{color:var(--muted);}
+  .proc-kpi .proc-caption{font-size:11.5px;color:var(--ink-soft);margin-top:6px;}
+  .proc-kpi .proc-foot{margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .pill.muted{background:var(--surface-2);color:var(--ink-soft);}
 
   .summary-table td.hl-worst{background:var(--red-bg);}
   .summary-table tr.hl-row td{position:relative;}
@@ -1483,6 +1482,19 @@ function trendDataForIndicator(rows, ind){
   });
 }
 
+// Calcula un paso de eje "redondo" (1, 2 o 5 × 10^n) para ~targetLines gridlines,
+// en vez de dividir el máximo en partes iguales (eso daba números como 3.5/10.5).
+function niceAxisStep(maxVal, targetLines){
+  if(maxVal<=0) return { step:1, niceMax:1 };
+  const rawStep = maxVal / targetLines;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const norm = rawStep / mag;
+  const niceNorm = norm<=1 ? 1 : norm<=2 ? 2 : norm<=5 ? 5 : 10;
+  const step = niceNorm * mag;
+  const niceMax = Math.ceil(maxVal/step) * step;
+  return { step, niceMax };
+}
+
 function drawIndicatorTrend(){
   const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
   const el = document.getElementById('indicatorTrend');
@@ -1500,20 +1512,20 @@ function drawIndicatorTrend(){
   const allVals = [];
   weeks.forEach(w=>{ allVals.push(w.promedio); if(w.compromiso!=null) allVals.push(w.compromiso); });
   if(ind.meta!=null) allVals.push(ind.meta);
-  let maxVal = Math.max(...allVals, 1);
-  maxVal = Math.ceil(maxVal * 1.15 * 2) / 2; // 15% de aire arriba, redondeado a 0.5
+  const rawMax = Math.max(...allVals, 1) * 1.15; // 15% de aire arriba
+  // Ejes con números "redondos" (1/2/5 x 10^n) en vez de fracciones raras como 3.5/10.5 —
+  // diseño más simple y claro pedido por Piero (01.09.2026).
+  const { step: gridStep, niceMax: maxVal } = niceAxisStep(rawMax, 4);
   const minVal = 0;
 
   const xFor = (i)=> padL + (weeks.length===1 ? plotW/2 : (i/(weeks.length-1)) * plotW);
   const yFor = (v)=> padT + plotH - ((v-minVal)/(maxVal-minVal)) * plotH;
 
-  const gridLines = 4;
   let gridSvg = '';
-  for(let g=0; g<=gridLines; g++){
-    const v = (maxVal/gridLines)*g;
+  for(let v=0; v<=maxVal+1e-9; v+=gridStep){
     const y = yFor(v);
     gridSvg += `<line class="tr-grid" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line>`;
-    gridSvg += `<text x="${padL-8}" y="${y+3}" text-anchor="end">${v.toFixed(v%1===0?0:1)}</text>`;
+    gridSvg += `<text x="${padL-8}" y="${y+3}" text-anchor="end">${Math.round(v*10)/10}</text>`;
   }
 
   let metaSvg = '';
@@ -1586,22 +1598,18 @@ function drawKpiCards(){
     const st = aggStatsForIndicator(rows, ind);
     const selected = ind.key===selectedIndicatorKey ? ' selected' : '';
     const metaTxt = ind.key==='d4' ? 'Según OC' : (ind.meta!=null ? '≤ '+ind.meta+' d.h.' : '—');
-    const cumpleTxt = st.cumplePct==null ? '—' : st.cumplePct.toFixed(0)+'%';
-    const cumpleCls = st.cumplePct==null ? '' : (st.cumplePct>=80?'good':st.cumplePct>=50?'mid':'bad');
+    const cumpleTxt = st.cumplePct==null ? 'Sin datos' : 'Cumple '+st.cumplePct.toFixed(0)+'%';
+    const cumpleCls = st.cumplePct==null ? 'muted' : (st.cumplePct>=80?'ok':st.cumplePct>=50?'late':'warn');
+    const headlineTxt = st.promedio==null ? '—' : st.promedio.toFixed(1);
     return `<div class="card proc-kpi${selected}" data-ind="${ind.key}">
-      <div class="proc-num">0${ind.num}</div>
+      <div class="proc-kpi-top">
+        <span class="proc-num">0${ind.num}</span>
+        <span class="pill ${cumpleCls}">${cumpleTxt}</span>
+      </div>
       <div class="proc-name">${ind.name}</div>
-      <div class="proc-metrics">
-        <div>Promedio<b>${st.promedio==null?'—':st.promedio.toFixed(1)+' d'}</b></div>
-        <div>Mediana<b>${st.mediana==null?'—':st.mediana.toFixed(1)+' d'}</b></div>
-        <div>Meta<b>${metaTxt}</b></div>
-      </div>
+      <div class="proc-headline${st.promedio==null?' muted':''}">${headlineTxt}${st.promedio==null?'':' <span class="unit">d.h. promedio</span>'}</div>
+      <div class="proc-caption">Meta ${metaTxt} · ${ind.areaLabel} · ${st.n.toLocaleString('es-PE')} casos</div>
       <div class="proc-foot">
-        <span>Responsable: <span class="chip ${AREA_CHIP_CLASS[ind.area]}">${ind.areaLabel}</span></span>
-        <span class="proc-cumple ${cumpleCls}">Cumple: ${cumpleTxt}</span>
-      </div>
-      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:11px;color:var(--ink-soft);">${st.n.toLocaleString('es-PE')} casos</span>
         <a href="#" class="proc-detail-link" data-ind="${ind.key}" style="font-size:11px;color:var(--brand-ink);font-weight:700;">🔍 ver detalle</a>
       </div>
     </div>`;
