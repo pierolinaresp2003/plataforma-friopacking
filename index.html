@@ -172,6 +172,15 @@
   .flow-alt-label{font-weight:700;color:var(--brand-2-dark);white-space:nowrap;}
   @media (max-width:860px){ .flow-row{flex-direction:column;align-items:stretch;} .flow-arrow{transform:rotate(90deg);padding:2px 0;align-self:center;} .flow-step{width:100%;} }
 
+  .mini-flow{display:flex;align-items:center;flex-wrap:wrap;gap:4px 0;margin:0 0 14px;}
+  .mini-flow .mf-step{background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700;color:var(--ink-soft);text-align:center;white-space:nowrap;}
+  .mini-flow .mf-step.active{background:var(--brand-2);color:#08281f;border-color:transparent;}
+  .mini-flow .mf-arrow{color:var(--border);font-size:14px;padding:0 4px;flex-shrink:0;}
+  .mini-flow .mf-arrow.active{color:var(--brand-2-dark);font-weight:700;}
+  .mini-flow .mf-dash{flex:0 0 32px;min-width:20px;border-top:2px dashed var(--brand-2-dark);margin:0 6px;}
+  .mini-flow .mf-alt-label{font-weight:700;font-size:11px;color:var(--brand-2-dark);white-space:nowrap;}
+  @media (max-width:640px){ .mini-flow .mf-dash{flex:0 0 16px;} }
+
   .proc-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
   @media (max-width:960px){ .proc-kpi-grid{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:640px){ .proc-kpi-grid{grid-template-columns:1fr;} }
@@ -307,8 +316,6 @@
           <option value="all">Área: todos</option>
           <option value="almacen">Área: Almacén</option>
           <option value="compras">Área: Compras</option>
-          <option value="jefatura">Área: Jefatura Compras</option>
-          <option value="proveedor">Área: Proveedor</option>
         </select>
         <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:5px;">Desde <input type="date" id="filterProcesoDesde" style="padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--ink);"></label>
         <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:5px;">Hasta <input type="date" id="filterProcesoHasta" style="padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--ink);"></label>
@@ -317,19 +324,20 @@
       <!-- Filas 2 y 3: tarjetas KPI de los 6 indicadores -->
       <div class="proc-kpi-grid" id="procKpiGrid"></div>
 
-      <!-- Resumen gerencial -->
-      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Resumen gerencial: proceso de atención</h3>
-      <div class="table-card card" style="margin-bottom:20px;">
-        <table id="tableProcesoResumen" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
-
-      <!-- Fila 4: gráfico principal dinámico -->
-      <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);" id="mainChartTitle">Gráfico principal</h3>
+      <!-- Fila 4: gráfico principal dinámico — aparece justo debajo de las tarjetas al hacer clic -->
+      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);" id="mainChartTitle">Gráfico principal</h3>
+      <div id="indicatorMiniFlow" class="mini-flow"></div>
       <div class="toolbar">
         <select id="groupByProceso"></select>
       </div>
       <div class="card" style="padding:18px 20px 12px;margin-bottom:18px;">
         <div id="chartProceso"></div>
+      </div>
+
+      <!-- Resumen gerencial -->
+      <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Resumen gerencial: proceso de atención</h3>
+      <div class="table-card card" style="margin-bottom:20px;">
+        <table id="tableProcesoResumen" class="summary-table"><thead></thead><tbody></tbody></table>
       </div>
 
     </div><!-- /section-proceso -->
@@ -401,7 +409,7 @@
 </div><!-- /app-shell -->
 
 <footer>
-  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 6 indicadores independientes. <b>Camino 2 (compra)</b>: Indicador 1 = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2 = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3 = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Jefatura Compras, meta 1 d.h.). Indicador 4 (Lead Time del Proveedor) = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>, comparado contra <code>ParaFechaOrden</code> (fecha de entrega comprometida de la OC) en vez de una meta fija, porque el lead time depende del producto/proveedor. Indicador 5 = días hábiles <code>FechaSalida − FechaRecepcion</code> (Almacén, meta 3 d.h.). <b>Camino 1 (stock)</b>: Indicador 6 = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 3 d.h.). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial. El camino se identifica solo por <code>MotivoDescr</code> (contiene "transferencia" o "consumo con requerimiento" → Camino 1) y, si no, por tener un <code>CodOrden</code> real (no vacío, no "-") → Camino 2; las líneas que no cumplen ninguna de las dos condiciones son requerimientos aún no resueltos por ningún camino y quedan fuera de ambos.
+  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 6 indicadores independientes. <b>Camino 2 (compra)</b>: Indicador 1 = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2 = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3 = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Compras, meta 1 d.h.). Indicador 4 (Lead Time del Proveedor) = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>, comparado contra <code>ParaFechaOrden</code> (fecha de entrega comprometida de la OC) en vez de una meta fija, porque el lead time depende del producto/proveedor. Indicador 5 = días hábiles <code>FechaSalida − FechaRecepcion</code> (Almacén, meta 3 d.h.). <b>Camino 1 (stock)</b>: Indicador 6 = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 3 d.h.). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial. El camino se identifica solo por <code>MotivoDescr</code> (contiene "transferencia" o "consumo con requerimiento" → Camino 1) y, si no, por tener un <code>CodOrden</code> real (no vacío, no "-") → Camino 2; las líneas que no cumplen ninguna de las dos condiciones son requerimientos aún no resueltos por ningún camino y quedan fuera de ambos.
 </footer>
 
 <script>
@@ -1235,15 +1243,17 @@ function formatMonthLabel(key){
   return m ? (MESES_CORTOS[+m[2]-1] + ' ' + m[1]) : (key || '—');
 }
 
-const AREA_CHIP_CLASS = { almacen:'chip-almacen', compras:'chip-compras', jefatura:'chip-jefatura', proveedor:'chip-proveedor' };
+const AREA_CHIP_CLASS = { almacen:'chip-almacen', compras:'chip-compras' };
 const INDICATORS = [
   { key:'d1', num:1, name:'REQ → PEDIDO', stage:'REQ → Pedido', area:'almacen', areaLabel:'ALMACÉN', meta:2, from:'fReq', to:'fPedido', respField:'responsablePedido', camino:'compra' },
   { key:'d2', num:2, name:'PEDIDO → OC', stage:'Pedido → OC', area:'compras', areaLabel:'COMPRAS', meta:2, from:'fPedido', to:'fOrden', respField:'usuarioCompras', camino:'compra' },
-  { key:'d3', num:3, name:'OC → APROBACIÓN', stage:'OC → Aprobación', area:'jefatura', areaLabel:'JEFATURA COMPRAS', meta:1, from:'fOrden', to:'fAprob', respField:'usuarioCompras', camino:'compra' },
-  { key:'d4', num:4, name:'LEAD TIME DEL PROVEEDOR', stage:'Aprobación → Recepción', area:'proveedor', areaLabel:'PROVEEDOR', meta:null, from:'fAprob', to:'fRecep', respField:'proveedor', camino:'compra' },
+  { key:'d3', num:3, name:'OC → APROBACIÓN', stage:'OC → Aprobación', area:'compras', areaLabel:'COMPRAS', meta:1, from:'fOrden', to:'fAprob', respField:'usuarioCompras', camino:'compra' },
+  { key:'d4', num:4, name:'LEAD TIME DEL PROVEEDOR', stage:'Aprobación → Recepción', area:'compras', areaLabel:'COMPRAS', meta:null, from:'fAprob', to:'fRecep', respField:'proveedor', camino:'compra' },
   { key:'d5', num:5, name:'RECEPCIÓN → SALIDA', stage:'Recepción → Salida', area:'almacen', areaLabel:'ALMACÉN', meta:3, from:'fRecep', to:'fSalida', respField:'responsableSalida', camino:'compra' },
   { key:'d6', num:6, name:'ATENCIÓN DIRECTA DESDE STOCK', stage:'REQ → Salida directa', area:'almacen', areaLabel:'ALMACÉN', meta:3, from:'fReq', to:'fSalida', respField:'responsableSalida', camino:'stock' },
 ];
+const STEP_LABELS = ['REQUERIMIENTO','PEDIDO','ORDEN DE<br>COMPRA','APROBACIÓN','RECEPCIÓN','SALIDA A OBRA'];
+const STEP_FIELD_INDEX = { fReq:0, fPedido:1, fOrden:2, fAprob:3, fRecep:4, fSalida:5 };
 let selectedIndicatorKey = 'd1';
 let procesoListenersBound = false;
 
@@ -1356,12 +1366,13 @@ function renderProceso(){
       ? '<b>No se pudo calcular este proceso:</b> no encontré la columna FechaRequerimiento en la hoja cargada.'
       : '<b>No se pudo calcular este proceso:</b> ninguna línea del archivo tuvo datos suficientes.';
     document.getElementById('procKpiGrid').innerHTML = '';
+    document.getElementById('indicatorMiniFlow').innerHTML = '';
     document.querySelector('#tableProcesoResumen thead').innerHTML = '';
     document.querySelector('#tableProcesoResumen tbody').innerHTML = '';
     document.getElementById('chartProceso').innerHTML = '';
     return;
   }
-  document.getElementById('procesoDefNote').innerHTML = `<b>Camino 2 (compra):</b> Indicador 1 <code>FechaPedido − FechaRequerimiento</code> (Almacén) · Indicador 2 <code>FechaOrden − FechaPedido</code> (Compras) · Indicador 3 <code>FechaAprobacionOC − FechaOrden</code> (Jefatura Compras) · Indicador 4 (Lead Time del Proveedor) <code>FechaRecepcion − FechaAprobacionOC</code>, comparado contra <code>ParaFechaOrden</code> (fecha de entrega comprometida de la OC) en vez de una meta fija · Indicador 5 <code>FechaSalida − FechaRecepcion</code> (Almacén). <b>Camino 1 (stock):</b> Indicador 6 <code>FechaSalida − FechaRequerimiento</code>, solo líneas atendidas directo desde stock, sin pasar por compra (Almacén). Días hábiles Perú (feriados excluidos). Cada indicador se calcula por línea de forma <b>independiente</b>: si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar a los demás indicadores de la misma línea ni a sus promedios.`;
+  document.getElementById('procesoDefNote').innerHTML = `<b>Camino 2 (compra):</b> Indicador 1 <code>FechaPedido − FechaRequerimiento</code> (Almacén) · Indicador 2 <code>FechaOrden − FechaPedido</code> (Compras) · Indicador 3 <code>FechaAprobacionOC − FechaOrden</code> (Compras) · Indicador 4 (Lead Time del Proveedor) <code>FechaRecepcion − FechaAprobacionOC</code>, comparado contra <code>ParaFechaOrden</code> (fecha de entrega comprometida de la OC) en vez de una meta fija · Indicador 5 <code>FechaSalida − FechaRecepcion</code> (Almacén). <b>Camino 1 (stock):</b> Indicador 6 <code>FechaSalida − FechaRequerimiento</code>, solo líneas atendidas directo desde stock, sin pasar por compra (Almacén). Días hábiles Perú (feriados excluidos). Cada indicador se calcula por línea de forma <b>independiente</b>: si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar a los demás indicadores de la misma línea ni a sus promedios.`;
 
   populateGroupByProceso();
   if(!procesoListenersBoundInner){
@@ -1389,9 +1400,28 @@ function renderProceso(){
 
 function drawProceso(){
   drawKpiCards();
+  drawIndicatorFlow();
   drawSummaryTable();
   populateGroupByProceso();
   drawMainChart();
+}
+
+function drawIndicatorFlow(){
+  const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
+  const el = document.getElementById('indicatorMiniFlow');
+  if(ind.key==='d6'){
+    el.innerHTML = `<span class="mf-step active">REQUERIMIENTO</span><span class="mf-dash"></span><span class="mf-alt-label">⚡ ATENCIÓN DIRECTA DESDE STOCK</span><span class="mf-dash"></span><span class="mf-step active">SALIDA A OBRA</span>`;
+    return;
+  }
+  const fromIdx = STEP_FIELD_INDEX[ind.from];
+  const toIdx = STEP_FIELD_INDEX[ind.to];
+  el.innerHTML = STEP_LABELS.map((label, i)=>{
+    const stepHtml = `<span class="mf-step${i>=fromIdx && i<=toIdx ? ' active' : ''}">${label}</span>`;
+    if(i < STEP_LABELS.length-1){
+      return stepHtml + `<span class="mf-arrow${i===fromIdx ? ' active' : ''}">→</span>`;
+    }
+    return stepHtml;
+  }).join('');
 }
 
 function drawKpiCards(){
