@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
   // Aplica el tema guardado ANTES de pintar la página, para que no haya parpadeo.
   (function(){
@@ -222,15 +223,8 @@
   .cmp-vals{width:150px;text-align:right;flex-shrink:0;font-size:11.5px;color:var(--ink-soft);}
   @media (max-width:640px){ .cmp-row .bar-label{width:110px;font-size:11px;} .cmp-vals{width:110px;font-size:10.5px;} }
 
-  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(10,15,25,.55);z-index:50;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;}
-  .modal-backdrop.open{display:flex;}
-  .modal{background:var(--card);border-radius:10px;box-shadow:var(--shadow);max-width:1100px;width:100%;max-height:calc(100vh - 80px);display:flex;flex-direction:column;}
-  .modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);}
-  .modal-head h3{margin:0;font-size:15px;color:var(--ink);}
   .modal-close{background:var(--surface-2);border:none;color:var(--ink);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;flex-shrink:0;}
   .modal-close:hover{background:var(--surface-2-hover);}
-  .modal-note{padding:8px 20px 0;font-size:11.5px;color:var(--ink-soft);}
-  .modal-body{overflow:auto;padding:8px 20px 20px;}
 </style>
 </head>
 <body>
@@ -314,6 +308,10 @@
 
       <div class="note" id="procesoDefNote"></div>
 
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        <button class="btn secondary" id="btnImgProceso" type="button">🖼️ Generar imagen del módulo</button>
+      </div>
+
       <div class="toolbar">
         <input type="search" id="searchProceso" placeholder="Buscar proyecto, producto, proveedor o familia...">
         <select id="filterProcesoProyecto"><option value="all">Todos los proyectos</option></select>
@@ -325,8 +323,32 @@
           <option value="almacen">Área: Almacén</option>
           <option value="compras">Área: Compras</option>
         </select>
-        <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:5px;">Desde <input type="date" id="filterProcesoDesde" style="padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--ink);"></label>
-        <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:5px;">Hasta <input type="date" id="filterProcesoHasta" style="padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--ink);"></label>
+        <select id="filterProcesoAnio"><option value="all">Todos los años</option></select>
+        <select id="filterProcesoMes">
+          <option value="all">Todos los meses</option>
+          <option value="1">Enero</option>
+          <option value="2">Febrero</option>
+          <option value="3">Marzo</option>
+          <option value="4">Abril</option>
+          <option value="5">Mayo</option>
+          <option value="6">Junio</option>
+          <option value="7">Julio</option>
+          <option value="8">Agosto</option>
+          <option value="9">Septiembre</option>
+          <option value="10">Octubre</option>
+          <option value="11">Noviembre</option>
+          <option value="12">Diciembre</option>
+        </select>
+        <select id="filterProcesoDia">
+          <option value="all">Todos los días</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+          <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+          <option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option>
+          <option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
+          <option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option>
+          <option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option>
+          <option value="31">31</option>
+        </select>
       </div>
 
       <!-- Filas 2 y 3: tarjetas KPI de los 5 indicadores -->
@@ -348,22 +370,35 @@
         <table id="tableProcesoResumen" class="summary-table"><thead></thead><tbody></tbody></table>
       </div>
 
-    </div><!-- /section-proceso -->
+      <!-- Rendimiento por persona: Compras (Indicador 2 y 3) y Almacén (Indicador 1 y 5) -->
+      <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Rendimiento por comprador (área Compras)</h3>
+      <div class="table-card card" style="margin-bottom:20px;">
+        <table id="tableProcesoCompradores" class="summary-table"><thead></thead><tbody></tbody></table>
+      </div>
 
-    <div id="modalDrilldown" class="modal-backdrop">
-      <div class="modal">
-        <div class="modal-head">
-          <h3 id="modalTitle">Detalle</h3>
-          <button class="modal-close" id="modalClose" type="button">✕</button>
+      <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Rendimiento por persona de Almacén</h3>
+      <div class="table-card card" style="margin-bottom:20px;">
+        <table id="tableProcesoAlmacen" class="summary-table"><thead></thead><tbody></tbody></table>
+      </div>
+
+      <!-- Detalle: en vez de modal, aparece aquí abajo al hacer clic en cualquier caso -->
+      <div id="procDetailPanel" class="card table-card" style="margin-bottom:20px;display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 0;">
+          <h3 id="procDetailTitle" style="margin:0;font-size:15px;color:var(--ink);">Detalle</h3>
+          <button class="modal-close" id="procDetailClose" type="button">✕</button>
         </div>
-        <div class="modal-note" id="modalNote"></div>
-        <div class="modal-body">
+        <div style="padding:6px 16px 0;font-size:11.5px;color:var(--ink-soft);" id="procDetailNote"></div>
+        <div style="overflow:auto;padding:8px 16px 16px;">
           <table id="tableDrilldown"><thead></thead><tbody></tbody></table>
         </div>
       </div>
-    </div>
+
+    </div><!-- /section-proceso -->
 
     <div id="section-gasto" class="section">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        <button class="btn secondary" id="btnImgGasto" type="button">🖼️ Generar imagen del módulo</button>
+      </div>
       <div class="kpi-grid" id="kpiGridGasto"></div>
       <div class="note" id="gastoDefNote"></div>
       <div class="toolbar">
@@ -1212,6 +1247,7 @@ function renderGasto(){
     document.getElementById('filterGastoMes').addEventListener('change', drawGasto);
     document.getElementById('filterGastoDia').addEventListener('change', drawGasto);
     document.getElementById('filterGastoPareto').addEventListener('change', drawGasto);
+    document.getElementById('btnImgGasto').addEventListener('click', (e)=> downloadSectionImage('section-gasto', 'concentracion-gasto', e.currentTarget));
     gastoListenersBound = true;
   }
   drawGasto();
@@ -1318,16 +1354,21 @@ function filteredProcesoRows(){
   const fProveedor = document.getElementById('filterProcesoProveedor').value;
   const fFamilia = document.getElementById('filterProcesoFamilia').value;
   const fResp = document.getElementById('filterProcesoResponsable').value;
-  const desde = document.getElementById('filterProcesoDesde').value ? fromIsoDay(document.getElementById('filterProcesoDesde').value) : null;
-  const hasta = document.getElementById('filterProcesoHasta').value ? fromIsoDay(document.getElementById('filterProcesoHasta').value) : null;
+  const fAnio = document.getElementById('filterProcesoAnio').value;
+  const fMes = document.getElementById('filterProcesoMes').value;
+  const fDia = document.getElementById('filterProcesoDia').value;
   return rows.filter(r=>{
     if(q && !((r.proyecto+' '+r.producto+' '+r.proveedor+' '+r.familia).toLowerCase().includes(q))) return false;
     if(fProyecto!=='all' && r.proyecto !== fProyecto) return false;
     if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
     if(fFamilia!=='all' && r.familia !== fFamilia) return false;
     if(fResp!=='all' && r.usuarioCompras !== fResp) return false;
-    if(desde && r.fReq && r.fReq < desde) return false;
-    if(hasta && r.fReq && r.fReq > hasta) return false;
+    // Año/Mes/Día son selectores independientes (reemplazan el rango Desde/Hasta a pedido de Piero,
+    // 01.09.2026) sobre FechaRequerimiento — se pueden combinar entre sí, cada uno filtra por su
+    // propio criterio (ej. "todos los agostos de cualquier año" con Mes=8 y Año=todos).
+    if(fAnio!=='all' && r.fReq && r.fReq.getUTCFullYear()!==Number(fAnio)) return false;
+    if(fMes!=='all' && r.fReq && (r.fReq.getUTCMonth()+1)!==Number(fMes)) return false;
+    if(fDia!=='all' && r.fReq && r.fReq.getUTCDate()!==Number(fDia)) return false;
     return true;
   });
 }
@@ -1400,6 +1441,11 @@ function populateProcesoFilters(){
   populateSelectDistinct(document.getElementById('filterProcesoProveedor'), rows.map(r=>r.proveedor), 'Todos los proveedores');
   populateSelectDistinct(document.getElementById('filterProcesoFamilia'), rows.map(r=>r.familia), 'Todas las familias');
   populateSelectDistinct(document.getElementById('filterProcesoResponsable'), rows.map(r=>r.usuarioCompras), 'Todos (responsable de compra)');
+  const anioSel = document.getElementById('filterProcesoAnio');
+  const current = anioSel.value;
+  const anios = Array.from(new Set(rows.filter(r=>r.fReq).map(r=>r.fReq.getUTCFullYear()))).sort((a,b)=>b-a);
+  anioSel.innerHTML = '<option value="all">Todos los años</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+  if(anios.map(String).includes(current)) anioSel.value = current;
 }
 function populateGroupByProceso(){
   const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
@@ -1430,7 +1476,7 @@ function renderProceso(){
 
   populateGroupByProceso();
   if(!procesoListenersBoundInner){
-    ['searchProceso','filterProcesoProyecto','filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoDesde','filterProcesoHasta'].forEach(id=>{
+    ['searchProceso','filterProcesoProyecto','filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoAnio','filterProcesoMes','filterProcesoDia'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawProceso);
     });
@@ -1445,8 +1491,8 @@ function renderProceso(){
       if(!row) return;
       openDrilldownForGroup(row.dataset.group);
     });
-    document.getElementById('modalClose').addEventListener('click', closeDrilldown);
-    document.getElementById('modalDrilldown').addEventListener('click', (e)=>{ if(e.target.id==='modalDrilldown') closeDrilldown(); });
+    document.getElementById('procDetailClose').addEventListener('click', closeDrilldown);
+    document.getElementById('btnImgProceso').addEventListener('click', (e)=> downloadSectionImage('section-proceso', 'tiempos-proceso-atencion', e.currentTarget));
     procesoListenersBoundInner = true;
   }
   drawProceso();
@@ -1456,8 +1502,72 @@ function drawProceso(){
   drawKpiCards();
   drawIndicatorTrend();
   drawSummaryTable();
+  drawPersonPerfTable(document.getElementById('tableProcesoCompradores'), INDICATORS.filter(i=>i.key==='d2'||i.key==='d3'), 'Comprador');
+  drawPersonPerfTable(document.getElementById('tableProcesoAlmacen'), INDICATORS.filter(i=>i.key==='d1'||i.key==='d6'), 'Persona de Almacén');
   populateGroupByProceso();
   drawMainChart();
+}
+
+// Rendimiento por persona (compradores en Compras, personal de Almacén): una fila por persona +
+// indicador aplicable, reutilizando groupRowsFor(..., 'responsable') que ya agrega promedio/cumplimiento
+// por responsableLabel(). Pedido de Piero (01.09.2026): ver el desempeño en números, no solo agregado.
+function drawPersonPerfTable(tableEl, indicators, personLabel){
+  const rows = filteredProcesoRows();
+  let combined = [];
+  indicators.forEach(ind=>{
+    const groups = groupRowsFor(rows, ind, 'responsable').sort((a,b)=>(b.promedio||0)-(a.promedio||0));
+    groups.forEach(g=> combined.push(Object.assign({ ind }, g)));
+  });
+  tableEl.querySelector('thead').innerHTML = `<tr><th>${personLabel}</th><th>Indicador</th><th>Promedio</th><th>Meta</th><th>Cumplimiento</th><th>Casos</th></tr>`;
+  tableEl.querySelector('tbody').innerHTML = combined.map(g=>{
+    const metaTxt = g.ind.key==='d4' ? 'Según OC' : (g.ind.meta!=null ? g.ind.meta+' d.h.' : '—');
+    return `<tr data-ind="${g.ind.key}" data-group="${escapeHtml(g.label)}" style="cursor:pointer;">
+      <td>${escapeHtml(g.label)}</td>
+      <td>${g.ind.num}. ${g.ind.stage}</td>
+      <td>${g.promedio.toFixed(1)} d.h.</td>
+      <td>${metaTxt}</td>
+      <td>${g.cumplePct==null?'—':g.cumplePct.toFixed(0)+'%'}</td>
+      <td>${g.n.toLocaleString('es-PE')}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--muted);">Sin datos con los filtros actuales</td></tr>';
+  tableEl.querySelectorAll('tbody tr[data-ind]').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      const ind = INDICATORS.find(i=>i.key===tr.dataset.ind);
+      const personRows = filteredProcesoRows().filter(r=>r.camino===ind.camino && r[ind.key]!=null && responsableLabel(r, ind)===tr.dataset.group);
+      openDrilldown(ind, personRows, tr.dataset.group);
+    });
+  });
+}
+
+// Generar imagen (PNG) del módulo activo tal como se ve en pantalla — pedido de Piero (01.09.2026)
+// para poder compartir un resumen sin tener que hacer captura de pantalla manual.
+async function downloadSectionImage(sectionId, filenamePrefix, btn){
+  const el = document.getElementById(sectionId);
+  if(!el){ return; }
+  if(typeof html2canvas === 'undefined'){
+    alert('No se pudo generar la imagen: la librería no cargó (revisa tu conexión a internet e intenta de nuevo).');
+    return;
+  }
+  const originalText = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Generando...';
+  const originalVisibility = btn.style.visibility;
+  btn.style.visibility = 'hidden';
+  try{
+    await new Promise(r=>setTimeout(r, 50));
+    const bg = (getComputedStyle(document.documentElement).getPropertyValue('--bg') || '#f4f6f8').trim();
+    const canvas = await html2canvas(el, { backgroundColor: bg, scale: 2 });
+    const link = document.createElement('a');
+    link.download = filenamePrefix + '-' + new Date().toISOString().slice(0,10) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }catch(err){
+    alert('No se pudo generar la imagen: ' + (err && err.message ? err.message : err));
+  }finally{
+    btn.style.visibility = originalVisibility;
+    btn.disabled = false; btn.textContent = originalText;
+  }
 }
 
 // Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = promedio de
@@ -1554,12 +1664,12 @@ function drawIndicatorTrend(){
 
   const dotsReal = weeks.map((w,i)=>{
     const [x,y] = [xFor(i), yFor(w.promedio)];
-    return `<circle class="tr-dot-real" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-val="${w.promedio.toFixed(1)}" data-n="${w.n}" data-series="real"></circle>`;
+    return `<circle class="tr-dot-real" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-key="${escapeHtml(w.key)}" data-val="${w.promedio.toFixed(1)}" data-n="${w.n}" data-series="real"></circle>`;
   }).join('');
   const dotsComp = hasComp ? weeks.filter(w=>w.compromiso!=null).map(w=>{
     const i = weeks.indexOf(w);
     const [x,y] = [xFor(i), yFor(w.compromiso)];
-    return `<circle class="tr-dot-comp" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-val="${w.compromiso.toFixed(1)}" data-n="${w.n}" data-series="comp"></circle>`;
+    return `<circle class="tr-dot-comp" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-key="${escapeHtml(w.key)}" data-val="${w.compromiso.toFixed(1)}" data-n="${w.n}" data-series="comp"></circle>`;
   }).join('') : '';
 
   const legendSvg = hasComp
@@ -1589,6 +1699,12 @@ function drawIndicatorTrend(){
       tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
     });
     dot.addEventListener('mouseleave', ()=>{ tooltip.style.display = 'none'; });
+    // Clic en un punto del gráfico de tendencia -> detalle de esa semana debajo (pedido de Piero,
+    // 01.09.2026: "al hacer click en un caso salga abajo el detalle").
+    dot.addEventListener('click', ()=>{
+      const weekRows = filteredProcesoRows().filter(r=>r.camino===ind.camino && r[ind.key]!=null && r.fReq && weekKeyFor(r.fReq)===dot.dataset.key);
+      openDrilldown(ind, weekRows, dot.dataset.week);
+    });
   });
 }
 
@@ -1726,8 +1842,8 @@ function openDrilldown(ind, rows, groupLabel){
   const withoutVal = rows.length - withVal.length;
   const sorted = withVal.slice().sort((a,b)=>(b[ind.key]||0)-(a[ind.key]||0));
   const capped = sorted.slice(0,500);
-  document.getElementById('modalTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.stage + (groupLabel ? ' · ' + groupLabel : '');
-  document.getElementById('modalNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + '.';
+  document.getElementById('procDetailTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.stage + (groupLabel ? ' · ' + groupLabel : '');
+  document.getElementById('procDetailNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + '.';
   const table = document.getElementById('tableDrilldown');
   table.querySelector('thead').innerHTML = '<tr><th>Requerimiento</th><th>Proyecto</th><th>Cód. producto</th><th>Descripción</th><th>Pedido</th><th>OC</th><th>Proveedor</th><th>Responsable</th><th>Fecha inicial</th><th>Fecha final</th><th>Días hábiles</th><th>Meta</th><th>Estado</th></tr>';
   table.querySelector('tbody').innerHTML = capped.map(r=>{
@@ -1752,10 +1868,14 @@ function openDrilldown(ind, rows, groupLabel){
       <td>${estado}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--muted);">Sin resultados</td></tr>';
-  document.getElementById('modalDrilldown').classList.add('open');
+  // Detalle inline debajo del contenido, no modal (pedido de Piero, 01.09.2026): se muestra el panel
+  // y se hace scroll hasta él para que el resultado del clic sea visible de inmediato.
+  const panel = document.getElementById('procDetailPanel');
+  panel.style.display = '';
+  panel.scrollIntoView({ behavior:'smooth', block:'start' });
 }
 function closeDrilldown(){
-  document.getElementById('modalDrilldown').classList.remove('open');
+  document.getElementById('procDetailPanel').style.display = 'none';
 }
 
 
