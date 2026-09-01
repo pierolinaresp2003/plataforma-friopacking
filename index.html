@@ -163,6 +163,7 @@
   </div>
   <nav class="sidebar-nav">
     <div class="navitem active" data-section="atencion">🚚 Tiempo de Atención Total</div>
+    <div class="navitem" data-section="gasto">💰 Concentración de Gasto</div>
   </nav>
   <div class="sidebar-foot">Grupo Friopacking<br>Logística</div>
 </aside>
@@ -198,6 +199,7 @@
     <p id="ghStatus">🔒 GitHub no conectado — conéctalo para poder guardar y compartir.</p>
     <ul class="filelist" id="fileList">
       <li data-key="maestro"><span class="ic">⬜</span> Reporte Maestro.xlsx — no cargado</li>
+      <li data-key="consulta"><span class="ic">⬜</span> Consulta.xlsx — no cargado</li>
     </ul>
     <p id="status" style="margin-top:8px;">Ningún archivo cargado todavía.</p>
   </div>
@@ -249,6 +251,53 @@
       </div>
       <div class="table-card card"><table id="tableTransfer"><thead></thead><tbody></tbody></table></div>
     </div><!-- /section-atencion -->
+
+    <div id="section-gasto" class="section">
+      <div class="kpi-grid" id="kpiGridGasto"></div>
+      <div class="note" id="gastoDefNote"></div>
+      <div class="toolbar">
+        <input type="search" id="searchGasto" placeholder="Buscar proveedor o familia...">
+        <select id="groupByGasto">
+          <option value="proveedor">Agrupar por proveedor</option>
+          <option value="familia">Agrupar por familia de producto</option>
+        </select>
+        <select id="filterGastoAnio"><option value="all">Todos los años</option></select>
+        <select id="filterGastoMes">
+          <option value="all">Todos los meses</option>
+          <option value="1">Enero</option>
+          <option value="2">Febrero</option>
+          <option value="3">Marzo</option>
+          <option value="4">Abril</option>
+          <option value="5">Mayo</option>
+          <option value="6">Junio</option>
+          <option value="7">Julio</option>
+          <option value="8">Agosto</option>
+          <option value="9">Septiembre</option>
+          <option value="10">Octubre</option>
+          <option value="11">Noviembre</option>
+          <option value="12">Diciembre</option>
+        </select>
+        <select id="filterGastoDia">
+          <option value="all">Todos los días</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+          <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+          <option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option>
+          <option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
+          <option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option>
+          <option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option>
+          <option value="31">31</option>
+        </select>
+        <select id="filterGastoPareto">
+          <option value="all">Todos</option>
+          <option value="top80">Solo el 80% principal (Pareto)</option>
+          <option value="resto">Solo el 20% restante</option>
+        </select>
+      </div>
+      <div class="card" style="padding:18px 20px 8px;margin-bottom:18px;">
+        <div id="chartGasto"></div>
+      </div>
+      <div class="table-card card"><table id="tableGasto"><thead></thead><tbody></tbody></table></div>
+    </div><!-- /section-gasto -->
 
   </div>
 
@@ -444,6 +493,15 @@ function buildSnapshot(){
         })(),
       };
     })(),
+    gasto: GASTO_DATA ? {
+      filename: GASTO_DATA.filename,
+      totalRows: GASTO_DATA.totalRows,
+      excluded: GASTO_DATA.excluded,
+      // registros livianos (claves cortas) para que quien vea el snapshot pueda seguir filtrando por
+      // año/mes/día sin tener que volver a subir Consulta.xlsx — el archivo puede tener decenas de
+      // miles de filas históricas, así que solo se publican los 5 campos que hacen falta para esto.
+      rows: GASTO_DATA.rows.map(r => ({ pv: r.proveedor, fa: r.familia, a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100 })),
+    } : null,
   };
 }
 
@@ -547,6 +605,14 @@ function loadFromSnapshot(snap){
     atencionRows: [], // idem — modo snapshot lee de DATA.atencion directamente
     proveedorOrders: [], // idem
   };
+  GASTO_DATA = (snap.gasto && snap.gasto.rows) ? {
+    fromSnapshot: true,
+    filename: snap.gasto.filename,
+    totalRows: snap.gasto.totalRows || 0,
+    excluded: snap.gasto.excluded || 0,
+    rows: snap.gasto.rows.map(r => ({ proveedor: r.pv, familia: r.fa, anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo })),
+  } : null;
+  populateGastoAnios();
   setStatus("Viendo datos publicados de " + (snap.filename || "un archivo") + ".", "ok");
   showPublishBanner("📌 Estás viendo la última versión publicada, del " + new Date(snap.publishedAt).toLocaleString('es-PE') + ". Puedes cargar tu propio archivo arriba para ver una versión más nueva antes de compartirla.", false);
   updateActionButtons();
@@ -627,11 +693,13 @@ document.getElementById('fileInput').addEventListener('change', async function(e
         const res = processWorkbook(wb, file.name);
         maestroOk = res.ok;
         setFileState('maestro', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+      } else if(sig && sig.key === 'consulta'){
+        const res = processConsulta(wb, file.name);
+        setFileState('consulta', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
       }
-      // Los otros 3 archivos (Consulta, Reporte Almacen, PedidoSinReq) se reconocen y quedan
-      // en memoria si se cargan, pero por ahora no tienen indicador armado en la plataforma —
-      // no se muestra nada en pantalla por ellos (ni error si no se reconocen) para no llenar
-      // la pantalla de texto sin utilidad todavía.
+      // Reporte Almacen.xlsx y PedidoSinReq.xlsx se reconocen y quedan en memoria si se cargan,
+      // pero todavía no tienen indicador armado en la plataforma — no se muestra nada en pantalla
+      // por ellos (ni error si no se reconocen) para no llenar la pantalla de texto sin utilidad.
     }catch(err){
       console.error(err);
       readError = err;
@@ -866,10 +934,217 @@ function processWorkbook(wb, filename){
   return { ok:true, message: "procesado: " + (compraN+transferN).toLocaleString('es-PE') + " líneas para Tiempo de Atención Total (" + compraN.toLocaleString('es-PE') + " con compra, " + transferN.toLocaleString('es-PE') + " por transferencia directa)." };
 }
 
+// ---------- Concentración de Gasto por Proveedor (Pareto 80/20) ----------
+// Consulta.xlsx trae líneas en Soles, Dólares y Euros sin tipo de cambio propio por línea. Para poder
+// sumar y rankear proveedores con un solo número se convierte todo a Soles con un tipo de cambio de
+// referencia FIJO (no el histórico real de cada operación) — tomado el 01.09.2026: SUNAT venta USD y
+// mercado EUR. Es una aproximación explícita, confirmada con Piero como forma de arrancar; ajustar acá
+// si se necesita otro valor o una tabla de tipo de cambio por fecha más adelante.
+const TIPO_CAMBIO = { 'US$': 3.375, 'USD': 3.375, '€': 3.90, 'EUR': 3.90 };
+let GASTO_DATA = null; // { rows: [{proveedor, familia, fecha, anio, mes, dia, montoPEN}], excluded, totalRows, filename, fromSnapshot }
+
+function processConsulta(wb, filename){
+  let sheetName = wb.SheetNames.find(n => n.trim().toLowerCase() === "consulta");
+  if(!sheetName) sheetName = wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+
+  const NEEDED = ["Origen","Documento","Fecha","Estado","Proveedor Razon Social","Moneda","Producto Cantidad"];
+  let headerRowIdx = -1, headerRow = null;
+  for(let i=0;i<Math.min(15, rows.length); i++){
+    const row = rows[i] || [];
+    const strs = row.map(c => (c||"").toString().trim().toLowerCase());
+    const hits = NEEDED.filter(n => strs.includes(n.toLowerCase())).length;
+    if(hits >= 5){ headerRowIdx = i; headerRow = row; break; }
+  }
+  if(headerRowIdx === -1){
+    return { ok:false, message: "no encontré las columnas esperadas de la hoja \"Consulta\" en las primeras 15 filas de \"" + sheetName + "\"." };
+  }
+
+  const col = {
+    origen: findCol(headerRow, ["Origen"]),
+    estado: findCol(headerRow, ["Estado"]),
+    provNombre: findCol(headerRow, ["Proveedor Razon Social","Proveedor Razón Social"]),
+    moneda: findCol(headerRow, ["Moneda"]),
+    fecha: findCol(headerRow, ["Fecha"]),
+    cantidad: findCol(headerRow, ["Producto Cantidad"]),
+    precioMN: findCol(headerRow, ["Precio M.N. Unitario Dscto.","Precio M.N. Unitario Dscto"]),
+    precioME: findCol(headerRow, ["Precio M.E. Unitario Dscto.","Precio M.E. Unitario Dscto"]),
+    grupo: findCol(headerRow, ["Producto Grupo"]),
+  };
+
+  const dataRows = rows.slice(headerRowIdx+1);
+  let totalRows = 0, excluded = 0;
+  const gastoRows = [];
+
+  for(const r of dataRows){
+    if(!r || r.every(c => c==null || c==="")) continue;
+    const origen = col.origen!==-1 ? (r[col.origen]||"").toString().trim().toUpperCase() : "";
+    if(origen !== "ORDENCOMPRA") continue; // decisión confirmada con Piero: solo Órdenes de Compra, no Órdenes de Servicio
+    totalRows++;
+
+    const estado = col.estado!==-1 ? (r[col.estado]||"").toString().trim() : "";
+    if(!["Atendido Total","Atendido Parcial","Aprobado"].includes(estado)){ excluded++; continue; } // decisión: Atendido + Aprobado, no Pendiente
+
+    const fecha = col.fecha!==-1 ? parseExcelDate(r[col.fecha]) : null;
+    if(!fecha){ excluded++; continue; }
+
+    const moneda = col.moneda!==-1 ? (r[col.moneda]||"").toString().trim() : "";
+    const cantidad = col.cantidad!==-1 ? Number(r[col.cantidad]) : null;
+    if(cantidad == null || isNaN(cantidad)){ excluded++; continue; }
+
+    let precioUnit = null, tc = null;
+    if(moneda === "S/."){
+      precioUnit = col.precioMN!==-1 ? Number(r[col.precioMN]) : null;
+      tc = 1;
+    } else if(TIPO_CAMBIO[moneda] != null){
+      precioUnit = col.precioME!==-1 ? Number(r[col.precioME]) : null;
+      tc = TIPO_CAMBIO[moneda];
+    } else {
+      excluded++; continue; // moneda no reconocida o vacía: no se puede convertir a Soles con confianza
+    }
+    if(precioUnit == null || isNaN(precioUnit)){ excluded++; continue; }
+
+    const montoPEN = cantidad * precioUnit * tc;
+    if(!(montoPEN > 0)){ excluded++; continue; } // líneas sin precio registrado (0) no aportan gasto
+
+    gastoRows.push({
+      proveedor: col.provNombre!==-1 ? ((r[col.provNombre]||"").toString().trim() || "(sin proveedor)") : "(sin proveedor)",
+      familia: col.grupo!==-1 ? ((r[col.grupo]||"").toString().trim() || "Sin familia") : "Sin familia",
+      fecha, montoPEN,
+      anio: fecha.getUTCFullYear(), mes: fecha.getUTCMonth()+1, dia: fecha.getUTCDate(),
+    });
+  }
+
+  GASTO_DATA = { fromSnapshot:false, rows: gastoRows, excluded, totalRows, filename };
+  populateGastoAnios();
+  render();
+
+  if(gastoRows.length === 0){
+    return { ok:false, message: "encontré la hoja \"Consulta\" pero ninguna línea de Orden de Compra cumplió los criterios (Atendido/Aprobado, con moneda reconocida y precio mayor a 0)." };
+  }
+  return { ok:true, message: "procesado: " + gastoRows.length.toLocaleString('es-PE') + " líneas de compra válidas (de " + totalRows.toLocaleString('es-PE') + " líneas de Orden de Compra detectadas)" + (excluded ? " · " + excluded.toLocaleString('es-PE') + " excluidas" : "") + "." };
+}
+
+function getGastoRows(){
+  return (GASTO_DATA && GASTO_DATA.rows) || [];
+}
+function populateGastoAnios(){
+  const sel = document.getElementById('filterGastoAnio');
+  const current = sel.value;
+  const anios = Array.from(new Set(getGastoRows().map(r=>r.anio))).sort((a,b)=>b-a);
+  sel.innerHTML = '<option value="all">Todos los años</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join("");
+  if(anios.map(String).includes(current)) sel.value = current;
+}
+function filteredGastoRows(){
+  let rows = getGastoRows();
+  const anio = document.getElementById('filterGastoAnio').value;
+  const mes = document.getElementById('filterGastoMes').value;
+  const dia = document.getElementById('filterGastoDia').value;
+  if(anio !== 'all') rows = rows.filter(r=>String(r.anio)===anio);
+  if(mes !== 'all') rows = rows.filter(r=>String(r.mes)===mes);
+  if(dia !== 'all') rows = rows.filter(r=>String(r.dia)===dia);
+  return rows;
+}
+function buildGastoAgg(groupKey, rows){
+  const groups = {};
+  for(const r of rows){
+    const key = groupKey === 'familia' ? (r.familia || "Sin familia") : (r.proveedor || "(sin proveedor)");
+    (groups[key] = groups[key] || []).push(r);
+  }
+  const agg = Object.entries(groups).map(([label, g])=>({
+    label, n: g.length, monto: g.reduce((s,r)=>s+r.montoPEN,0),
+  }));
+  agg.sort((a,b)=>b.monto-a.monto);
+  const total = agg.reduce((s,g)=>s+g.monto,0);
+  let acc = 0;
+  for(const g of agg){
+    const before = acc;
+    acc += g.monto;
+    g.pct = total>0 ? g.monto/total*100 : 0;
+    g.pctAcum = total>0 ? acc/total*100 : 0;
+    g.top80 = total>0 ? (before < total*0.8) : false; // el grupo aún hacía falta para llegar al 80%
+  }
+  return { agg, total };
+}
+function fmtPEN(n){
+  return 'S/ ' + Math.round(n).toLocaleString('es-PE');
+}
+let gastoListenersBound = false;
+function renderGasto(){
+  const hasData = GASTO_DATA && GASTO_DATA.rows && GASTO_DATA.rows.length > 0;
+  if(!hasData){
+    document.getElementById('kpiGridGasto').innerHTML = '';
+    document.getElementById('gastoDefNote').innerHTML = GASTO_DATA
+      ? '<b>No se pudo calcular este indicador:</b> no encontré líneas de Orden de Compra válidas en la hoja "Consulta" (revisa Estado, Moneda, Producto Cantidad y Precio Unitario).'
+      : 'Carga tu <b>Consulta.xlsx</b> arriba (junto con Reporte Maestro.xlsx) para ver este indicador.';
+    document.getElementById('chartGasto').innerHTML = '';
+    document.querySelector('#tableGasto thead').innerHTML = '';
+    document.querySelector('#tableGasto tbody').innerHTML = '';
+    return;
+  }
+  if(!gastoListenersBound){
+    document.getElementById('searchGasto').addEventListener('input', drawGasto);
+    document.getElementById('groupByGasto').addEventListener('change', drawGasto);
+    document.getElementById('filterGastoAnio').addEventListener('change', drawGasto);
+    document.getElementById('filterGastoMes').addEventListener('change', drawGasto);
+    document.getElementById('filterGastoDia').addEventListener('change', drawGasto);
+    document.getElementById('filterGastoPareto').addEventListener('change', drawGasto);
+    gastoListenersBound = true;
+  }
+  drawGasto();
+}
+function drawGasto(){
+  document.getElementById('gastoDefNote').innerHTML = `<b>Qué cuenta como gasto:</b> solo líneas de <b>Órdenes de Compra</b> (no Órdenes de Servicio) con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> — se excluye lo Pendiente (aún sin aprobar). Monto = Cantidad × Precio Unitario con descuento, en la moneda de cada línea, convertido a Soles con un tipo de cambio de referencia fijo (US$ = S/ ${TIPO_CAMBIO['US$'].toFixed(3)}, € = S/ ${TIPO_CAMBIO['€'].toFixed(2)}, tomados el 01.09.2026) — es una aproximación, no el tipo de cambio real de cada operación histórica. El <b>80% principal (Pareto)</b> son los proveedores (o familias) que, ordenados de mayor a menor gasto, acumulan el 80% del gasto total del período filtrado.`;
+
+  const rows = filteredGastoRows();
+  const groupKey = document.getElementById('groupByGasto').value;
+  const { agg, total } = buildGastoAgg(groupKey, rows);
+  const nTop80 = agg.filter(g=>g.top80).length;
+
+  document.getElementById('kpiGridGasto').innerHTML = `
+    <div class="card kpi"><div class="label">Gasto total (período filtrado)</div><div class="value">${fmtPEN(total)}</div><div class="sub">${rows.length.toLocaleString('es-PE')} líneas</div></div>
+    <div class="card kpi"><div class="label">${groupKey==='familia'?'Familias':'Proveedores'} con compras</div><div class="value">${agg.length.toLocaleString('es-PE')}</div></div>
+    <div class="card kpi"><div class="label">${groupKey==='familia'?'Familias':'Proveedores'} en el 80% principal</div><div class="value">${nTop80.toLocaleString('es-PE')}</div><div class="sub">${agg.length ? (nTop80/agg.length*100).toFixed(0) : 0}% de ${agg.length.toLocaleString('es-PE')} concentra el 80% del gasto</div></div>
+  `;
+
+  const q = (document.getElementById('searchGasto').value||"").toLowerCase();
+  const paretoFilter = document.getElementById('filterGastoPareto').value;
+  let view = agg;
+  if(q) view = view.filter(g=>g.label.toLowerCase().includes(q));
+  if(paretoFilter === 'top80') view = view.filter(g=>g.top80);
+  if(paretoFilter === 'resto') view = view.filter(g=>!g.top80);
+
+  const maxMonto = view.reduce((m,g)=>g.monto>m?g.monto:m, 0);
+  document.getElementById('chartGasto').innerHTML = view.slice(0,20).map(g=>{
+    const pct = maxMonto>0 ? g.monto/maxMonto*100 : 0;
+    const color = g.top80 ? 'var(--seg-a)' : 'var(--track-empty)';
+    return `<div class="bar-row">
+      <div class="bar-label" title="${g.label}">${g.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="bar-pct" style="width:100px;">${fmtPEN(g.monto)}</div>
+    </div>`;
+  }).join("") || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
+
+  const table = document.getElementById('tableGasto');
+  const groupLabel = groupKey === 'familia' ? 'Familia' : 'Proveedor';
+  table.querySelector('thead').innerHTML = `<tr><th>${groupLabel}</th><th>Líneas</th><th>Gasto</th><th>% del total</th><th>% acumulado</th><th>Pareto</th></tr>`;
+  table.querySelector('tbody').innerHTML = view.map(g=>`
+    <tr>
+      <td style="white-space:normal;min-width:220px;">${g.label}</td>
+      <td>${g.n.toLocaleString('es-PE')}</td>
+      <td>${fmtPEN(g.monto)}</td>
+      <td>${g.pct.toFixed(1)}%</td>
+      <td>${g.pctAcum.toFixed(1)}%</td>
+      <td>${g.top80 ? '<span class="pill late">80% principal</span>' : '<span class="pill">20% restante</span>'}</td>
+    </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
+}
+
 function render(){
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
   renderAtencion();
+  renderGasto();
 }
 
 // ---------- Tiempo de Atención Total (Requerimiento -> Salida hacia obra) ----------
