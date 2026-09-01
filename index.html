@@ -172,14 +172,23 @@
   .flow-alt-label{font-weight:700;color:var(--brand-2-dark);white-space:nowrap;}
   @media (max-width:860px){ .flow-row{flex-direction:column;align-items:stretch;} .flow-arrow{transform:rotate(90deg);padding:2px 0;align-self:center;} .flow-step{width:100%;} }
 
-  .mini-flow{display:flex;align-items:center;flex-wrap:wrap;gap:4px 0;margin:0 0 14px;}
-  .mini-flow .mf-step{background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700;color:var(--ink-soft);text-align:center;white-space:nowrap;}
-  .mini-flow .mf-step.active{background:var(--brand-2);color:#08281f;border-color:transparent;}
-  .mini-flow .mf-arrow{color:var(--border);font-size:14px;padding:0 4px;flex-shrink:0;}
-  .mini-flow .mf-arrow.active{color:var(--brand-2-dark);font-weight:700;}
-  .mini-flow .mf-dash{flex:0 0 32px;min-width:20px;border-top:2px dashed var(--brand-2-dark);margin:0 6px;}
-  .mini-flow .mf-alt-label{font-weight:700;font-size:11px;color:var(--brand-2-dark);white-space:nowrap;}
-  @media (max-width:640px){ .mini-flow .mf-dash{flex:0 0 16px;} }
+  .trend-wrap{margin:0 0 16px;}
+  .trend-empty{font-size:12.5px;color:var(--ink-soft);padding:4px 0 10px;}
+  .trend-legend{display:flex;gap:16px;font-size:11.5px;color:var(--ink-soft);margin:0 0 6px;}
+  .trend-legend .lg-item{display:inline-flex;align-items:center;gap:6px;}
+  .trend-legend .lg-swatch{width:16px;height:2px;border-radius:2px;background:var(--brand-2-dark);flex-shrink:0;}
+  .trend-legend .lg-swatch.dashed{background:none;border-top:2px dashed var(--ink-soft);height:0;}
+  .trend-tooltip{position:absolute;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:11.5px;color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.14);pointer-events:none;white-space:nowrap;z-index:20;display:none;}
+  .trend-tooltip b{color:var(--ink);}
+  .trend-svg{display:block;overflow:visible;max-width:100%;}
+  .trend-svg .tr-grid{stroke:var(--border);stroke-width:1;}
+  .trend-svg .tr-meta{stroke:var(--ink-soft);stroke-width:1.5;stroke-dasharray:4 3;fill:none;}
+  .trend-svg .tr-line-real{stroke:var(--brand-2-dark);stroke-width:2;fill:none;}
+  .trend-svg .tr-line-comp{stroke:var(--ink-soft);stroke-width:2;stroke-dasharray:5 3;fill:none;}
+  .trend-svg .tr-dot-real{fill:var(--brand-2-dark);cursor:pointer;}
+  .trend-svg .tr-dot-comp{fill:var(--card);stroke:var(--ink-soft);stroke-width:1.5;cursor:pointer;}
+  .trend-svg text{font-size:10.5px;fill:var(--ink-soft);}
+  .trend-svg .tr-meta-label{fill:var(--ink-soft);font-size:10px;}
 
   .proc-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
   @media (max-width:960px){ .proc-kpi-grid{grid-template-columns:repeat(2,1fr);} }
@@ -326,7 +335,7 @@
 
       <!-- Fila 4: gráfico principal dinámico — aparece justo debajo de las tarjetas al hacer clic -->
       <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);" id="mainChartTitle">Gráfico principal</h3>
-      <div id="indicatorMiniFlow" class="mini-flow"></div>
+      <div id="indicatorTrend" class="trend-wrap" style="position:relative;"></div>
       <div class="toolbar">
         <select id="groupByProceso"></select>
       </div>
@@ -1281,8 +1290,21 @@ const INDICATORS = [
   { key:'d5', num:5, name:'RECEPCIÓN → SALIDA', stage:'Recepción → Salida', area:'almacen', areaLabel:'ALMACÉN', meta:3, from:'fRecep', to:'fSalida', respField:'responsableSalida', camino:'compra' },
   { key:'d6', num:6, name:'ATENCIÓN DIRECTA DESDE STOCK', stage:'REQ → Salida directa', area:'almacen', areaLabel:'ALMACÉN', meta:5, from:'fReq', to:'fSalida', respField:'responsableSalida', camino:'stock' },
 ];
-const STEP_LABELS = ['REQUERIMIENTO','PEDIDO','ORDEN DE<br>COMPRA','APROBACIÓN','RECEPCIÓN','SALIDA A OBRA'];
-const STEP_FIELD_INDEX = { fReq:0, fPedido:1, fOrden:2, fAprob:3, fRecep:4, fSalida:5 };
+// Semana ISO (lunes a domingo) para el diagrama de tendencia — mismo criterio que "mes" (usa fReq).
+function isoWeekStart(d){
+  const utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dow = utc.getUTCDay(); // 0=domingo..6=sabado
+  const diffToMonday = (dow===0) ? -6 : (1-dow);
+  utc.setUTCDate(utc.getUTCDate() + diffToMonday);
+  return utc;
+}
+function weekKeyFor(d){ return isoWeekStart(d).toISOString().slice(0,10); }
+function weekLabelFor(key){
+  const start = fromIsoDay(key);
+  const end = new Date(start); end.setUTCDate(end.getUTCDate()+6);
+  const short = (x)=> x.getUTCDate() + ' ' + MESES_CORTOS[x.getUTCMonth()];
+  return short(start) + '–' + short(end);
+}
 let selectedIndicatorKey = 'd1';
 let procesoListenersBound = false;
 
@@ -1397,7 +1419,7 @@ function renderProceso(){
       ? '<b>No se pudo calcular este proceso:</b> no encontré la columna FechaRequerimiento en la hoja cargada.'
       : '<b>No se pudo calcular este proceso:</b> ninguna línea del archivo tuvo datos suficientes.';
     document.getElementById('procKpiGrid').innerHTML = '';
-    document.getElementById('indicatorMiniFlow').innerHTML = '';
+    document.getElementById('indicatorTrend').innerHTML = '';
     document.querySelector('#tableProcesoResumen thead').innerHTML = '';
     document.querySelector('#tableProcesoResumen tbody').innerHTML = '';
     document.getElementById('chartProceso').innerHTML = '';
@@ -1431,28 +1453,129 @@ function renderProceso(){
 
 function drawProceso(){
   drawKpiCards();
-  drawIndicatorFlow();
+  drawIndicatorTrend();
   drawSummaryTable();
   populateGroupByProceso();
   drawMainChart();
 }
 
-function drawIndicatorFlow(){
+// Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = promedio de
+// días hábiles), con la meta como línea punteada de referencia. Para el Indicador 4 (sin meta fija)
+// se dibujan dos líneas: real vs. el plazo pactado promedio de esa semana (mismo criterio que
+// tolerancia4For). Pedido explícito de Piero: "diagrama lineal que siga a través del tiempo x y".
+function trendDataForIndicator(rows, ind){
+  const applicable = rows.filter(r=>r.camino===ind.camino && r[ind.key]!=null && r.fReq);
+  const byWeek = {};
+  for(const r of applicable){
+    const key = weekKeyFor(r.fReq);
+    (byWeek[key] = byWeek[key] || []).push(r);
+  }
+  return Object.keys(byWeek).sort().map(key=>{
+    const g = byWeek[key];
+    const vals = g.map(r=>r[ind.key]);
+    const promedio = vals.reduce((a,b)=>a+b,0) / vals.length;
+    let compromiso = null;
+    if(ind.key==='d4'){
+      const cs = g.map(r=>tolerancia4For(r)).filter(v=>v!=null && v>=0);
+      compromiso = cs.length ? cs.reduce((a,b)=>a+b,0)/cs.length : null;
+    }
+    return { key, label: weekLabelFor(key), n:g.length, promedio, compromiso };
+  });
+}
+
+function drawIndicatorTrend(){
   const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
-  const el = document.getElementById('indicatorMiniFlow');
-  if(ind.key==='d6'){
-    el.innerHTML = `<span class="mf-step active">REQUERIMIENTO</span><span class="mf-dash"></span><span class="mf-alt-label">⚡ ATENCIÓN DIRECTA DESDE STOCK</span><span class="mf-dash"></span><span class="mf-step active">SALIDA A OBRA</span>`;
+  const el = document.getElementById('indicatorTrend');
+  const rows = filteredProcesoRows();
+  const weeks = trendDataForIndicator(rows, ind);
+
+  if(weeks.length < 2){
+    el.innerHTML = `<div class="trend-empty">Se necesitan al menos 2 semanas con datos para mostrar una tendencia (hay ${weeks.length} semana${weeks.length===1?'':'s'} con datos para este indicador con los filtros actuales).</div>`;
     return;
   }
-  const fromIdx = STEP_FIELD_INDEX[ind.from];
-  const toIdx = STEP_FIELD_INDEX[ind.to];
-  el.innerHTML = STEP_LABELS.map((label, i)=>{
-    const stepHtml = `<span class="mf-step${i>=fromIdx && i<=toIdx ? ' active' : ''}">${label}</span>`;
-    if(i < STEP_LABELS.length-1){
-      return stepHtml + `<span class="mf-arrow${i===fromIdx ? ' active' : ''}">→</span>`;
-    }
-    return stepHtml;
+
+  const W = 900, H = 190, padL = 34, padR = 14, padT = 14, padB = 26;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  const allVals = [];
+  weeks.forEach(w=>{ allVals.push(w.promedio); if(w.compromiso!=null) allVals.push(w.compromiso); });
+  if(ind.meta!=null) allVals.push(ind.meta);
+  let maxVal = Math.max(...allVals, 1);
+  maxVal = Math.ceil(maxVal * 1.15 * 2) / 2; // 15% de aire arriba, redondeado a 0.5
+  const minVal = 0;
+
+  const xFor = (i)=> padL + (weeks.length===1 ? plotW/2 : (i/(weeks.length-1)) * plotW);
+  const yFor = (v)=> padT + plotH - ((v-minVal)/(maxVal-minVal)) * plotH;
+
+  const gridLines = 4;
+  let gridSvg = '';
+  for(let g=0; g<=gridLines; g++){
+    const v = (maxVal/gridLines)*g;
+    const y = yFor(v);
+    gridSvg += `<line class="tr-grid" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line>`;
+    gridSvg += `<text x="${padL-8}" y="${y+3}" text-anchor="end">${v.toFixed(v%1===0?0:1)}</text>`;
+  }
+
+  let metaSvg = '';
+  if(ind.key!=='d4' && ind.meta!=null){
+    const y = yFor(ind.meta);
+    metaSvg = `<line class="tr-meta" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line><text class="tr-meta-label" x="${W-padR}" y="${y-4}" text-anchor="end">meta ${ind.meta} d.h.</text>`;
+  }
+
+  const realPts = weeks.map((w,i)=>[xFor(i), yFor(w.promedio)]);
+  const realPath = realPts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  let compPath = '';
+  const hasComp = ind.key==='d4' && weeks.some(w=>w.compromiso!=null);
+  if(hasComp){
+    const compPts = weeks.filter(w=>w.compromiso!=null).map(w=>{
+      const i = weeks.indexOf(w);
+      return [xFor(i), yFor(w.compromiso)];
+    });
+    compPath = compPts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  }
+
+  const xLabelStep = Math.ceil(weeks.length / 8); // evita amontonar etiquetas si hay muchas semanas
+  const xLabelsSvg = weeks.map((w,i)=> (i % xLabelStep===0 || i===weeks.length-1)
+    ? `<text x="${xFor(i)}" y="${H-6}" text-anchor="middle">${escapeHtml(w.label)}</text>` : '').join('');
+
+  const dotsReal = weeks.map((w,i)=>{
+    const [x,y] = [xFor(i), yFor(w.promedio)];
+    return `<circle class="tr-dot-real" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-val="${w.promedio.toFixed(1)}" data-n="${w.n}" data-series="real"></circle>`;
   }).join('');
+  const dotsComp = hasComp ? weeks.filter(w=>w.compromiso!=null).map(w=>{
+    const i = weeks.indexOf(w);
+    const [x,y] = [xFor(i), yFor(w.compromiso)];
+    return `<circle class="tr-dot-comp" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-val="${w.compromiso.toFixed(1)}" data-n="${w.n}" data-series="comp"></circle>`;
+  }).join('') : '';
+
+  const legendSvg = hasComp
+    ? `<div class="trend-legend"><span class="lg-item"><span class="lg-swatch"></span>Real</span><span class="lg-item"><span class="lg-swatch dashed"></span>Comprometido (plazo pactado en la OC)</span></div>`
+    : '';
+
+  el.innerHTML = `${legendSvg}<svg class="trend-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+    ${gridSvg}
+    ${metaSvg}
+    <path class="tr-line-real" d="${realPath}"></path>
+    ${hasComp ? `<path class="tr-line-comp" d="${compPath}"></path>` : ''}
+    ${dotsReal}
+    ${dotsComp}
+    ${xLabelsSvg}
+  </svg><div class="trend-tooltip" id="trendTooltip"></div>`;
+
+  const tooltip = document.getElementById('trendTooltip');
+  el.querySelectorAll('circle').forEach(dot=>{
+    dot.addEventListener('mouseenter', (e)=>{
+      const series = dot.dataset.series==='comp' ? 'Comprometido' : 'Real';
+      tooltip.innerHTML = `<b>${escapeHtml(dot.dataset.week)}</b><br>${series}: ${dot.dataset.val} d.h. · ${dot.dataset.n} caso${dot.dataset.n==='1'?'':'s'}`;
+      tooltip.style.display = 'block';
+    });
+    dot.addEventListener('mousemove', (e)=>{
+      const rect = el.getBoundingClientRect();
+      tooltip.style.left = (e.clientX - rect.left + 12) + 'px';
+      tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+    });
+    dot.addEventListener('mouseleave', ()=>{ tooltip.style.display = 'none'; });
+  });
 }
 
 function drawKpiCards(){
