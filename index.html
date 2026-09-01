@@ -303,6 +303,11 @@
         <select id="filterProcesoProveedor"><option value="all">Todos los proveedores</option></select>
         <select id="filterProcesoFamilia"><option value="all">Todas las familias</option></select>
         <select id="filterProcesoResponsable"><option value="all">Todos (responsable de compra)</option></select>
+        <select id="filterProcesoOrigen">
+          <option value="all">Origen: todos</option>
+          <option value="nacional">Origen: Nacional</option>
+          <option value="importado">Origen: Importado</option>
+        </select>
         <select id="filterProcesoArea">
           <option value="all">Área: todos</option>
           <option value="almacen">Área: Almacén</option>
@@ -588,6 +593,14 @@ function reresolveResponsableD1(){
   render();
 }
 
+// Origen del proveedor (nacional/importado) según su RUC — pedido de Piero, 01.09.2026: "eso lo ves
+// según el ruc del proveedor, los importados empiezan con EX". Los proveedores importados no tienen
+// RUC peruano real, así que Nisira les asigna un código interno que empieza con "EX".
+function origenFor(ruc){
+  const r = (ruc||"").toString().trim().toUpperCase();
+  return r.startsWith('EX') ? 'importado' : 'nacional';
+}
+
 // ---------- Guardar y compartir (snapshot publicado en el mismo repo de GitHub) ----------
 const GH_OWNER = "pierolinaresp2003";
 const GH_REPO = "plataforma-friopacking";
@@ -644,6 +657,11 @@ function updateActionButtons(){
 function buildSnapshot(){
   return {
     publishedAt: new Date().toISOString(),
+    // Versión del formato de "proceso.rows" — sube a 2 el 01.09.2026 cuando "rp" pasó de publicar la
+    // columna cruda ResponsablePedido (poco confiable) al responsable YA RESUELTO del Indicador 1. Un
+    // snapshot viejo (sin este campo, o con procesoSchemaVersion < 2) tiene "rp" con nombres crudos del
+    // Excel — loadFromSnapshot lo detecta y NO los muestra como si fueran el responsable resuelto.
+    procesoSchemaVersion: 2,
     filename: DATA.filename,
     corte: DATA.corte ? DATA.corte.toISOString() : null,
     excluded: DATA.excluded,
@@ -659,7 +677,7 @@ function buildSnapshot(){
         // PedidoSinReq.xlsx para pedidos directos) — no la columna cruda de Reporte Maestro, que no es
         // confiable (aclaración de Piero, 01.09.2026). d3 y d6 no necesitan publicarse: son fijos
         // (MLUJAN / KALBUJAR), responsableLabel() los resuelve igual con o sin snapshot.
-        rp: r.responsableD1, uc: r.usuarioCompras, rs: r.responsableSalida,
+        rp: r.responsableD1, uc: r.usuarioCompras, rs: r.responsableSalida, og: r.origen,
         cr: r.codRequerimiento, cp: r.codPedido, co: r.codOrden, cm: r.camino,
         fr: isoDay(r.fReq), fp: isoDay(r.fPedido), fo: isoDay(r.fOrden), fb: isoDay(r.fAprob),
         fc: isoDay(r.fRecep), fs: isoDay(r.fSalida), fx: isoDay(r.fCompromiso),
@@ -764,6 +782,10 @@ async function loadPublishedSnapshot(manual){
 }
 
 function loadFromSnapshot(snap){
+  const isLegacyProcesoSnapshot = !(snap.procesoSchemaVersion >= 2);
+  if(isLegacyProcesoSnapshot && snap.proceso && snap.proceso.rows && snap.proceso.rows.length){
+    console.warn('Snapshot publicado con un formato antiguo de "proceso" (sin procesoSchemaVersion >= 2) — se ignoró el campo "rp" heredado de cada fila y se usó JCENTENO por defecto para el Indicador 1. Vuelve a publicar ("Guardar y compartir") con el archivo actual para actualizar el link.');
+  }
   DATA = {
     fromSnapshot: true,
     filename: snap.filename,
@@ -776,7 +798,13 @@ function loadFromSnapshot(snap){
     proveedorOrders: [], // idem
     procesoRows: (snap.proceso && snap.proceso.rows) ? snap.proceso.rows.map(r => ({
       proyecto: r.py, producto: r.pr, idProducto: r.ip, familia: r.fa, proveedor: r.pv,
-      responsableD1: r.rp || 'JCENTENO', usuarioCompras: r.uc, responsableSalida: r.rs,
+      // Un snapshot publicado ANTES del 01.09.2026 (procesoSchemaVersion < 2) trae "rp" con el nombre
+      // crudo de la columna ResponsablePedido de Reporte Maestro.xlsx (no confiable, ver buildSnapshot) —
+      // se ignora ese valor viejo por completo en vez de mostrarlo como si fuera el responsable ya
+      // resuelto. Con un snapshot nuevo, "rp" YA es el responsable resuelto (JCENTENO u otro por
+      // pedido directo) y se usa tal cual.
+      responsableD1: (isLegacyProcesoSnapshot ? 'JCENTENO' : (r.rp || 'JCENTENO')),
+      usuarioCompras: r.uc, responsableSalida: r.rs, origen: r.og || 'nacional',
       codRequerimiento: r.cr, codPedido: r.cp, codOrden: r.co, camino: r.cm,
       fReq: fromIsoDay(r.fr), fPedido: fromIsoDay(r.fp), fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb),
       fRecep: fromIsoDay(r.fc), fSalida: fromIsoDay(r.fs), fCompromiso: fromIsoDay(r.fx),
@@ -796,6 +824,9 @@ function loadFromSnapshot(snap){
   // El aviso "estás viendo la última versión publicada" ya no se muestra (a pedido de Piero,
   // 01.09.2026 — quería el reporte más limpio) — el resto del banner de publicar/errores sigue
   // funcionando igual para las acciones explícitas (Guardar y compartir, Actualizar).
+  if(isLegacyProcesoSnapshot && DATA.procesoRows.length){
+    showPublishBanner("⚠️ Este link tiene publicada una versión anterior de \"Tiempos del Proceso\" — el responsable del Indicador 1 se está mostrando como JCENTENO por defecto en vez del dato de esa versión vieja, que no era confiable. Carga tu archivo actual y usa \"Guardar y compartir\" para actualizar el link.", true);
+  }
   updateActionButtons();
   render();
 }
@@ -1083,6 +1114,9 @@ function processWorkbook(wb, filename){
         idProducto: col.idProducto!==-1 ? (r[col.idProducto]||"").toString() : "",
         familia: col.familia!==-1 ? ((r[col.familia]||"").toString().trim() || "Sin familia") : "Sin familia",
         proveedor: col.proveedor!==-1 ? (r[col.proveedor]||"").toString().trim() : "",
+        // Origen (nacional/importado): según RUC del proveedor — los proveedores importados no tienen
+        // RUC peruano real y Nisira les asigna un código que empieza con "EX" (pedido de Piero, 01.09.2026).
+        origen: origenFor(col.rucProveedor!==-1 ? r[col.rucProveedor] : ""),
         responsablePedido: col.responsablePedido!==-1 ? (r[col.responsablePedido]||"").toString().trim() : "",
         usuarioCompras: col.usuarioCompras!==-1 ? (r[col.usuarioCompras]||"").toString().trim() : "",
         responsableSalida: col.responsableSalida!==-1 ? (r[col.responsableSalida]||"").toString().trim() : "",
@@ -1431,6 +1465,7 @@ function filteredProcesoRows(){
   const fProveedor = document.getElementById('filterProcesoProveedor').value;
   const fFamilia = document.getElementById('filterProcesoFamilia').value;
   const fResp = document.getElementById('filterProcesoResponsable').value;
+  const fOrigen = document.getElementById('filterProcesoOrigen').value;
   const fAnio = document.getElementById('filterProcesoAnio').value;
   const fMes = document.getElementById('filterProcesoMes').value;
   const fDia = document.getElementById('filterProcesoDia').value;
@@ -1440,6 +1475,7 @@ function filteredProcesoRows(){
     if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
     if(fFamilia!=='all' && r.familia !== fFamilia) return false;
     if(fResp!=='all' && r.usuarioCompras !== fResp) return false;
+    if(fOrigen!=='all' && r.origen !== fOrigen) return false;
     // Año/Mes/Día son selectores independientes (reemplazan el rango Desde/Hasta a pedido de Piero,
     // 01.09.2026) sobre FechaRequerimiento — se pueden combinar entre sí, cada uno filtra por su
     // propio criterio (ej. "todos los agostos de cualquier año" con Mes=8 y Año=todos).
@@ -1571,7 +1607,7 @@ function renderProceso(){
 
   populateGroupByProceso();
   if(!procesoListenersBoundInner){
-    ['searchProceso','filterProcesoProyecto','filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoAnio','filterProcesoMes','filterProcesoDia'].forEach(id=>{
+    ['searchProceso','filterProcesoProyecto','filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoOrigen','filterProcesoAnio','filterProcesoMes','filterProcesoDia'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawProceso);
     });
