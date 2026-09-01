@@ -329,7 +329,7 @@
         <label style="font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:5px;">Hasta <input type="date" id="filterProcesoHasta" style="padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--ink);"></label>
       </div>
 
-      <!-- Filas 2 y 3: tarjetas KPI de los 6 indicadores -->
+      <!-- Filas 2 y 3: tarjetas KPI de los 5 indicadores -->
       <div class="proc-kpi-grid" id="procKpiGrid"></div>
 
       <!-- Fila 4: gráfico principal dinámico — aparece justo debajo de las tarjetas al hacer clic -->
@@ -417,7 +417,7 @@
 </div><!-- /app-shell -->
 
 <footer>
-  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 6 indicadores independientes. El camino se define por si la línea tiene <code>CodPedido</code> real (no vacío, no "-"): si lo tiene, pasó a Compras → <b>Camino 2 (compra)</b>; si no, se atendió directo desde stock → <b>Camino 1 (stock)</b>. <b>Camino 2 (compra)</b>: Indicador 1 = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2 = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3 = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Compras, meta 1 d.h.). Indicador 4 (Lead Time del Proveedor) = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>; la meta no es fija — es el plazo pactado en la OC (días hábiles entre <code>FechaOrden</code> y <code>ParaFechaOrden</code>) trasladado para empezar a contar desde <code>FechaAprobacionOC</code>, así queda bien anclado aunque el Indicador 3 haya tenido demora. Indicador 5 = días hábiles <code>FechaSalida − FechaRecepcion</code> (Almacén, meta 3 d.h.). <b>Camino 1 (stock)</b>: Indicador 6 = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 5 d.h.). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial.
+  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 5 indicadores independientes. El camino se define por si la línea tiene <code>CodPedido</code> real (no vacío, no "-"): si lo tiene, pasó a Compras → <b>Camino 2 (compra)</b>; si no, se atendió directo desde stock → <b>Camino 1 (stock)</b>. <b>Camino 2 (compra)</b>: Indicador 1 = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2 = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3 = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Compras, meta 1 d.h.). Indicador 4 (Lead Time del Proveedor) = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>; la meta no es fija — es el plazo pactado en la OC (días hábiles entre <code>FechaOrden</code> y <code>ParaFechaOrden</code>) trasladado para empezar a contar desde <code>FechaAprobacionOC</code>, así queda bien anclado aunque el Indicador 3 haya tenido demora. <b>Camino 1 (stock)</b>: Indicador 5 = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 5 d.h.). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial.
 </footer>
 
 <script>
@@ -620,7 +620,7 @@ function buildSnapshot(){
         cr: r.codRequerimiento, cp: r.codPedido, co: r.codOrden, cm: r.camino,
         fr: isoDay(r.fReq), fp: isoDay(r.fPedido), fo: isoDay(r.fOrden), fb: isoDay(r.fAprob),
         fc: isoDay(r.fRecep), fs: isoDay(r.fSalida), fx: isoDay(r.fCompromiso),
-        d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d5: r.d5, d6: r.d6, d4c: r.d4cumple,
+        d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d6: r.d6, d4c: r.d4cumple,
       })),
     },
     gasto: GASTO_DATA ? {
@@ -737,7 +737,7 @@ function loadFromSnapshot(snap){
       codRequerimiento: r.cr, codPedido: r.cp, codOrden: r.co, camino: r.cm,
       fReq: fromIsoDay(r.fr), fPedido: fromIsoDay(r.fp), fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb),
       fRecep: fromIsoDay(r.fc), fSalida: fromIsoDay(r.fs), fCompromiso: fromIsoDay(r.fx),
-      d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d5: r.d5, d6: r.d6, d4cumple: r.d4c,
+      d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d6: r.d6, d4cumple: r.d4c,
     })) : [],
   };
   GASTO_DATA = (snap.gasto && snap.gasto.rows) ? {
@@ -969,7 +969,7 @@ function processWorkbook(wb, filename){
     }
   }
 
-  // ---- Cuarto dataset: Tiempos del Proceso de Atención (6 indicadores independientes) ----
+  // ---- Cuarto dataset: Tiempos del Proceso de Atención (5 indicadores independientes) ----
   const hasFechaRequerimientoCol = col.fechaRequerimiento !== -1;
   const procesoRows = [];
   if(hasFechaRequerimientoCol){
@@ -1012,14 +1012,13 @@ function processWorkbook(wb, filename){
       const d2 = camino==='compra' ? calcDias(fPedido, fOrden) : null;
       const d3 = camino==='compra' ? calcDias(fOrden, fAprob) : null;
       const d4 = camino==='compra' ? calcDias(fAprob, fRecep) : null;
-      const d5 = camino==='compra' ? calcDias(fRecep, fSalida) : null;
       const d6 = camino==='stock' ? calcDias(fReq, fSalida) : null;
       // "Cumple" del Indicador 4 = llegó dentro del plazo pactado, contado desde Aprobación (no
       // comparado directo contra ParaFechaOrden — ver tolerancia4For/limite4For arriba).
       const fLimite4 = camino==='compra' ? limite4For({ fOrden, fAprob, fCompromiso }) : null;
       const d4cumple = (camino==='compra' && fRecep && fLimite4) ? (fRecep <= fLimite4) : null;
 
-      if(d1==null && d2==null && d3==null && d4==null && d5==null && d6==null) continue; // nada calculable
+      if(d1==null && d2==null && d3==null && d4==null && d6==null) continue; // nada calculable
 
       procesoRows.push({
         proyecto: col.nombreProyecto!==-1 ? ((r[col.nombreProyecto]||"").toString().trim() || "SIN PROYECTO (compra de almacén)") : "SIN PROYECTO (compra de almacén)",
@@ -1035,7 +1034,7 @@ function processWorkbook(wb, filename){
         codOrden: codOrdenAt,
         camino,
         fReq, fPedido, fOrden, fAprob, fRecep, fSalida, fCompromiso,
-        d1, d2, d3, d4, d5, d6, d4cumple,
+        d1, d2, d3, d4, d6, d4cumple,
       });
     }
   }
@@ -1270,7 +1269,7 @@ function render(){
   renderGasto();
 }
 
-// ---------- Tiempos del Proceso de Atención (6 indicadores) ----------
+// ---------- Tiempos del Proceso de Atención (5 indicadores) ----------
 function escapeHtml(s){
   return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1286,8 +1285,11 @@ const INDICATORS = [
   { key:'d2', num:2, name:'PEDIDO → OC', stage:'Pedido → OC', area:'compras', areaLabel:'COMPRAS', meta:2, from:'fPedido', to:'fOrden', respField:'usuarioCompras', camino:'compra' },
   { key:'d3', num:3, name:'OC → APROBACIÓN', stage:'OC → Aprobación', area:'compras', areaLabel:'COMPRAS', meta:1, from:'fOrden', to:'fAprob', respField:'usuarioCompras', camino:'compra' },
   { key:'d4', num:4, name:'LEAD TIME DEL PROVEEDOR', stage:'Aprobación → Recepción', area:'compras', areaLabel:'COMPRAS', meta:null, from:'fAprob', to:'fRecep', respField:'proveedor', camino:'compra' },
-  { key:'d5', num:5, name:'RECEPCIÓN → SALIDA', stage:'Recepción → Salida', area:'almacen', areaLabel:'ALMACÉN', meta:3, from:'fRecep', to:'fSalida', respField:'responsableSalida', camino:'compra' },
-  { key:'d6', num:6, name:'ATENCIÓN DIRECTA DESDE STOCK', stage:'REQ → Salida directa', area:'almacen', areaLabel:'ALMACÉN', meta:5, from:'fReq', to:'fSalida', respField:'responsableSalida', camino:'stock' },
+  // Indicador "RECEPCIÓN → SALIDA" (antes num 5) fue eliminado a pedido de Piero (01.09.2026):
+  // con datos reales solo tenía 9 casos medibles (el material de compra casi siempre se mezcla
+  // con el stock general y su salida real queda registrada como una línea de requerimiento
+  // distinta, ya cubierta por el indicador de abajo) — el indicador no era representativo.
+  { key:'d6', num:5, name:'ATENCIÓN DIRECTA DESDE STOCK', stage:'REQ → Salida directa', area:'almacen', areaLabel:'ALMACÉN', meta:5, from:'fReq', to:'fSalida', respField:'responsableSalida', camino:'stock' },
 ];
 // Semana ISO (lunes a domingo) para el diagrama de tendencia — mismo criterio que "mes" (usa fReq).
 function isoWeekStart(d){
@@ -1424,7 +1426,7 @@ function renderProceso(){
     document.getElementById('chartProceso').innerHTML = '';
     return;
   }
-  document.getElementById('procesoDefNote').innerHTML = `Camino según <code>CodPedido</code>: tiene pedido → Compras. <b>Camino 2 (compra):</b> Indicador 1 <code>FechaPedido − FechaRequerimiento</code> (Almacén) · Indicador 2 <code>FechaOrden − FechaPedido</code> (Compras) · Indicador 3 <code>FechaAprobacionOC − FechaOrden</code> (Compras) · Indicador 4 (Lead Time del Proveedor) <code>FechaRecepcion − FechaAprobacionOC</code>, meta = plazo pactado en la OC trasladado desde <code>FechaAprobacionOC</code> · Indicador 5 <code>FechaSalida − FechaRecepcion</code> (Almacén). <b>Camino 1 (stock):</b> Indicador 6 <code>FechaSalida − FechaRequerimiento</code>, solo líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 5 d.h.). Días hábiles Perú (feriados excluidos). Cada indicador se calcula por línea de forma <b>independiente</b>: si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar a los demás indicadores de la misma línea ni a sus promedios.`;
+  document.getElementById('procesoDefNote').innerHTML = `Camino según <code>CodPedido</code>: tiene pedido → Compras. <b>Camino 2 (compra):</b> Indicador 1 <code>FechaPedido − FechaRequerimiento</code> (Almacén) · Indicador 2 <code>FechaOrden − FechaPedido</code> (Compras) · Indicador 3 <code>FechaAprobacionOC − FechaOrden</code> (Compras) · Indicador 4 (Lead Time del Proveedor) <code>FechaRecepcion − FechaAprobacionOC</code>, meta = plazo pactado en la OC trasladado desde <code>FechaAprobacionOC</code>. <b>Camino 1 (stock):</b> Indicador 5 <code>FechaSalida − FechaRequerimiento</code>, solo líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 5 d.h.). Días hábiles Perú (feriados excluidos). Cada indicador se calcula por línea de forma <b>independiente</b>: si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar a los demás indicadores de la misma línea ni a sus promedios.`;
 
   populateGroupByProceso();
   if(!procesoListenersBoundInner){

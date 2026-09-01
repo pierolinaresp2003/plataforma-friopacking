@@ -1,6 +1,6 @@
 # Plataforma de Reportes — Grupo Friopacking
 
-Dos indicadores activos por ahora: **Tiempos del Proceso de Atención** (6 indicadores independientes desde que se genera el Requerimiento hasta la Salida a obra — Camino 1 directo desde stock y Camino 2 vía compra: Requerimiento → Pedido → Orden de Compra → Aprobación → Recepción → Salida, usa `Reporte Maestro.xlsx`) y **Concentración de Gasto por Proveedor — Pareto 80/20** (qué se le ha comprado a cada proveedor, cuánto dinero, y qué proveedores concentran el 80% del gasto; usa `Consulta.xlsx`). Corre 100% en el navegador — subes tus Excel y todo el cálculo se hace ahí mismo, sin subir el archivo a ningún servidor ni consumir tokens.
+Dos indicadores activos por ahora: **Tiempos del Proceso de Atención** (5 indicadores independientes desde que se genera el Requerimiento hasta la Salida a obra — Camino 1 directo desde stock y Camino 2 vía compra: Requerimiento → Pedido → Orden de Compra → Aprobación → Recepción → Salida, usa `Reporte Maestro.xlsx`) y **Concentración de Gasto por Proveedor — Pareto 80/20** (qué se le ha comprado a cada proveedor, cuánto dinero, y qué proveedores concentran el 80% del gasto; usa `Consulta.xlsx`). Corre 100% en el navegador — subes tus Excel y todo el cálculo se hace ahí mismo, sin subir el archivo a ningún servidor ni consumir tokens.
 
 Pensada para ir sumando el resto de indicadores del marco ELI5 (stock crítico, etc.) como pestañas nuevas más adelante.
 
