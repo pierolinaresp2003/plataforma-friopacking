@@ -198,13 +198,9 @@
   <div class="content">
 
   <div class="card upload-card">
-    <p>Selecciona hasta 4 archivos de tu carpeta <b>Master Data</b> (Reporte Maestro.xlsx, Consulta.xlsx, Reporte Almacen.xlsx, PedidoSinReq.xlsx). Todo el cálculo se hace en tu navegador — no se sube nada a internet ni consume tokens. Para que otra persona vea estos mismos números al abrir el link: conecta GitHub una vez y luego usa "Guardar y compartir".</p>
     <p id="ghStatus">🔒 GitHub no conectado — conéctalo para poder guardar y compartir.</p>
     <ul class="filelist" id="fileList">
       <li data-key="maestro"><span class="ic">⬜</span> Reporte Maestro.xlsx — no cargado</li>
-      <li data-key="consulta"><span class="ic">⬜</span> Consulta.xlsx — no cargado</li>
-      <li data-key="almacen"><span class="ic">⬜</span> Reporte Almacen.xlsx — no cargado</li>
-      <li data-key="pedidosinreq"><span class="ic">⬜</span> PedidoSinReq.xlsx — no cargado</li>
     </ul>
     <p id="status" style="margin-top:8px;">Ningún archivo cargado todavía.</p>
   </div>
@@ -357,7 +353,7 @@
       </div>
       <div class="table-card card"><table id="tableAtencion"><thead></thead><tbody></tbody></table></div>
 
-      <h3 style="margin:28px 0 6px;font-size:15px;color:var(--ink);">Transferencia directa de stock — referencia por producto</h3>
+      <h3 style="margin:28px 0 6px;font-size:15px;color:var(--ink);">Tiempo de almacén: Requerimiento → Salida a obra (solo stock, sin pasar por compra)</h3>
       <div class="note" id="transferDefNote"></div>
       <div class="toolbar">
         <input type="search" id="searchTransfer" placeholder="Buscar producto...">
@@ -366,6 +362,9 @@
           <option value="warn">Solo con ⚠ desvío &gt;50%</option>
           <option value="sinref">Solo sin referencia suficiente</option>
         </select>
+      </div>
+      <div class="card" style="padding:18px 20px 8px;margin-bottom:18px;">
+        <div id="chartTransfer"></div>
       </div>
       <div class="table-card card"><table id="tableTransfer"><thead></thead><tbody></tbody></table></div>
     </div><!-- /section-atencion -->
@@ -735,11 +734,15 @@ updateActionButtons();
 loadPublishedSnapshot(false);
 
 // ---------- Reconocimiento de los 4 archivos de Master Data ----------
+// El matching es más permisivo de lo estrictamente necesario a propósito: se revisa el nombre
+// del archivo Y el nombre de sus hojas con varias variantes, para no depender de que el archivo
+// se llame exactamente igual al nombre "oficial" (corregido 01.09.2026 — Reporte Almacen.xlsx no
+// se estaba reconociendo con el patrón anterior, más estricto).
 const FILE_SIGNATURES = [
   { key: 'maestro', label: 'Reporte Maestro.xlsx', match: (name, sheets) => /reporte.?maestro/i.test(name) || sheets.some(s=>s.trim().toLowerCase()==='reporte maestro') },
   { key: 'consulta', label: 'Consulta.xlsx', match: (name, sheets) => /consulta/i.test(name) || sheets.some(s=>s.trim().toLowerCase()==='consulta') },
-  { key: 'almacen', label: 'Reporte Almacen.xlsx', match: (name, sheets) => /almac[ée]n/i.test(name) || sheets.some(s=>/an[aá]lisis inventario/i.test(s)) },
-  { key: 'pedidosinreq', label: 'PedidoSinReq.xlsx', match: (name, sheets) => /pedido.?sin.?req/i.test(name) },
+  { key: 'almacen', label: 'Reporte Almacen.xlsx', match: (name, sheets) => /almac[ée]n/i.test(name) || /inventario/i.test(name) || sheets.some(s=>/inventario/i.test(s)) || sheets.some(s=>/almac[ée]n/i.test(s)) || sheets.some(s=>/stock/i.test(s)) },
+  { key: 'pedidosinreq', label: 'PedidoSinReq.xlsx', match: (name, sheets) => /pedido.?sin.?req/i.test(name) || /sinreq/i.test(name) || sheets.some(s=>/pedido.?sin.?req/i.test(s)) },
 ];
 const fileState = {}; // key -> { icon, text, cls }
 
@@ -766,26 +769,35 @@ document.getElementById('fileInput').addEventListener('change', async function(e
   const files = Array.from(e.target.files || []).slice(0, 4);
   if(!files.length) return;
   setStatus("Leyendo " + files.length + " archivo(s)...");
+  let maestroOk = false, maestroSeen = false, readError = null;
   for(const file of files){
     try{
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, {type:'array', cellDates:true});
       const sig = FILE_SIGNATURES.find(s => s.match(file.name, wb.SheetNames));
       if(sig && sig.key === 'maestro'){
+        maestroSeen = true;
         const res = processWorkbook(wb, file.name);
+        maestroOk = res.ok;
         setFileState('maestro', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
-      } else if(sig){
-        setFileState(sig.key, '📥', 'cargado (' + wb.SheetNames.length + ' hojas) — todavía no tiene un indicador armado en la plataforma.', '');
-      } else {
-        setStatus("No reconocí \"" + file.name + "\" como uno de los 4 archivos de Master Data. Revisa el nombre del archivo.", "err");
       }
+      // Los otros 3 archivos (Consulta, Reporte Almacen, PedidoSinReq) se reconocen y quedan
+      // en memoria si se cargan, pero por ahora no tienen indicador armado en la plataforma —
+      // no se muestra nada en pantalla por ellos (ni error si no se reconocen) para no llenar
+      // la pantalla de texto sin utilidad todavía.
     }catch(err){
       console.error(err);
-      setStatus("No se pudo leer \"" + file.name + "\": " + err.message, "err");
+      readError = err;
     }
   }
   if(document.getElementById('status').textContent.startsWith("Leyendo")){
-    setStatus("Listo — revisa el detalle de cada archivo arriba.", "ok");
+    if(maestroSeen){
+      setStatus(maestroOk ? "Listo." : "Reporte Maestro.xlsx se cargó pero tuvo un problema — revisa el detalle arriba.", maestroOk ? "ok" : "err");
+    } else if(readError){
+      setStatus("No se pudo leer uno de los archivos: " + readError.message, "err");
+    } else {
+      setStatus("No encontré Reporte Maestro.xlsx entre los archivos seleccionados.", "err");
+    }
   }
   e.target.value = "";
 });
@@ -1345,6 +1357,7 @@ function renderAtencion(){
     document.querySelector('#tableAtencion thead').innerHTML = '';
     document.querySelector('#tableAtencion tbody').innerHTML = '';
     document.getElementById('transferDefNote').innerHTML = '';
+    document.getElementById('chartTransfer').innerHTML = '';
     document.querySelector('#tableTransfer thead').innerHTML = '';
     document.querySelector('#tableTransfer tbody').innerHTML = '';
     return;
@@ -1429,6 +1442,24 @@ function drawTransfer(){
   if(q) agg = agg.filter(g=>g.label.toLowerCase().includes(q));
   if(warnFilter === 'warn') agg = agg.filter(g=>g.nWarn>0);
   if(warnFilter === 'sinref') agg = agg.filter(g=>g.referencia==null);
+
+  // Gráfica completa: solo el total Requerimiento → Salida de los productos que se atendieron
+  // por transferencia directa de stock (nunca pasaron por compra) — ordenada de mayor a menor
+  // tiempo real, para ver de un vistazo qué productos tarda más almacén en despachar aunque ya
+  // los tenga en stock. Muestra todos los productos filtrados, no solo un top 15.
+  const chartAgg = agg.slice().sort((a,b)=>(b.medTotal==null?-1:b.medTotal)-(a.medTotal==null?-1:a.medTotal));
+  const maxTotal = chartAgg.reduce((m,g)=> (g.medTotal!=null && g.medTotal>m) ? g.medTotal : m, 0);
+  document.getElementById('chartTransfer').innerHTML = chartAgg.map(g=>{
+    const val = g.medTotal;
+    const pct = (maxTotal>0 && val!=null) ? (val/maxTotal*100) : 0;
+    const color = g.nWarn ? 'var(--red)' : 'var(--seg-a)';
+    return `<div class="bar-row">
+      <div class="bar-label" title="${g.label}">${g.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="bar-pct" style="width:64px;">${val==null?'—':val.toFixed(1)+' d.h.'}${g.nWarn?' ⚠':''}</div>
+    </div>`;
+  }).join("") || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
+
   agg.sort((a,b)=>b.n-a.n);
 
   const table = document.getElementById('tableTransfer');
