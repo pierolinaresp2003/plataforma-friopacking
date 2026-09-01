@@ -356,6 +356,18 @@
         </div>
       </div>
       <div class="table-card card"><table id="tableAtencion"><thead></thead><tbody></tbody></table></div>
+
+      <h3 style="margin:28px 0 6px;font-size:15px;color:var(--ink);">Transferencia directa de stock — referencia por producto</h3>
+      <div class="note" id="transferDefNote"></div>
+      <div class="toolbar">
+        <input type="search" id="searchTransfer" placeholder="Buscar producto...">
+        <select id="filterTransferWarn">
+          <option value="all">Todos</option>
+          <option value="warn">Solo con ⚠ desvío &gt;50%</option>
+          <option value="sinref">Solo sin referencia suficiente</option>
+        </select>
+      </div>
+      <div class="table-card card"><table id="tableTransfer"><thead></thead><tbody></tbody></table></div>
     </div><!-- /section-atencion -->
 
   </div>
@@ -371,7 +383,7 @@
   <br><br>
   <b>Proveedores Fuera de Tiempo</b> — Usa el mismo criterio de tardanza que el Lead Time (días hábiles reales entre <b>FechaAprobacionOC → FechaRecepcion</b> mayores a la tolerancia comprometida entre <b>FechaOrden → ParaFechaOrden</b>), pero a diferencia del Lead Time incluye órdenes nacionales <b>e</b> importadas (prefijo "0001" y "0002"). Los filtros de año/mes/día usan <b>FechaAprobacionOC</b>. Un proveedor se marca "crítico" cuando su % de tardanza es igual o mayor a 50% y alcanza el mínimo de órdenes elegido en el filtro; por debajo de ese mínimo el porcentaje no es representativo y se marca como "datos insuficientes" en vez de forzar un semáforo.
   <br><br>
-  <b>Tiempo de Atención Total</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>) — no hasta "Recibido en Obra", porque esa confirmación depende de que alguien en el proyecto la registre en el sistema y puede demorar semanas o meses sin que sea una demora real de Logística (ver "posible regularización" en Lead Time y en Cumplimiento). Para líneas con orden de compra: Tramo A = días hábiles <code>FechaAprobacionOC − FechaRequerimiento</code> (gestión interna, 100% Friopacking). Tramo B = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code> (proveedor — mismo cálculo que el Lead Time, no se recalcula aparte). Tramo C = días hábiles <code>FechaSalida − FechaRecepcion</code> (despacho interno). Total = días hábiles <code>FechaSalida − FechaRequerimiento</code> directo, no la suma de los tramos redondeados. Las líneas de <b>transferencia directa de stock</b> (<code>CodOrden</code> vacío con <code>MotivoDescr</code> de transferencia o consumo con requerimiento) se reportan aparte, solo con su total, sin tramos. Se excluyen líneas con fecha de fin anterior a la de inicio en cualquier tramo. Se marca con ⚠ (sin excluir) el Tramo C cuando supera 30 días hábiles. Los tramos A y C todavía no tienen una meta interna definida — a diferencia del Tramo B, que sí tiene <code>ParaFechaOrden</code> como compromiso pactado — así que por ahora se muestra el dato observado sin semáforo de color.
+  <b>Tiempo de Atención Total</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>) — no hasta "Recibido en Obra", porque esa confirmación depende de que alguien en el proyecto la registre en el sistema y puede demorar semanas o meses sin que sea una demora real de Logística (ver "posible regularización" en Lead Time y en Cumplimiento). Para líneas con orden de compra: Tramo A = días hábiles <code>FechaAprobacionOC − FechaRequerimiento</code> (gestión interna, 100% Friopacking). Tramo B = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code> (proveedor — mismo cálculo que el Lead Time, no se recalcula aparte). Tramo C = días hábiles <code>FechaSalida − FechaRecepcion</code> (despacho interno). Total = días hábiles <code>FechaSalida − FechaRequerimiento</code> directo, no la suma de los tramos redondeados. Se excluyen líneas con fecha de fin anterior a la de inicio en cualquier tramo. Se marca con ⚠ (sin excluir) el Tramo C cuando supera 30 días hábiles. Los tramos A y C todavía no tienen una meta interna definida — a diferencia del Tramo B, que sí tiene <code>ParaFechaOrden</code> como compromiso pactado — así que por ahora se muestra el dato observado sin semáforo de color. Las líneas de <b>transferencia directa de stock</b> (identificadas solo por <code>MotivoDescr</code> — transferencia o consumo con requerimiento — sin importar si tienen o no un <code>CodOrden</code> generado por otro motivo) se reportan aparte: para cada producto con al menos 5 líneas de transferencia se calcula una <b>referencia</b> propia (mediana histórica de días hábiles Requerimiento→Salida de ese mismo producto, usando solo sus casos de transferencia — no se mezcla con el compromiso de OC del Tramo B, que es un dato distinto), y cada línea se compara contra la referencia de su producto, marcando con ⚠ un desvío mayor a 50%. Productos con menos de 5 líneas muestran el dato observado sin comparación ("sin referencia suficiente"). El mínimo de 5 líneas y el umbral de 50% son valores razonables para arrancar, pendientes de validar contra casos reales.
 </footer>
 
 <script>
@@ -568,7 +580,16 @@ function buildSnapshot(){
           porProyecto: buildAtencionAggFromRows(compraRows, 'proyecto'),
           porProducto: buildAtencionAggFromRows(compraRows, 'producto'),
         },
-        transferencia: { n: transferRows.length, medTotal: tts.length?median(tts):null },
+        transferencia: (function(){
+          const transferAgg = buildTransferAggFromRows(transferRows);
+          return {
+            n: transferRows.length, medTotal: tts.length?median(tts):null,
+            nWarnDesvio: transferRows.filter(r=>r.warnDesvio).length,
+            nConReferencia: transferAgg.filter(g=>g.referencia!=null).length,
+            nProductos: transferAgg.length,
+            porProducto: transferAgg,
+          };
+        })(),
       };
     })(),
   };
@@ -887,7 +908,10 @@ function processWorkbook(wb, filename){
       const fReq = parseExcelDate(r[col.fechaRequerimiento]);
       if(!fReq) continue; // sin fecha de requerimiento no se puede calcular nada de este indicador
 
-      const codOrdenAt = col.codOrden!==-1 ? (r[col.codOrden]||"").toString().trim() : "";
+      // Nisira guarda "sin código" como el texto "-", no como celda vacía — se normaliza para que
+      // no se cuente como un CodOrden real (esto ya se confirmó contra Master Data.xlsx real).
+      const codOrdenAtRaw = col.codOrden!==-1 ? (r[col.codOrden]||"").toString().trim() : "";
+      const codOrdenAt = codOrdenAtRaw === "-" ? "" : codOrdenAtRaw;
       const motivo = col.motivoDescr!==-1 ? (r[col.motivoDescr]||"").toString().trim() : "";
       const motivoUpper = motivo.toUpperCase();
       const fSalidaAt = hasFechaSalidaCol ? parseExcelDate(r[col.fechaSalida]) : null;
@@ -897,14 +921,16 @@ function processWorkbook(wb, filename){
       const producto = col.producto!==-1 ? (r[col.producto]||"").toString() : "(sin descripción)";
       const idProducto = col.idProducto!==-1 ? r[col.idProducto] : "";
 
-      // caso especial: transferencia directa de stock, sin orden de compra nueva
-      const isTransferencia = !codOrdenAt && (motivoUpper.includes("TRANSFERENCIA") || motivoUpper.includes("CONSUMO CON REQ"));
+      // caso especial: transferencia directa de stock. Se define solo por MotivoDescr — en datos
+      // reales, una línea puede tener un CodOrden generado (por otro motivo) y AUN ASÍ haberse
+      // resuelto por transferencia; el CodOrden no es un criterio confiable acá (confirmado con Piero).
+      const isTransferencia = motivoUpper.includes("TRANSFERENCIA") || motivoUpper.includes("CONSUMO CON REQ");
 
       if(isTransferencia){
         if(!fSalidaAt) continue; // no se puede calcular el total sin fecha de salida
         const total = busdayCount(fReq, fSalidaAt);
         if(total === null || total < 0) continue; // fecha de fin anterior a la de inicio: error de digitación
-        atencionRows.push({ group:'transferencia', proyecto, producto, idProducto, tramoA:null, tramoB:null, tramoC:null, total, warnC:false });
+        atencionRows.push({ group:'transferencia', proyecto, producto, idProducto, tramoA:null, tramoB:null, tramoC:null, total, warnC:false, referencia:null, pctDesvio:null, warnDesvio:false });
         continue;
       }
 
@@ -941,6 +967,26 @@ function processWorkbook(wb, filename){
         tramoA, tramoB, tramoC, total,
         warnC: tramoC != null && tramoC > 30,
       });
+    }
+
+    // Referencia por producto para transferencia directa: mediana histórica de Requerimiento->Salida
+    // de ESE producto (solo entre sus propias líneas de transferencia — no se mezcla con el LT de
+    // compromiso de OC del Tramo B, que es un dato distinto). Mínimo 5 líneas para confiar en la
+    // mediana propia del producto; si no llega, se muestra el dato observado sin comparación.
+    const transferGroups = {};
+    for(const r of atencionRows){
+      if(r.group !== 'transferencia') continue;
+      const key = (r.producto || "").toString().trim() || "—";
+      (transferGroups[key] = transferGroups[key] || []).push(r);
+    }
+    for(const rows of Object.values(transferGroups)){
+      if(rows.length < 5) continue; // sin referencia suficiente: queda tal cual (referencia:null)
+      const ref = median(rows.map(r=>r.total));
+      for(const r of rows){
+        r.referencia = ref;
+        r.pctDesvio = ref > 0 ? (r.total - ref) / ref * 100 : null;
+        r.warnDesvio = r.pctDesvio != null && r.pctDesvio > 50;
+      }
     }
   }
 
@@ -1235,11 +1281,35 @@ function buildAtencionAgg(groupKey){
   }
   return buildAtencionAggFromRows(getAtencionRows().filter(r=>r.group==='compra'), groupKey);
 }
+function buildTransferAggFromRows(transferRows){
+  const groups = {};
+  for(const r of transferRows){
+    const key = (r.producto || "").toString().trim() || "—";
+    (groups[key] = groups[key] || []).push(r);
+  }
+  return Object.entries(groups).map(([label, g])=>{
+    const ts = g.map(r=>r.total).filter(v=>v!=null);
+    const referencia = g[0] && g[0].referencia != null ? g[0].referencia : null;
+    return {
+      label, n: g.length,
+      medTotal: ts.length ? median(ts) : null,
+      referencia,
+      nWarn: g.filter(r=>r.warnDesvio).length,
+    };
+  });
+}
+function buildTransferAgg(){
+  if(DATA.fromSnapshot){
+    const t = DATA.atencion && DATA.atencion.transferencia;
+    return (t && t.porProducto) || [];
+  }
+  return buildTransferAggFromRows(getAtencionRows().filter(r=>r.group==='transferencia'));
+}
 function atencionStats(){
   if(DATA.fromSnapshot){
     return {
       compra: (DATA.atencion && DATA.atencion.compra) || { n:0, medTotal:null, medA:null, medB:null, medC:null, nWarnC:0 },
-      transferencia: (DATA.atencion && DATA.atencion.transferencia) || { n:0, medTotal:null },
+      transferencia: (DATA.atencion && DATA.atencion.transferencia) || { n:0, medTotal:null, nWarnDesvio:0, nConReferencia:0, nProductos:0 },
     };
   }
   const rows = getAtencionRows();
@@ -1250,9 +1320,15 @@ function atencionStats(){
   const cs = compraRows.map(r=>r.tramoC).filter(v=>v!=null);
   const ts = compraRows.map(r=>r.total).filter(v=>v!=null);
   const tts = transferRows.map(r=>r.total).filter(v=>v!=null);
+  const transferAgg = buildTransferAggFromRows(transferRows);
   return {
     compra: { n: compraRows.length, medTotal: ts.length?median(ts):null, medA: as.length?median(as):null, medB: bs.length?median(bs):null, medC: cs.length?median(cs):null, nWarnC: compraRows.filter(r=>r.warnC).length, nA: as.length, nB: bs.length, nC: cs.length },
-    transferencia: { n: transferRows.length, medTotal: tts.length?median(tts):null },
+    transferencia: {
+      n: transferRows.length, medTotal: tts.length?median(tts):null,
+      nWarnDesvio: transferRows.filter(r=>r.warnDesvio).length,
+      nConReferencia: transferAgg.filter(g=>g.referencia!=null).length,
+      nProductos: transferAgg.length,
+    },
   };
 }
 let atencionListenersBound = false;
@@ -1268,18 +1344,23 @@ function renderAtencion(){
     document.getElementById('chartAtencion').innerHTML = '';
     document.querySelector('#tableAtencion thead').innerHTML = '';
     document.querySelector('#tableAtencion tbody').innerHTML = '';
+    document.getElementById('transferDefNote').innerHTML = '';
+    document.querySelector('#tableTransfer thead').innerHTML = '';
+    document.querySelector('#tableTransfer tbody').innerHTML = '';
     return;
   }
 
   const noteExtra = !DATA.hasFechaSalidaCol
     ? ' <b>⚠ Este archivo no tiene la columna FechaSalida</b> — solo se pudo calcular el Tramo A (gestión interna); los tramos B, C, el total y el grupo de transferencias directas quedan sin datos hasta que el archivo incluya esa columna.'
     : '';
-  document.getElementById('atencionDefNote').innerHTML = `<b>Definición usada:</b> Tramo A = días hábiles <code>FechaAprobacionOC − FechaRequerimiento</code> (gestión interna de compra). Tramo B = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code> (proveedor, mismo cálculo que el Lead Time). Tramo C = días hábiles <code>FechaSalida − FechaRecepcion</code> (despacho interno: recepción en almacén → salida a obra). Total = días hábiles <code>FechaSalida − FechaRequerimiento</code>, calculado directo de las fechas extremas (no es la suma de los tramos redondeados). Las líneas de <b>transferencia directa de stock</b> (sin orden de compra nueva — <code>CodOrden</code> vacío con motivo de transferencia o consumo con requerimiento) se reportan aparte: su total es naturalmente más rápido y no tiene tramos. Se excluyen líneas con fecha de fin anterior a la de inicio en cualquier tramo (error de digitación). Se marca con ⚠ el Tramo C cuando supera 30 días hábiles — no se excluye, es una demora inusual para un tramo puramente interno que conviene revisar caso por caso. Todavía no hay una meta interna definida para los tramos A y C, así que se muestra el dato observado sin semáforo.${noteExtra}`;
+  document.getElementById('atencionDefNote').innerHTML = `<b>Definición usada:</b> Tramo A = días hábiles <code>FechaAprobacionOC − FechaRequerimiento</code> (gestión interna de compra). Tramo B = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code> (proveedor, mismo cálculo que el Lead Time). Tramo C = días hábiles <code>FechaSalida − FechaRecepcion</code> (despacho interno: recepción en almacén → salida a obra). Total = días hábiles <code>FechaSalida − FechaRequerimiento</code>, calculado directo de las fechas extremas (no es la suma de los tramos redondeados). Las líneas de <b>transferencia directa de stock</b> (identificadas solo por <code>MotivoDescr</code> — "transferencia" o "consumo con requerimiento" — tenga o no la línea un <code>CodOrden</code> generado por otro motivo) se reportan aparte, con su propia referencia por producto más abajo. Se excluyen líneas con fecha de fin anterior a la de inicio en cualquier tramo (error de digitación). Se marca con ⚠ el Tramo C cuando supera 30 días hábiles — no se excluye, es una demora inusual para un tramo puramente interno que conviene revisar caso por caso. Todavía no hay una meta interna definida para los tramos A y C, así que se muestra el dato observado sin semáforo.${noteExtra}`;
 
   if(!atencionListenersBound){
     document.getElementById('searchAtencion').addEventListener('input', drawAtencion);
     document.getElementById('groupByAtencion').addEventListener('change', drawAtencion);
     document.getElementById('filterAtencionWarn').addEventListener('change', drawAtencion);
+    document.getElementById('searchTransfer').addEventListener('input', drawTransfer);
+    document.getElementById('filterTransferWarn').addEventListener('change', drawTransfer);
     atencionListenersBound = true;
   }
   drawAtencion();
@@ -1290,11 +1371,13 @@ function drawAtencion(){
 
   document.getElementById('kpiGridAtencion').innerHTML = `
     <div class="card kpi"><div class="label">Total — con compra (mediana)</div><div class="value">${compra.medTotal==null?'—':compra.medTotal.toFixed(1)} d.h.</div><div class="sub">${compra.n.toLocaleString('es-PE')} líneas</div></div>
-    <div class="card kpi"><div class="label">Total — transferencia directa (mediana)</div><div class="value">${transferencia.medTotal==null?'—':transferencia.medTotal.toFixed(1)} d.h.</div><div class="sub">${transferencia.n.toLocaleString('es-PE')} líneas</div></div>
+    <div class="card kpi"><div class="label">Total — transferencia directa (mediana)</div><div class="value">${transferencia.medTotal==null?'—':transferencia.medTotal.toFixed(1)} d.h.</div><div class="sub">${transferencia.n.toLocaleString('es-PE')} líneas · ${(transferencia.nConReferencia||0).toLocaleString('es-PE')} de ${(transferencia.nProductos||0).toLocaleString('es-PE')} productos con referencia propia</div></div>
     <div class="card kpi" style="border-top:3px solid var(--seg-a)"><div class="label">Tramo A — Gestión interna</div><div class="value">${compra.medA==null?'—':compra.medA.toFixed(1)} d.h.</div><div class="sub">${(compra.nA||0).toLocaleString('es-PE')} líneas con dato</div></div>
     <div class="card kpi" style="border-top:3px solid var(--seg-b)"><div class="label">Tramo B — Proveedor</div><div class="value">${compra.medB==null?'—':compra.medB.toFixed(1)} d.h.</div><div class="sub">${(compra.nB||0).toLocaleString('es-PE')} líneas con dato</div></div>
     <div class="card kpi" style="border-top:3px solid var(--seg-c)"><div class="label">Tramo C — Despacho interno</div><div class="value">${compra.medC==null?'—':compra.medC.toFixed(1)} d.h.</div><div class="sub">${(compra.nC||0).toLocaleString('es-PE')} líneas con dato${compra.nWarnC?' · ⚠ '+compra.nWarnC+' con desvío &gt;30 d.h.':''}</div></div>
+    <div class="card kpi"><div class="label">Transferencia — ⚠ desvío &gt;50% vs. su referencia</div><div class="value">${(transferencia.nWarnDesvio||0).toLocaleString('es-PE')}</div><div class="sub">de ${(transferencia.n||0).toLocaleString('es-PE')} líneas de transferencia</div></div>
   `;
+  drawTransfer();
 
   const groupKey = document.getElementById('groupByAtencion').value; // 'proyecto' | 'producto'
   const q = (document.getElementById('searchAtencion').value||"").toLowerCase();
@@ -1333,6 +1416,31 @@ function drawAtencion(){
       <td>${g.medB==null?'—':g.medB.toFixed(1)+' d.h.'}</td>
       <td>${g.medC==null?'—':g.medC.toFixed(1)+' d.h.'}${g.nWarn?' <span class="pill warn">⚠ '+g.nWarn+'</span>':''}</td>
       <td>${g.medTotal==null?'—':g.medTotal.toFixed(1)+' d.h.'}</td>
+    </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
+}
+
+function drawTransfer(){
+  document.getElementById('transferDefNote').innerHTML = `<b>Referencia por producto:</b> mediana histórica de días hábiles <code>FechaSalida − FechaRequerimiento</code>, calculada solo entre las propias líneas de transferencia directa de ese producto (no se mezcla con el Tramo B, que es el compromiso de entrega de una OC — acá no hay OC de por medio). Se necesitan al menos <b>5 líneas</b> de un producto para confiar en su mediana como referencia; con menos, se muestra el dato observado marcado como "sin referencia suficiente", sin comparación. Se marca con ⚠ una línea individual cuando su tiempo real supera en más de <b>50%</b> a la referencia de su producto — este umbral (igual que el mínimo de 5 líneas) es un valor razonable elegido para arrancar, pendiente de que lo valides contra casos reales antes de darlo por definitivo.`;
+
+  const q = (document.getElementById('searchTransfer').value||"").toLowerCase();
+  const warnFilter = document.getElementById('filterTransferWarn').value;
+
+  let agg = buildTransferAgg();
+  if(q) agg = agg.filter(g=>g.label.toLowerCase().includes(q));
+  if(warnFilter === 'warn') agg = agg.filter(g=>g.nWarn>0);
+  if(warnFilter === 'sinref') agg = agg.filter(g=>g.referencia==null);
+  agg.sort((a,b)=>b.n-a.n);
+
+  const table = document.getElementById('tableTransfer');
+  table.querySelector('thead').innerHTML = `<tr><th>Producto</th><th>Líneas</th><th>Referencia (mediana)</th><th>Real del período (mediana)</th><th>⚠ Desvío &gt;50%</th><th>Estado</th></tr>`;
+  table.querySelector('tbody').innerHTML = agg.map(g=>`
+    <tr>
+      <td style="white-space:normal;min-width:200px;">${g.label}</td>
+      <td>${g.n.toLocaleString('es-PE')}</td>
+      <td>${g.referencia==null?'—':g.referencia.toFixed(1)+' d.h.'}</td>
+      <td>${g.medTotal==null?'—':g.medTotal.toFixed(1)+' d.h.'}</td>
+      <td>${g.referencia==null?'—':(g.nWarn?'⚠ '+g.nWarn+' de '+g.n:'0 de '+g.n)}</td>
+      <td>${g.referencia==null?'<span class="pill">Sin referencia suficiente</span>':'<span class="pill ok">Con referencia</span>'}</td>
     </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
 }
 
