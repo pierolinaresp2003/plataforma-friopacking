@@ -1389,6 +1389,9 @@ function aggStatsForIndicator(rows, ind){
   const applicable = rows.filter(r=>r.camino===ind.camino);
   const vals = applicable.map(r=>r[ind.key]).filter(v=>v!=null);
   const n = vals.length;
+  // Se muestra la mediana como cifra principal (no el promedio): pedidos puntuales muy antiguos
+  // pendientes desde hace semanas/meses inflan un promedio simple sin ser representativos del
+  // desempeño típico — pedido de Piero (01.09.2026). El promedio se conserva por si se necesita.
   const promedio = n ? vals.reduce((a,b)=>a+b,0)/n : null;
   const mediana = n ? median(vals) : null;
   let cumpleN=0, cumpleDenom=0;
@@ -1414,17 +1417,20 @@ function groupRowsFor(rows, ind, groupField){
   }
   return Object.entries(groups).map(([label,g])=>{
     const vals = g.map(r=>r[ind.key]);
-    const promedio = vals.reduce((a,b)=>a+b,0)/vals.length;
+    // Se usa mediana (no promedio) como cifra representativa — pedido de Piero (01.09.2026): casos
+    // puntuales muy antiguos (pedidos pendientes desde hace semanas/meses) inflan un promedio simple
+    // y no son representativos del desempeño típico. La mediana ignora ese efecto sin descartar filas.
+    const mediana = median(vals);
     let cumpleN=0, cumpleDenom=0;
     for(const r of g){ const c=indCumple(ind,r); if(c==null) continue; cumpleDenom++; if(c) cumpleN++; }
-    let compromisoProm = null;
+    let compromisoMediana = null;
     if(ind.key==='d4'){
       // días hábiles pactados (Orden→ParaFechaOrden), mismo plazo usado para "cumple" — no el gap
       // Aprobación→ParaFechaOrden (ese queda mal anclado si hubo demora en el Indicador 3).
       const cs = g.map(r=> tolerancia4For(r)).filter(v=>v!=null && v>=0);
-      compromisoProm = cs.length ? cs.reduce((a,b)=>a+b,0)/cs.length : null;
+      compromisoMediana = cs.length ? median(cs) : null;
     }
-    return { label, displayLabel: groupField==='mes' ? formatMonthLabel(label) : label, n:g.length, promedio, cumplePct: cumpleDenom?cumpleN/cumpleDenom*100:null, compromisoProm };
+    return { label, displayLabel: groupField==='mes' ? formatMonthLabel(label) : label, n:g.length, mediana, cumplePct: cumpleDenom?cumpleN/cumpleDenom*100:null, compromisoMediana };
   });
 }
 
@@ -1511,22 +1517,22 @@ function drawProceso(){
 }
 
 // Rendimiento por persona (compradores en Compras, personal de Almacén): una fila por persona +
-// indicador aplicable, reutilizando groupRowsFor(..., 'responsable') que ya agrega promedio/cumplimiento
+// indicador aplicable, reutilizando groupRowsFor(..., 'responsable') que ya agrega mediana/cumplimiento
 // por responsableLabel(). Pedido de Piero (01.09.2026): ver el desempeño en números, no solo agregado.
 function drawPersonPerfTable(tableEl, indicators, personLabel){
   const rows = filteredProcesoRows();
   let combined = [];
   indicators.forEach(ind=>{
-    const groups = groupRowsFor(rows, ind, 'responsable').sort((a,b)=>(b.promedio||0)-(a.promedio||0));
+    const groups = groupRowsFor(rows, ind, 'responsable').sort((a,b)=>(b.mediana||0)-(a.mediana||0));
     groups.forEach(g=> combined.push(Object.assign({ ind }, g)));
   });
-  tableEl.querySelector('thead').innerHTML = `<tr><th>${personLabel}</th><th>Indicador</th><th>Promedio</th><th>Meta</th><th>Cumplimiento</th><th>Casos</th></tr>`;
+  tableEl.querySelector('thead').innerHTML = `<tr><th>${personLabel}</th><th>Indicador</th><th>Mediana</th><th>Meta</th><th>Cumplimiento</th><th>Casos</th></tr>`;
   tableEl.querySelector('tbody').innerHTML = combined.map(g=>{
     const metaTxt = g.ind.key==='d4' ? 'Según OC' : (g.ind.meta!=null ? g.ind.meta+' d.h.' : '—');
     return `<tr data-ind="${g.ind.key}" data-group="${escapeHtml(g.label)}" style="cursor:pointer;">
       <td>${escapeHtml(g.label)}</td>
       <td>${g.ind.num}. ${g.ind.stage}</td>
-      <td>${g.promedio.toFixed(1)} d.h.</td>
+      <td>${g.mediana.toFixed(1)} d.h.</td>
       <td>${metaTxt}</td>
       <td>${g.cumplePct==null?'—':g.cumplePct.toFixed(0)+'%'}</td>
       <td>${g.n.toLocaleString('es-PE')}</td>
@@ -1572,10 +1578,12 @@ async function downloadSectionImage(sectionId, filenamePrefix, btn){
   }
 }
 
-// Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = promedio de
+// Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = mediana de
 // días hábiles), con la meta como línea punteada de referencia. Para el Indicador 4 (sin meta fija)
-// se dibujan dos líneas: real vs. el plazo pactado promedio de esa semana (mismo criterio que
+// se dibujan dos líneas: real vs. el plazo pactado (mediana) de esa semana (mismo criterio que
 // tolerancia4For). Pedido explícito de Piero: "diagrama lineal que siga a través del tiempo x y".
+// Se usa mediana en vez de promedio por semana (pedido de Piero, 01.09.2026): una orden puntual muy
+// antigua sin cerrar en una semana dada puede disparar el promedio de esa semana sin ser representativa.
 function trendDataForIndicator(rows, ind){
   const applicable = rows.filter(r=>r.camino===ind.camino && r[ind.key]!=null && r.fReq);
   const byWeek = {};
@@ -1586,13 +1594,13 @@ function trendDataForIndicator(rows, ind){
   return Object.keys(byWeek).sort().map(key=>{
     const g = byWeek[key];
     const vals = g.map(r=>r[ind.key]);
-    const promedio = vals.reduce((a,b)=>a+b,0) / vals.length;
+    const mediana = median(vals);
     let compromiso = null;
     if(ind.key==='d4'){
       const cs = g.map(r=>tolerancia4For(r)).filter(v=>v!=null && v>=0);
-      compromiso = cs.length ? cs.reduce((a,b)=>a+b,0)/cs.length : null;
+      compromiso = cs.length ? median(cs) : null;
     }
-    return { key, label: weekLabelFor(key), n:g.length, promedio, compromiso };
+    return { key, label: weekLabelFor(key), n:g.length, mediana, compromiso };
   });
 }
 
@@ -1624,7 +1632,7 @@ function drawIndicatorTrend(){
   const plotW = W - padL - padR, plotH = H - padT - padB;
 
   const allVals = [];
-  weeks.forEach(w=>{ allVals.push(w.promedio); if(w.compromiso!=null) allVals.push(w.compromiso); });
+  weeks.forEach(w=>{ allVals.push(w.mediana); if(w.compromiso!=null) allVals.push(w.compromiso); });
   if(ind.meta!=null) allVals.push(ind.meta);
   const rawMax = Math.max(...allVals, 1) * 1.15; // 15% de aire arriba
   // Ejes con números "redondos" (1/2/5 x 10^n) en vez de fracciones raras como 3.5/10.5 —
@@ -1648,7 +1656,7 @@ function drawIndicatorTrend(){
     metaSvg = `<line class="tr-meta" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line><text class="tr-meta-label" x="${W-padR}" y="${y-4}" text-anchor="end">meta ${ind.meta} d.h.</text>`;
   }
 
-  const realPts = weeks.map((w,i)=>[xFor(i), yFor(w.promedio)]);
+  const realPts = weeks.map((w,i)=>[xFor(i), yFor(w.mediana)]);
   const realPath = realPts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
   let compPath = '';
   const hasComp = ind.key==='d4' && weeks.some(w=>w.compromiso!=null);
@@ -1665,8 +1673,8 @@ function drawIndicatorTrend(){
     ? `<text x="${xFor(i)}" y="${H-6}" text-anchor="middle">${escapeHtml(w.label)}</text>` : '').join('');
 
   const dotsReal = weeks.map((w,i)=>{
-    const [x,y] = [xFor(i), yFor(w.promedio)];
-    return `<circle class="tr-dot-real" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-key="${escapeHtml(w.key)}" data-val="${w.promedio.toFixed(1)}" data-n="${w.n}" data-series="real"></circle>`;
+    const [x,y] = [xFor(i), yFor(w.mediana)];
+    return `<circle class="tr-dot-real" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-key="${escapeHtml(w.key)}" data-val="${w.mediana.toFixed(1)}" data-n="${w.n}" data-series="real"></circle>`;
   }).join('');
   const dotsComp = hasComp ? weeks.filter(w=>w.compromiso!=null).map(w=>{
     const i = weeks.indexOf(w);
@@ -1720,14 +1728,14 @@ function drawKpiCards(){
     const metaTxt = ind.key==='d4' ? 'Según OC' : (ind.meta!=null ? '≤ '+ind.meta+' d.h.' : '—');
     const cumpleTxt = st.cumplePct==null ? 'Sin datos' : 'Cumple '+st.cumplePct.toFixed(0)+'%';
     const cumpleCls = st.cumplePct==null ? 'muted' : (st.cumplePct>=80?'ok':st.cumplePct>=50?'late':'warn');
-    const headlineTxt = st.promedio==null ? '—' : st.promedio.toFixed(1);
+    const headlineTxt = st.mediana==null ? '—' : st.mediana.toFixed(1);
     return `<div class="card proc-kpi${selected}" data-ind="${ind.key}">
       <div class="proc-kpi-top">
         <span class="proc-num">0${ind.num}</span>
         <span class="pill ${cumpleCls}">${cumpleTxt}</span>
       </div>
       <div class="proc-name">${ind.name}</div>
-      <div class="proc-headline${st.promedio==null?' muted':''}">${headlineTxt}${st.promedio==null?'':' <span class="unit">d.h. promedio</span>'}</div>
+      <div class="proc-headline${st.mediana==null?' muted':''}">${headlineTxt}${st.mediana==null?'':' <span class="unit">d.h. mediana</span>'}</div>
       <div class="proc-caption">Meta ${metaTxt} · ${ind.areaLabel} · ${st.n.toLocaleString('es-PE')} casos</div>
       <div class="proc-foot">
         <a href="#" class="proc-detail-link" data-ind="${ind.key}" style="font-size:11px;color:var(--brand-ink);font-weight:700;">🔍 ver detalle</a>
@@ -1757,23 +1765,23 @@ function drawSummaryTable(){
   const summaries = INDICATORS.map(ind=>({ ind, st: aggStatsForIndicator(rows, ind) }));
   let worstProm=null, worstCumple=null, worstOut=null;
   for(const s of summaries){
-    if(s.st.promedio!=null && (worstProm==null || s.st.promedio>worstProm.st.promedio)) worstProm = s;
+    if(s.st.mediana!=null && (worstProm==null || s.st.mediana>worstProm.st.mediana)) worstProm = s;
     if(s.st.cumplePct!=null && (worstCumple==null || s.st.cumplePct<worstCumple.st.cumplePct)) worstCumple = s;
     if(s.st.cumpleDenom>0 && (worstOut==null || s.st.noCumpleN>worstOut.st.noCumpleN)) worstOut = s;
   }
   const table = document.getElementById('tableProcesoResumen');
-  table.querySelector('thead').innerHTML = '<tr><th>Etapa</th><th>Responsable</th><th>Promedio</th><th>Meta</th><th>Cumplimiento</th></tr>';
+  table.querySelector('thead').innerHTML = '<tr><th>Etapa</th><th>Responsable</th><th>Mediana</th><th>Meta</th><th>Cumplimiento</th></tr>';
   table.querySelector('tbody').innerHTML = summaries.map(s=>{
     const ind = s.ind, st = s.st;
     const tags = [];
-    if(worstProm===s) tags.push('<span class="hl-tag">⚠ mayor promedio</span>');
+    if(worstProm===s) tags.push('<span class="hl-tag">⚠ mayor mediana</span>');
     if(worstCumple===s) tags.push('<span class="hl-tag">⚠ menor cumplimiento</span>');
     if(worstOut===s) tags.push('<span class="hl-tag">⚠ más fuera de meta</span>');
     const metaTxt = ind.key==='d4' ? 'Según OC' : (ind.meta!=null ? ind.meta+' d.h.' : '—');
     return `<tr class="${tags.length?'hl-row':''}" data-ind="${ind.key}" style="cursor:pointer;">
       <td>${ind.num}. ${ind.stage}${tags.join('')}</td>
       <td><span class="chip ${AREA_CHIP_CLASS[ind.area]}">${ind.areaLabel}</span></td>
-      <td${worstProm===s?' class="hl-worst"':''}>${st.promedio==null?'—':st.promedio.toFixed(1)+' d.h.'}</td>
+      <td${worstProm===s?' class="hl-worst"':''}>${st.mediana==null?'—':st.mediana.toFixed(1)+' d.h.'}</td>
       <td>${metaTxt}</td>
       <td${worstCumple===s?' class="hl-worst"':''}>${st.cumplePct==null?'—':st.cumplePct.toFixed(0)+'%'}</td>
     </tr>`;
@@ -1789,32 +1797,32 @@ function drawMainChart(){
   const groupField = document.getElementById('groupByProceso').value;
   const rows = filteredProcesoRows();
   let agg = groupRowsFor(rows, ind, groupField);
-  agg.sort((a,b)=>(b.promedio||0)-(a.promedio||0));
+  agg.sort((a,b)=>(b.mediana||0)-(a.mediana||0));
   const top = agg.slice(0,15);
   const empty = `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
 
   if(ind.key==='d4'){
-    const maxVal = top.reduce((m,g)=>Math.max(m, g.promedio||0, g.compromisoProm||0), 0);
+    const maxVal = top.reduce((m,g)=>Math.max(m, g.mediana||0, g.compromisoMediana||0), 0);
     document.getElementById('chartProceso').innerHTML = top.map(g=>{
-      const realPct = maxVal>0 ? (g.promedio/maxVal*100) : 0;
-      const compPct = (maxVal>0 && g.compromisoProm!=null) ? (g.compromisoProm/maxVal*100) : 0;
-      const late = g.compromisoProm!=null && g.promedio > g.compromisoProm;
-      const color = g.compromisoProm==null ? 'var(--seg-a)' : (late ? 'var(--red)' : 'var(--green)');
+      const realPct = maxVal>0 ? (g.mediana/maxVal*100) : 0;
+      const compPct = (maxVal>0 && g.compromisoMediana!=null) ? (g.compromisoMediana/maxVal*100) : 0;
+      const late = g.compromisoMediana!=null && g.mediana > g.compromisoMediana;
+      const color = g.compromisoMediana==null ? 'var(--seg-a)' : (late ? 'var(--red)' : 'var(--green)');
       return `<div class="cmp-row" data-group="${escapeHtml(g.label)}">
         <div class="bar-label" title="${escapeHtml(g.displayLabel)}">${escapeHtml(g.displayLabel)}</div>
         <div class="cmp-track">
-          ${g.compromisoProm!=null?`<div class="cmp-target" style="width:${compPct}%"></div>`:''}
+          ${g.compromisoMediana!=null?`<div class="cmp-target" style="width:${compPct}%"></div>`:''}
           <div class="cmp-fill" style="width:${realPct}%;background:${color}"></div>
         </div>
-        <div class="cmp-vals">${g.promedio.toFixed(1)} d.h. real${g.compromisoProm!=null?' vs '+g.compromisoProm.toFixed(1)+' comprometido':''}</div>
+        <div class="cmp-vals">${g.mediana.toFixed(1)} d.h. real${g.compromisoMediana!=null?' vs '+g.compromisoMediana.toFixed(1)+' comprometido':''}</div>
       </div>`;
     }).join('') || empty;
   } else {
-    const maxVal = top.reduce((m,g)=>Math.max(m, g.promedio||0), 0);
+    const maxVal = top.reduce((m,g)=>Math.max(m, g.mediana||0), 0);
     document.getElementById('chartProceso').innerHTML = top.map(g=>{
-      const pct = maxVal>0 ? (g.promedio/maxVal*100) : 0;
+      const pct = maxVal>0 ? (g.mediana/maxVal*100) : 0;
       const metaPct = (ind.meta!=null && maxVal>0) ? Math.min(100, ind.meta/maxVal*100) : null;
-      const over = ind.meta!=null && g.promedio > ind.meta;
+      const over = ind.meta!=null && g.mediana > ind.meta;
       const color = over ? 'var(--red)' : 'var(--seg-a)';
       return `<div class="bar-row" data-group="${escapeHtml(g.label)}">
         <div class="bar-label" title="${escapeHtml(g.displayLabel)}">${escapeHtml(g.displayLabel)}</div>
@@ -1822,7 +1830,7 @@ function drawMainChart(){
           <div class="bar-fill" style="width:${pct}%;background:${color}"></div>
           ${metaPct!=null?`<div class="meta-line" style="left:${metaPct}%"></div>`:''}
         </div>
-        <div class="bar-pct" style="width:90px;">${g.promedio.toFixed(1)} d.h.</div>
+        <div class="bar-pct" style="width:90px;">${g.mediana.toFixed(1)} d.h.</div>
       </div>`;
     }).join('') || empty;
   }
