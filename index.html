@@ -306,7 +306,7 @@
         </div>
       </div>
 
-      <div class="note" id="procesoDefNote"></div>
+      <div class="note" id="procesoDefNote" style="display:none;"></div>
 
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
         <button class="btn secondary" id="btnImgProceso" type="button">🖼️ Generar imagen del módulo</button>
@@ -1462,7 +1462,9 @@ let procesoListenersBoundInner = false;
 function renderProceso(){
   const hasData = getProcesoRows().length > 0;
   if(!hasData){
-    document.getElementById('procesoDefNote').innerHTML = !DATA.hasFechaRequerimientoCol
+    const note = document.getElementById('procesoDefNote');
+    note.style.display = '';
+    note.innerHTML = !DATA.hasFechaRequerimientoCol
       ? '<b>No se pudo calcular este proceso:</b> no encontré la columna FechaRequerimiento en la hoja cargada.'
       : '<b>No se pudo calcular este proceso:</b> ninguna línea del archivo tuvo datos suficientes.';
     document.getElementById('procKpiGrid').innerHTML = '';
@@ -1472,7 +1474,7 @@ function renderProceso(){
     document.getElementById('chartProceso').innerHTML = '';
     return;
   }
-  document.getElementById('procesoDefNote').innerHTML = `Camino según <code>CodPedido</code>: tiene pedido → Compras. <b>Camino 2 (compra):</b> Indicador 1 <code>FechaPedido − FechaRequerimiento</code> (Almacén) · Indicador 2 <code>FechaOrden − FechaPedido</code> (Compras) · Indicador 3 <code>FechaAprobacionOC − FechaOrden</code> (Compras) · Indicador 4 (Lead Time del Proveedor) <code>FechaRecepcion − FechaAprobacionOC</code>, meta = plazo pactado en la OC trasladado desde <code>FechaAprobacionOC</code>. <b>Camino 1 (stock):</b> Indicador 5 <code>FechaSalida − FechaRequerimiento</code>, solo líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 5 d.h.). Días hábiles Perú (feriados excluidos). Cada indicador se calcula por línea de forma <b>independiente</b>: si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar a los demás indicadores de la misma línea ni a sus promedios.`;
+  document.getElementById('procesoDefNote').style.display = 'none';
 
   populateGroupByProceso();
   if(!procesoListenersBoundInner){
