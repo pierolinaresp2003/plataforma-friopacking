@@ -438,6 +438,16 @@
       <div class="note" id="alertasDefNote" style="margin-bottom:14px;">
         <b>Qué muestra esta alerta:</b> requerimientos y pedidos que todavía no pasan al siguiente paso del proceso y ya superan los <b>2 días hábiles</b> (la meta de Tiempo de Generación de Pedido y Tiempo de Emisión de OC) contados hasta <b>hoy</b> — no hasta que se resuelvan. Se excluyen los requerimientos/pedidos marcados como "Archivado". Como se calcula contra la fecha de hoy, la lista cambia cada día aunque no vuelvas a cargar el archivo.
       </div>
+      <div class="toolbar">
+        <select id="filterAlertaProyecto"><option value="all">Todos los proyectos</option></select>
+        <select id="filterAlertaProveedor"><option value="all">Todos los proveedores</option></select>
+        <select id="filterAlertaResponsable"><option value="all">Todos los responsables</option></select>
+        <select id="filterAlertaOrigen">
+          <option value="all">Origen: todos</option>
+          <option value="nacional">Origen: Nacional</option>
+          <option value="importado">Origen: Importado</option>
+        </select>
+      </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
 
       <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Requerimientos sin Pedido (más de 2 d.h.)</h3>
@@ -715,7 +725,7 @@ function buildSnapshot(){
       // indicador calculable. Los días hábiles transcurridos NO se guardan aquí: se calculan al vuelo
       // contra la fecha de hoy en el navegador de quien mire el link, para que la alerta no quede vieja.
       alertas: (DATA.alertRows||[]).map(a => ({
-        tp: a.tipo, py: a.proyecto, pr: a.producto, ip: a.idProducto, pv: a.proveedor,
+        tp: a.tipo, py: a.proyecto, pr: a.producto, ip: a.idProducto, pv: a.proveedor, og: a.origen,
         cr: a.codRequerimiento, cp: a.codPedido, rp: a.responsable, fd: isoDay(a.fDesde),
       })),
     },
@@ -848,7 +858,7 @@ function loadFromSnapshot(snap){
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
     // ese caso, simplemente no se muestran alertas hasta que se vuelva a publicar con el archivo actual.
     alertRows: (snap.proceso && snap.proceso.alertas) ? snap.proceso.alertas.map(a => ({
-      tipo: a.tp, proyecto: a.py, producto: a.pr, idProducto: a.ip, proveedor: a.pv,
+      tipo: a.tp, proyecto: a.py, producto: a.pr, idProducto: a.ip, proveedor: a.pv, origen: a.og || 'nacional',
       codRequerimiento: a.cr, codPedido: a.cp, responsable: a.rp, fDesde: fromIsoDay(a.fd),
     })) : [],
   };
@@ -1165,6 +1175,7 @@ function processWorkbook(wb, filename){
         producto: col.producto!==-1 ? (r[col.producto]||"").toString() : "(sin descripción)",
         idProducto: col.idProducto!==-1 ? (r[col.idProducto]||"").toString() : "",
         proveedor: col.proveedor!==-1 ? (r[col.proveedor]||"").toString().trim() : "",
+        origen: origenFor(col.rucProveedor!==-1 ? r[col.rucProveedor] : ""),
         codRequerimiento: col.codRequerimiento!==-1 ? (r[col.codRequerimiento]||"").toString().trim() : "",
         codPedido: codPedidoAt,
       };
@@ -1501,6 +1512,27 @@ function metaAlerta(tipo){
 function diasHabilesAlerta(row){
   return busdayCount(row.fDesde, new Date());
 }
+function populateAlertaFilters(){
+  const rows = (DATA && DATA.alertRows) || [];
+  populateSelectDistinct(document.getElementById('filterAlertaProyecto'), rows.map(r=>r.proyecto), 'Todos los proyectos');
+  populateSelectDistinct(document.getElementById('filterAlertaProveedor'), rows.map(r=>r.proveedor), 'Todos los proveedores');
+  populateSelectDistinct(document.getElementById('filterAlertaResponsable'), rows.map(r=>r.responsable), 'Todos los responsables');
+}
+// Filtros compartidos por las 2 tablas de alertas (Proyecto/Proveedor/Responsable/Origen) — el buscador
+// de cada tabla sigue siendo independiente, pero estos 4 filtros aplican a ambas a la vez.
+function filteredAlertRows(rows){
+  const fProyecto = document.getElementById('filterAlertaProyecto').value;
+  const fProveedor = document.getElementById('filterAlertaProveedor').value;
+  const fResp = document.getElementById('filterAlertaResponsable').value;
+  const fOrigen = document.getElementById('filterAlertaOrigen').value;
+  return rows.filter(r=>{
+    if(fProyecto!=='all' && r.proyecto !== fProyecto) return false;
+    if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
+    if(fResp!=='all' && r.responsable !== fResp) return false;
+    if(fOrigen!=='all' && r.origen !== fOrigen) return false;
+    return true;
+  });
+}
 let alertasListenersBound = false;
 function renderAlertas(){
   const hasData = DATA && DATA.alertRows && DATA.alertRows.length >= 0 && DATA.hasFechaRequerimientoCol;
@@ -1512,9 +1544,12 @@ function renderAlertas(){
     document.querySelector('#tableAlertaPedido tbody').innerHTML = '';
     return;
   }
+  populateAlertaFilters();
   if(!alertasListenersBound){
-    document.getElementById('searchAlertaReq').addEventListener('input', drawAlertas);
-    document.getElementById('searchAlertaPedido').addEventListener('input', drawAlertas);
+    ['searchAlertaReq','searchAlertaPedido','filterAlertaProyecto','filterAlertaProveedor','filterAlertaResponsable','filterAlertaOrigen'].forEach(id=>{
+      const el = document.getElementById(id);
+      el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawAlertas);
+    });
     document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'alertas-atencion', e.currentTarget));
     alertasListenersBound = true;
   }
@@ -1522,7 +1557,7 @@ function renderAlertas(){
 }
 function drawAlertasTable(tableEl, rows, codLabel, searchInputId){
   const q = (document.getElementById(searchInputId).value||"").toLowerCase();
-  let view = rows.filter(r=>!q || (r.proyecto+' '+r.producto+' '+r.codRequerimiento+' '+r.codPedido).toLowerCase().includes(q));
+  let view = filteredAlertRows(rows).filter(r=>!q || (r.proyecto+' '+r.producto+' '+r.codRequerimiento+' '+r.codPedido).toLowerCase().includes(q));
   view = view.map(r=>Object.assign({}, r, { dias: diasHabilesAlerta(r) }))
     .filter(r=>r.dias!=null && r.dias > metaAlerta(r.tipo))
     .sort((a,b)=>b.dias-a.dias);
