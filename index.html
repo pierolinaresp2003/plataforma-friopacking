@@ -273,6 +273,7 @@
     <ul class="filelist" id="fileList">
       <li data-key="maestro"><span class="ic">⬜</span> Reporte Maestro.xlsx — no cargado</li>
       <li data-key="consulta"><span class="ic">⬜</span> Consulta.xlsx — no cargado</li>
+      <li data-key="pedidosinreq"><span class="ic">⬜</span> PedidoSinReq.xlsx — no cargado</li>
     </ul>
     <p id="status" style="margin-top:8px;">Ningún archivo cargado todavía.</p>
   </div>
@@ -308,7 +309,8 @@
 
       <div class="note" id="procesoDefNote" style="display:none;"></div>
 
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
+        <button class="btn secondary" id="btnEli5Proceso" type="button">📱 Resumen WhatsApp (1 imagen)</button>
         <button class="btn secondary" id="btnImgProceso" type="button">🖼️ Generar imagen del módulo</button>
       </div>
 
@@ -452,7 +454,7 @@
 </div><!-- /app-shell -->
 
 <footer>
-  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 5 indicadores independientes. El camino se define por si la línea tiene <code>CodPedido</code> real (no vacío, no "-"): si lo tiene, pasó a Compras → <b>Camino 2 (compra)</b>; si no, se atendió directo desde stock → <b>Camino 1 (stock)</b>. <b>Camino 2 (compra)</b>: Indicador 1 = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2 = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3 = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Compras, meta 1 d.h.). Indicador 4 (Lead Time del Proveedor) = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>; la meta no es fija — es el plazo pactado en la OC (días hábiles entre <code>FechaOrden</code> y <code>ParaFechaOrden</code>) trasladado para empezar a contar desde <code>FechaAprobacionOC</code>, así queda bien anclado aunque el Indicador 3 haya tenido demora. <b>Camino 1 (stock)</b>: Indicador 5 = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 5 d.h.). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial.
+  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 5 indicadores independientes. El camino se define por si la línea tiene <code>CodPedido</code> real (no vacío, no "-"): si lo tiene, pasó a Compras → <b>Camino 2 (compra)</b>; si no, se atendió directo desde stock → <b>Camino 1 (stock)</b>. <b>Camino 2 (compra)</b>: Indicador 1 = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2 = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3 = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Compras, meta 1 d.h.). Indicador 4 (Lead Time del Proveedor) = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>; la meta no es fija — es el plazo pactado en la OC (días hábiles entre <code>FechaOrden</code> y <code>ParaFechaOrden</code>) trasladado para empezar a contar desde <code>FechaAprobacionOC</code>, así queda bien anclado aunque el Indicador 3 haya tenido demora. <b>Camino 1 (stock)</b>: Indicador 5 = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta 5 d.h.). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial. <b>Responsables (aclarado por Piero, 01.09.2026):</b> Indicador 1 (Req → Pedido) es siempre <b>JCENTENO</b>, salvo en "pedidos directos" (generados sin requerimiento previo, identificados por aparecer en PedidoSinReq.xlsx) donde el responsable real se toma de ese archivo. Indicador 3 (OC → Aprobación) es siempre <b>MLUJAN</b>. Indicador 5 (Atención directa desde stock) es siempre <b>KALBUJAR</b>. Indicador 2 y 4 sí varían por línea — son las 2 métricas de "rendimiento por comprador" (<code>UsuarioCompras</code>).
 </footer>
 
 <script>
@@ -596,6 +598,27 @@ function setStatus(msg, cls){
 
 let DATA = null; // { orders: [...], corte: Date, excluded: n, totalRows: n, fromSnapshot: bool }
 
+// Mapa CodPedido -> ResponsablePedido, armado desde la columna F ("ResponsablePedido") de
+// PedidoSinReq.xlsx (verificado 01.09.2026 contra el archivo real de Piero: A=CodPedido, ...,
+// F=ResponsablePedido). Se usa SOLO para el Indicador 1 (Req -> Pedido), y SOLO para los "pedidos
+// directos" (pedidos que aparecen en este archivo porque se generaron sin requerimiento previo) —
+// para el resto de casos el responsable del Indicador 1 es fijo (ver responsableD1For). Piero
+// aclaró (01.09.2026) que el campo "ResponsablePedido" que trae Reporte Maestro.xlsx no refleja
+// quién ejecuta el paso en la práctica, así que no se usa directamente.
+let PEDIDO_SIN_REQ_RESP = {};
+function responsableD1For(codPedido){
+  const directo = codPedido && PEDIDO_SIN_REQ_RESP[codPedido];
+  return directo || 'JCENTENO';
+}
+// Si Reporte Maestro.xlsx ya se había cargado ANTES que PedidoSinReq.xlsx (o se recarga el mapa),
+// hay que volver a resolver el responsable del Indicador 1 para las filas ya calculadas — si no,
+// se quedarían con el valor por defecto aunque el archivo correcto ya esté en memoria.
+function reresolveResponsableD1(){
+  if(!DATA || !DATA.procesoRows) return;
+  for(const r of DATA.procesoRows){ r.responsableD1 = responsableD1For(r.codPedido); }
+  render();
+}
+
 // ---------- Guardar y compartir (snapshot publicado en el mismo repo de GitHub) ----------
 const GH_OWNER = "pierolinaresp2003";
 const GH_REPO = "plataforma-friopacking";
@@ -663,7 +686,11 @@ function buildSnapshot(){
       // mismo criterio que Concentración de Gasto: publicar filas compactas, no agregados fijos.
       rows: (DATA.procesoRows||[]).map(r => ({
         py: r.proyecto, pr: r.producto, ip: r.idProducto, fa: r.familia, pv: r.proveedor,
-        rp: r.responsablePedido, uc: r.usuarioCompras, rs: r.responsableSalida,
+        // rp ahora publica el responsable YA RESUELTO del Indicador 1 (JCENTENO, o el nombre real de
+        // PedidoSinReq.xlsx para pedidos directos) — no la columna cruda de Reporte Maestro, que no es
+        // confiable (aclaración de Piero, 01.09.2026). d3 y d6 no necesitan publicarse: son fijos
+        // (MLUJAN / KALBUJAR), responsableLabel() los resuelve igual con o sin snapshot.
+        rp: r.responsableD1, uc: r.usuarioCompras, rs: r.responsableSalida,
         cr: r.codRequerimiento, cp: r.codPedido, co: r.codOrden, cm: r.camino,
         fr: isoDay(r.fReq), fp: isoDay(r.fPedido), fo: isoDay(r.fOrden), fb: isoDay(r.fAprob),
         fc: isoDay(r.fRecep), fs: isoDay(r.fSalida), fx: isoDay(r.fCompromiso),
@@ -780,7 +807,7 @@ function loadFromSnapshot(snap){
     proveedorOrders: [], // idem
     procesoRows: (snap.proceso && snap.proceso.rows) ? snap.proceso.rows.map(r => ({
       proyecto: r.py, producto: r.pr, idProducto: r.ip, familia: r.fa, proveedor: r.pv,
-      responsablePedido: r.rp, usuarioCompras: r.uc, responsableSalida: r.rs,
+      responsableD1: r.rp || 'JCENTENO', usuarioCompras: r.uc, responsableSalida: r.rs,
       codRequerimiento: r.cr, codPedido: r.cp, codOrden: r.co, camino: r.cm,
       fReq: fromIsoDay(r.fr), fPedido: fromIsoDay(r.fp), fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb),
       fRecep: fromIsoDay(r.fc), fSalida: fromIsoDay(r.fs), fCompromiso: fromIsoDay(r.fx),
@@ -866,27 +893,39 @@ document.getElementById('fileInput').addEventListener('change', async function(e
   if(!files.length) return;
   setStatus("Leyendo " + files.length + " archivo(s)...");
   let maestroOk = false, maestroSeen = false, readError = null;
+  // Se leen y clasifican todos los archivos primero, y recién después se procesan — en un orden fijo
+  // que pone PedidoSinReq.xlsx ANTES que Reporte Maestro.xlsx sin importar cómo los haya seleccionado
+  // Piero. El Indicador 1 (Req -> Pedido) necesita el mapa de "pedidos directos" ya armado para poder
+  // asignar bien el responsable de esos casos en la misma pasada (01.09.2026, ver responsableD1For).
+  const parsed = [];
   for(const file of files){
     try{
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, {type:'array', cellDates:true});
       const sig = FILE_SIGNATURES.find(s => s.match(file.name, wb.SheetNames));
-      if(sig && sig.key === 'maestro'){
-        maestroSeen = true;
-        const res = processWorkbook(wb, file.name);
-        maestroOk = res.ok;
-        setFileState('maestro', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
-      } else if(sig && sig.key === 'consulta'){
-        const res = processConsulta(wb, file.name);
-        setFileState('consulta', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
-      }
-      // Reporte Almacen.xlsx y PedidoSinReq.xlsx se reconocen y quedan en memoria si se cargan,
-      // pero todavía no tienen indicador armado en la plataforma — no se muestra nada en pantalla
-      // por ellos (ni error si no se reconocen) para no llenar la pantalla de texto sin utilidad.
+      parsed.push({ file, wb, sig });
     }catch(err){
       console.error(err);
       readError = err;
     }
+  }
+  const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3 };
+  parsed.sort((a,b) => (PROC_ORDER[a.sig && a.sig.key] ?? 9) - (PROC_ORDER[b.sig && b.sig.key] ?? 9));
+  for(const { file, wb, sig } of parsed){
+    if(sig && sig.key === 'maestro'){
+      maestroSeen = true;
+      const res = processWorkbook(wb, file.name);
+      maestroOk = res.ok;
+      setFileState('maestro', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+    } else if(sig && sig.key === 'consulta'){
+      const res = processConsulta(wb, file.name);
+      setFileState('consulta', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+    } else if(sig && sig.key === 'pedidosinreq'){
+      const res = processPedidoSinReq(wb, file.name);
+      setFileState('pedidosinreq', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+    }
+    // Reporte Almacen.xlsx se reconoce y queda en memoria si se carga, pero todavía no tiene
+    // indicador armado en la plataforma — no se muestra nada en pantalla si no se reconoce.
   }
   if(document.getElementById('status').textContent.startsWith("Leyendo")){
     if(maestroSeen){
@@ -1082,6 +1121,9 @@ function processWorkbook(wb, filename){
         camino,
         fReq, fPedido, fOrden, fAprob, fRecep, fSalida, fCompromiso,
         d1, d2, d3, d4, d6, d4cumple,
+        // Responsable real del Indicador 1 para este caso puntual (ver responsableD1For arriba) —
+        // se recalcula solo con reresolveResponsableD1() si PedidoSinReq.xlsx se carga después.
+        responsableD1: responsableD1For(codPedidoAt),
       });
     }
   }
@@ -1101,6 +1143,56 @@ function processWorkbook(wb, filename){
   const compraN = procesoRows.filter(r=>r.camino==='compra').length;
   const stockN = procesoRows.filter(r=>r.camino==='stock').length;
   return { ok:true, message: "procesado: " + procesoRows.length.toLocaleString('es-PE') + " líneas para Tiempos del Proceso de Atención (" + compraN.toLocaleString('es-PE') + " camino compra, " + stockN.toLocaleString('es-PE') + " camino stock)." };
+}
+
+// ---------- PedidoSinReq.xlsx: responsable real de los "pedidos directos" (01.09.2026) ----------
+// Piero aclaró que el responsable de Req -> Pedido es siempre JCENTENO, EXCEPTO cuando el pedido se
+// generó sin pasar por un requerimiento previo ("pedido directo") — esos pedidos son justamente los
+// que aparecen en PedidoSinReq.xlsx, y ahí el responsable real está en la columna F de ese archivo
+// (verificado contra el archivo real: A=CodPedido ... F=ResponsablePedido). Este archivo solo alimenta
+// ese mapa de responsables — no tiene un indicador ni una pestaña propia todavía.
+function processPedidoSinReq(wb, filename){
+  let sheetName = wb.SheetNames.find(n => n.trim().toLowerCase() === "pedidosinreq");
+  if(!sheetName) sheetName = wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+
+  const NEEDED = ["CodPedido","ResponsablePedido"];
+  let headerRowIdx = -1, headerRow = null;
+  for(let i=0;i<Math.min(15, rows.length); i++){
+    const row = rows[i] || [];
+    const strs = row.map(c => (c||"").toString().trim().toLowerCase());
+    const hits = NEEDED.filter(n => strs.includes(n.toLowerCase())).length;
+    if(hits >= 2){ headerRowIdx = i; headerRow = row; break; }
+  }
+  if(headerRowIdx === -1){
+    return { ok:false, message: "no encontré las columnas CodPedido / ResponsablePedido en las primeras 15 filas de la hoja \"" + sheetName + "\"." };
+  }
+
+  const col = {
+    codPedido: findCol(headerRow, ["CodPedido"]),
+    responsablePedido: findCol(headerRow, ["ResponsablePedido"]),
+  };
+  const dataRows = rows.slice(headerRowIdx+1);
+  const map = {};
+  let n = 0;
+  for(const r of dataRows){
+    if(!r || r.every(c => c==null || c==="")) continue;
+    const cpRaw = col.codPedido!==-1 ? (r[col.codPedido]||"").toString().trim() : "";
+    const cp = cpRaw === "-" ? "" : cpRaw;
+    if(!cp) continue;
+    const resp = col.responsablePedido!==-1 ? (r[col.responsablePedido]||"").toString().trim() : "";
+    if(!resp) continue;
+    map[cp] = resp;
+    n++;
+  }
+  PEDIDO_SIN_REQ_RESP = map;
+  reresolveResponsableD1(); // por si Reporte Maestro.xlsx ya se había cargado antes que este archivo
+
+  if(n === 0){
+    return { ok:false, message: "encontré la hoja, pero ninguna fila tuvo CodPedido y ResponsablePedido juntos." };
+  }
+  return { ok:true, message: n.toLocaleString('es-PE') + " pedidos directos identificados (usados para asignar el responsable real del Indicador 1 en esos casos)." };
 }
 
 // ---------- Concentración de Gasto por Proveedor (Pareto 80/20) ----------
@@ -1332,7 +1424,7 @@ const INDICATORS = [
   { key:'d1', num:1, name:'REQ → PEDIDO', stage:'REQ → Pedido', area:'almacen', areaLabel:'ALMACÉN', meta:2, from:'fReq', to:'fPedido', respField:'responsablePedido', camino:'compra' },
   { key:'d2', num:2, name:'PEDIDO → OC', stage:'Pedido → OC', area:'compras', areaLabel:'COMPRAS', meta:2, from:'fPedido', to:'fOrden', respField:'usuarioCompras', camino:'compra' },
   { key:'d3', num:3, name:'OC → APROBACIÓN', stage:'OC → Aprobación', area:'compras', areaLabel:'COMPRAS', meta:1, from:'fOrden', to:'fAprob', respField:'usuarioCompras', camino:'compra' },
-  { key:'d4', num:4, name:'LEAD TIME DEL PROVEEDOR', stage:'Aprobación → Recepción', area:'compras', areaLabel:'COMPRAS', meta:null, from:'fAprob', to:'fRecep', respField:'proveedor', camino:'compra' },
+  { key:'d4', num:4, name:'LEAD TIME DEL PROVEEDOR', stage:'Aprobación → Recepción', area:'compras', areaLabel:'COMPRAS', meta:null, from:'fAprob', to:'fRecep', respField:'usuarioCompras', camino:'compra' },
   // Indicador "RECEPCIÓN → SALIDA" (antes num 5) fue eliminado a pedido de Piero (01.09.2026):
   // con datos reales solo tenía 9 casos medibles (el material de compra casi siempre se mezcla
   // con el stock general y su salida real queda registrada como una línea de requerimiento
@@ -1389,6 +1481,14 @@ function visibleIndicators(){
   return fArea==='all' ? INDICATORS : INDICATORS.filter(i=>i.area===fArea);
 }
 function responsableLabel(row, ind){
+  // Piero aclaró (01.09.2026) que estos 3 roles son organizacionalmente fijos — no varían según lo
+  // que diga la columna de responsable de cada línea del Excel (ese dato no siempre refleja quién
+  // ejecuta el paso en la práctica). Solo el Indicador 1 tiene una excepción real: los "pedidos
+  // directos" (ver responsableD1For / PedidoSinReq.xlsx). d2 y d4 sí usan el comprador real de la
+  // línea (UsuarioCompras) — esas son las 2 métricas de "rendimiento por comprador".
+  if(ind.key === 'd3') return 'MLUJAN';                 // OC → Aprobación: siempre Manuel Luján
+  if(ind.key === 'd6') return 'KALBUJAR';               // Atención directa desde stock: siempre Katherine Albujar
+  if(ind.key === 'd1') return row.responsableD1 || 'JCENTENO';
   return row[ind.respField] || '(sin responsable)';
 }
 function indCumple(ind, row){
@@ -1515,6 +1615,7 @@ function renderProceso(){
     });
     document.getElementById('procDetailClose').addEventListener('click', closeDrilldown);
     document.getElementById('btnImgProceso').addEventListener('click', (e)=> downloadSectionImage('section-proceso', 'tiempos-proceso-atencion', e.currentTarget));
+    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=> downloadEli5Image(e.currentTarget));
     procesoListenersBoundInner = true;
   }
   drawProceso();
@@ -1524,7 +1625,9 @@ function drawProceso(){
   drawKpiCards();
   drawIndicatorTrend();
   drawSummaryTable();
-  drawPersonPerfTable(document.getElementById('tableProcesoCompradores'), INDICATORS.filter(i=>i.key==='d2'||i.key==='d3'), 'Comprador');
+  // Rendimiento por comprador = Pedido→OC y OC aprobada→Entrega (aclaración de Piero, 01.09.2026) —
+  // OC→Aprobación (d3) ya no entra aquí: ese paso es siempre de Manuel Luján, no varía por comprador.
+  drawPersonPerfTable(document.getElementById('tableProcesoCompradores'), INDICATORS.filter(i=>i.key==='d2'||i.key==='d4'), 'Comprador');
   drawPersonPerfTable(document.getElementById('tableProcesoAlmacen'), INDICATORS.filter(i=>i.key==='d1'||i.key==='d6'), 'Persona de Almacén');
   populateGroupByProceso();
   drawMainChart();
@@ -1589,6 +1692,103 @@ async function downloadSectionImage(sectionId, filenamePrefix, btn){
     alert('No se pudo generar la imagen: ' + (err && err.message ? err.message : err));
   }finally{
     btn.style.visibility = originalVisibility;
+    btn.disabled = false; btn.textContent = originalText;
+  }
+}
+
+// ---------- Resumen ELI5 en UNA sola imagen para WhatsApp (01.09.2026) ----------
+// Piero pidió una foto "completamente distinta" a "Generar imagen del módulo" — esa captura fiel
+// toda la pantalla (útil para revisión detallada, pero no cabe legible en un mensaje de WhatsApp).
+// Esta es una tarjeta condensada, en lenguaje simple (ELI5), con los 5 indicadores y quién es
+// responsable de cada uno (aclaración de Piero el mismo día — ver responsableLabel). Se arma en un
+// <div> aparte, fuera de pantalla, para no alterar el diseño de la pestaña ni depender del tema
+// claro/oscuro activo (esta imagen siempre sale en los colores de marca, pensada para compartir).
+const ELI5_DESC = {
+  d1: '¿Cuánto tarda Almacén en convertir el requerimiento en un pedido?',
+  d2: '¿Cuánto tarda el comprador en generar la Orden de Compra?',
+  d3: '¿Cuánto tarda en aprobarse la Orden de Compra?',
+  d4: '¿Cuánto tarda el proveedor en entregar, ya aprobada la orden?',
+  d6: '¿Cuánto tarda Almacén en despachar directo desde stock, sin pasar por Compras?',
+};
+function eli5ResponsableTag(ind){
+  // Mismos 3 roles fijos de responsableLabel() -- aquí se repiten como texto corto para la tarjeta,
+  // sin depender de una fila puntual (d1 muestra JCENTENO con asterisco: la excepción de "pedido
+  // directo" se explica una sola vez al pie, no fila por fila, para no saturar la imagen).
+  if(ind.key === 'd3') return 'MLUJAN';
+  if(ind.key === 'd6') return 'KALBUJAR';
+  if(ind.key === 'd1') return 'JCENTENO*';
+  return 'COMPRADORES'; // d2 y d4
+}
+function eli5SemColor(pct){
+  if(pct==null) return '#8b98a4';
+  if(pct>=80) return '#0ca30c';
+  if(pct>=50) return '#e2960a';
+  return '#d03b3b';
+}
+function buildEli5Html(){
+  const rows = filteredProcesoRows();
+  const fecha = new Date().toLocaleDateString('es-PE', { day:'numeric', month:'long', year:'numeric' });
+  const logoEl = document.querySelector('.logo-lockup');
+  const cards = INDICATORS.map(ind=>{
+    const st = aggStatsForIndicator(rows, ind);
+    const metaTxt = ind.key==='d4' ? 'Según OC' : (ind.meta!=null ? ind.meta+' d.h.' : '—');
+    const promTxt = st.promedio==null ? '—' : st.promedio.toFixed(1)+' d.h.';
+    const cumpleTxt = st.cumplePct==null ? '—' : st.cumplePct.toFixed(0)+'%';
+    const color = eli5SemColor(st.cumplePct);
+    return `
+      <div style="display:flex;align-items:center;gap:16px;background:#ffffff;border-radius:14px;padding:18px 20px;margin-bottom:14px;">
+        <div style="flex-shrink:0;width:46px;height:46px;border-radius:50%;background:#0a1e64;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;font-family:Arial,sans-serif;">${ind.num}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:16px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${escapeHtml(ind.stage)}</div>
+          <div style="font-size:13px;color:#5b6b7a;margin-top:3px;font-family:Arial,sans-serif;">${ELI5_DESC[ind.key]}</div>
+          <div style="font-size:12px;color:#8b98a4;margin-top:6px;font-family:Arial,sans-serif;">Responsable: <b style="color:#2fa48d;">${eli5ResponsableTag(ind)}</b> · Meta: ${metaTxt} · ${st.n.toLocaleString('es-PE')} casos</div>
+        </div>
+        <div style="flex-shrink:0;text-align:right;">
+          <div style="font-size:26px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${promTxt}</div>
+          <div style="font-size:13px;font-weight:700;color:${color};font-family:Arial,sans-serif;">${cumpleTxt} cumple</div>
+        </div>
+      </div>`;
+  }).join('');
+  return `
+  <div id="eli5CardInner" style="width:1080px;font-family:Arial,sans-serif;background:#eef1f5;padding:36px;box-sizing:border-box;">
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
+      ${logoEl ? `<img src="${logoEl.src}" style="height:56px;" alt="Grupo Friopacking">` : ''}
+      <div>
+        <div style="font-size:24px;font-weight:800;color:#0a1e64;">Tiempos del Proceso de Atención</div>
+        <div style="font-size:14px;color:#5b6b7a;">Grupo Friopacking · Área Logística · ${fecha}</div>
+      </div>
+    </div>
+    ${cards}
+    <div style="font-size:12px;color:#8b98a4;margin-top:6px;line-height:1.5;">*Indicador 1: JCENTENO, salvo "pedidos directos" (generados sin requerimiento previo), donde el responsable es quien generó ese pedido puntual. Los promedios excluyen casos atípicos (más de 3× la meta).</div>
+  </div>`;
+}
+async function downloadEli5Image(btn){
+  if(typeof html2canvas === 'undefined'){
+    alert('No se pudo generar la imagen: la librería no cargó (revisa tu conexión a internet e intenta de nuevo).');
+    return;
+  }
+  const originalText = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Generando...';
+  const host = document.createElement('div');
+  host.style.position = 'fixed';
+  host.style.left = '-99999px';
+  host.style.top = '0';
+  host.innerHTML = buildEli5Html();
+  document.body.appendChild(host);
+  try{
+    await new Promise(r=>setTimeout(r, 50));
+    const target = host.querySelector('#eli5CardInner');
+    const canvas = await html2canvas(target, { backgroundColor: '#eef1f5', scale: 2 });
+    const link = document.createElement('a');
+    link.download = 'resumen-whatsapp-tiempos-proceso-' + new Date().toISOString().slice(0,10) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }catch(err){
+    alert('No se pudo generar la imagen: ' + (err && err.message ? err.message : err));
+  }finally{
+    host.remove();
     btn.disabled = false; btn.textContent = originalText;
   }
 }
