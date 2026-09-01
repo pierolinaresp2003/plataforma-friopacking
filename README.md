@@ -1,14 +1,14 @@
 # Plataforma de Reportes — Grupo Friopacking
 
-Un indicador activo por ahora: **Tiempo de Atención Total** (Requerimiento → Salida a obra, con caso especial de transferencia directa de stock). Corre 100% en el navegador — subes tu `Reporte Maestro.xlsx` y todo el cálculo se hace ahí mismo, sin subir el archivo a ningún servidor ni consumir tokens.
+Dos indicadores activos por ahora: **Tiempo de Atención Total** (Requerimiento → Salida a obra, con caso especial de transferencia directa de stock, usa `Reporte Maestro.xlsx`) y **Concentración de Gasto por Proveedor — Pareto 80/20** (qué se le ha comprado a cada proveedor, cuánto dinero, y qué proveedores concentran el 80% del gasto; usa `Consulta.xlsx`). Corre 100% en el navegador — subes tus Excel y todo el cálculo se hace ahí mismo, sin subir el archivo a ningún servidor ni consumir tokens.
 
-Pensada para ir sumando el resto de indicadores del marco ELI5 (gasto por proveedor, stock crítico, etc.) como pestañas nuevas más adelante.
+Pensada para ir sumando el resto de indicadores del marco ELI5 (stock crítico, etc.) como pestañas nuevas más adelante.
 
 ## Cómo usarla
 
 1. Abre `index.html` (doble clic, se abre en tu navegador) o entra al link público de GitHub Pages.
-2. Clic en "Cargar archivos (hasta 4)" y selecciona uno o varios de los 4 Excel de tu carpeta Master Data (Reporte Maestro.xlsx, Consulta.xlsx, Reporte Almacen.xlsx, PedidoSinReq.xlsx). Por ahora los indicadores solo usan Reporte Maestro.xlsx — los otros 3 quedan cargados y confirmados en la lista, listos para cuando se sumen sus indicadores.
-3. Revisa la pestaña Tiempo de Atención Total en el sidebar.
+2. Clic en "Cargar archivos (hasta 4)" y selecciona uno o varios de los 4 Excel de tu carpeta Master Data (Reporte Maestro.xlsx, Consulta.xlsx, Reporte Almacen.xlsx, PedidoSinReq.xlsx). Reporte Maestro.xlsx y Consulta.xlsx ya alimentan indicadores; Reporte Almacen.xlsx y PedidoSinReq.xlsx quedan cargados y confirmados en la lista, listos para cuando se sumen sus indicadores.
+3. Revisa las pestañas Tiempo de Atención Total y Concentración de Gasto en el sidebar.
 
 No necesitas internet para usarla, salvo la primera carga de la página (trae una librería pequeña, SheetJS, desde un CDN).
 
