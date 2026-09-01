@@ -180,6 +180,7 @@
       <div class="tab" data-view="familia">Por familia</div>
       <div class="tab" data-view="producto">Por producto</div>
       <div class="tab" data-view="cumplimiento">Cumplimiento por Proyecto</div>
+      <div class="tab" data-view="proveedores">Proveedores Fuera de Tiempo</div>
     </div>
 
     <div id="view-resumen" class="view active">
@@ -236,6 +237,57 @@
       <div class="table-card card"><table id="tableCump"><thead></thead><tbody></tbody></table></div>
     </div>
 
+    <div id="view-proveedores" class="view">
+      <div class="kpi-grid" id="kpiGridProv"></div>
+      <div class="note" id="provDefNote"></div>
+      <div class="toolbar">
+        <input type="search" id="searchProv" placeholder="Buscar proveedor o RUC...">
+        <select id="filterProvAnio"><option value="all">Todos los años</option></select>
+        <select id="filterProvMes">
+          <option value="all">Todos los meses</option>
+          <option value="1">Enero</option>
+          <option value="2">Febrero</option>
+          <option value="3">Marzo</option>
+          <option value="4">Abril</option>
+          <option value="5">Mayo</option>
+          <option value="6">Junio</option>
+          <option value="7">Julio</option>
+          <option value="8">Agosto</option>
+          <option value="9">Septiembre</option>
+          <option value="10">Octubre</option>
+          <option value="11">Noviembre</option>
+          <option value="12">Diciembre</option>
+        </select>
+        <select id="filterProvDia">
+          <option value="all">Todos los días</option>
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+          <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+          <option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option>
+          <option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
+          <option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option>
+          <option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option>
+          <option value="31">31</option>
+        </select>
+        <select id="filterProvMinOrdenes">
+          <option value="3">Mínimo 3 órdenes</option>
+          <option value="5" selected>Mínimo 5 órdenes</option>
+          <option value="10">Mínimo 10 órdenes</option>
+          <option value="20">Mínimo 20 órdenes</option>
+        </select>
+        <select id="filterProvSemaforo">
+          <option value="all">Todos los evaluados</option>
+          <option value="red">Solo críticos (≥50%)</option>
+          <option value="amber">Atención (25-49%)</option>
+          <option value="green">Buen desempeño (&lt;25%)</option>
+          <option value="insuficiente">Datos insuficientes</option>
+        </select>
+      </div>
+      <div class="card" style="padding:18px 20px 8px;margin-bottom:18px;">
+        <div id="chartProv"></div>
+      </div>
+      <div class="table-card card"><table id="tableProv"><thead></thead><tbody></tbody></table></div>
+    </div>
+
   </div>
 
 </div>
@@ -244,6 +296,8 @@
   <b>Lead Time de Compras Nacionales</b> — Metodología: días hábiles entre <b>FechaAprobacionOC → FechaRecepcion</b> (real) comparado contra <b>FechaOrden → ParaFechaOrden</b> (tolerancia comprometida en la orden). Solo órdenes de compra nacionales (código con prefijo "0001"). Se excluyen registros con recepción anterior a la aprobación, con fecha comprometida anterior a la fecha de orden, y con tolerancia planeada mayor a 120 días hábiles (errores de digitación). Estadístico usado: mediana. Feriados considerados: calendario oficial de Perú 2026 (16 feriados nacionales). Si cargas datos de otro año, esos feriados no estarán excluidos — solo se resta fines de semana.
   <br><br>
   <b>Cumplimiento de Entrega por Proyecto</b> — Agrupado por <b>NombreProyecto</b> (cliente/obra). "Entregado" = <code>Recibido en Obra</code>, o <code>Enviado a Obra</code> con <code>FechaSalida</code> registrada. Se excluyen del total las líneas <code>Archivado</code>. % cumplimiento = entregados / requerimientos activos. Usa todas las líneas del archivo (nacionales e importadas), a diferencia del Lead Time que solo mira nacionales.
+  <br><br>
+  <b>Proveedores Fuera de Tiempo</b> — Usa el mismo criterio de tardanza que el Lead Time (días hábiles reales entre <b>FechaAprobacionOC → FechaRecepcion</b> mayores a la tolerancia comprometida entre <b>FechaOrden → ParaFechaOrden</b>), pero a diferencia del Lead Time incluye órdenes nacionales <b>e</b> importadas (prefijo "0001" y "0002"). Los filtros de año/mes/día usan <b>FechaAprobacionOC</b>. Un proveedor se marca "crítico" cuando su % de tardanza es igual o mayor a 50% y alcanza el mínimo de órdenes elegido en el filtro; por debajo de ese mínimo el porcentaje no es representativo y se marca como "datos insuficientes" en vez de forzar un semáforo.
 </footer>
 
 <script>
@@ -410,7 +464,14 @@ function buildSnapshot(){
     cumplimiento: {
       usedV3: DATA.hasFechaSalidaCol,
       porProyecto: DATA.projectRows && DATA.projectRows.length ? buildProyectoAgg() : [],
-    }
+    },
+    proveedores: {
+      orders: (DATA.proveedorOrders||[]).map(o=>({
+        pv: o.proveedor, rc: o.rucProveedor, na: o.nacional,
+        fa: o.fAprob ? o.fAprob.toISOString() : null,
+        to: o.tolerancia, re: o.real, ta: o.tardio, de: o.desvio,
+      })),
+    },
   };
 }
 
@@ -511,6 +572,11 @@ function loadFromSnapshot(snap){
     cumplimiento: snap.cumplimiento || { porProyecto: [] },
     orders: [], // no se usa en modo snapshot, las tablas leen de leadTime/cumplimiento directamente
     projectRows: [], // idem
+    proveedorOrders: ((snap.proveedores && snap.proveedores.orders) || []).map(o=>({
+      proveedor: o.pv, rucProveedor: o.rc, nacional: o.na,
+      fAprob: o.fa ? new Date(o.fa) : null,
+      tolerancia: o.to, real: o.re, tardio: o.ta, desvio: o.de,
+    })),
   };
   setStatus("Viendo datos publicados de " + (snap.filename || "un archivo") + ".", "ok");
   showPublishBanner("📌 Estás viendo la última versión publicada, del " + new Date(snap.publishedAt).toLocaleString('es-PE') + ". Puedes cargar tu propio archivo arriba para ver una versión más nueva antes de compartirla.", false);
@@ -629,6 +695,7 @@ function processWorkbook(wb, filename){
     producto: findCol(headerRow, ["Producto"]),
     familia: findCol(headerRow, ["NombreFamilia","Familia"]),
     proveedor: findCol(headerRow, ["NombreProveedor","Proveedor"]),
+    rucProveedor: findCol(headerRow, ["RucProveedor","RUC Proveedor","RUC"]),
     nombreProyecto: findCol(headerRow, ["NombreProyecto"]),
     estadoReq: findCol(headerRow, ["EstadoRequerimiento"]),
     fechaSalida: findCol(headerRow, ["FechaSalida"]),
@@ -636,38 +703,41 @@ function processWorkbook(wb, filename){
 
   const dataRows = rows.slice(headerRowIdx+1);
   let totalRows = 0, excluded = 0;
-  const orders = [];
+  const allOrders = []; // nacionales + importadas, mismo criterio de tardanza (usado por "Proveedores Fuera de Tiempo")
   let corte = null;
 
   for(const r of dataRows){
     if(!r || r.every(c => c==null || c==="")) continue;
     const codOrden = col.codOrden!==-1 ? (r[col.codOrden]||"").toString().trim() : "";
-    if(!codOrden || !codOrden.startsWith("0001")) continue; // solo nacional, y requiere OC generada
-    totalRows++;
+    const isNacional = codOrden.startsWith("0001");
+    const isImportada = codOrden.startsWith("0002");
+    if(!codOrden || !(isNacional || isImportada)) continue; // requiere OC generada, nacional o importada
+    if(isNacional) totalRows++;
 
     const fOrden = col.fechaOrden!==-1 ? parseExcelDate(r[col.fechaOrden]) : null;
     const fPara = col.paraFecha!==-1 ? parseExcelDate(r[col.paraFecha]) : null;
     const fAprob = col.fechaAprob!==-1 ? parseExcelDate(r[col.fechaAprob]) : null;
     const fRecep = col.fechaRecep!==-1 ? parseExcelDate(r[col.fechaRecep]) : null;
 
-    if(!fOrden || !fPara || !fAprob || !fRecep){ excluded++; continue; }
-    if(fRecep < fAprob){ excluded++; continue; }
-    if(fPara < fOrden){ excluded++; continue; }
+    if(!fOrden || !fPara || !fAprob || !fRecep){ if(isNacional) excluded++; continue; }
+    if(fRecep < fAprob){ if(isNacional) excluded++; continue; }
+    if(fPara < fOrden){ if(isNacional) excluded++; continue; }
 
     const tolerancia = busdayCount(fOrden, fPara);
-    if(tolerancia === null || tolerancia > 120){ excluded++; continue; }
+    if(tolerancia === null || tolerancia > 120){ if(isNacional) excluded++; continue; }
     const real = busdayCount(fAprob, fRecep);
-    if(real === null){ excluded++; continue; }
+    if(real === null){ if(isNacional) excluded++; continue; }
 
-    if(!corte || fRecep > corte) corte = fRecep;
+    if(isNacional && (!corte || fRecep > corte)) corte = fRecep;
 
     const desvio = real - tolerancia;
-    orders.push({
-      codOrden,
+    allOrders.push({
+      codOrden, nacional: isNacional,
       idProducto: col.idProducto!==-1 ? r[col.idProducto] : "",
       producto: col.producto!==-1 ? (r[col.producto]||"").toString() : "(sin descripción)",
       familia: col.familia!==-1 ? (r[col.familia]||"Sin familia").toString() : "Sin familia",
       proveedor: col.proveedor!==-1 ? (r[col.proveedor]||"").toString() : "",
+      rucProveedor: col.rucProveedor!==-1 ? (r[col.rucProveedor]||"").toString().trim() : "",
       fOrden, fPara, fAprob, fRecep,
       tolerancia, real, desvio,
       tardio: real > tolerancia,
@@ -675,6 +745,8 @@ function processWorkbook(wb, filename){
       mesKey: fOrden.getUTCFullYear() + "-" + String(fOrden.getUTCMonth()+1).padStart(2,"0"),
     });
   }
+
+  const orders = allOrders.filter(o=>o.nacional); // solo nacionales: dataset del Lead Time (comportamiento original, sin cambios)
 
   if(orders.length === 0){
     return { ok:false, message: "encontré la hoja y las columnas, pero ninguna fila cumplió los criterios (OC nacional con las 4 fechas completas)." };
@@ -702,7 +774,7 @@ function processWorkbook(wb, filename){
     }
   }
 
-  DATA = { fromSnapshot: false, orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol };
+  DATA = { fromSnapshot: false, orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol, proveedorOrders: allOrders };
   const cumpMsg = projectRows.length
     ? (" · " + new Set(projectRows.map(p=>p.proyecto)).size.toLocaleString('es-PE') + " proyectos para cumplimiento de entrega")
     : "";
@@ -720,6 +792,7 @@ function render(){
   renderFamilia();
   renderProducto();
   renderCumplimiento();
+  renderProveedores();
 }
 
 // ---------- Cumplimiento por Proyecto ----------
@@ -823,6 +896,139 @@ function drawCumplimiento(){
       <td>${p.pct==null?'—':`<span class="pill ${pillClass}">${label}</span>`}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
+}
+
+// ---------- Proveedores Fuera de Tiempo ----------
+function getProveedorOrders(){
+  return (DATA.proveedorOrders || []).filter(o=>o.fAprob);
+}
+function semaforoProv(pct){
+  if(pct == null) return 'na';
+  if(pct >= 50) return 'red';
+  if(pct >= 25) return 'amber';
+  return 'green';
+}
+function filteredProveedorOrders(){
+  const anio = document.getElementById('filterProvAnio').value;
+  const mes = document.getElementById('filterProvMes').value;
+  const dia = document.getElementById('filterProvDia').value;
+  return getProveedorOrders().filter(o=>{
+    if(anio!=='all' && o.fAprob.getUTCFullYear() !== +anio) return false;
+    if(mes!=='all' && (o.fAprob.getUTCMonth()+1) !== +mes) return false;
+    if(dia!=='all' && o.fAprob.getUTCDate() !== +dia) return false;
+    return true;
+  });
+}
+function buildProveedorAgg(orders){
+  const groups = {};
+  for(const o of orders){
+    const key = (o.proveedor||"").trim() || "(sin proveedor)";
+    (groups[key] = groups[key] || []).push(o);
+  }
+  return Object.entries(groups).map(([proveedor, g])=>{
+    const tardias = g.filter(o=>o.tardio);
+    const rucHit = g.find(o=>o.rucProveedor);
+    const nNacional = g.filter(o=>o.nacional).length;
+    return {
+      proveedor, ruc: rucHit ? rucHit.rucProveedor : "",
+      total: g.length, nNacional, nImportada: g.length - nNacional,
+      tardias: tardias.length,
+      pctTardio: g.length ? (tardias.length/g.length*100) : 0,
+      medDesvioTardias: tardias.length ? median(tardias.map(o=>o.desvio)) : null,
+    };
+  });
+}
+function populateProveedorAnios(){
+  const sel = document.getElementById('filterProvAnio');
+  const cur = sel.value;
+  const anios = Array.from(new Set(getProveedorOrders().map(o=>o.fAprob.getUTCFullYear()))).sort((a,b)=>b-a);
+  sel.innerHTML = '<option value="all">Todos los años</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+  if(anios.map(String).includes(cur)) sel.value = cur;
+}
+let provListenersBound = false;
+function renderProveedores(){
+  const hasProvData = getProveedorOrders().length > 0;
+  if(!hasProvData){
+    document.getElementById('kpiGridProv').innerHTML = '';
+    document.getElementById('provDefNote').innerHTML = '<b>No se pudo calcular este indicador:</b> no encontré las columnas necesarias (CodOrden, NombreProveedor, y las 4 fechas) en la hoja cargada.';
+    document.getElementById('chartProv').innerHTML = '';
+    document.querySelector('#tableProv thead').innerHTML = '';
+    document.querySelector('#tableProv tbody').innerHTML = '';
+    return;
+  }
+  populateProveedorAnios();
+  document.getElementById('provDefNote').innerHTML = `<b>Definición usada:</b> mismo criterio de tardanza que el Lead Time (días hábiles reales entre <code>FechaAprobacionOC → FechaRecepcion</code> mayores a la tolerancia comprometida entre <code>FechaOrden → ParaFechaOrden</code>). Incluye órdenes nacionales <b>e</b> importadas. Los filtros de año/mes/día usan <code>FechaAprobacionOC</code>. "Crítico" = % de tardanza ≥50% con al menos el mínimo de órdenes elegido — con menos, el dato se marca "insuficiente" en vez de forzar un semáforo poco representativo.`;
+  if(!provListenersBound){
+    document.getElementById('searchProv').addEventListener('input', drawProveedores);
+    document.getElementById('filterProvSemaforo').addEventListener('change', drawProveedores);
+    document.getElementById('filterProvMinOrdenes').addEventListener('change', drawProveedores);
+    document.getElementById('filterProvAnio').addEventListener('change', drawProveedores);
+    document.getElementById('filterProvMes').addEventListener('change', drawProveedores);
+    document.getElementById('filterProvDia').addEventListener('change', drawProveedores);
+    provListenersBound = true;
+  }
+  drawProveedores();
+}
+function drawProveedores(){
+  const q = (document.getElementById('searchProv').value||"").toLowerCase();
+  const semFilter = document.getElementById('filterProvSemaforo').value;
+  const minOrdenes = +document.getElementById('filterProvMinOrdenes').value;
+
+  const agg = buildProveedorAgg(filteredProveedorOrders());
+
+  const evaluados = agg.filter(p=>p.total>=minOrdenes);
+  const totalOrdenesEval = evaluados.reduce((s,p)=>s+p.total,0);
+  const totalTardiasEval = evaluados.reduce((s,p)=>s+p.tardias,0);
+  const globalPct = totalOrdenesEval>0 ? (totalTardiasEval/totalOrdenesEval*100) : 0;
+  const nRed = evaluados.filter(p=>semaforoProv(p.pctTardio)==='red').length;
+  const nAmber = evaluados.filter(p=>semaforoProv(p.pctTardio)==='amber').length;
+  const nGreen = evaluados.filter(p=>semaforoProv(p.pctTardio)==='green').length;
+
+  document.getElementById('kpiGridProv').innerHTML = `
+    <div class="card kpi"><div class="label">% tardanza global</div><div class="value">${globalPct.toFixed(1)}%</div><div class="sub">${totalTardiasEval.toLocaleString('es-PE')} de ${totalOrdenesEval.toLocaleString('es-PE')} órdenes (proveedores evaluados)</div></div>
+    <div class="card kpi"><div class="label">Proveedores evaluados</div><div class="value">${evaluados.length}</div><div class="sub">con ≥${minOrdenes} órdenes en el periodo</div></div>
+    <div class="card kpi"><div class="label" style="color:var(--red)">Críticos</div><div class="value" style="color:var(--red)">${nRed}</div><div class="sub">≥50% de tardanza</div></div>
+    <div class="card kpi"><div class="label" style="color:var(--amber)">Atención</div><div class="value" style="color:var(--amber)">${nAmber}</div><div class="sub">25-49% de tardanza</div></div>
+    <div class="card kpi"><div class="label" style="color:var(--green)">Buen desempeño</div><div class="value" style="color:var(--green)">${nGreen}</div><div class="sub">menos de 25% de tardanza</div></div>
+  `;
+
+  let view = agg;
+  if(q) view = view.filter(p=>p.proveedor.toLowerCase().includes(q) || (p.ruc||"").toLowerCase().includes(q));
+  if(semFilter === 'insuficiente'){
+    view = view.filter(p=>p.total<minOrdenes);
+  } else {
+    view = view.filter(p=>p.total>=minOrdenes);
+    if(semFilter !== 'all') view = view.filter(p=>semaforoProv(p.pctTardio)===semFilter);
+  }
+  view.sort((a,b)=>b.pctTardio-a.pctTardio);
+
+  const colorFor = s => s==='red' ? 'var(--red)' : s==='amber' ? 'var(--amber)' : s==='green' ? 'var(--green)' : 'var(--track-empty)';
+
+  document.getElementById('chartProv').innerHTML = view.slice(0,15).map(p=>{
+    const s = p.total>=minOrdenes ? semaforoProv(p.pctTardio) : 'na';
+    return `<div class="bar-row">
+      <div class="bar-label" title="${p.proveedor}">${p.proveedor}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${p.pctTardio}%;background:${colorFor(s)}"></div></div>
+      <div class="bar-pct">${p.pctTardio.toFixed(0)}%</div>
+    </div>`;
+  }).join("") || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
+
+  const table = document.getElementById('tableProv');
+  table.querySelector('thead').innerHTML = `<tr><th>Proveedor</th><th>RUC</th><th>Órdenes (Nac/Imp)</th><th>Tardías</th><th>% Tardío</th><th>Desvío mediano (tardías)</th><th>Estado</th></tr>`;
+  table.querySelector('tbody').innerHTML = view.map(p=>{
+    const s = p.total>=minOrdenes ? semaforoProv(p.pctTardio) : 'na';
+    const pillClass = s==='red' ? 'warn' : s==='amber' ? 'late' : s==='green' ? 'ok' : '';
+    const label = s==='red' ? 'Crítico' : s==='amber' ? 'Atención' : s==='green' ? 'Buen desempeño' : 'Datos insuficientes';
+    return `<tr>
+      <td style="white-space:normal;min-width:200px;">${p.proveedor}</td>
+      <td>${p.ruc || '—'}</td>
+      <td>${p.total.toLocaleString('es-PE')} (${p.nNacional}/${p.nImportada})</td>
+      <td>${p.tardias.toLocaleString('es-PE')}</td>
+      <td>${p.pctTardio.toFixed(1)}%</td>
+      <td>${p.medDesvioTardias==null ? '—' : p.medDesvioTardias.toFixed(1)+' d.h.'}</td>
+      <td><span class="pill ${pillClass}">${label}</span></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
 }
 
 function pillFor(o){
