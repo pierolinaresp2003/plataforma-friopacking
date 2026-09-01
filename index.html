@@ -113,6 +113,8 @@
   .kpi{padding:16px 18px;}
   .kpi .label{font-size:12px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
   .kpi .value{font-size:26px;font-weight:800;margin-top:6px;color:var(--brand-ink);}
+  .kpi .value.alert-n{color:var(--red);}
+  .kpi.alert-card{border-color:var(--red);}
   .kpi .sub{font-size:12px;color:var(--ink-soft);margin-top:4px;}
   .note{padding:14px 16px;font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:18px;background:var(--surface-3);}
   .note b{color:var(--ink);}
@@ -237,6 +239,7 @@
   <nav class="sidebar-nav">
     <div class="navitem active" data-section="proceso">🕐 Tiempos del Proceso de Atención</div>
     <div class="navitem" data-section="gasto">💰 Concentración de Gasto</div>
+    <div class="navitem" data-section="alertas">⚠️ Alertas de Atención</div>
   </nav>
   <div class="sidebar-foot">Grupo Friopacking<br>Logística</div>
 </aside>
@@ -428,6 +431,32 @@
       <div class="table-card card"><table id="tableGasto"><thead></thead><tbody></tbody></table></div>
     </div><!-- /section-gasto -->
 
+    <div id="section-alertas" class="section">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        <button class="btn secondary" id="btnImgAlertas" type="button">🖼️ Generar imagen del módulo</button>
+      </div>
+      <div class="note" id="alertasDefNote" style="margin-bottom:14px;">
+        <b>Qué muestra esta alerta:</b> requerimientos y pedidos que todavía no pasan al siguiente paso del proceso y ya superan los <b>2 días hábiles</b> (la meta de Tiempo de Generación de Pedido y Tiempo de Emisión de OC) contados hasta <b>hoy</b> — no hasta que se resuelvan. Se excluyen los requerimientos/pedidos marcados como "Archivado". Como se calcula contra la fecha de hoy, la lista cambia cada día aunque no vuelvas a cargar el archivo.
+      </div>
+      <div class="kpi-grid" id="kpiGridAlertas"></div>
+
+      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Requerimientos sin Pedido (más de 2 d.h.)</h3>
+      <div class="toolbar">
+        <input type="search" id="searchAlertaReq" placeholder="Buscar proyecto, producto o código...">
+      </div>
+      <div class="table-card card" style="margin-bottom:24px;">
+        <table id="tableAlertaReq" class="summary-table"><thead></thead><tbody></tbody></table>
+      </div>
+
+      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Pedidos sin OC (más de 2 d.h.)</h3>
+      <div class="toolbar">
+        <input type="search" id="searchAlertaPedido" placeholder="Buscar proyecto, producto o código...">
+      </div>
+      <div class="table-card card">
+        <table id="tableAlertaPedido" class="summary-table"><thead></thead><tbody></tbody></table>
+      </div>
+    </div><!-- /section-alertas -->
+
   </div>
 
   </div><!-- /content -->
@@ -583,6 +612,11 @@ function responsableD1For(codPedido){
 function reresolveResponsableD1(){
   if(!DATA || !DATA.procesoRows) return;
   for(const r of DATA.procesoRows){ r.responsableD1 = responsableD1For(r.codPedido); }
+  // Las alertas "req_sin_pedido" usan el mismo responsable fijo/pedido-directo del Indicador 1 —
+  // se re-resuelven igual si PedidoSinReq.xlsx se carga después de Reporte Maestro.xlsx.
+  if(DATA.alertRows){
+    for(const a of DATA.alertRows){ if(a.tipo==='req_sin_pedido') a.responsable = responsableD1For(a.codPedido); }
+  }
   render();
 }
 
@@ -675,6 +709,14 @@ function buildSnapshot(){
         fr: isoDay(r.fReq), fp: isoDay(r.fPedido), fo: isoDay(r.fOrden), fb: isoDay(r.fAprob),
         fc: isoDay(r.fRecep), fs: isoDay(r.fSalida), fx: isoDay(r.fCompromiso),
         d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d6: r.d6, d4c: r.d4cumple,
+      })),
+      // Alertas de atención (Req sin Pedido / Pedido sin OC) — se publican aparte porque son casos SIN
+      // fecha final (siguen abiertos), y "proceso.rows" de arriba solo contiene casos con al menos un
+      // indicador calculable. Los días hábiles transcurridos NO se guardan aquí: se calculan al vuelo
+      // contra la fecha de hoy en el navegador de quien mire el link, para que la alerta no quede vieja.
+      alertas: (DATA.alertRows||[]).map(a => ({
+        tp: a.tipo, py: a.proyecto, pr: a.producto, ip: a.idProducto, pv: a.proveedor,
+        cr: a.codRequerimiento, cp: a.codPedido, rp: a.responsable, fd: isoDay(a.fDesde),
       })),
     },
     gasto: GASTO_DATA ? {
@@ -802,6 +844,12 @@ function loadFromSnapshot(snap){
       fReq: fromIsoDay(r.fr), fPedido: fromIsoDay(r.fp), fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb),
       fRecep: fromIsoDay(r.fc), fSalida: fromIsoDay(r.fs), fCompromiso: fromIsoDay(r.fx),
       d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d6: r.d6, d4cumple: r.d4c,
+    })) : [],
+    // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
+    // ese caso, simplemente no se muestran alertas hasta que se vuelva a publicar con el archivo actual.
+    alertRows: (snap.proceso && snap.proceso.alertas) ? snap.proceso.alertas.map(a => ({
+      tipo: a.tp, proyecto: a.py, producto: a.pr, idProducto: a.ip, proveedor: a.pv,
+      codRequerimiento: a.cr, codPedido: a.cp, responsable: a.rp, fDesde: fromIsoDay(a.fd),
     })) : [],
   };
   GASTO_DATA = (snap.gasto && snap.gasto.rows) ? {
@@ -965,6 +1013,7 @@ function processWorkbook(wb, filename){
     rucProveedor: findCol(headerRow, ["RucProveedor","RUC Proveedor","RUC"]),
     nombreProyecto: findCol(headerRow, ["NombreProyecto"]),
     estadoReq: findCol(headerRow, ["EstadoRequerimiento"]),
+    estadoPedido: findCol(headerRow, ["EstadoPedido"]),
     fechaSalida: findCol(headerRow, ["FechaSalida"]),
     fechaRequerimiento: findCol(headerRow, ["FechaRequerimiento"]),
     motivoDescr: findCol(headerRow, ["MotivoDescr"]),
@@ -1053,6 +1102,12 @@ function processWorkbook(wb, filename){
   // ---- Cuarto dataset: Tiempos del Proceso de Atención (5 indicadores independientes) ----
   const hasFechaRequerimientoCol = col.fechaRequerimiento !== -1;
   const procesoRows = [];
+  // Alertas de atención (pedido de Piero, 01.09.2026): requerimientos/pedidos que TODAVÍA no pasan al
+  // siguiente paso — estos casos casi siempre tienen d1..d6 en null (nada calculable todavía), así que
+  // se arman en un dataset aparte, ANTES del "continue" de más abajo que descarta esas filas de
+  // procesoRows. Los días hábiles transcurridos se calculan en pantalla contra la fecha de HOY (no se
+  // guardan aquí), para que la alerta se mantenga vigente día a día sin tener que recargar el archivo.
+  const alertRows = [];
   if(hasFechaRequerimientoCol){
     for(const r of dataRows){
       if(!r || r.every(c => c==null || c==="")) continue;
@@ -1099,6 +1154,29 @@ function processWorkbook(wb, filename){
       const fLimite4 = camino==='compra' ? limite4For({ fOrden, fAprob, fCompromiso }) : null;
       const d4cumple = (camino==='compra' && fRecep && fLimite4) ? (fRecep <= fLimite4) : null;
 
+      // "Archivado" = el requerimiento/pedido se cerró sin seguir el camino normal (cancelado, etc.) —
+      // no cuenta como "atención pendiente" aunque nunca haya tenido Pedido/OC.
+      const estadoReqAt = col.estadoReq!==-1 ? (r[col.estadoReq]||"").toString().trim() : "";
+      const archivadoReq = estadoReqAt.toLowerCase() === "archivado";
+      const estadoPedidoAt = col.estadoPedido!==-1 ? (r[col.estadoPedido]||"").toString().trim() : "";
+      const archivadoPedido = estadoPedidoAt.toLowerCase() === "archivado";
+      const alertBase = {
+        proyecto: col.nombreProyecto!==-1 ? ((r[col.nombreProyecto]||"").toString().trim() || "SIN PROYECTO (compra de almacén)") : "SIN PROYECTO (compra de almacén)",
+        producto: col.producto!==-1 ? (r[col.producto]||"").toString() : "(sin descripción)",
+        idProducto: col.idProducto!==-1 ? (r[col.idProducto]||"").toString() : "",
+        proveedor: col.proveedor!==-1 ? (r[col.proveedor]||"").toString().trim() : "",
+        codRequerimiento: col.codRequerimiento!==-1 ? (r[col.codRequerimiento]||"").toString().trim() : "",
+        codPedido: codPedidoAt,
+      };
+      // Req sin Pedido: no tiene Pedido NI Salida directa — todavía no se definió ningún camino.
+      if(!archivadoReq && !fPedido && !fSalida){
+        alertRows.push(Object.assign({}, alertBase, { tipo:'req_sin_pedido', fDesde: fReq, responsable: responsableD1For(codPedidoAt) }));
+      }
+      // Pedido sin OC: ya tiene Pedido, todavía no tiene Orden de Compra.
+      if(fPedido && !fOrden && !archivadoPedido){
+        alertRows.push(Object.assign({}, alertBase, { tipo:'pedido_sin_oc', fDesde: fPedido, responsable: (col.usuarioCompras!==-1 ? (r[col.usuarioCompras]||"").toString().trim() : "") || '(sin comprador asignado)' }));
+      }
+
       if(d1==null && d2==null && d3==null && d4==null && d6==null) continue; // nada calculable
 
       procesoRows.push({
@@ -1126,7 +1204,7 @@ function processWorkbook(wb, filename){
     }
   }
 
-  DATA = { fromSnapshot: false, orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol, proveedorOrders: allOrders, procesoRows, hasFechaRequerimientoCol };
+  DATA = { fromSnapshot: false, orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol, proveedorOrders: allOrders, procesoRows, alertRows, hasFechaRequerimientoCol };
   document.getElementById('publishBanner').style.display = 'none';
   updateActionButtons();
   populateProcesoFilters();
@@ -1405,6 +1483,70 @@ function render(){
   document.getElementById('dashboard').style.display = 'block';
   renderProceso();
   renderGasto();
+  renderAlertas();
+}
+
+// ---------- Alertas de Atención (Req sin Pedido / Pedido sin OC) ----------
+// Ambas alertas usan la misma meta que su indicador equivalente (2 d.h.): Req sin Pedido = meta del
+// Indicador 1 (Tiempo de Generación de Pedido), Pedido sin OC = meta del Indicador 2 (Tiempo de
+// Emisión de OC) — se leen de INDICATORS en vez de repetir "2" a mano, para que si Piero cambia esas
+// metas más adelante, esta alerta se actualice sola.
+function metaAlerta(tipo){
+  const key = tipo === 'req_sin_pedido' ? 'd1' : 'd2';
+  return INDICATORS.find(i=>i.key===key).meta;
+}
+// Días hábiles transcurridos SIEMPRE contra la fecha de HOY (no contra "corte" ni ninguna fecha
+// guardada) — es lo que hace que la alerta sea "viva": el mismo caso sin resolver se ve cada día un
+// poco más atrasado, tanto en una carga fresca como en el link publicado.
+function diasHabilesAlerta(row){
+  return busdayCount(row.fDesde, new Date());
+}
+let alertasListenersBound = false;
+function renderAlertas(){
+  const hasData = DATA && DATA.alertRows && DATA.alertRows.length >= 0 && DATA.hasFechaRequerimientoCol;
+  if(!hasData){
+    document.getElementById('kpiGridAlertas').innerHTML = '';
+    document.querySelector('#tableAlertaReq thead').innerHTML = '';
+    document.querySelector('#tableAlertaReq tbody').innerHTML = '';
+    document.querySelector('#tableAlertaPedido thead').innerHTML = '';
+    document.querySelector('#tableAlertaPedido tbody').innerHTML = '';
+    return;
+  }
+  if(!alertasListenersBound){
+    document.getElementById('searchAlertaReq').addEventListener('input', drawAlertas);
+    document.getElementById('searchAlertaPedido').addEventListener('input', drawAlertas);
+    document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'alertas-atencion', e.currentTarget));
+    alertasListenersBound = true;
+  }
+  drawAlertas();
+}
+function drawAlertasTable(tableEl, rows, codLabel, searchInputId){
+  const q = (document.getElementById(searchInputId).value||"").toLowerCase();
+  let view = rows.filter(r=>!q || (r.proyecto+' '+r.producto+' '+r.codRequerimiento+' '+r.codPedido).toLowerCase().includes(q));
+  view = view.map(r=>Object.assign({}, r, { dias: diasHabilesAlerta(r) }))
+    .filter(r=>r.dias!=null && r.dias > metaAlerta(r.tipo))
+    .sort((a,b)=>b.dias-a.dias);
+  tableEl.querySelector('thead').innerHTML = `<tr><th>${codLabel}</th><th>Proyecto</th><th>Producto</th><th>Proveedor</th><th>Responsable</th><th>Desde</th><th>Días hábiles sin atención</th></tr>`;
+  tableEl.querySelector('tbody').innerHTML = view.map(r=>`
+    <tr>
+      <td>${escapeHtml(r.tipo==='req_sin_pedido'?r.codRequerimiento:r.codPedido)||'—'}</td>
+      <td style="white-space:normal;min-width:160px;">${escapeHtml(r.proyecto)}</td>
+      <td style="white-space:normal;min-width:180px;">${escapeHtml(r.producto)}</td>
+      <td style="white-space:normal;min-width:140px;">${escapeHtml(r.proveedor)||'—'}</td>
+      <td>${escapeHtml(r.responsable)}</td>
+      <td>${fmtDate(r.fDesde)}</td>
+      <td><span class="pill warn">${r.dias} d.h.</span></td>
+    </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin casos por encima de la meta con el filtro actual 🎉</td></tr>`;
+  return view.length;
+}
+function drawAlertas(){
+  const all = DATA.alertRows || [];
+  const nReq = drawAlertasTable(document.getElementById('tableAlertaReq'), all.filter(r=>r.tipo==='req_sin_pedido'), 'Requerimiento', 'searchAlertaReq');
+  const nPedido = drawAlertasTable(document.getElementById('tableAlertaPedido'), all.filter(r=>r.tipo==='pedido_sin_oc'), 'Pedido', 'searchAlertaPedido');
+  document.getElementById('kpiGridAlertas').innerHTML = `
+    <div class="card kpi${nReq>0?' alert-card':''}"><div class="label">Requerimientos sin Pedido (&gt;2 d.h.)</div><div class="value${nReq>0?' alert-n':''}">${nReq.toLocaleString('es-PE')}</div><div class="sub">Responsable fijo: JCENTENO</div></div>
+    <div class="card kpi${nPedido>0?' alert-card':''}"><div class="label">Pedidos sin OC (&gt;2 d.h.)</div><div class="value${nPedido>0?' alert-n':''}">${nPedido.toLocaleString('es-PE')}</div><div class="sub">Responsable: comprador asignado (UsuarioCompras)</div></div>
+  `;
 }
 
 // ---------- Tiempos del Proceso de Atención (5 indicadores) ----------
