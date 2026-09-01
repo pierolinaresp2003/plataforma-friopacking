@@ -360,16 +360,9 @@
         <table id="tableProcesoResumen" class="summary-table"><thead></thead><tbody></tbody></table>
       </div>
 
-      <!-- Rendimiento por persona: Compras (Indicador 2 y 3) y Almacén (Indicador 1 y 5) -->
-      <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Rendimiento por comprador (área Compras)</h3>
-      <div class="table-card card" style="margin-bottom:20px;">
-        <table id="tableProcesoCompradores" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
-
-      <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Rendimiento por persona de Almacén</h3>
-      <div class="table-card card" style="margin-bottom:20px;">
-        <table id="tableProcesoAlmacen" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
+      <!-- Las tablas "Rendimiento por comprador" y "Rendimiento por persona de Almacén" se quitaron a
+      pedido de Piero (01.09.2026, misma tarde que el filtro de origen) — las vio con datos reales y
+      pidió eliminarlas del reporte. -->
 
       <!-- Detalle: en vez de modal, aparece aquí abajo al hacer clic en cualquier caso -->
       <div id="procDetailPanel" class="card table-card" style="margin-bottom:20px;display:none;">
@@ -1634,43 +1627,8 @@ function drawProceso(){
   drawKpiCards();
   drawIndicatorTrend();
   drawSummaryTable();
-  // Rendimiento por comprador = Pedido→OC y OC aprobada→Entrega (aclaración de Piero, 01.09.2026) —
-  // OC→Aprobación (d3) ya no entra aquí: ese paso es siempre de Manuel Luján, no varía por comprador.
-  drawPersonPerfTable(document.getElementById('tableProcesoCompradores'), INDICATORS.filter(i=>i.key==='d2'||i.key==='d4'), 'Comprador');
-  drawPersonPerfTable(document.getElementById('tableProcesoAlmacen'), INDICATORS.filter(i=>i.key==='d1'||i.key==='d6'), 'Persona de Almacén');
   populateGroupByProceso();
   drawMainChart();
-}
-
-// Rendimiento por persona (compradores en Compras, personal de Almacén): una fila por persona +
-// indicador aplicable, reutilizando groupRowsFor(..., 'responsable') que ya agrega promedio/cumplimiento
-// por responsableLabel(). Pedido de Piero (01.09.2026): ver el desempeño en números, no solo agregado.
-function drawPersonPerfTable(tableEl, indicators, personLabel){
-  const rows = filteredProcesoRows();
-  let combined = [];
-  indicators.forEach(ind=>{
-    const groups = groupRowsFor(rows, ind, 'responsable').sort((a,b)=>(b.promedio||0)-(a.promedio||0));
-    groups.forEach(g=> combined.push(Object.assign({ ind }, g)));
-  });
-  tableEl.querySelector('thead').innerHTML = `<tr><th>${personLabel}</th><th>Indicador</th><th>Promedio</th><th>Meta</th><th>Cumplimiento</th><th>Casos</th></tr>`;
-  tableEl.querySelector('tbody').innerHTML = combined.map(g=>{
-    const metaTxt = g.ind.key==='d4' ? 'Según OC' : (g.ind.meta!=null ? g.ind.meta+' d.h.' : '—');
-    return `<tr data-ind="${g.ind.key}" data-group="${escapeHtml(g.label)}" style="cursor:pointer;">
-      <td>${escapeHtml(g.label)}</td>
-      <td>${g.ind.num}. ${g.ind.stage}</td>
-      <td>${g.promedio.toFixed(1)} d.h.</td>
-      <td>${metaTxt}</td>
-      <td>${g.cumplePct==null?'—':g.cumplePct.toFixed(0)+'%'}</td>
-      <td>${g.n.toLocaleString('es-PE')}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--muted);">Sin datos con los filtros actuales</td></tr>';
-  tableEl.querySelectorAll('tbody tr[data-ind]').forEach(tr=>{
-    tr.addEventListener('click', ()=>{
-      const ind = INDICATORS.find(i=>i.key===tr.dataset.ind);
-      const personRows = filteredProcesoRows().filter(r=>r.camino===ind.camino && r[ind.key]!=null && responsableLabel(r, ind)===tr.dataset.group);
-      openDrilldown(ind, personRows, tr.dataset.group);
-    });
-  });
 }
 
 // Generar imagen (PNG) del módulo activo tal como se ve en pantalla — pedido de Piero (01.09.2026)
