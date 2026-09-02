@@ -333,16 +333,7 @@
           <option value="11">Noviembre</option>
           <option value="12">Diciembre</option>
         </select>
-        <select id="filterProcesoDia">
-          <option value="all">Todos los días</option>
-          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
-          <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
-          <option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option>
-          <option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
-          <option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option>
-          <option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option>
-          <option value="31">31</option>
-        </select>
+        <select id="filterProcesoSemana"><option value="all">Todas las semanas</option></select>
       </div>
 
       <!-- Filas 2 y 3: tarjetas KPI de los 5 indicadores -->
@@ -411,16 +402,7 @@
           <option value="11">Noviembre</option>
           <option value="12">Diciembre</option>
         </select>
-        <select id="filterGastoDia">
-          <option value="all">Todos los días</option>
-          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
-          <option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
-          <option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option>
-          <option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option>
-          <option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option>
-          <option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option>
-          <option value="31">31</option>
-        </select>
+        <select id="filterGastoSemana"><option value="all">Todas las semanas</option></select>
         <select id="filterGastoPareto">
           <option value="all">Todos</option>
           <option value="top80">Solo el 80% principal (Pareto)</option>
@@ -450,7 +432,15 @@
           <option value="nacional">Origen: Nacional</option>
           <option value="importado">Origen: Importado</option>
         </select>
-        <select id="filterAlertaDesdeMes"><option value="all">Desde: todos</option></select>
+        <select id="filterAlertaAnio"><option value="all">Todos los años</option></select>
+        <select id="filterAlertaMes">
+          <option value="all">Todos los meses</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+        <select id="filterAlertaSemana"><option value="all">Todas las semanas</option></select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
 
@@ -486,6 +476,7 @@
           <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
           <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
         </select>
+        <select id="filterComprasSemana"><option value="all">Todas las semanas</option></select>
       </div>
 
       <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Compras por semana: Nacional vs. Importado</h3>
@@ -775,6 +766,10 @@ function buildSnapshot(){
         fr: isoDay(r.fReq), fp: isoDay(r.fPedido), fo: isoDay(r.fOrden), fb: isoDay(r.fAprob),
         fc: isoDay(r.fRecep), fs: isoDay(r.fSalida), fx: isoDay(r.fCompromiso),
         d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d6: r.d6, d4c: r.d4cumple,
+        // d4raw/esRegularizacion (02.09.2026): para que el detalle del Indicador 4 pueda seguir
+        // mostrando, marcadas, las líneas excluidas por la columna "¿Es regularización?" también sobre
+        // el link publicado (ver openDrilldown). rg se guarda como 0/1 para no engordar el JSON.
+        d4r: r.d4raw, rg: r.esRegularizacion ? 1 : 0,
       })),
       // Alertas de atención (Req sin Pedido / Pedido sin OC) — se publican aparte porque son casos SIN
       // fecha final (siguen abiertos), y "proceso.rows" de arriba solo contiene casos con al menos un
@@ -929,6 +924,9 @@ function loadFromSnapshot(snap){
       fReq: fromIsoDay(r.fr), fPedido: fromIsoDay(r.fp), fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb),
       fRecep: fromIsoDay(r.fc), fSalida: fromIsoDay(r.fs), fCompromiso: fromIsoDay(r.fx),
       d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d6: r.d6, d4cumple: r.d4c,
+      // Un snapshot publicado ANTES de esta ronda (02.09.2026) no trae "d4r"/"rg" — se cae a d4raw=d4
+      // (mismo valor, sin marcar ninguna como regularización) para no romper el detalle en ese caso.
+      d4raw: (r.d4r !== undefined ? r.d4r : r.d4), esRegularizacion: !!r.rg,
     })) : [],
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
     // ese caso, simplemente no se muestran alertas hasta que se vuelva a publicar con el archivo actual.
@@ -1123,6 +1121,11 @@ function processWorkbook(wb, filename){
     responsableSalida: findCol(headerRow, ["ResponsableGeneralSalida"]),
     codRequerimiento: findCol(headerRow, ["CodRequerimiento"]),
     codPedido: findCol(headerRow, ["CodPedido"]),
+    // Columna agregada por Piero en Reporte Maestro.xlsx (02.09.2026, al final de la hoja): marca con
+    // el texto "Regularización" las líneas que no deben contar en el cálculo del Indicador 4 (Tiempo de
+    // Entrega de OC) — verificado contra el archivo real: header exacto "¿Es regularización?", valores
+    // "Regularización" (139 filas) o vacío (el resto).
+    esRegularizacion: findCol(headerRow, ["¿Es regularización?","Es regularización","Regularización"]),
   };
 
   const dataRows = rows.slice(headerRowIdx+1);
@@ -1255,7 +1258,14 @@ function processWorkbook(wb, filename){
       const d1 = camino==='compra' ? calcDias(fReq, fPedido) : null;
       const d2 = camino==='compra' ? calcDias(fPedido, fOrden) : null;
       const d3 = camino==='compra' ? calcDias(fOrden, fAprob) : null;
-      const d4 = camino==='compra' ? calcDias(fAprob, fRecep) : null;
+      const d4raw = camino==='compra' ? calcDias(fAprob, fRecep) : null;
+      // Las líneas marcadas "Regularización" (columna agregada por Piero, 02.09.2026) no cuentan en el
+      // cálculo del Indicador 4 — ni promedio, ni cumplimiento, ni el ranking de compradores que lo
+      // reutiliza. Se trata igual que "Sin información" (d4 en null) en todos los cálculos, pero se
+      // conserva el valor crudo en d4raw para poder seguir mostrando esas líneas en el detalle, marcadas,
+      // en vez de que desaparezcan sin explicación (ver openDrilldown).
+      const esRegularizacion = col.esRegularizacion!==-1 ? (r[col.esRegularizacion]||"").toString().trim().toLowerCase() === "regularización" : false;
+      const d4 = (camino==='compra' && !esRegularizacion) ? d4raw : null;
       const d6 = camino==='stock' ? calcDias(fReq, fSalida) : null;
       // "Cumple" del Indicador 4 = llegó dentro del plazo pactado, contado desde Aprobación (no
       // comparado directo contra ParaFechaOrden — ver tolerancia4For/limite4For arriba).
@@ -1305,7 +1315,7 @@ function processWorkbook(wb, filename){
         codOrden: codOrdenAt,
         camino,
         fReq, fPedido, fOrden, fAprob, fRecep, fSalida, fCompromiso,
-        d1, d2, d3, d4, d6, d4cumple,
+        d1, d2, d3, d4, d6, d4cumple, d4raw, esRegularizacion,
         // Responsable real del Indicador 1 para este caso puntual (ver responsableD1For arriba) —
         // se recalcula solo con reresolveResponsableD1() si PedidoSinReq.xlsx se carga después.
         responsableD1: responsableD1For(codPedidoAt),
@@ -1599,10 +1609,12 @@ function filteredGastoRows(){
   let rows = getGastoRows();
   const anio = document.getElementById('filterGastoAnio').value;
   const mes = document.getElementById('filterGastoMes').value;
-  const dia = document.getElementById('filterGastoDia').value;
+  const semana = document.getElementById('filterGastoSemana').value;
   if(anio !== 'all') rows = rows.filter(r=>String(r.anio)===anio);
   if(mes !== 'all') rows = rows.filter(r=>String(r.mes)===mes);
-  if(dia !== 'all') rows = rows.filter(r=>String(r.dia)===dia);
+  // Semana reemplazó a Día (pedido de Piero, 02.09.2026) — las filas de Gasto solo guardan
+  // {anio,mes,dia} sueltos (no un objeto Date), así que se arma la fecha al vuelo para compararla.
+  if(semana !== 'all') rows = rows.filter(r=>weekKeyFor(dateFromYMD(r.anio, r.mes, r.dia))===semana);
   return rows;
 }
 function buildGastoAgg(groupKey, rows){
@@ -1647,7 +1659,7 @@ function renderGasto(){
     document.getElementById('groupByGasto').addEventListener('change', drawGasto);
     document.getElementById('filterGastoAnio').addEventListener('change', drawGasto);
     document.getElementById('filterGastoMes').addEventListener('change', drawGasto);
-    document.getElementById('filterGastoDia').addEventListener('change', drawGasto);
+    document.getElementById('filterGastoSemana').addEventListener('change', drawGasto);
     document.getElementById('filterGastoPareto').addEventListener('change', drawGasto);
     document.getElementById('btnImgGasto').addEventListener('click', (e)=> downloadSectionImage('section-gasto', 'concentracion-gasto', e.currentTarget));
     document.getElementById('btnProImgGasto').addEventListener('click', (e)=> downloadProImage(buildProImageGasto, 'resumen-concentracion-gasto', e.currentTarget));
@@ -1656,6 +1668,7 @@ function renderGasto(){
   drawGasto();
 }
 function drawGasto(){
+  populateSemanaSelect(document.getElementById('filterGastoSemana'), document.getElementById('filterGastoAnio').value, document.getElementById('filterGastoMes').value);
   document.getElementById('gastoDefNote').innerHTML = `<b>Qué cuenta como gasto:</b> solo líneas de <b>Órdenes de Compra</b> (no Órdenes de Servicio) con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> — se excluye lo Pendiente (aún sin aprobar). Monto = Cantidad × Precio Unitario con descuento, en la moneda de cada línea, convertido a Soles con un tipo de cambio de referencia fijo (US$ = S/ ${TIPO_CAMBIO['US$'].toFixed(3)}, € = S/ ${TIPO_CAMBIO['€'].toFixed(2)}, tomados el 01.09.2026) — es una aproximación, no el tipo de cambio real de cada operación histórica. El <b>80% principal (Pareto)</b> son los proveedores (o familias) que, ordenados de mayor a menor gasto, acumulan el 80% del gasto total del período filtrado.`;
 
   const rows = filteredGastoRows();
@@ -1730,36 +1743,36 @@ function populateAlertaFilters(){
   populateSelectDistinct(document.getElementById('filterAlertaProyecto'), rows.map(r=>r.proyecto), 'Todos los proyectos');
   populateSelectDistinct(document.getElementById('filterAlertaProveedor'), rows.map(r=>r.proveedor), 'Todos los proveedores');
   populateSelectDistinct(document.getElementById('filterAlertaResponsable'), rows.map(r=>r.responsable), 'Todos los responsables');
-  populateAlertaMesFilter(rows);
+  populateAlertaAnioFilter(rows);
 }
-// Filtro "Desde (mes)": a diferencia de los demás filtros (que son de coincidencia exacta), este es un
-// corte — Piero pidió poder "considerarlo desde un mes en específico en adelante" (para dejar fuera el
-// backlog más viejo y enfocarse en lo reciente). Las opciones se arman con los meses reales que hay en
-// los datos (según fDesde: FechaRequerimiento para "Req sin Pedido", FechaPedido para "Pedido sin OC").
-function populateAlertaMesFilter(rows){
-  const sel = document.getElementById('filterAlertaDesdeMes');
+// Año/Mes/Semana de coincidencia exacta sobre fDesde (FechaRequerimiento para "Req sin Pedido",
+// FechaPedido para "Pedido sin OC") — reemplaza el corte "Desde (mes)" que tenía este módulo (02.09.2026,
+// confirmado con Piero vía AskUserQuestion: mismo patrón que Tiempos del Proceso/Gasto/Compras).
+function populateAlertaAnioFilter(rows){
+  const sel = document.getElementById('filterAlertaAnio');
   const current = sel.value;
-  const keys = [...new Set(rows.filter(r=>r.fDesde).map(r=>isoDay(r.fDesde).slice(0,7)))].sort();
-  sel.innerHTML = ['<option value="all">Desde: todos</option>'].concat(
-    keys.map(k=>`<option value="${k}">Desde ${formatMonthLabel(k)}</option>`)
-  ).join('');
-  if([...sel.options].some(o=>o.value===current)) sel.value = current;
+  const anios = Array.from(new Set(rows.filter(r=>r.fDesde).map(r=>r.fDesde.getUTCFullYear()))).sort((a,b)=>b-a);
+  sel.innerHTML = '<option value="all">Todos los años</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+  if(anios.map(String).includes(current)) sel.value = current;
 }
-// Filtros compartidos por las 2 tablas de alertas (Proyecto/Proveedor/Responsable/Origen/Desde mes) — el
-// buscador de cada tabla sigue siendo independiente, pero estos filtros aplican a ambas a la vez.
+// Filtros compartidos por las 2 tablas de alertas (Proyecto/Proveedor/Responsable/Origen/Año/Mes/Semana)
+// — el buscador de cada tabla sigue siendo independiente, pero estos filtros aplican a ambas a la vez.
 function filteredAlertRows(rows){
   const fProyecto = document.getElementById('filterAlertaProyecto').value;
   const fProveedor = document.getElementById('filterAlertaProveedor').value;
   const fResp = document.getElementById('filterAlertaResponsable').value;
   const fOrigen = document.getElementById('filterAlertaOrigen').value;
-  const fMes = document.getElementById('filterAlertaDesdeMes').value;
-  const cutoff = fMes!=='all' ? fromIsoDay(fMes+'-01') : null;
+  const fAnio = document.getElementById('filterAlertaAnio').value;
+  const fMes = document.getElementById('filterAlertaMes').value;
+  const fSemana = document.getElementById('filterAlertaSemana').value;
   return rows.filter(r=>{
     if(fProyecto!=='all' && r.proyecto !== fProyecto) return false;
     if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
     if(fResp!=='all' && r.responsable !== fResp) return false;
     if(fOrigen!=='all' && r.origen !== fOrigen) return false;
-    if(cutoff && (!r.fDesde || r.fDesde < cutoff)) return false;
+    if(fAnio!=='all' && r.fDesde && r.fDesde.getUTCFullYear()!==Number(fAnio)) return false;
+    if(fMes!=='all' && r.fDesde && (r.fDesde.getUTCMonth()+1)!==Number(fMes)) return false;
+    if(fSemana!=='all' && r.fDesde && weekKeyFor(r.fDesde)!==fSemana) return false;
     return true;
   });
 }
@@ -1776,7 +1789,7 @@ function renderAlertas(){
   }
   populateAlertaFilters();
   if(!alertasListenersBound){
-    ['searchAlertaReq','searchAlertaPedido','filterAlertaProyecto','filterAlertaProveedor','filterAlertaResponsable','filterAlertaOrigen','filterAlertaDesdeMes'].forEach(id=>{
+    ['searchAlertaReq','searchAlertaPedido','filterAlertaProyecto','filterAlertaProveedor','filterAlertaResponsable','filterAlertaOrigen','filterAlertaAnio','filterAlertaMes','filterAlertaSemana'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawAlertas);
     });
@@ -1806,6 +1819,7 @@ function drawAlertasTable(tableEl, rows, codLabel, searchInputId){
   return view.length;
 }
 function drawAlertas(){
+  populateSemanaSelect(document.getElementById('filterAlertaSemana'), document.getElementById('filterAlertaAnio').value, document.getElementById('filterAlertaMes').value);
   const all = DATA.alertRows || [];
   const nReq = drawAlertasTable(document.getElementById('tableAlertaReq'), all.filter(r=>r.tipo==='req_sin_pedido'), 'Requerimiento', 'searchAlertaReq');
   const nPedido = drawAlertasTable(document.getElementById('tableAlertaPedido'), all.filter(r=>r.tipo==='pedido_sin_oc'), 'Pedido', 'searchAlertaPedido');
@@ -1841,16 +1855,20 @@ function filteredReocRowsForCompras(){
   let rows = getReocRows();
   const anio = document.getElementById('filterComprasAnio').value;
   const mes = document.getElementById('filterComprasMes').value;
+  const semana = document.getElementById('filterComprasSemana').value;
   if(anio !== 'all') rows = rows.filter(r=>String(r.anio)===anio);
   if(mes !== 'all') rows = rows.filter(r=>String(r.mes)===mes);
+  if(semana !== 'all') rows = rows.filter(r=>r.semana===semana); // r.semana ya viene precalculado (ver processREOC)
   return rows;
 }
 function filteredProjectRowsForCompras(){
   let rows = (DATA.projectRows||[]).filter(p=>!p.archivado && p.fReq); // activos = total - archivados, mismo criterio que Cumplimiento por Proyecto
   const anio = document.getElementById('filterComprasAnio').value;
   const mes = document.getElementById('filterComprasMes').value;
+  const semana = document.getElementById('filterComprasSemana').value;
   if(anio !== 'all') rows = rows.filter(p=>String(p.fReq.getUTCFullYear())===anio);
   if(mes !== 'all') rows = rows.filter(p=>String(p.fReq.getUTCMonth()+1)===mes);
+  if(semana !== 'all') rows = rows.filter(p=>weekKeyFor(p.fReq)===semana);
   return rows;
 }
 // Compras por semana (nacional/importado): agrupa por semana ISO (lunes a domingo, mismo criterio que
@@ -1882,6 +1900,26 @@ function formaPagoAgg(rows){
   for(const g of agg){ g.pct = total>0 ? g.monto/total*100 : 0; }
   return { agg, total };
 }
+// Crédito vs. Contado por origen (pedido de Piero, 02.09.2026, para la imagen "Reporte Semanal de
+// Compras"): reutiliza el mismo campo Forma_pago de R.EOC ya usado en formaPagoAgg. Regla de
+// clasificación verificada contra los valores reales de Piero (Consulta.xlsx, hoja "R.EOC",
+// columna Forma_pago): "CONTADO" aparece literal en el texto -> contado; cualquier otro valor
+// (CREDITO A N DIAS, ANTICIPO..., FACTURA NEGOCIABLE..., etc.) se trata como crédito, es decir,
+// todo lo que no sea explícitamente contado.
+function creditoContadoAgg(rows){
+  function origenAgg(origen){
+    const g = rows.filter(r=>r.origen===origen);
+    const monto = g.reduce((s,r)=>s+r.montoPEN,0);
+    const contado = g.filter(r=>(r.formaPago||'').toUpperCase().includes('CONTADO')).reduce((s,r)=>s+r.montoPEN,0);
+    const credito = monto - contado;
+    return {
+      origen, monto, montoCredito: credito, montoContado: contado,
+      pctContado: monto>0 ? contado/monto*100 : null,
+      pctCredito: monto>0 ? credito/monto*100 : null,
+    };
+  }
+  return [ origenAgg('nacional'), origenAgg('importado') ];
+}
 // Ranking de compradores: reutiliza groupRowsFor/aggStatsForIndicator ya validados para el Indicador 2
 // (Tiempo de Emisión de OC) y el Indicador 4 (Tiempo de Entrega de OC) — misma lógica que la tabla
 // "Rendimiento por comprador" que existió en Tiempos del Proceso (quitada el 01.09.2026), reintroducida
@@ -1906,8 +1944,10 @@ function procesoRowsFilteredForCompras(){
   let rows = getProcesoRows();
   const anio = document.getElementById('filterComprasAnio').value;
   const mes = document.getElementById('filterComprasMes').value;
+  const semana = document.getElementById('filterComprasSemana').value;
   if(anio !== 'all') rows = rows.filter(r=>r.fReq && String(r.fReq.getUTCFullYear())===anio);
   if(mes !== 'all') rows = rows.filter(r=>r.fReq && String(r.fReq.getUTCMonth()+1)===mes);
+  if(semana !== 'all') rows = rows.filter(r=>r.fReq && weekKeyFor(r.fReq)===semana);
   return rows;
 }
 function compradorRankingRows(){
@@ -1922,15 +1962,33 @@ function compradorRankingScored(rows){
   const scored = list.map(r=>{
     const n2 = r.d2?r.d2.n:0, n4 = r.d4?r.d4.n:0, nTotal = n2+n4;
     const promTotal = nTotal ? (((r.d2?r.d2.promedio*n2:0)+(r.d4?r.d4.promedio*n4:0))/nTotal) : null;
-    const cd2 = r.d2 && r.d2.cumplePct!=null ? r.d2.cumplePct : null;
-    const cd4 = r.d4 && r.d4.cumplePct!=null ? r.d4.cumplePct : null;
-    let cumplePct = null;
-    if(cd2!=null && cd4!=null) cumplePct = (cd2+cd4)/2;
-    else if(cd2!=null) cumplePct = cd2;
-    else if(cd4!=null) cumplePct = cd4;
+    // Cumplimiento combinado (corrección de Piero, 02.09.2026: "el cumplimiento solo se mida en base a
+    // si cumplieron o no con el máximo permitido") — ANTES se promediaba el % de Ind.2 con el % de
+    // Ind.4 a secas (cd2+cd4)/2, lo que distorsiona el resultado cuando un comprador tiene muchos más
+    // casos de un indicador que del otro (ej. 50 casos de Ind.2 al 90% y solo 2 de Ind.4 al 0% no es
+    // "45%", es prácticamente 90%). Ahora se cuenta cuántos casos cumplieron sobre el total de casos
+    // evaluados entre AMBOS indicadores juntos — mismo principio aplicado a "todo lo que le toca a
+    // compras" (Ind.2+4, esta tabla) y a "todo lo que le toca a almacén" (Responsables de Almacén, que
+    // ya no tenía este problema porque cada persona cubre un solo indicador con meta).
+    const cumpleN = (r.d2?r.d2.n*(r.d2.cumplePct||0)/100:0) + (r.d4?r.d4.n*(r.d4.cumplePct!=null?r.d4.cumplePct:0)/100:0);
+    const cumpleDenomN2 = r.d2 && r.d2.cumplePct!=null ? r.d2.n : 0;
+    const cumpleDenomN4 = r.d4 && r.d4.cumplePct!=null ? r.d4.n : 0;
+    const cumpleDenom = cumpleDenomN2 + cumpleDenomN4;
+    const cumplePct = cumpleDenom>0 ? cumpleN/cumpleDenom*100 : null;
     return Object.assign({}, r, { promTotal, cumplePct, nTotal });
   });
-  scored.sort((a,b)=>b.nTotal-a.nTotal);
+  // Orden por cumplimiento (mejor desempeño primero) — antes ordenaba por cantidad de casos, lo que no
+  // es un "ranking" real (un comprador con muchos casos y mal desempeño salía primero igual). Los
+  // compradores sin ningún % de cumplimiento calculable (cumplePct null) van al final. Decisión de
+  // implementación de Claude señalada a Piero: "se ordene bien" se interpretó como de mejor a peor
+  // cumplimiento, a confirmar si prefiere el orden inverso (peor primero, para resaltar quién necesita
+  // atención primero).
+  scored.sort((a,b)=>{
+    if(a.cumplePct==null && b.cumplePct==null) return b.nTotal-a.nTotal;
+    if(a.cumplePct==null) return 1;
+    if(b.cumplePct==null) return -1;
+    return b.cumplePct-a.cumplePct;
+  });
   return scored;
 }
 function weeklyCierreAgg(rows){
@@ -1959,7 +2017,7 @@ function renderCompras(){
   }
   populateComprasAnios();
   if(!comprasListenersBound){
-    ['filterComprasAnio','filterComprasMes'].forEach(id=>document.getElementById(id).addEventListener('change', drawCompras));
+    ['filterComprasAnio','filterComprasMes','filterComprasSemana'].forEach(id=>document.getElementById(id).addEventListener('change', drawCompras));
     document.getElementById('searchFormaPago').addEventListener('input', drawCompras);
     document.getElementById('searchRankingCompradores').addEventListener('input', drawCompras);
     document.getElementById('btnImgCompras').addEventListener('click', (e)=> downloadSectionImage('section-compras', 'reporte-semanal-compras', e.currentTarget));
@@ -1969,6 +2027,7 @@ function renderCompras(){
   drawCompras();
 }
 function drawCompras(){
+  populateSemanaSelect(document.getElementById('filterComprasSemana'), document.getElementById('filterComprasAnio').value, document.getElementById('filterComprasMes').value);
   document.getElementById('comprasDefNote').innerHTML = `<b>Qué cuenta como compra:</b> líneas de la hoja "R.EOC" con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> (mismo criterio que Concentración de Gasto). Monto convertido a Soles con el tipo de cambio real de cada orden cuando está disponible, o el de referencia si falta (US$ ${TIPO_CAMBIO_FALLBACK['Dolares Americanos'].toFixed(3)}, € ${TIPO_CAMBIO_FALLBACK['Euros'].toFixed(2)}). <b>Nacional/Importado:</b> según el prefijo del código de orden (0001 = nacional, 0002 = importado). <b>Requerimiento cerrado:</b> estado "Recibido en Obra", o "Enviado a Obra" con salida de almacén ya registrada — se excluyen los "Archivado". <b>Ranking de compradores:</b> mismos Indicador 2 (Tiempo de Emisión de OC) e Indicador 4 (Tiempo de Entrega de OC) ya usados en Tiempos del Proceso.`;
 
   // ---- Compras por semana: nacional vs. importado ----
@@ -2119,6 +2178,47 @@ function weekLabelFor(key){
   const short = (x)=> x.getUTCDate() + ' ' + MESES_CORTOS[x.getUTCMonth()];
   return short(start) + '–' + short(end);
 }
+// ---- Filtro "Semana" (02.09.2026, pedido de Piero: "poder filtrar por semanas en lugar de 'Todos los
+// días'... si selecciono mes agosto que me ponga semana 1 y de fecha a tal fecha, semana 2...") ----
+// Aplicado a los 4 módulos con filtro de fecha: reemplaza "Día" en Tiempos del Proceso y Concentración
+// de Gasto (ambos ya tenían Año/Mes/Día), se agrega en Reporte Semanal de Compras (que solo tenía
+// Año/Mes) y reemplaza el corte "Desde (mes)" de Alertas de Atención por el mismo patrón Año/Mes/Semana
+// de coincidencia exacta que los otros 3 (confirmado con Piero, AskUserQuestion).
+// Da la lista de semanas ISO (lunes a domingo) que tocan un mes dado, numeradas en orden — reutiliza
+// weekKeyFor/weekLabelFor, ya validados por la agrupación semanal de Reporte Semanal de Compras.
+function weeksInMonth(anio, mes){
+  const first = new Date(Date.UTC(anio, mes-1, 1));
+  const last = new Date(Date.UTC(anio, mes, 0)); // último día del mes
+  const keys = [];
+  const seen = new Set();
+  for(let d = new Date(first); d <= last; d.setUTCDate(d.getUTCDate()+1)){
+    const key = weekKeyFor(d);
+    if(!seen.has(key)){ seen.add(key); keys.push(key); }
+  }
+  keys.sort();
+  return keys.map((key,i)=>({ value:key, label: 'Semana ' + (i+1) + ' (' + weekLabelFor(key) + ')' }));
+}
+// Puebla un <select> de Semana según los <select> de Año/Mes ya elegidos. La semana solo tiene sentido
+// numerada dentro de un mes concreto de un año concreto — si cualquiera de los dos está en "todos", se
+// deja solo la opción "Todas las semanas" (deshabilitado) hasta que se elija un Año y un Mes puntuales.
+function populateSemanaSelect(semanaSel, anioVal, mesVal){
+  if(!semanaSel) return;
+  const current = semanaSel.value;
+  if(anioVal==='all' || mesVal==='all'){
+    semanaSel.innerHTML = '<option value="all">Todas las semanas</option>';
+    semanaSel.disabled = true;
+    return;
+  }
+  semanaSel.disabled = false;
+  const weeks = weeksInMonth(Number(anioVal), Number(mesVal));
+  semanaSel.innerHTML = '<option value="all">Todas las semanas</option>' + weeks.map(w=>`<option value="${w.value}">${w.label}</option>`).join('');
+  if(weeks.some(w=>w.value===current)) semanaSel.value = current;
+}
+// Fecha (UTC) a partir de año/mes/día sueltos — Concentración de Gasto guarda sus filas como
+// {anio,mes,dia} en vez de un objeto Date (igual recién cargado que desde un snapshot publicado).
+function dateFromYMD(anio, mes, dia){
+  return new Date(Date.UTC(anio, mes-1, dia));
+}
 let selectedIndicatorKey = 'd1';
 let procesoListenersBound = false;
 
@@ -2134,7 +2234,7 @@ function filteredProcesoRows(){
   const fOrigen = document.getElementById('filterProcesoOrigen').value;
   const fAnio = document.getElementById('filterProcesoAnio').value;
   const fMes = document.getElementById('filterProcesoMes').value;
-  const fDia = document.getElementById('filterProcesoDia').value;
+  const fSemana = document.getElementById('filterProcesoSemana').value;
   return rows.filter(r=>{
     if(q && !((r.proyecto+' '+r.producto+' '+r.proveedor+' '+r.familia).toLowerCase().includes(q))) return false;
     if(fProyecto!=='all' && r.proyecto !== fProyecto) return false;
@@ -2142,12 +2242,12 @@ function filteredProcesoRows(){
     if(fFamilia!=='all' && r.familia !== fFamilia) return false;
     if(fResp!=='all' && r.usuarioCompras !== fResp) return false;
     if(fOrigen!=='all' && r.origen !== fOrigen) return false;
-    // Año/Mes/Día son selectores independientes (reemplazan el rango Desde/Hasta a pedido de Piero,
-    // 01.09.2026) sobre FechaRequerimiento — se pueden combinar entre sí, cada uno filtra por su
-    // propio criterio (ej. "todos los agostos de cualquier año" con Mes=8 y Año=todos).
+    // Año/Mes/Semana son selectores independientes sobre FechaRequerimiento — se pueden combinar entre
+    // sí (ej. "todos los agostos de cualquier año" con Mes=8 y Año=todos). Semana reemplazó a Día a
+    // pedido de Piero (02.09.2026: "filtrar por semanas en lugar de 'Todos los días'").
     if(fAnio!=='all' && r.fReq && r.fReq.getUTCFullYear()!==Number(fAnio)) return false;
     if(fMes!=='all' && r.fReq && (r.fReq.getUTCMonth()+1)!==Number(fMes)) return false;
-    if(fDia!=='all' && r.fReq && r.fReq.getUTCDate()!==Number(fDia)) return false;
+    if(fSemana!=='all' && r.fReq && weekKeyFor(r.fReq)!==fSemana) return false;
     return true;
   });
 }
@@ -2273,7 +2373,7 @@ function renderProceso(){
 
   populateGroupByProceso();
   if(!procesoListenersBoundInner){
-    ['searchProceso','filterProcesoProyecto','filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoOrigen','filterProcesoAnio','filterProcesoMes','filterProcesoDia'].forEach(id=>{
+    ['searchProceso','filterProcesoProyecto','filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoOrigen','filterProcesoAnio','filterProcesoMes','filterProcesoSemana'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawProceso);
     });
@@ -2297,6 +2397,9 @@ function renderProceso(){
 }
 
 function drawProceso(){
+  // Repuebla la Semana disponible según el Año/Mes elegidos justo antes de filtrar (02.09.2026) — así
+  // queda siempre en sincronía sin depender del orden de los listeners de Año/Mes vs. Semana.
+  populateSemanaSelect(document.getElementById('filterProcesoSemana'), document.getElementById('filterProcesoAnio').value, document.getElementById('filterProcesoMes').value);
   drawKpiCards();
   drawIndicatorTrend();
   drawSummaryTable();
@@ -2656,17 +2759,13 @@ function buildProImageCompras(){
   const cierreTotal = cierreRows.length;
   const cierreCerrados = cierreRows.filter(p=>p.entregado).length;
   const cierrePct = cierreTotal ? cierreCerrados/cierreTotal*100 : null;
+  // KPIs (corrección de Piero, 02.09.2026: la imagen ya no debe calcular una "diferencia" nacional −
+  // importado — en su lugar cada tarjeta trae su propio aro de % de participación sobre el gasto total).
   const kpis = [
-    { num:'🇵🇪', label:'GASTO NACIONAL', value: fmtPEN(totalNacional), valueLabel:'MONTO', metaLabel:'PARTICIPACIÓN', metaValue: pctNac!=null?pctNac.toFixed(0)+'% del total':'—', color:'#2a78d6' },
-    { num:'🌎', label:'GASTO IMPORTADO', value: fmtPEN(totalImportado), valueLabel:'MONTO', metaLabel:'PARTICIPACIÓN', metaValue: pctImp!=null?pctImp.toFixed(0)+'% del total':'—', color:'#4a3aa7' },
-    { num:'⚖️', label:'DIFERENCIA NAC. − IMP.', value: fmtPEN(totalNacional-totalImportado), valueLabel:'MONTO', metaLabel:'BRECHA', metaValue: pctNac!=null?(pctNac-pctImp).toFixed(0)+' pp de participación':'—' },
+    { num:'🇵🇪', label:'GASTO NACIONAL', value: fmtPEN(totalNacional), valueLabel:'MONTO', metaLabel:'PARTICIPACIÓN', metaValue: pctNac!=null?pctNac.toFixed(0)+'% del total':'—', color:'#2a78d6', pct: pctNac },
+    { num:'🌎', label:'GASTO IMPORTADO', value: fmtPEN(totalImportado), valueLabel:'MONTO', metaLabel:'PARTICIPACIÓN', metaValue: pctImp!=null?pctImp.toFixed(0)+'% del total':'—', color:'#4a3aa7', pct: pctImp },
     { num:'✅', label:'CIERRE DE REQUERIMIENTOS', value: cierrePct!=null?cierrePct.toFixed(0)+'%':'—', valueLabel:'% CERRADOS', metaLabel:'CASOS', metaValue: cierreCerrados.toLocaleString('es-PE')+' de '+cierreTotal.toLocaleString('es-PE'), pct: cierrePct },
   ];
-  const rankingRows = compradorRankingScored(procesoRowsFilteredForCompras()).slice(0,6).map((r,i)=>({
-    rank: i+1, name: r.comprador,
-    cells: [ r.d2?r.d2.promedio.toFixed(1)+'d':'—', r.d4?r.d4.promedio.toFixed(1)+'d':'—' ],
-    pct: r.cumplePct,
-  }));
   const { agg: pagoAgg } = formaPagoAgg(reocRows);
   const pagoRows = pagoAgg.slice(0,6).map((g,i)=>({
     rank: i+1, name: g.label.length>22 ? g.label.slice(0,20)+'…' : g.label,
@@ -2674,17 +2773,30 @@ function buildProImageCompras(){
     pct: g.pct, pctLabel: g.pct.toFixed(0)+'%',
     barColor: '#2a78d6',
   }));
+  // Crédito vs. Contado por origen (corrección de Piero, 02.09.2026): reemplaza el Ranking de
+  // Compradores en esta imagen — no mide desempeño, es una foto de cómo se paga el gasto del período.
+  // La barra muestra % Contado (pct); el % Crédito, al ser el complemento, se muestra como columna de
+  // texto junto al monto total, para no repetir dos barras en la misma fila.
+  const ccAgg = creditoContadoAgg(reocRows);
+  const origenLabel = { nacional:'NACIONAL', importado:'IMPORTADO' };
+  const origenColor = { nacional:'#2a78d6', importado:'#4a3aa7' };
+  const ccRows = ccAgg.map((g,i)=>({
+    rank: i+1, name: origenLabel[g.origen],
+    cells: [ fmtPEN(g.monto), g.pctCredito!=null ? g.pctCredito.toFixed(0)+'%' : '—' ],
+    pct: g.pctContado, pctLabel: g.pctContado!=null ? g.pctContado.toFixed(0)+'%' : '—',
+    barColor: origenColor[g.origen],
+  }));
   const banner = { tone: (cierrePct!=null && cierrePct<50) ? 'alert' : 'info', items:[ {value:cierreCerrados.toLocaleString('es-PE')+' / '+cierreTotal.toLocaleString('es-PE'), label:'Requerimientos cerrados en el período filtrado'} ], action: cierrePct!=null ? ('Cierre actual: '+cierrePct.toFixed(0)+'%') : null };
   return {
     title: 'REPORTE SEMANAL DE COMPRAS',
-    subtitle: 'NACIONAL / IMPORTADO · FORMAS DE PAGO · RANKING Y CIERRE',
+    subtitle: 'NACIONAL / IMPORTADO · FORMAS DE PAGO · CRÉDITO Y CONTADO · CIERRE',
     kpis,
     tables: [
-      { icon:'🏆', title:'Ranking de Compradores', subtitle:'Tiempo de Emisión de OC (Ind. 2) y Tiempo de Entrega de OC (Ind. 4)', nameLabel:'COMPRADOR', columns:['EMISIÓN OC','ENTREGA OC'], rows: rankingRows, legend:true },
       { icon:'💳', title:'Formas de Pago', subtitle:'Top formas de pago por monto en el período filtrado', nameLabel:'FORMA DE PAGO', columns:['MONTO'], barLabel:'% DEL TOTAL', rows: pagoRows, avatarIcon:'💳' },
+      { icon:'🏦', title:'Crédito vs. Contado por Origen', subtitle:'% del gasto pagado a crédito y al contado, según origen nacional o importado', nameLabel:'ORIGEN', columns:['MONTO TOTAL','% CRÉDITO'], barLabel:'% CONTADO', rows: ccRows },
     ],
     banner,
-    footnote: 'Nacional/Importado según el prefijo del código de orden en la hoja "R.EOC" (0001/0002). Cerrado = "Recibido en Obra", o "Enviado a Obra" con salida de almacén ya registrada — excluye "Archivado".',
+    footnote: 'Nacional/Importado según el prefijo del código de orden en la hoja "R.EOC" (0001/0002). Contado = Forma_pago contiene "CONTADO"; el resto (crédito a N días, anticipos, factura negociable, etc.) se cuenta como crédito. Cerrado = "Recibido en Obra", o "Enviado a Obra" con salida de almacén ya registrada — excluye "Archivado".',
   };
 }
 
@@ -2957,17 +3069,22 @@ function openDrilldownForIndicator(ind){
 }
 function openDrilldown(ind, rows, groupLabel){
   const withVal = rows.filter(r=>r[ind.key]!=null);
-  const withoutVal = rows.length - withVal.length;
+  // Indicador 4: las líneas marcadas "Regularización" (columna agregada por Piero, 02.09.2026) quedan
+  // con d4=null (excluidas del cálculo, ver processWorkbook), pero se siguen listando aquí abajo,
+  // marcadas, para que Gerencia pueda auditar cuáles se excluyeron y por qué en vez de que desaparezcan
+  // mezcladas con las genuinamente "sin información".
+  const regRows = ind.key==='d4' ? rows.filter(r=>r.esRegularizacion && r.d4raw!=null) : [];
+  const withoutVal = rows.length - withVal.length - regRows.length;
   const sorted = withVal.slice().sort((a,b)=>(b[ind.key]||0)-(a[ind.key]||0));
   const capped = sorted.slice(0,500);
   document.getElementById('procDetailTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.stage + (groupLabel ? ' · ' + groupLabel : '');
-  document.getElementById('procDetailNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + '.';
+  document.getElementById('procDetailNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + (regRows.length>0 ? ' · ' + regRows.length.toLocaleString('es-PE') + ' excluidas del cálculo por regularización (se listan al final)' : '') + '.';
   const table = document.getElementById('tableDrilldown');
   table.querySelector('thead').innerHTML = '<tr><th>Requerimiento</th><th>Proyecto</th><th>Cód. producto</th><th>Descripción</th><th>Pedido</th><th>OC</th><th>Proveedor</th><th>Responsable</th><th>Fecha inicial</th><th>Fecha final</th><th>Días hábiles</th><th>Meta</th><th>Estado</th></tr>';
-  table.querySelector('tbody').innerHTML = capped.map(r=>{
-    const d = r[ind.key];
-    const cumple = indCumple(ind, r);
-    const estado = cumple===null ? '<span class="pill">Sin información</span>' : (cumple ? '<span class="pill ok">Cumple</span>' : '<span class="pill warn">No cumple</span>');
+  function rowHtml(r, forced){
+    const d = forced ? forced.dias : r[ind.key];
+    const cumple = forced ? null : indCumple(ind, r);
+    const estado = forced ? forced.estado : (cumple===null ? '<span class="pill">Sin información</span>' : (cumple ? '<span class="pill ok">Cumple</span>' : '<span class="pill warn">No cumple</span>'));
     const lim4 = ind.key==='d4' ? limite4For(r) : null;
     const metaTxt = ind.key==='d4' ? (lim4 ? fmtDate(lim4) : '—') : (ind.meta!=null ? ind.meta+' d.h.' : '—');
     return `<tr>
@@ -2985,7 +3102,10 @@ function openDrilldown(ind, rows, groupLabel){
       <td>${metaTxt}</td>
       <td>${estado}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--muted);">Sin resultados</td></tr>';
+  }
+  const bodyHtml = capped.map(r=>rowHtml(r)).join('')
+    + regRows.map(r=>rowHtml(r, { dias:r.d4raw, estado:'<span class="pill muted">⚠ Regularización (excluida)</span>' })).join('');
+  table.querySelector('tbody').innerHTML = bodyHtml || '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--muted);">Sin resultados</td></tr>';
   // Detalle inline debajo del contenido, no modal (pedido de Piero, 01.09.2026): se muestra el panel
   // y se hace scroll hasta él para que el resultado del clic sea visible de inmediato.
   const panel = document.getElementById('procDetailPanel');
