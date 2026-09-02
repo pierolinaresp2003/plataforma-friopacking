@@ -383,7 +383,8 @@
     </div><!-- /section-proceso -->
 
     <div id="section-gasto" class="section">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
+        <button class="btn secondary" id="btnProImgGasto" type="button">📱 Resumen para compartir</button>
         <button class="btn secondary" id="btnImgGasto" type="button">🖼️ Generar imagen del módulo</button>
       </div>
       <div class="kpi-grid" id="kpiGridGasto"></div>
@@ -433,7 +434,8 @@
     </div><!-- /section-gasto -->
 
     <div id="section-alertas" class="section">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
+        <button class="btn secondary" id="btnProImgAlertas" type="button">📱 Resumen para compartir</button>
         <button class="btn secondary" id="btnImgAlertas" type="button">🖼️ Generar imagen del módulo</button>
       </div>
       <div class="note" id="alertasDefNote" style="margin-bottom:14px;">
@@ -470,7 +472,8 @@
     </div><!-- /section-alertas -->
 
     <div id="section-compras" class="section">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
+        <button class="btn secondary" id="btnProImgCompras" type="button">📱 Resumen para compartir</button>
         <button class="btn secondary" id="btnImgCompras" type="button">🖼️ Generar imagen del módulo</button>
       </div>
       <div class="note" id="comprasDefNote" style="margin-bottom:14px;"></div>
@@ -1647,6 +1650,7 @@ function renderGasto(){
     document.getElementById('filterGastoDia').addEventListener('change', drawGasto);
     document.getElementById('filterGastoPareto').addEventListener('change', drawGasto);
     document.getElementById('btnImgGasto').addEventListener('click', (e)=> downloadSectionImage('section-gasto', 'concentracion-gasto', e.currentTarget));
+    document.getElementById('btnProImgGasto').addEventListener('click', (e)=> downloadProImage(buildProImageGasto, 'resumen-concentracion-gasto', e.currentTarget));
     gastoListenersBound = true;
   }
   drawGasto();
@@ -1777,6 +1781,7 @@ function renderAlertas(){
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawAlertas);
     });
     document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'alertas-atencion', e.currentTarget));
+    document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-alertas-atencion', e.currentTarget));
     alertasListenersBound = true;
   }
   drawAlertas();
@@ -1882,12 +1887,10 @@ function formaPagoAgg(rows){
 // "Rendimiento por comprador" que existió en Tiempos del Proceso (quitada el 01.09.2026), reintroducida
 // aquí como su propio módulo. No se filtra por Año/Mes de Reporte Maestro por separado: usa el mismo
 // filtro Año/Mes de este módulo, aplicado sobre FechaRequerimiento (igual que el resto de la plataforma).
-function compradorRankingRows(){
-  let rows = getProcesoRows();
-  const anio = document.getElementById('filterComprasAnio').value;
-  const mes = document.getElementById('filterComprasMes').value;
-  if(anio !== 'all') rows = rows.filter(r=>r.fReq && String(r.fReq.getUTCFullYear())===anio);
-  if(mes !== 'all') rows = rows.filter(r=>r.fReq && String(r.fReq.getUTCMonth()+1)===mes);
+// Reutilizable con cualquier conjunto de filas ya filtrado (ver también las imágenes "pro" más abajo,
+// que necesitan este mismo ranking pero con sus propios filtros de origen — Tiempos del Proceso en vez
+// de los filtros Año/Mes de este módulo).
+function compradorRankingFromRows(rows){
   const ind2 = INDICATORS.find(i=>i.key==='d2'), ind4 = INDICATORS.find(i=>i.key==='d4');
   const g2 = groupRowsFor(rows, ind2, 'responsable');
   const g4 = groupRowsFor(rows, ind4, 'responsable');
@@ -1896,6 +1899,39 @@ function compradorRankingRows(){
   for(const g of g4){ byComprador[g.label] = byComprador[g.label] || {}; byComprador[g.label].d4 = g; }
   return Object.entries(byComprador).map(([comprador, v])=>({ comprador, d2: v.d2 || null, d4: v.d4 || null }))
     .sort((a,b)=> (b.d2?b.d2.n:0) - (a.d2?a.d2.n:0));
+}
+// Filas de Tiempos del Proceso, filtradas por el Año/Mes propio del módulo de Compras (no los filtros
+// de Tiempos del Proceso) — usado tanto por la tabla en pantalla como por su imagen para compartir.
+function procesoRowsFilteredForCompras(){
+  let rows = getProcesoRows();
+  const anio = document.getElementById('filterComprasAnio').value;
+  const mes = document.getElementById('filterComprasMes').value;
+  if(anio !== 'all') rows = rows.filter(r=>r.fReq && String(r.fReq.getUTCFullYear())===anio);
+  if(mes !== 'all') rows = rows.filter(r=>r.fReq && String(r.fReq.getUTCMonth()+1)===mes);
+  return rows;
+}
+function compradorRankingRows(){
+  return compradorRankingFromRows(procesoRowsFilteredForCompras());
+}
+// Versión "puntuada" para las imágenes para compartir (02.09.2026): combina Indicador 2 e Indicador 4
+// en un solo promedio y un solo % de cumplimiento por comprador, ponderado por cantidad de casos de
+// cada indicador, para poder mostrar una sola barra de cumplimiento por fila (igual que el resto de
+// tablas de ranking de las imágenes).
+function compradorRankingScored(rows){
+  const list = compradorRankingFromRows(rows).filter(r=>r.d2 || r.d4);
+  const scored = list.map(r=>{
+    const n2 = r.d2?r.d2.n:0, n4 = r.d4?r.d4.n:0, nTotal = n2+n4;
+    const promTotal = nTotal ? (((r.d2?r.d2.promedio*n2:0)+(r.d4?r.d4.promedio*n4:0))/nTotal) : null;
+    const cd2 = r.d2 && r.d2.cumplePct!=null ? r.d2.cumplePct : null;
+    const cd4 = r.d4 && r.d4.cumplePct!=null ? r.d4.cumplePct : null;
+    let cumplePct = null;
+    if(cd2!=null && cd4!=null) cumplePct = (cd2+cd4)/2;
+    else if(cd2!=null) cumplePct = cd2;
+    else if(cd4!=null) cumplePct = cd4;
+    return Object.assign({}, r, { promTotal, cumplePct, nTotal });
+  });
+  scored.sort((a,b)=>b.nTotal-a.nTotal);
+  return scored;
 }
 function weeklyCierreAgg(rows){
   const groups = {};
@@ -1927,6 +1963,7 @@ function renderCompras(){
     document.getElementById('searchFormaPago').addEventListener('input', drawCompras);
     document.getElementById('searchRankingCompradores').addEventListener('input', drawCompras);
     document.getElementById('btnImgCompras').addEventListener('click', (e)=> downloadSectionImage('section-compras', 'reporte-semanal-compras', e.currentTarget));
+    document.getElementById('btnProImgCompras').addEventListener('click', (e)=> downloadProImage(buildProImageCompras, 'resumen-compras', e.currentTarget));
     comprasListenersBound = true;
   }
   drawCompras();
@@ -2253,7 +2290,7 @@ function renderProceso(){
     });
     document.getElementById('procDetailClose').addEventListener('click', closeDrilldown);
     document.getElementById('btnImgProceso').addEventListener('click', (e)=> downloadSectionImage('section-proceso', 'tiempos-proceso-atencion', e.currentTarget));
-    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=> downloadEli5Image(e.currentTarget));
+    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=> downloadProImage(buildProImageTiempos, 'resumen-whatsapp-tiempos-proceso', e.currentTarget));
     procesoListenersBoundInner = true;
   }
   drawProceso();
@@ -2298,73 +2335,172 @@ async function downloadSectionImage(sectionId, filenamePrefix, btn){
   }
 }
 
-// ---------- Resumen ELI5 en UNA sola imagen para WhatsApp (01.09.2026) ----------
-// Piero pidió una foto "completamente distinta" a "Generar imagen del módulo" — esa captura fiel
-// toda la pantalla (útil para revisión detallada, pero no cabe legible en un mensaje de WhatsApp).
-// Esta es una tarjeta condensada, en lenguaje simple (ELI5), con los 5 indicadores y quién es
-// responsable de cada uno (aclaración de Piero el mismo día — ver responsableLabel). Se arma en un
-// <div> aparte, fuera de pantalla, para no alterar el diseño de la pestaña ni depender del tema
-// claro/oscuro activo (esta imagen siempre sale en los colores de marca, pensada para compartir).
-const ELI5_DESC = {
-  d1: '¿Cuánto tarda Almacén en convertir el requerimiento en un pedido?',
-  d2: '¿Cuánto tarda el comprador en generar la Orden de Compra?',
-  d3: '¿Cuánto tarda en aprobarse la Orden de Compra?',
-  d4: '¿Cuánto tarda el proveedor en entregar, ya aprobada la orden?',
-  d6: '¿Cuánto tarda Almacén en despachar directo desde stock, sin pasar por Compras?',
-};
-function eli5ResponsableTag(ind){
-  // Mismos 3 roles fijos de responsableLabel() -- aquí se repiten como texto corto para la tarjeta,
-  // sin depender de una fila puntual (d1 muestra JCENTENO con asterisco: la excepción de "pedido
-  // directo" se explica una sola vez al pie, no fila por fila, para no saturar la imagen).
-  if(ind.key === 'd3') return 'MLUJAN';
-  if(ind.key === 'd6') return 'KALBUJAR';
-  if(ind.key === 'd1') return 'JCENTENO*';
-  return 'COMPRADORES'; // d2 y d4
-}
-function eli5SemColor(pct){
+// ---------- Imágenes "para compartir" con estilo de reporte gerencial (02.09.2026) ----------
+// Piero mostró una referencia visual (encabezado de marca, tarjetas KPI con aro de cumplimiento,
+// tablas de ranking con inicial/avatar y barra de color, alerta al pie) y pidió que TODAS las
+// imágenes descargables de la plataforma sigan ese estilo, en una sola imagen grande y legible desde
+// WhatsApp/celular. Confirmado con Piero (AskUserQuestion): se aplica a los 4 módulos con botón de
+// imagen; el contenido de cada una se adapta a sus datos reales (no se fuerza el "ranking por
+// almacén" con sedes ficticias de la referencia — Almacén hoy son responsables fijos, no sedes). Se
+// agregó un botón nuevo "📱 Resumen para compartir" en Gasto/Alertas/Compras (sin quitar su botón de
+// captura completa "🖼️ Generar imagen del módulo", igual criterio que cuando se agregó el primer
+// "Resumen WhatsApp" en Tiempos del Proceso: no quitarle a Piero la opción de captura detallada). En
+// Tiempos del Proceso se reutilizó el mismo botón "📱 Resumen WhatsApp" ya existente, solo se le
+// cambió el contenido/diseño. Estas imágenes siempre salen en los colores de marca (no dependen del
+// tema claro/oscuro activo), armadas en un <div> fuera de pantalla para no alterar la pestaña.
+function proSemColor(pct){
   if(pct==null) return '#8b98a4';
   if(pct>=80) return '#0ca30c';
   if(pct>=50) return '#e2960a';
   return '#d03b3b';
 }
-function buildEli5Html(){
-  const rows = filteredProcesoRows();
-  const fecha = new Date().toLocaleDateString('es-PE', { day:'numeric', month:'long', year:'numeric' });
-  const logoEl = document.querySelector('.logo-lockup');
-  const cards = INDICATORS.map(ind=>{
-    const st = aggStatsForIndicator(rows, ind);
-    const metaTxt = ind.key==='d4' ? 'Según OC' : (ind.meta!=null ? ind.meta+' d.h.' : '—');
-    const promTxt = st.promedio==null ? '—' : st.promedio.toFixed(1)+' d.h.';
-    const cumpleTxt = st.cumplePct==null ? '—' : st.cumplePct.toFixed(0)+'%';
-    const color = eli5SemColor(st.cumplePct);
-    return `
-      <div style="display:flex;align-items:center;gap:16px;background:#ffffff;border-radius:14px;padding:18px 20px;margin-bottom:14px;">
-        <div style="flex-shrink:0;width:46px;height:46px;border-radius:50%;background:#0a1e64;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;font-family:Arial,sans-serif;">${ind.num}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:16px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${escapeHtml(ind.stage)}</div>
-          <div style="font-size:13px;color:#5b6b7a;margin-top:3px;font-family:Arial,sans-serif;">${ELI5_DESC[ind.key]}</div>
-          <div style="font-size:12px;color:#8b98a4;margin-top:6px;font-family:Arial,sans-serif;">Responsable: <b style="color:#2fa48d;">${eli5ResponsableTag(ind)}</b> · Meta: ${metaTxt} · ${st.n.toLocaleString('es-PE')} casos</div>
-        </div>
-        <div style="flex-shrink:0;text-align:right;">
-          <div style="font-size:26px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${promTxt}</div>
-          <div style="font-size:13px;font-weight:700;color:${color};font-family:Arial,sans-serif;">${cumpleTxt} cumple</div>
-        </div>
-      </div>`;
-  }).join('');
+function proSeverityColor(dias, meta){
+  if(dias > meta*4) return '#d03b3b';
+  if(dias > meta*2) return '#e2960a';
+  return '#0ca30c';
+}
+function initialsFor(name){
+  const parts = (name||'').toString().trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '?';
+  return (parts[0][0] + (parts.length>1 ? parts[parts.length-1][0] : '')).toUpperCase();
+}
+function proRingSvg(pct, size){
+  size = size || 78;
+  const r = size/2 - 7;
+  const c = 2*Math.PI*r;
+  const color = proSemColor(pct);
+  const frac = pct==null ? 0 : Math.max(0,Math.min(100,pct))/100;
+  const dash = c*frac;
+  const label = pct==null ? '—' : Math.round(pct)+'%';
+  // stroke-linecap:round con dash=0 igual dibuja un punto visible -- solo se pinta el arco de color
+  // cuando hay algo que pintar (frac>0), para que 0%/sin dato se vea como un aro vacío limpio.
+  const arcHtml = frac>0 ? `<circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="7"
+      stroke-linecap="round" stroke-dasharray="${dash} ${c-dash}" transform="rotate(-90 ${size/2} ${size/2})"/>` : '';
   return `
-  <div id="eli5CardInner" style="width:1080px;font-family:Arial,sans-serif;background:#eef1f5;padding:36px;box-sizing:border-box;">
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
-      ${logoEl ? `<img src="${logoEl.src}" style="height:56px;" alt="Grupo Friopacking">` : ''}
-      <div>
-        <div style="font-size:24px;font-weight:800;color:#0a1e64;">Tiempos del Proceso de Atención</div>
-        <div style="font-size:14px;color:#5b6b7a;">Grupo Friopacking · Área Logística · ${fecha}</div>
+  <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;flex-shrink:0;">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#e2e8ee" stroke-width="7"/>
+    ${arcHtml}
+    <text x="${size/2}" y="${size/2+6}" text-anchor="middle" font-family="Arial,sans-serif" font-size="${Math.round(size*0.23)}" font-weight="800" fill="${pct==null?'#8b98a4':'#0a1e64'}">${label}</text>
+  </svg>`;
+}
+function proHeaderHtml(title, subtitle, dateLabel){
+  const logoEl = document.querySelector('.logo-lockup');
+  return `
+  <div style="background:linear-gradient(120deg,#0a1e64 55%,#123080 100%);border-radius:18px 18px 0 0;padding:34px 40px 28px;position:relative;overflow:hidden;">
+    <div style="position:absolute;right:-40px;top:-40px;width:260px;height:260px;border-radius:50%;background:rgba(62,198,172,.14);"></div>
+    <div style="position:absolute;right:70px;bottom:-70px;width:190px;height:190px;border-radius:50%;background:rgba(62,198,172,.10);"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative;gap:20px;">
+      <div style="max-width:1000px;">
+        <div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:.3px;line-height:1.2;font-family:Arial,sans-serif;">${escapeHtml(title)}</div>
+        <div style="font-size:17px;font-weight:700;color:#7fe3cf;margin-top:6px;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(subtitle)}</div>
+        <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;margin-top:16px;font-family:Arial,sans-serif;">📅 Actualizado: ${escapeHtml(dateLabel)}</div>
       </div>
+      ${logoEl ? `<img src="${logoEl.src}" style="height:50px;flex-shrink:0;" alt="Grupo Friopacking">` : ''}
     </div>
-    ${cards}
-    <div style="font-size:12px;color:#8b98a4;margin-top:6px;line-height:1.5;">*Indicador 1: JCENTENO, salvo "pedidos directos" (generados sin requerimiento previo), donde el responsable es quien generó ese pedido puntual.</div>
   </div>`;
 }
-async function downloadEli5Image(btn){
+function proKpiCardHtml(kpi){
+  // kpi: {num, label, value, valueLabel, metaLabel, metaValue, pct?, color?}
+  const hasRing = kpi.pct !== undefined;
+  const color = kpi.color || (hasRing ? proSemColor(kpi.pct) : '#3ec6ac');
+  return `
+  <div style="flex:1;min-width:230px;background:#fff;border-radius:14px;padding:20px 18px;border-top:5px solid ${color};box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;min-height:34px;">
+      <div style="width:34px;height:34px;border-radius:50%;background:#0a1e64;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;font-family:Arial,sans-serif;flex-shrink:0;">${kpi.num}</div>
+      <div style="font-size:13.5px;font-weight:800;color:#0a1e64;line-height:1.25;font-family:Arial,sans-serif;">${escapeHtml(kpi.label)}</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div>
+        <div style="font-size:10.5px;color:#8b98a4;font-weight:700;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(kpi.valueLabel||'VALOR')}</div>
+        <div style="font-size:27px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${escapeHtml(kpi.value)}</div>
+        ${kpi.metaValue ? `<div style="font-size:11.5px;color:#8b98a4;font-weight:600;margin-top:2px;font-family:Arial,sans-serif;">${escapeHtml(kpi.metaLabel||'META')}: ${escapeHtml(kpi.metaValue)}</div>` : ''}
+      </div>
+      ${hasRing ? proRingSvg(kpi.pct, 72) : ''}
+    </div>
+  </div>`;
+}
+function proKpiRowHtml(kpis){
+  if(!kpis || !kpis.length) return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:26px 40px 6px;">${kpis.map(proKpiCardHtml).join('')}</div>`;
+}
+function proTableHtml(t){
+  // t: {icon, title, subtitle, nameLabel, columns:[label,...], barLabel, rows:[{rank,name,cells:[...],pct,barColor?,pctLabel?}], legend?, legendItems?, avatarIcon?, footnote?}
+  const rankColors = ['#e2b93c','#b7bec7','#c98a4a'];
+  const rowsHtml = t.rows.map(r=>{
+    const rankBg = r.rank!=null && r.rank<=3 ? rankColors[r.rank-1] : '#eef2f6';
+    const rankColor = r.rank!=null && r.rank<=3 ? '#fff' : '#5b6b7a';
+    const barColor = r.barColor || proSemColor(r.pct);
+    const avatarContent = t.avatarIcon || initialsFor(r.name);
+    const pctLabel = r.pctLabel !== undefined ? r.pctLabel : (r.pct==null?'—':Math.round(r.pct)+'%');
+    return `<tr>
+      <td style="padding:10px 6px;text-align:center;"><div style="width:26px;height:26px;border-radius:50%;background:${rankBg};color:${rankColor};display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;font-family:Arial,sans-serif;">${r.rank!=null?r.rank:''}</div></td>
+      <td style="padding:10px 8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:#eef2f6;color:#0a1e64;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;font-family:Arial,sans-serif;flex-shrink:0;">${avatarContent}</div>
+          <span style="font-weight:700;color:#0a1e64;font-size:13.5px;font-family:Arial,sans-serif;white-space:nowrap;">${escapeHtml(r.name)}</span>
+        </div>
+      </td>
+      ${r.cells.map(c=>`<td style="padding:10px 8px;text-align:center;font-size:13px;color:#1c2733;font-family:Arial,sans-serif;white-space:nowrap;">${c}</td>`).join('')}
+      <td style="padding:10px 8px;min-width:150px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${r.pct==null?0:Math.max(0,Math.min(100,r.pct))}%;height:100%;background:${barColor};"></div></div>
+          <span style="font-size:12px;font-weight:800;color:${barColor};font-family:Arial,sans-serif;width:52px;text-align:right;">${pctLabel}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  const legendItems = t.legendItems || (t.legend ? [
+    {color:'#0ca30c', label:'Dentro de meta'}, {color:'#e2960a', label:'En seguimiento'}, {color:'#d03b3b', label:'Fuera de meta'},
+  ] : null);
+  return `
+  <div style="flex:1;min-width:420px;background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:16px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${t.icon||''} ${escapeHtml(t.title)}</div>
+    <div style="font-size:12px;color:#8b98a4;margin:3px 0 14px;font-family:Arial,sans-serif;">${escapeHtml(t.subtitle||'')}</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="font-size:10px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;">RANK</th>
+        <th style="font-size:10px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.nameLabel||'NOMBRE')}</th>
+        ${t.columns.map(c=>`<th style="font-size:10px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;white-space:nowrap;">${escapeHtml(c)}</th>`).join('')}
+        <th style="font-size:10px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.barLabel||'CUMPLIMIENTO')}</th>
+      </tr></thead>
+      <tbody>${rowsHtml || `<tr><td colspan="${3+t.columns.length}" style="text-align:center;padding:18px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
+    </table>
+    ${legendItems ? `<div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;font-size:11px;color:#5b6b7a;font-family:Arial,sans-serif;">${legendItems.map(li=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${li.color};margin-right:5px;"></span>${escapeHtml(li.label)}</span>`).join('')}</div>` : ''}
+    ${t.footnote ? `<div style="font-size:11px;color:#8b98a4;margin-top:10px;font-family:Arial,sans-serif;">${t.footnote}</div>` : ''}
+  </div>`;
+}
+function proTablesRowHtml(tables){
+  if(!tables || !tables.length) return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 40px;">${tables.map(proTableHtml).join('')}</div>`;
+}
+function proBannerHtml(b){
+  // b: {tone:'alert'|'info', icon, items:[{value,label}], action}
+  if(!b) return '';
+  const bg = b.tone==='alert' ? '#fbe8e8' : '#e7f7e7';
+  const border = b.tone==='alert' ? '#d03b3b' : '#0ca30c';
+  const ink = b.tone==='alert' ? '#8a2020' : '#0a5c0a';
+  return `
+  <div style="margin:16px 40px 30px;background:${bg};border-left:6px solid ${border};border-radius:10px;padding:16px 22px;display:flex;align-items:center;gap:28px;flex-wrap:wrap;">
+    <div style="font-size:26px;">${b.icon || (b.tone==='alert'?'⚠️':'✅')}</div>
+    <div style="display:flex;gap:32px;flex-wrap:wrap;flex:1;">
+      ${b.items.map(it=>`<div><div style="font-size:22px;font-weight:800;color:${ink};font-family:Arial,sans-serif;">${it.value}</div><div style="font-size:12px;color:${ink};font-weight:600;font-family:Arial,sans-serif;">${escapeHtml(it.label)}</div></div>`).join('')}
+    </div>
+    ${b.action ? `<div style="font-size:12.5px;font-weight:700;color:${ink};font-family:Arial,sans-serif;max-width:300px;">${escapeHtml(b.action)}</div>` : ''}
+  </div>`;
+}
+function proImageHtml(opts){
+  // opts: {title, subtitle, kpis, tables, banner, footnote}
+  const fecha = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
+  return `
+  <div id="proImgInner" style="width:1500px;font-family:Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
+    ${proHeaderHtml(opts.title, opts.subtitle, fecha)}
+    ${proKpiRowHtml(opts.kpis)}
+    ${proTablesRowHtml(opts.tables)}
+    ${proBannerHtml(opts.banner)}
+    ${opts.footnote ? `<div style="padding:2px 40px 26px;font-size:11px;color:#8b98a4;line-height:1.5;font-family:Arial,sans-serif;">${opts.footnote}</div>` : ''}
+  </div>`;
+}
+async function downloadProImage(buildFn, filenamePrefix, btn){
   if(typeof html2canvas === 'undefined'){
     alert('No se pudo generar la imagen: la librería no cargó (revisa tu conexión a internet e intenta de nuevo).');
     return;
@@ -2375,14 +2511,14 @@ async function downloadEli5Image(btn){
   host.style.position = 'fixed';
   host.style.left = '-99999px';
   host.style.top = '0';
-  host.innerHTML = buildEli5Html();
+  host.innerHTML = proImageHtml(buildFn());
   document.body.appendChild(host);
   try{
     await new Promise(r=>setTimeout(r, 50));
-    const target = host.querySelector('#eli5CardInner');
+    const target = host.querySelector('#proImgInner');
     const canvas = await html2canvas(target, { backgroundColor: '#eef1f5', scale: 2 });
     const link = document.createElement('a');
-    link.download = 'resumen-whatsapp-tiempos-proceso-' + new Date().toISOString().slice(0,10) + '.png';
+    link.download = filenamePrefix + '-' + new Date().toISOString().slice(0,10) + '.png';
     link.href = canvas.toDataURL('image/png');
     document.body.appendChild(link);
     link.click();
@@ -2393,6 +2529,163 @@ async function downloadEli5Image(btn){
     host.remove();
     btn.disabled = false; btn.textContent = originalText;
   }
+}
+
+// ---- Contenido por módulo (cada uno arma solo los datos; el estilo lo pone proImageHtml arriba) ----
+
+// Alertas: conteos simples reutilizables tanto por la propia imagen de Alertas como por la de Tiempos
+// del Proceso (que muestra el mismo resumen al pie, sin los filtros propios del módulo de Alertas).
+function alertCountsSimple(){
+  const all = (DATA && DATA.alertRows) || [];
+  function count(tipo){
+    return all.filter(r=>r.tipo===tipo).map(r=>diasHabilesAlerta(r)).filter(d=>d!=null && d>metaAlerta(tipo)).length;
+  }
+  return { nReq: count('req_sin_pedido'), nPedido: count('pedido_sin_oc') };
+}
+function buildProImageTiempos(){
+  const rows = filteredProcesoRows();
+  const kpis = INDICATORS.map(ind=>{
+    const st = aggStatsForIndicator(rows, ind);
+    const metaTxt = ind.key==='d4' ? 'Plazo pactado en OC' : (ind.meta!=null ? '≤ '+ind.meta+' d.h.' : 'Sin meta');
+    return {
+      num: String(ind.num).padStart(2,'0'),
+      label: ind.stage.toUpperCase(),
+      value: st.promedio==null ? '—' : st.promedio.toFixed(1)+' días',
+      valueLabel: 'PROMEDIO',
+      metaLabel: 'META', metaValue: metaTxt,
+      pct: st.cumplePct,
+    };
+  });
+  const rankingRows = compradorRankingScored(rows).slice(0,6).map((r,i)=>({
+    rank: i+1, name: r.comprador,
+    cells: [ r.d2?r.d2.promedio.toFixed(1)+'d':'—', r.d4?r.d4.promedio.toFixed(1)+'d':'—' ],
+    pct: r.cumplePct,
+  }));
+  const almacenPersons = [ { name:'JCENTENO', ind: INDICATORS.find(i=>i.key==='d1') }, { name:'KALBUJAR', ind: INDICATORS.find(i=>i.key==='d6') } ];
+  const almacenRows = almacenPersons.map((p,i)=>{
+    const st = aggStatsForIndicator(rows, p.ind);
+    return { rank: i+1, name: p.name, cells: [ st.promedio==null?'—':st.promedio.toFixed(1)+'d', st.n.toLocaleString('es-PE') ], pct: st.cumplePct };
+  });
+  const ac = alertCountsSimple();
+  const banner = (ac.nReq>0 || ac.nPedido>0) ? {
+    tone:'alert',
+    items:[ {value:ac.nReq.toLocaleString('es-PE'), label:'Requerimientos sin Pedido (>2 d.h.)'}, {value:ac.nPedido.toLocaleString('es-PE'), label:'Pedidos sin OC (>2 d.h.)'} ],
+    action:'ACCIÓN: revisar pendientes con Almacén y Compras.',
+  } : { tone:'info', items:[ {value:'0', label:'Alertas abiertas fuera de meta'} ], action:'Todo al día 🎉' };
+  return {
+    title: 'INDICADORES DE TIEMPOS DEL PROCESO',
+    subtitle: 'RANKING POR COMPRADORES Y RESPONSABLES DE ALMACÉN',
+    kpis,
+    tables: [
+      { icon:'🏆', title:'Ranking de Compradores', subtitle:'Tiempo de Emisión de OC (Ind. 2) y Tiempo de Entrega de OC (Ind. 4)', nameLabel:'COMPRADOR', columns:['EMISIÓN OC','ENTREGA OC'], rows: rankingRows, legend:true },
+      { icon:'🏬', title:'Responsables de Almacén', subtitle:'Generación de Pedido (Ind. 1) y Despacho de Requerimiento (Ind. 5)', nameLabel:'RESPONSABLE', columns:['PROMEDIO','CASOS'], rows: almacenRows, legend:true },
+    ],
+    banner,
+    footnote: 'Indicador 1: responsable fijo JCENTENO, salvo "pedidos directos" (generados sin requerimiento previo). Indicador 3 (Aprobación de OC): responsable fijo MLUJAN, no varía por comprador — no se incluye en el ranking porque no depende de quién compra. Indicador 5 (Despacho de Requerimiento) no tiene meta fija: KALBUJAR lo coordina caso a caso, por eso su aro de cumplimiento y el de esta tabla salen en blanco.',
+  };
+}
+function buildProImageGasto(){
+  const rows = filteredGastoRows();
+  const groupKey = document.getElementById('groupByGasto').value;
+  const { agg, total } = buildGastoAgg(groupKey, rows);
+  const nTop80 = agg.filter(g=>g.top80).length;
+  const kpis = [
+    { num:'💰', label:'GASTO TOTAL DEL PERÍODO', value: fmtPEN(total), valueLabel:'MONTO', metaLabel:'VOLUMEN', metaValue: rows.length.toLocaleString('es-PE')+' líneas' },
+    { num:'🏭', label:(groupKey==='familia'?'FAMILIAS':'PROVEEDORES')+' CON COMPRAS', value: agg.length.toLocaleString('es-PE'), valueLabel:'CANTIDAD' },
+    { num:'📊', label:'CONCENTRACIÓN 80/20 (PARETO)', value: nTop80.toLocaleString('es-PE'), valueLabel:'EN EL 80% PRINCIPAL', metaLabel:'PROPORCIÓN', metaValue: (agg.length?(nTop80/agg.length*100).toFixed(0):0)+'% de '+(groupKey==='familia'?'las familias':'los proveedores') },
+  ];
+  const nameLabel = groupKey==='familia' ? 'FAMILIA' : 'PROVEEDOR';
+  const topRows = agg.slice(0,8).map((g,i)=>({
+    rank: i+1, name: g.label,
+    cells: [ fmtPEN(g.monto), g.pct.toFixed(1)+'%' ],
+    pct: g.pctAcum, pctLabel: g.pctAcum.toFixed(0)+'%',
+    barColor: g.top80 ? '#2a78d6' : '#c7d0d9',
+  }));
+  return {
+    title: 'CONCENTRACIÓN DE GASTO POR PROVEEDOR',
+    subtitle: 'ANÁLISIS PARETO 80/20',
+    kpis,
+    tables: [
+      { icon:'📦', title:'Top '+nameLabel.toLowerCase()+'s por gasto', subtitle:'Ordenados de mayor a menor gasto en el período filtrado', nameLabel, columns:['GASTO','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: topRows, legendItems:[{color:'#2a78d6',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
+    ],
+    banner: { tone:'info', items:[ {value:nTop80+' / '+agg.length, label:(groupKey==='familia'?'Familias':'Proveedores')+' concentran el 80% del gasto'} ], action:null },
+    footnote: 'Solo Órdenes de Compra (no de Servicio) con Estado Atendido Total/Parcial o Aprobado. Monto convertido a Soles con tipo de cambio de referencia fijo (US$ y €).',
+  };
+}
+function buildProImageAlertas(){
+  const ac = alertCountsSimple();
+  const kpis = [
+    { num:'📋', label:'REQUERIMIENTOS SIN PEDIDO (>2 D.H.)', value: ac.nReq.toLocaleString('es-PE'), valueLabel:'CASOS ABIERTOS', metaLabel:'RESPONSABLE', metaValue:'JCENTENO', color: ac.nReq>0?'#d03b3b':'#0ca30c' },
+    { num:'🧾', label:'PEDIDOS SIN OC (>2 D.H.)', value: ac.nPedido.toLocaleString('es-PE'), valueLabel:'CASOS ABIERTOS', metaLabel:'RESPONSABLE', metaValue:'Comprador asignado', color: ac.nPedido>0?'#d03b3b':'#0ca30c' },
+  ];
+  function rankingTable(tipo, title){
+    const meta = metaAlerta(tipo);
+    const view = (DATA.alertRows||[]).filter(r=>r.tipo===tipo)
+      .map(r=>Object.assign({}, r, { dias: diasHabilesAlerta(r) }))
+      .filter(r=>r.dias!=null && r.dias>meta)
+      .sort((a,b)=>b.dias-a.dias)
+      .slice(0,6);
+    const rows = view.map((r,i)=>({
+      rank: i+1, name: r.responsable || '(sin responsable)',
+      cells: [ (r.proyecto||'—').length>26 ? r.proyecto.slice(0,24)+'…' : (r.proyecto||'—') ],
+      pct: Math.min(100, r.dias/(meta*6)*100), pctLabel: r.dias+' d.h.',
+      barColor: proSeverityColor(r.dias, meta),
+    }));
+    return { icon:'⏱️', title, subtitle:'Casos por encima de la meta ('+meta+' d.h.), más atrasados primero', nameLabel:'RESPONSABLE', columns:['PROYECTO'], barLabel:'ATRASO', rows, legendItems:[{color:'#0ca30c',label:'Atraso moderado'},{color:'#e2960a',label:'Atraso alto'},{color:'#d03b3b',label:'Atraso crítico'}] };
+  }
+  const banner = (ac.nReq>0 || ac.nPedido>0)
+    ? { tone:'alert', items:[ {value:ac.nReq.toLocaleString('es-PE'), label:'Requerimientos sin Pedido'}, {value:ac.nPedido.toLocaleString('es-PE'), label:'Pedidos sin OC'} ], action:'ACCIÓN: revisar con Almacén y Compras los casos listados arriba.' }
+    : { tone:'info', items:[ {value:'0', label:'Casos abiertos fuera de meta'} ], action:'Todo al día 🎉' };
+  return {
+    title: 'ALERTAS DE ATENCIÓN',
+    subtitle: 'REQUERIMIENTOS Y PEDIDOS SIN ATENDER',
+    kpis,
+    tables: [ rankingTable('req_sin_pedido','Requerimientos sin Pedido'), rankingTable('pedido_sin_oc','Pedidos sin OC') ],
+    banner,
+    footnote: 'Días hábiles transcurridos calculados contra hoy (no contra una fecha guardada) — la lista cambia cada día aunque no se vuelva a cargar el archivo. Se excluyen los casos "Archivado".',
+  };
+}
+function buildProImageCompras(){
+  const reocRows = filteredReocRowsForCompras();
+  const totalNacional = reocRows.filter(r=>r.origen==='nacional').reduce((s,r)=>s+r.montoPEN,0);
+  const totalImportado = reocRows.filter(r=>r.origen==='importado').reduce((s,r)=>s+r.montoPEN,0);
+  const totalGeneral = totalNacional + totalImportado;
+  const pctNac = totalGeneral>0 ? totalNacional/totalGeneral*100 : null;
+  const pctImp = totalGeneral>0 ? totalImportado/totalGeneral*100 : null;
+  const cierreRows = filteredProjectRowsForCompras();
+  const cierreTotal = cierreRows.length;
+  const cierreCerrados = cierreRows.filter(p=>p.entregado).length;
+  const cierrePct = cierreTotal ? cierreCerrados/cierreTotal*100 : null;
+  const kpis = [
+    { num:'🇵🇪', label:'GASTO NACIONAL', value: fmtPEN(totalNacional), valueLabel:'MONTO', metaLabel:'PARTICIPACIÓN', metaValue: pctNac!=null?pctNac.toFixed(0)+'% del total':'—', color:'#2a78d6' },
+    { num:'🌎', label:'GASTO IMPORTADO', value: fmtPEN(totalImportado), valueLabel:'MONTO', metaLabel:'PARTICIPACIÓN', metaValue: pctImp!=null?pctImp.toFixed(0)+'% del total':'—', color:'#4a3aa7' },
+    { num:'⚖️', label:'DIFERENCIA NAC. − IMP.', value: fmtPEN(totalNacional-totalImportado), valueLabel:'MONTO', metaLabel:'BRECHA', metaValue: pctNac!=null?(pctNac-pctImp).toFixed(0)+' pp de participación':'—' },
+    { num:'✅', label:'CIERRE DE REQUERIMIENTOS', value: cierrePct!=null?cierrePct.toFixed(0)+'%':'—', valueLabel:'% CERRADOS', metaLabel:'CASOS', metaValue: cierreCerrados.toLocaleString('es-PE')+' de '+cierreTotal.toLocaleString('es-PE'), pct: cierrePct },
+  ];
+  const rankingRows = compradorRankingScored(procesoRowsFilteredForCompras()).slice(0,6).map((r,i)=>({
+    rank: i+1, name: r.comprador,
+    cells: [ r.d2?r.d2.promedio.toFixed(1)+'d':'—', r.d4?r.d4.promedio.toFixed(1)+'d':'—' ],
+    pct: r.cumplePct,
+  }));
+  const { agg: pagoAgg } = formaPagoAgg(reocRows);
+  const pagoRows = pagoAgg.slice(0,6).map((g,i)=>({
+    rank: i+1, name: g.label.length>22 ? g.label.slice(0,20)+'…' : g.label,
+    cells: [ fmtPEN(g.monto) ],
+    pct: g.pct, pctLabel: g.pct.toFixed(0)+'%',
+    barColor: '#2a78d6',
+  }));
+  const banner = { tone: (cierrePct!=null && cierrePct<50) ? 'alert' : 'info', items:[ {value:cierreCerrados.toLocaleString('es-PE')+' / '+cierreTotal.toLocaleString('es-PE'), label:'Requerimientos cerrados en el período filtrado'} ], action: cierrePct!=null ? ('Cierre actual: '+cierrePct.toFixed(0)+'%') : null };
+  return {
+    title: 'REPORTE SEMANAL DE COMPRAS',
+    subtitle: 'NACIONAL / IMPORTADO · FORMAS DE PAGO · RANKING Y CIERRE',
+    kpis,
+    tables: [
+      { icon:'🏆', title:'Ranking de Compradores', subtitle:'Tiempo de Emisión de OC (Ind. 2) y Tiempo de Entrega de OC (Ind. 4)', nameLabel:'COMPRADOR', columns:['EMISIÓN OC','ENTREGA OC'], rows: rankingRows, legend:true },
+      { icon:'💳', title:'Formas de Pago', subtitle:'Top formas de pago por monto en el período filtrado', nameLabel:'FORMA DE PAGO', columns:['MONTO'], barLabel:'% DEL TOTAL', rows: pagoRows, avatarIcon:'💳' },
+    ],
+    banner,
+    footnote: 'Nacional/Importado según el prefijo del código de orden en la hoja "R.EOC" (0001/0002). Cerrado = "Recibido en Obra", o "Enviado a Obra" con salida de almacén ya registrada — excluye "Archivado".',
+  };
 }
 
 // Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = promedio simple
