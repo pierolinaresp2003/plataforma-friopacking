@@ -1935,7 +1935,11 @@ function compradorRankingFromRows(rows){
   const byComprador = {};
   for(const g of g2){ byComprador[g.label] = byComprador[g.label] || {}; byComprador[g.label].d2 = g; }
   for(const g of g4){ byComprador[g.label] = byComprador[g.label] || {}; byComprador[g.label].d4 = g; }
-  return Object.entries(byComprador).map(([comprador, v])=>({ comprador, d2: v.d2 || null, d4: v.d4 || null }))
+  // Se excluye MLUJAN de este análisis (pedido de Piero, 02.09.2026: "no consideres a MLUJAN en este
+  // análisis") — él es el responsable fijo del Indicador 3 (Aprobación de OC), no un comprador real;
+  // aparece acá solo porque en algunas filas reales `UsuarioCompras` lo trae a él también.
+  return Object.entries(byComprador).filter(([comprador])=> comprador.trim().toUpperCase()!=='MLUJAN')
+    .map(([comprador, v])=>({ comprador, d2: v.d2 || null, d4: v.d4 || null }))
     .sort((a,b)=> (b.d2?b.d2.n:0) - (a.d2?a.d2.n:0));
 }
 // Filas de Tiempos del Proceso, filtradas por el Año/Mes propio del módulo de Compras (no los filtros
@@ -1953,44 +1957,12 @@ function procesoRowsFilteredForCompras(){
 function compradorRankingRows(){
   return compradorRankingFromRows(procesoRowsFilteredForCompras());
 }
-// Versión "puntuada" para las imágenes para compartir (02.09.2026): combina Indicador 2 e Indicador 4
-// en un solo promedio y un solo % de cumplimiento por comprador, ponderado por cantidad de casos de
-// cada indicador, para poder mostrar una sola barra de cumplimiento por fila (igual que el resto de
-// tablas de ranking de las imágenes).
-function compradorRankingScored(rows){
-  const list = compradorRankingFromRows(rows).filter(r=>r.d2 || r.d4);
-  const scored = list.map(r=>{
-    const n2 = r.d2?r.d2.n:0, n4 = r.d4?r.d4.n:0, nTotal = n2+n4;
-    const promTotal = nTotal ? (((r.d2?r.d2.promedio*n2:0)+(r.d4?r.d4.promedio*n4:0))/nTotal) : null;
-    // Cumplimiento combinado (corrección de Piero, 02.09.2026: "el cumplimiento solo se mida en base a
-    // si cumplieron o no con el máximo permitido") — ANTES se promediaba el % de Ind.2 con el % de
-    // Ind.4 a secas (cd2+cd4)/2, lo que distorsiona el resultado cuando un comprador tiene muchos más
-    // casos de un indicador que del otro (ej. 50 casos de Ind.2 al 90% y solo 2 de Ind.4 al 0% no es
-    // "45%", es prácticamente 90%). Ahora se cuenta cuántos casos cumplieron sobre el total de casos
-    // evaluados entre AMBOS indicadores juntos — mismo principio aplicado a "todo lo que le toca a
-    // compras" (Ind.2+4, esta tabla) y a "todo lo que le toca a almacén" (Responsables de Almacén, que
-    // ya no tenía este problema porque cada persona cubre un solo indicador con meta).
-    const cumpleN = (r.d2?r.d2.n*(r.d2.cumplePct||0)/100:0) + (r.d4?r.d4.n*(r.d4.cumplePct!=null?r.d4.cumplePct:0)/100:0);
-    const cumpleDenomN2 = r.d2 && r.d2.cumplePct!=null ? r.d2.n : 0;
-    const cumpleDenomN4 = r.d4 && r.d4.cumplePct!=null ? r.d4.n : 0;
-    const cumpleDenom = cumpleDenomN2 + cumpleDenomN4;
-    const cumplePct = cumpleDenom>0 ? cumpleN/cumpleDenom*100 : null;
-    return Object.assign({}, r, { promTotal, cumplePct, nTotal });
-  });
-  // Orden por cumplimiento (mejor desempeño primero) — antes ordenaba por cantidad de casos, lo que no
-  // es un "ranking" real (un comprador con muchos casos y mal desempeño salía primero igual). Los
-  // compradores sin ningún % de cumplimiento calculable (cumplePct null) van al final. Decisión de
-  // implementación de Claude señalada a Piero: "se ordene bien" se interpretó como de mejor a peor
-  // cumplimiento, a confirmar si prefiere el orden inverso (peor primero, para resaltar quién necesita
-  // atención primero).
-  scored.sort((a,b)=>{
-    if(a.cumplePct==null && b.cumplePct==null) return b.nTotal-a.nTotal;
-    if(a.cumplePct==null) return 1;
-    if(b.cumplePct==null) return -1;
-    return b.cumplePct-a.cumplePct;
-  });
-  return scored;
-}
+// Nota (02.09.2026): esta tabla dejó de ser un "ranking" de cumplimiento — Piero pidió quitar el %
+// de cumplimiento y el puesto de la tabla de compradores en la imagen de Tiempos del Proceso ("ya no
+// es un ranking"), mostrando en su lugar solo tiempo de Emisión de OC y volumen de OC por comprador
+// (ver `buildProImageTiempos`, que ahora arma sus filas directo desde `compradorRankingFromRows`).
+// La función `compradorRankingScored` (cumplimiento combinado Ind.2+4, orden por %) que alimentaba la
+// versión anterior de esta tabla ya no se usa en ningún lado — se quitó de aquí.
 function weeklyCierreAgg(rows){
   const groups = {};
   for(const p of rows){ const k = weekKeyFor(p.fReq); (groups[k] = groups[k] || []).push(p); }
@@ -2539,8 +2511,13 @@ function proKpiRowHtml(kpis, large){
   return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:26px 40px 6px;">${kpis.map(k=>proKpiCardHtml(k, large)).join('')}</div>`;
 }
 function proTableHtml(t, large){
-  // t: {icon, title, subtitle, nameLabel, columns:[label,...], barLabel, rows:[{rank,name,cells:[...],pct,barColor?,pctLabel?}], legend?, legendItems?, avatarIcon?, footnote?}
+  // t: {icon, title, subtitle, nameLabel, columns:[label,...], barLabel, rows:[{rank,name,cells:[...],pct,barColor?,pctLabel?}], legend?, legendItems?, avatarIcon?, footnote?, showRank?, showBar?}
   // `large` — ver nota en proKpiCardHtml.
+  // `showRank`/`showBar` (default true) — pedido de Piero, 02.09.2026, sobre Ranking de Compradores y
+  // Responsables de Almacén en la imagen de Tiempos del Proceso: "ya no es un ranking", sin puesto ni
+  // % de cumplimiento — solo tiempos/volúmenes. Las otras tablas (Gasto, Alertas, Compras) no se tocan,
+  // siguen mostrando rank/bar como antes (quedan en `true` por defecto).
+  const showRank = t.showRank !== false, showBar = t.showBar !== false;
   const rankColors = ['#e2b93c','#b7bec7','#c98a4a'];
   const rankSize = large ? 32 : 26, rankFont = large ? 14.5 : 12.5;
   const rowPadV = large ? 14 : 10, rowPadH = large ? 10 : 8;
@@ -2556,7 +2533,7 @@ function proTableHtml(t, large){
     const avatarContent = t.avatarIcon || initialsFor(r.name);
     const pctLabel = r.pctLabel !== undefined ? r.pctLabel : (r.pct==null?'—':Math.round(r.pct)+'%');
     return `<tr>
-      <td style="padding:${rowPadV}px 6px;text-align:center;"><div style="width:${rankSize}px;height:${rankSize}px;border-radius:50%;background:${rankBg};color:${rankColor};display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:${rankFont}px;font-family:Arial,sans-serif;">${r.rank!=null?r.rank:''}</div></td>
+      ${showRank ? `<td style="padding:${rowPadV}px 6px;text-align:center;"><div style="width:${rankSize}px;height:${rankSize}px;border-radius:50%;background:${rankBg};color:${rankColor};display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:${rankFont}px;font-family:Arial,sans-serif;">${r.rank!=null?r.rank:''}</div></td>` : ''}
       <td style="padding:${rowPadV}px ${rowPadH}px;">
         <div style="display:flex;align-items:center;gap:10px;">
           <div style="width:${avatarSize}px;height:${avatarSize}px;border-radius:50%;background:#eef2f6;color:#0a1e64;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:${avatarFont}px;font-family:Arial,sans-serif;flex-shrink:0;">${avatarContent}</div>
@@ -2564,29 +2541,29 @@ function proTableHtml(t, large){
         </div>
       </td>
       ${r.cells.map(c=>`<td style="padding:${rowPadV}px ${rowPadH}px;text-align:center;font-size:${cellFont}px;color:#1c2733;font-family:Arial,sans-serif;white-space:nowrap;">${c}</td>`).join('')}
-      <td style="padding:${rowPadV}px ${rowPadH}px;min-width:150px;">
+      ${showBar ? `<td style="padding:${rowPadV}px ${rowPadH}px;min-width:150px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="flex:1;height:${barH}px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${r.pct==null?0:Math.max(0,Math.min(100,r.pct))}%;height:100%;background:${barColor};"></div></div>
           <span style="font-size:${pctFont}px;font-weight:800;color:${barColor};font-family:Arial,sans-serif;width:${pctW}px;text-align:right;">${pctLabel}</span>
         </div>
-      </td>
+      </td>` : ''}
     </tr>`;
   }).join('');
-  const legendItems = t.legendItems || (t.legend ? [
+  const legendItems = !showBar ? null : (t.legendItems || (t.legend ? [
     {color:'#0ca30c', label:'Dentro de meta'}, {color:'#e2960a', label:'En seguimiento'}, {color:'#d03b3b', label:'Fuera de meta'},
-  ] : null);
+  ] : null));
   return `
   <div style="flex:1;min-width:420px;background:#fff;border-radius:14px;padding:${large?'26px 28px':'20px 22px'};box-shadow:0 1px 3px rgba(20,30,45,.10);">
     <div style="font-size:${titleFont}px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${t.icon||''} ${escapeHtml(t.title)}</div>
     <div style="font-size:${subtitleFont}px;color:#8b98a4;margin:3px 0 14px;font-family:Arial,sans-serif;">${escapeHtml(t.subtitle||'')}</div>
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr>
-        <th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;">RANK</th>
+        ${showRank ? `<th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;">RANK</th>` : ''}
         <th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.nameLabel||'NOMBRE')}</th>
         ${t.columns.map(c=>`<th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;white-space:nowrap;">${escapeHtml(c)}</th>`).join('')}
-        <th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.barLabel||'CUMPLIMIENTO')}</th>
+        ${showBar ? `<th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.barLabel||'CUMPLIMIENTO')}</th>` : ''}
       </tr></thead>
-      <tbody>${rowsHtml || `<tr><td colspan="${3+t.columns.length}" style="text-align:center;padding:18px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
+      <tbody>${rowsHtml || `<tr><td colspan="${1+(showRank?1:0)+(showBar?1:0)+t.columns.length}" style="text-align:center;padding:18px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
     </table>
     ${legendItems ? `<div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;font-size:${legendFont}px;color:#5b6b7a;font-family:Arial,sans-serif;">${legendItems.map(li=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${li.color};margin-right:5px;"></span>${escapeHtml(li.label)}</span>`).join('')}</div>` : ''}
     ${t.footnote ? `<div style="font-size:11px;color:#8b98a4;margin-top:10px;font-family:Arial,sans-serif;">${t.footnote}</div>` : ''}
@@ -2683,15 +2660,22 @@ function buildProImageTiempos(){
       pct: st.cumplePct,
     };
   });
-  const rankingRows = compradorRankingScored(rows).slice(0,6).map((r,i)=>({
-    rank: i+1, name: r.comprador,
-    cells: [ r.d2?r.d2.promedio.toFixed(1)+'d':'—', r.d4?r.d4.promedio.toFixed(1)+'d':'—' ],
-    pct: r.cumplePct,
-  }));
+  // Tabla de compradores simplificada (pedido de Piero, 02.09.2026: "quita el % de cumplimiento...
+  // ya no es un ranking... simplemente para compradores coloca cuánto se tardan en emisión de oc [y]
+  // el volumen de cantidad de oc que generó cada comprador") — sin puesto, sin % de cumplimiento, y
+  // sin la columna de Entrega de OC (Ind. 4): solo Emisión de OC (Ind. 2), promedio y volumen. MLUJAN
+  // ya queda excluido desde `compradorRankingFromRows` (no es un comprador real).
+  const compradorRows = compradorRankingFromRows(rows)
+    .filter(r=>r.d2)
+    .sort((a,b)=> b.d2.n - a.d2.n)
+    .slice(0,8)
+    .map(r=>({ name: r.comprador, cells: [ r.d2.promedio.toFixed(1)+'d', r.d2.n.toLocaleString('es-PE') ] }));
   const almacenPersons = [ { name:'JCENTENO', ind: INDICATORS.find(i=>i.key==='d1') }, { name:'KALBUJAR', ind: INDICATORS.find(i=>i.key==='d6') } ];
-  const almacenRows = almacenPersons.map((p,i)=>{
+  // Mismo tratamiento para Almacén (pedido de Piero: "del mismo modo con almacén, no coloques su %")
+  // — sin puesto ni % de cumplimiento, solo promedio y casos.
+  const almacenRows = almacenPersons.map(p=>{
     const st = aggStatsForIndicator(rows, p.ind);
-    return { rank: i+1, name: p.name, cells: [ st.promedio==null?'—':st.promedio.toFixed(1)+'d', st.n.toLocaleString('es-PE') ], pct: st.cumplePct };
+    return { name: p.name, cells: [ st.promedio==null?'—':st.promedio.toFixed(1)+'d', st.n.toLocaleString('es-PE') ] };
   });
   // Sin banner de alertas ni pie de letra chica (pedido de Piero, 02.09.2026: "la parte de rojo de
   // abajo prefiero que la quites y agrandes el resto de indicadores... las letras pequeñas del final
@@ -2699,12 +2683,12 @@ function buildProImageTiempos(){
   // en proKpiCardHtml/proTableHtml).
   return {
     title: 'INDICADORES DE TIEMPOS DEL PROCESO',
-    subtitle: 'RANKING POR COMPRADORES Y RESPONSABLES DE ALMACÉN',
+    subtitle: 'COMPRADORES Y RESPONSABLES DE ALMACÉN',
     kpis,
     large: true,
     tables: [
-      { icon:'🏆', title:'Ranking de Compradores', subtitle:'Tiempo de Emisión de OC (Ind. 2) y Tiempo de Entrega de OC en Lurín (Ind. 4)', nameLabel:'COMPRADOR', columns:['EMISIÓN OC','ENTREGA OC'], rows: rankingRows, legend:true },
-      { icon:'🏬', title:'Responsables de Almacén', subtitle:'Generación de Pedido (Ind. 1) y Despacho de Requerimiento (Ind. 5)', nameLabel:'RESPONSABLE', columns:['PROMEDIO','CASOS'], rows: almacenRows, legend:true },
+      { icon:'📋', title:'Compradores', subtitle:'Tiempo de Emisión de OC (Ind. 2) — promedio y volumen por comprador', nameLabel:'COMPRADOR', columns:['PROMEDIO','VOLUMEN OC'], rows: compradorRows, showRank:false, showBar:false },
+      { icon:'🏬', title:'Responsables de Almacén', subtitle:'Generación de Pedido (Ind. 1) y Despacho de Requerimiento (Ind. 5)', nameLabel:'RESPONSABLE', columns:['PROMEDIO','CASOS'], rows: almacenRows, showRank:false, showBar:false },
     ],
   };
 }
