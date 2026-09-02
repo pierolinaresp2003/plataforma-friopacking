@@ -447,6 +447,7 @@
           <option value="nacional">Origen: Nacional</option>
           <option value="importado">Origen: Importado</option>
         </select>
+        <select id="filterAlertaDesdeMes"><option value="all">Desde: todos</option></select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
 
@@ -1517,19 +1518,36 @@ function populateAlertaFilters(){
   populateSelectDistinct(document.getElementById('filterAlertaProyecto'), rows.map(r=>r.proyecto), 'Todos los proyectos');
   populateSelectDistinct(document.getElementById('filterAlertaProveedor'), rows.map(r=>r.proveedor), 'Todos los proveedores');
   populateSelectDistinct(document.getElementById('filterAlertaResponsable'), rows.map(r=>r.responsable), 'Todos los responsables');
+  populateAlertaMesFilter(rows);
 }
-// Filtros compartidos por las 2 tablas de alertas (Proyecto/Proveedor/Responsable/Origen) — el buscador
-// de cada tabla sigue siendo independiente, pero estos 4 filtros aplican a ambas a la vez.
+// Filtro "Desde (mes)": a diferencia de los demás filtros (que son de coincidencia exacta), este es un
+// corte — Piero pidió poder "considerarlo desde un mes en específico en adelante" (para dejar fuera el
+// backlog más viejo y enfocarse en lo reciente). Las opciones se arman con los meses reales que hay en
+// los datos (según fDesde: FechaRequerimiento para "Req sin Pedido", FechaPedido para "Pedido sin OC").
+function populateAlertaMesFilter(rows){
+  const sel = document.getElementById('filterAlertaDesdeMes');
+  const current = sel.value;
+  const keys = [...new Set(rows.filter(r=>r.fDesde).map(r=>isoDay(r.fDesde).slice(0,7)))].sort();
+  sel.innerHTML = ['<option value="all">Desde: todos</option>'].concat(
+    keys.map(k=>`<option value="${k}">Desde ${formatMonthLabel(k)}</option>`)
+  ).join('');
+  if([...sel.options].some(o=>o.value===current)) sel.value = current;
+}
+// Filtros compartidos por las 2 tablas de alertas (Proyecto/Proveedor/Responsable/Origen/Desde mes) — el
+// buscador de cada tabla sigue siendo independiente, pero estos filtros aplican a ambas a la vez.
 function filteredAlertRows(rows){
   const fProyecto = document.getElementById('filterAlertaProyecto').value;
   const fProveedor = document.getElementById('filterAlertaProveedor').value;
   const fResp = document.getElementById('filterAlertaResponsable').value;
   const fOrigen = document.getElementById('filterAlertaOrigen').value;
+  const fMes = document.getElementById('filterAlertaDesdeMes').value;
+  const cutoff = fMes!=='all' ? fromIsoDay(fMes+'-01') : null;
   return rows.filter(r=>{
     if(fProyecto!=='all' && r.proyecto !== fProyecto) return false;
     if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
     if(fResp!=='all' && r.responsable !== fResp) return false;
     if(fOrigen!=='all' && r.origen !== fOrigen) return false;
+    if(cutoff && (!r.fDesde || r.fDesde < cutoff)) return false;
     return true;
   });
 }
@@ -1546,7 +1564,7 @@ function renderAlertas(){
   }
   populateAlertaFilters();
   if(!alertasListenersBound){
-    ['searchAlertaReq','searchAlertaPedido','filterAlertaProyecto','filterAlertaProveedor','filterAlertaResponsable','filterAlertaOrigen'].forEach(id=>{
+    ['searchAlertaReq','searchAlertaPedido','filterAlertaProyecto','filterAlertaProveedor','filterAlertaResponsable','filterAlertaOrigen','filterAlertaDesdeMes'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawAlertas);
     });
