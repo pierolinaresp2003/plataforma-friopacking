@@ -521,7 +521,7 @@
 </div><!-- /app-shell -->
 
 <footer>
-  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 5 indicadores independientes. El camino se define por si la línea tiene <code>CodPedido</code> real (no vacío, no "-"): si lo tiene, pasó a Compras → <b>Camino 2 (compra)</b>; si no, se atendió directo desde stock → <b>Camino 1 (stock)</b>. <b>Camino 2 (compra)</b>: Indicador 1, <b>Tiempo de Generación de Pedido</b>, = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2, <b>Tiempo de Emisión de OC</b>, = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3, <b>Tiempo de Aprobación de OC</b>, = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Compras, meta 2 d.h.). Indicador 4, <b>Tiempo de Entrega de OC</b>, = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>; la meta no es fija — es el plazo pactado en la OC (días hábiles entre <code>FechaOrden</code> y <code>ParaFechaOrden</code>) trasladado para empezar a contar desde <code>FechaAprobacionOC</code>, así queda bien anclado aunque el Indicador 3 haya tenido demora. <b>Camino 1 (stock)</b>: Indicador 5, <b>Tiempo de Despacho de Requerimiento</b>, = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, <b>sin meta fija</b> — Piero aclaró que Kathy lo coordina caso a caso, sin una fecha comprometida, pero sí se calcula el promedio). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial. <b>Responsables (aclarado por Piero, 01.09.2026):</b> Indicador 1 (Tiempo de Generación de Pedido) es siempre <b>JCENTENO</b>, salvo en "pedidos directos" (generados sin requerimiento previo, identificados por aparecer en PedidoSinReq.xlsx) donde el responsable real se toma de ese archivo. Indicador 3 (Tiempo de Aprobación de OC) es siempre <b>MLUJAN</b>. Indicador 5 (Tiempo de Despacho de Requerimiento) es siempre <b>KALBUJAR</b>. Indicador 2 y 4 sí varían por línea — son las 2 métricas de "rendimiento por comprador" (<code>UsuarioCompras</code>).
+  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 5 indicadores independientes. El camino se define por si la línea tiene <code>CodPedido</code> real (no vacío, no "-"): si lo tiene, pasó a Compras → <b>Camino 2 (compra)</b>; si no, se atendió directo desde stock → <b>Camino 1 (stock)</b>. <b>Camino 2 (compra)</b>: Indicador 1, <b>Tiempo de Generación de Pedido</b>, = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2, <b>Tiempo de Emisión de OC</b>, = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3, <b>Tiempo de Aprobación de OC</b>, = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Compras, meta 2 d.h.). Indicador 4, <b>Tiempo de Entrega de OC en Lurín</b>, = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>; la meta no es fija — es el plazo pactado en la OC (días hábiles entre <code>FechaOrden</code> y <code>ParaFechaOrden</code>) trasladado para empezar a contar desde <code>FechaAprobacionOC</code>, así queda bien anclado aunque el Indicador 3 haya tenido demora. <b>Camino 1 (stock)</b>: Indicador 5, <b>Tiempo de Despacho de Requerimiento</b>, = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta <b>15 d.h.</b> — regla confirmada por Piero, 02.09.2026). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial. <b>Responsables (aclarado por Piero, 01.09.2026):</b> Indicador 1 (Tiempo de Generación de Pedido) es siempre <b>JCENTENO</b>, salvo en "pedidos directos" (generados sin requerimiento previo, identificados por aparecer en PedidoSinReq.xlsx) donde el responsable real se toma de ese archivo. Indicador 3 (Tiempo de Aprobación de OC) es siempre <b>MLUJAN</b>. Indicador 5 (Tiempo de Despacho de Requerimiento) es siempre <b>KALBUJAR</b>. Indicador 2 y 4 sí varían por línea — son las 2 métricas de "rendimiento por comprador" (<code>UsuarioCompras</code>).
 </footer>
 
 <script>
@@ -2028,7 +2028,7 @@ function renderCompras(){
 }
 function drawCompras(){
   populateSemanaSelect(document.getElementById('filterComprasSemana'), document.getElementById('filterComprasAnio').value, document.getElementById('filterComprasMes').value);
-  document.getElementById('comprasDefNote').innerHTML = `<b>Qué cuenta como compra:</b> líneas de la hoja "R.EOC" con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> (mismo criterio que Concentración de Gasto). Monto convertido a Soles con el tipo de cambio real de cada orden cuando está disponible, o el de referencia si falta (US$ ${TIPO_CAMBIO_FALLBACK['Dolares Americanos'].toFixed(3)}, € ${TIPO_CAMBIO_FALLBACK['Euros'].toFixed(2)}). <b>Nacional/Importado:</b> según el prefijo del código de orden (0001 = nacional, 0002 = importado). <b>Requerimiento cerrado:</b> estado "Recibido en Obra", o "Enviado a Obra" con salida de almacén ya registrada — se excluyen los "Archivado". <b>Ranking de compradores:</b> mismos Indicador 2 (Tiempo de Emisión de OC) e Indicador 4 (Tiempo de Entrega de OC) ya usados en Tiempos del Proceso.`;
+  document.getElementById('comprasDefNote').innerHTML = `<b>Qué cuenta como compra:</b> líneas de la hoja "R.EOC" con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> (mismo criterio que Concentración de Gasto). Monto convertido a Soles con el tipo de cambio real de cada orden cuando está disponible, o el de referencia si falta (US$ ${TIPO_CAMBIO_FALLBACK['Dolares Americanos'].toFixed(3)}, € ${TIPO_CAMBIO_FALLBACK['Euros'].toFixed(2)}). <b>Nacional/Importado:</b> según el prefijo del código de orden (0001 = nacional, 0002 = importado). <b>Requerimiento cerrado:</b> estado "Recibido en Obra", o "Enviado a Obra" con salida de almacén ya registrada — se excluyen los "Archivado". <b>Ranking de compradores:</b> mismos Indicador 2 (Tiempo de Emisión de OC) e Indicador 4 (Tiempo de Entrega de OC en Lurín) ya usados en Tiempos del Proceso.`;
 
   // ---- Compras por semana: nacional vs. importado ----
   const reocRows = filteredReocRowsForCompras();
@@ -2100,7 +2100,7 @@ function drawCompras(){
   let ranking = compradorRankingRows();
   if(qComp) ranking = ranking.filter(r=>r.comprador.toLowerCase().includes(qComp));
   const tRank = document.getElementById('tableRankingCompradores');
-  tRank.querySelector('thead').innerHTML = `<tr><th>Comprador</th><th>Tiempo de Emisión de OC — Prom.</th><th>Cumplimiento</th><th>Casos</th><th>Tiempo de Entrega de OC — Prom.</th><th>Cumplimiento</th><th>Casos</th></tr>`;
+  tRank.querySelector('thead').innerHTML = `<tr><th>Comprador</th><th>Tiempo de Emisión de OC — Prom.</th><th>Cumplimiento</th><th>Casos</th><th>Tiempo de Entrega de OC en Lurín — Prom.</th><th>Cumplimiento</th><th>Casos</th></tr>`;
   tRank.querySelector('tbody').innerHTML = ranking.map(r=>`
     <tr>
       <td>${escapeHtml(r.comprador)}</td>
@@ -2154,14 +2154,16 @@ const INDICATORS = [
   { key:'d1', num:1, name:'Tiempo de Generación de Pedido', stage:'Tiempo de Generación de Pedido', area:'almacen', areaLabel:'ALMACÉN', meta:2, from:'fReq', to:'fPedido', respField:'responsablePedido', camino:'compra' },
   { key:'d2', num:2, name:'Tiempo de Emisión de OC', stage:'Tiempo de Emisión de OC', area:'compras', areaLabel:'COMPRAS', meta:2, from:'fPedido', to:'fOrden', respField:'usuarioCompras', camino:'compra' },
   { key:'d3', num:3, name:'Tiempo de Aprobación de OC', stage:'Tiempo de Aprobación de OC', area:'compras', areaLabel:'COMPRAS', meta:2, from:'fOrden', to:'fAprob', respField:'usuarioCompras', camino:'compra' },
-  { key:'d4', num:4, name:'Tiempo de Entrega de OC', stage:'Tiempo de Entrega de OC', area:'compras', areaLabel:'COMPRAS', meta:null, from:'fAprob', to:'fRecep', respField:'usuarioCompras', camino:'compra' },
+  { key:'d4', num:4, name:'Tiempo de Entrega de OC en Lurín', stage:'Tiempo de Entrega de OC en Lurín', area:'compras', areaLabel:'COMPRAS', meta:null, from:'fAprob', to:'fRecep', respField:'usuarioCompras', camino:'compra' },
   // Indicador "RECEPCIÓN → SALIDA" (antes num 5) fue eliminado a pedido de Piero (01.09.2026):
   // con datos reales solo tenía 9 casos medibles (el material de compra casi siempre se mezcla
   // con el stock general y su salida real queda registrada como una línea de requerimiento
   // distinta, ya cubierta por el indicador de abajo) — el indicador no era representativo.
-  // Sin meta fija (aclaración de Piero, 01.09.2026): "Kathy lo coordina (no hay fecha) pero sí
-  // calcula prom" — se sigue calculando el promedio, pero no hay cumplimiento que medir contra nada.
-  { key:'d6', num:5, name:'Tiempo de Despacho de Requerimiento', stage:'Tiempo de Despacho de Requerimiento', area:'almacen', areaLabel:'ALMACÉN', meta:null, from:'fReq', to:'fSalida', respField:'responsableSalida', camino:'stock' },
+  // Meta 15 d.h. (regla confirmada por Piero, 02.09.2026) — reemplaza la meta "null" que tenía desde
+  // la aclaración del 01.09.2026 ("Kathy lo coordina, no hay fecha, pero sí calcula prom"). Se asumió
+  // días hábiles, por consistencia con el resto de metas de la plataforma — Piero no especificó si es
+  // hábil o calendario, señalado para que lo confirme.
+  { key:'d6', num:5, name:'Tiempo de Despacho de Requerimiento', stage:'Tiempo de Despacho de Requerimiento', area:'almacen', areaLabel:'ALMACÉN', meta:15, from:'fReq', to:'fSalida', respField:'responsableSalida', camino:'stock' },
 ];
 // Semana ISO (lunes a domingo) para el diagrama de tendencia — mismo criterio que "mes" (usa fReq).
 function isoWeekStart(d){
@@ -2502,33 +2504,51 @@ function proHeaderHtml(title, subtitle, dateLabel){
     </div>
   </div>`;
 }
-function proKpiCardHtml(kpi){
+function proKpiCardHtml(kpi, large){
   // kpi: {num, label, value, valueLabel, metaLabel, metaValue, pct?, color?}
+  // `large` (pedido de Piero, 02.09.2026: al quitar el banner rojo y el pie de letra chica de la
+  // imagen de Tiempos del Proceso, "agrandar el resto de indicadores" con el espacio liberado) agranda
+  // tipografía/espaciado sin tocar min-width, para no romper el ajuste de 5 tarjetas por fila.
   const hasRing = kpi.pct !== undefined;
   const color = kpi.color || (hasRing ? proSemColor(kpi.pct) : '#3ec6ac');
+  const pad = large ? '28px 24px' : '20px 18px';
+  const numSize = large ? 42 : 34, numFont = large ? 17 : 15;
+  const labelFont = large ? 15.5 : 13.5;
+  const valueLabelFont = large ? 12 : 10.5;
+  const valueFont = large ? 36 : 27;
+  const metaFont = large ? 13 : 11.5;
+  const ringSize = large ? 92 : 72;
   return `
-  <div style="flex:1;min-width:230px;background:#fff;border-radius:14px;padding:20px 18px;border-top:5px solid ${color};box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;min-height:34px;">
-      <div style="width:34px;height:34px;border-radius:50%;background:#0a1e64;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;font-family:Arial,sans-serif;flex-shrink:0;">${kpi.num}</div>
-      <div style="font-size:13.5px;font-weight:800;color:#0a1e64;line-height:1.25;font-family:Arial,sans-serif;">${escapeHtml(kpi.label)}</div>
+  <div style="flex:1;min-width:230px;background:#fff;border-radius:14px;padding:${pad};border-top:5px solid ${color};box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:${large?18:14}px;min-height:${numSize}px;">
+      <div style="width:${numSize}px;height:${numSize}px;border-radius:50%;background:#0a1e64;color:#fff;display:flex;align-items:center;justify-content:center;font-size:${numFont}px;font-weight:800;font-family:Arial,sans-serif;flex-shrink:0;">${kpi.num}</div>
+      <div style="font-size:${labelFont}px;font-weight:800;color:#0a1e64;line-height:1.25;font-family:Arial,sans-serif;">${escapeHtml(kpi.label)}</div>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <div>
-        <div style="font-size:10.5px;color:#8b98a4;font-weight:700;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(kpi.valueLabel||'VALOR')}</div>
-        <div style="font-size:27px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${escapeHtml(kpi.value)}</div>
-        ${kpi.metaValue ? `<div style="font-size:11.5px;color:#8b98a4;font-weight:600;margin-top:2px;font-family:Arial,sans-serif;">${escapeHtml(kpi.metaLabel||'META')}: ${escapeHtml(kpi.metaValue)}</div>` : ''}
+        <div style="font-size:${valueLabelFont}px;color:#8b98a4;font-weight:700;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(kpi.valueLabel||'VALOR')}</div>
+        <div style="font-size:${valueFont}px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${escapeHtml(kpi.value)}</div>
+        ${kpi.metaValue ? `<div style="font-size:${metaFont}px;color:#8b98a4;font-weight:600;margin-top:2px;font-family:Arial,sans-serif;">${escapeHtml(kpi.metaLabel||'META')}: ${escapeHtml(kpi.metaValue)}</div>` : ''}
       </div>
-      ${hasRing ? proRingSvg(kpi.pct, 72) : ''}
+      ${hasRing ? proRingSvg(kpi.pct, ringSize) : ''}
     </div>
   </div>`;
 }
-function proKpiRowHtml(kpis){
+function proKpiRowHtml(kpis, large){
   if(!kpis || !kpis.length) return '';
-  return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:26px 40px 6px;">${kpis.map(proKpiCardHtml).join('')}</div>`;
+  return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:26px 40px 6px;">${kpis.map(k=>proKpiCardHtml(k, large)).join('')}</div>`;
 }
-function proTableHtml(t){
+function proTableHtml(t, large){
   // t: {icon, title, subtitle, nameLabel, columns:[label,...], barLabel, rows:[{rank,name,cells:[...],pct,barColor?,pctLabel?}], legend?, legendItems?, avatarIcon?, footnote?}
+  // `large` — ver nota en proKpiCardHtml.
   const rankColors = ['#e2b93c','#b7bec7','#c98a4a'];
+  const rankSize = large ? 32 : 26, rankFont = large ? 14.5 : 12.5;
+  const rowPadV = large ? 14 : 10, rowPadH = large ? 10 : 8;
+  const avatarSize = large ? 40 : 32, avatarFont = large ? 15 : 13;
+  const nameFont = large ? 15.5 : 13.5, cellFont = large ? 15 : 13;
+  const barH = large ? 12 : 9, pctFont = large ? 14 : 12, pctW = large ? 60 : 52;
+  const titleFont = large ? 19 : 16, subtitleFont = large ? 13.5 : 12, theadFont = large ? 11.5 : 10;
+  const legendFont = large ? 13 : 11;
   const rowsHtml = t.rows.map(r=>{
     const rankBg = r.rank!=null && r.rank<=3 ? rankColors[r.rank-1] : '#eef2f6';
     const rankColor = r.rank!=null && r.rank<=3 ? '#fff' : '#5b6b7a';
@@ -2536,18 +2556,18 @@ function proTableHtml(t){
     const avatarContent = t.avatarIcon || initialsFor(r.name);
     const pctLabel = r.pctLabel !== undefined ? r.pctLabel : (r.pct==null?'—':Math.round(r.pct)+'%');
     return `<tr>
-      <td style="padding:10px 6px;text-align:center;"><div style="width:26px;height:26px;border-radius:50%;background:${rankBg};color:${rankColor};display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;font-family:Arial,sans-serif;">${r.rank!=null?r.rank:''}</div></td>
-      <td style="padding:10px 8px;">
+      <td style="padding:${rowPadV}px 6px;text-align:center;"><div style="width:${rankSize}px;height:${rankSize}px;border-radius:50%;background:${rankBg};color:${rankColor};display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:${rankFont}px;font-family:Arial,sans-serif;">${r.rank!=null?r.rank:''}</div></td>
+      <td style="padding:${rowPadV}px ${rowPadH}px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:32px;height:32px;border-radius:50%;background:#eef2f6;color:#0a1e64;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;font-family:Arial,sans-serif;flex-shrink:0;">${avatarContent}</div>
-          <span style="font-weight:700;color:#0a1e64;font-size:13.5px;font-family:Arial,sans-serif;white-space:nowrap;">${escapeHtml(r.name)}</span>
+          <div style="width:${avatarSize}px;height:${avatarSize}px;border-radius:50%;background:#eef2f6;color:#0a1e64;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:${avatarFont}px;font-family:Arial,sans-serif;flex-shrink:0;">${avatarContent}</div>
+          <span style="font-weight:700;color:#0a1e64;font-size:${nameFont}px;font-family:Arial,sans-serif;white-space:nowrap;">${escapeHtml(r.name)}</span>
         </div>
       </td>
-      ${r.cells.map(c=>`<td style="padding:10px 8px;text-align:center;font-size:13px;color:#1c2733;font-family:Arial,sans-serif;white-space:nowrap;">${c}</td>`).join('')}
-      <td style="padding:10px 8px;min-width:150px;">
+      ${r.cells.map(c=>`<td style="padding:${rowPadV}px ${rowPadH}px;text-align:center;font-size:${cellFont}px;color:#1c2733;font-family:Arial,sans-serif;white-space:nowrap;">${c}</td>`).join('')}
+      <td style="padding:${rowPadV}px ${rowPadH}px;min-width:150px;">
         <div style="display:flex;align-items:center;gap:8px;">
-          <div style="flex:1;height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${r.pct==null?0:Math.max(0,Math.min(100,r.pct))}%;height:100%;background:${barColor};"></div></div>
-          <span style="font-size:12px;font-weight:800;color:${barColor};font-family:Arial,sans-serif;width:52px;text-align:right;">${pctLabel}</span>
+          <div style="flex:1;height:${barH}px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${r.pct==null?0:Math.max(0,Math.min(100,r.pct))}%;height:100%;background:${barColor};"></div></div>
+          <span style="font-size:${pctFont}px;font-weight:800;color:${barColor};font-family:Arial,sans-serif;width:${pctW}px;text-align:right;">${pctLabel}</span>
         </div>
       </td>
     </tr>`;
@@ -2556,25 +2576,25 @@ function proTableHtml(t){
     {color:'#0ca30c', label:'Dentro de meta'}, {color:'#e2960a', label:'En seguimiento'}, {color:'#d03b3b', label:'Fuera de meta'},
   ] : null);
   return `
-  <div style="flex:1;min-width:420px;background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="font-size:16px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${t.icon||''} ${escapeHtml(t.title)}</div>
-    <div style="font-size:12px;color:#8b98a4;margin:3px 0 14px;font-family:Arial,sans-serif;">${escapeHtml(t.subtitle||'')}</div>
+  <div style="flex:1;min-width:420px;background:#fff;border-radius:14px;padding:${large?'26px 28px':'20px 22px'};box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:${titleFont}px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${t.icon||''} ${escapeHtml(t.title)}</div>
+    <div style="font-size:${subtitleFont}px;color:#8b98a4;margin:3px 0 14px;font-family:Arial,sans-serif;">${escapeHtml(t.subtitle||'')}</div>
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr>
-        <th style="font-size:10px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;">RANK</th>
-        <th style="font-size:10px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.nameLabel||'NOMBRE')}</th>
-        ${t.columns.map(c=>`<th style="font-size:10px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;white-space:nowrap;">${escapeHtml(c)}</th>`).join('')}
-        <th style="font-size:10px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.barLabel||'CUMPLIMIENTO')}</th>
+        <th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;">RANK</th>
+        <th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.nameLabel||'NOMBRE')}</th>
+        ${t.columns.map(c=>`<th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:6px;font-family:Arial,sans-serif;white-space:nowrap;">${escapeHtml(c)}</th>`).join('')}
+        <th style="font-size:${theadFont}px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:6px;font-family:Arial,sans-serif;">${escapeHtml(t.barLabel||'CUMPLIMIENTO')}</th>
       </tr></thead>
       <tbody>${rowsHtml || `<tr><td colspan="${3+t.columns.length}" style="text-align:center;padding:18px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
     </table>
-    ${legendItems ? `<div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;font-size:11px;color:#5b6b7a;font-family:Arial,sans-serif;">${legendItems.map(li=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${li.color};margin-right:5px;"></span>${escapeHtml(li.label)}</span>`).join('')}</div>` : ''}
+    ${legendItems ? `<div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;font-size:${legendFont}px;color:#5b6b7a;font-family:Arial,sans-serif;">${legendItems.map(li=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${li.color};margin-right:5px;"></span>${escapeHtml(li.label)}</span>`).join('')}</div>` : ''}
     ${t.footnote ? `<div style="font-size:11px;color:#8b98a4;margin-top:10px;font-family:Arial,sans-serif;">${t.footnote}</div>` : ''}
   </div>`;
 }
-function proTablesRowHtml(tables){
+function proTablesRowHtml(tables, large){
   if(!tables || !tables.length) return '';
-  return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 40px;">${tables.map(proTableHtml).join('')}</div>`;
+  return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 40px;">${tables.map(t=>proTableHtml(t, large)).join('')}</div>`;
 }
 function proBannerHtml(b){
   // b: {tone:'alert'|'info', icon, items:[{value,label}], action}
@@ -2592,15 +2612,19 @@ function proBannerHtml(b){
   </div>`;
 }
 function proImageHtml(opts){
-  // opts: {title, subtitle, kpis, tables, banner, footnote}
+  // opts: {title, subtitle, kpis, tables, banner, footnote, large?}
   const fecha = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
+  // Cuando no hay banner ni pie de letra chica (Tiempos del Proceso, 02.09.2026), se agrega un margen
+  // inferior propio para que la imagen no termine pegada justo debajo de las tablas.
+  const bottomSpacer = (!opts.banner && !opts.footnote) ? `<div style="padding-bottom:34px;"></div>` : '';
   return `
   <div id="proImgInner" style="width:1500px;font-family:Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
     ${proHeaderHtml(opts.title, opts.subtitle, fecha)}
-    ${proKpiRowHtml(opts.kpis)}
-    ${proTablesRowHtml(opts.tables)}
+    ${proKpiRowHtml(opts.kpis, opts.large)}
+    ${proTablesRowHtml(opts.tables, opts.large)}
     ${proBannerHtml(opts.banner)}
     ${opts.footnote ? `<div style="padding:2px 40px 26px;font-size:11px;color:#8b98a4;line-height:1.5;font-family:Arial,sans-serif;">${opts.footnote}</div>` : ''}
+    ${bottomSpacer}
   </div>`;
 }
 async function downloadProImage(buildFn, filenamePrefix, btn){
@@ -2669,22 +2693,19 @@ function buildProImageTiempos(){
     const st = aggStatsForIndicator(rows, p.ind);
     return { rank: i+1, name: p.name, cells: [ st.promedio==null?'—':st.promedio.toFixed(1)+'d', st.n.toLocaleString('es-PE') ], pct: st.cumplePct };
   });
-  const ac = alertCountsSimple();
-  const banner = (ac.nReq>0 || ac.nPedido>0) ? {
-    tone:'alert',
-    items:[ {value:ac.nReq.toLocaleString('es-PE'), label:'Requerimientos sin Pedido (>2 d.h.)'}, {value:ac.nPedido.toLocaleString('es-PE'), label:'Pedidos sin OC (>2 d.h.)'} ],
-    action:'ACCIÓN: revisar pendientes con Almacén y Compras.',
-  } : { tone:'info', items:[ {value:'0', label:'Alertas abiertas fuera de meta'} ], action:'Todo al día 🎉' };
+  // Sin banner de alertas ni pie de letra chica (pedido de Piero, 02.09.2026: "la parte de rojo de
+  // abajo prefiero que la quites y agrandes el resto de indicadores... las letras pequeñas del final
+  // de la foto igual quítalas") — el espacio liberado se usa agrandando tarjetas y tablas (ver `large`
+  // en proKpiCardHtml/proTableHtml).
   return {
     title: 'INDICADORES DE TIEMPOS DEL PROCESO',
     subtitle: 'RANKING POR COMPRADORES Y RESPONSABLES DE ALMACÉN',
     kpis,
+    large: true,
     tables: [
-      { icon:'🏆', title:'Ranking de Compradores', subtitle:'Tiempo de Emisión de OC (Ind. 2) y Tiempo de Entrega de OC (Ind. 4)', nameLabel:'COMPRADOR', columns:['EMISIÓN OC','ENTREGA OC'], rows: rankingRows, legend:true },
+      { icon:'🏆', title:'Ranking de Compradores', subtitle:'Tiempo de Emisión de OC (Ind. 2) y Tiempo de Entrega de OC en Lurín (Ind. 4)', nameLabel:'COMPRADOR', columns:['EMISIÓN OC','ENTREGA OC'], rows: rankingRows, legend:true },
       { icon:'🏬', title:'Responsables de Almacén', subtitle:'Generación de Pedido (Ind. 1) y Despacho de Requerimiento (Ind. 5)', nameLabel:'RESPONSABLE', columns:['PROMEDIO','CASOS'], rows: almacenRows, legend:true },
     ],
-    banner,
-    footnote: 'Indicador 1: responsable fijo JCENTENO, salvo "pedidos directos" (generados sin requerimiento previo). Indicador 3 (Aprobación de OC): responsable fijo MLUJAN, no varía por comprador — no se incluye en el ranking porque no depende de quién compra. Indicador 5 (Despacho de Requerimiento) no tiene meta fija: KALBUJAR lo coordina caso a caso, por eso su aro de cumplimiento y el de esta tabla salen en blanco.',
   };
 }
 function buildProImageGasto(){
