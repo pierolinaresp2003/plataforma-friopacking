@@ -298,7 +298,6 @@
 
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
         <button class="btn secondary" id="btnEli5Proceso" type="button">📱 Resumen WhatsApp (1 imagen)</button>
-        <button class="btn secondary" id="btnImgProceso" type="button">🖼️ Generar imagen del módulo</button>
       </div>
 
       <div class="toolbar">
@@ -2363,7 +2362,6 @@ function renderProceso(){
       openDrilldownForGroup(row.dataset.group);
     });
     document.getElementById('procDetailClose').addEventListener('click', closeDrilldown);
-    document.getElementById('btnImgProceso').addEventListener('click', (e)=> downloadSectionImage('section-proceso', 'tiempos-proceso-atencion', e.currentTarget));
     document.getElementById('btnEli5Proceso').addEventListener('click', (e)=> downloadProImage(buildProImageTiempos, 'resumen-whatsapp-tiempos-proceso', e.currentTarget));
     procesoListenersBoundInner = true;
   }
@@ -2665,11 +2663,27 @@ function buildProImageTiempos(){
   // el volumen de cantidad de oc que generó cada comprador") — sin puesto, sin % de cumplimiento, y
   // sin la columna de Entrega de OC (Ind. 4): solo Emisión de OC (Ind. 2), promedio y volumen. MLUJAN
   // ya queda excluido desde `compradorRankingFromRows` (no es un comprador real).
+  //
+  // BUG corregido (02.09.2026, misma ronda, tras pregunta de Piero: "en agosto solo PLINARES hizo 85
+  // oc, por qué colocas que hizo 238?"): "volumen de OC" se había calculado como cantidad de LÍNEAS de
+  // requerimiento con Indicador 2 válido (`d2.n` de `groupRowsFor`), no cantidad de ÓRDENES DE COMPRA
+  // distintas — una sola OC suele traer varias líneas/productos, así que esa cuenta multiplicaba el
+  // volumen real. Ahora se cuenta `codOrden` distinto por comprador (Set), que sí es "cuántas OC generó".
+  const compradorOcSets = {};
+  for(const r of rows){
+    if(r.camino!=='compra') continue;
+    const comprador = (r.usuarioCompras||'').trim();
+    if(!comprador || comprador.toUpperCase()==='MLUJAN') continue;
+    const oc = (r.codOrden||'').trim();
+    if(!oc) continue;
+    (compradorOcSets[comprador] = compradorOcSets[comprador] || new Set()).add(oc);
+  }
   const compradorRows = compradorRankingFromRows(rows)
     .filter(r=>r.d2)
-    .sort((a,b)=> b.d2.n - a.d2.n)
+    .map(r=> Object.assign({}, r, { volumenOC: compradorOcSets[r.comprador] ? compradorOcSets[r.comprador].size : 0 }))
+    .sort((a,b)=> b.volumenOC - a.volumenOC)
     .slice(0,8)
-    .map(r=>({ name: r.comprador, cells: [ r.d2.promedio.toFixed(1)+'d', r.d2.n.toLocaleString('es-PE') ] }));
+    .map(r=>({ name: r.comprador, cells: [ r.d2.promedio.toFixed(1)+'d', r.volumenOC.toLocaleString('es-PE') ] }));
   const almacenPersons = [ { name:'JCENTENO', ind: INDICATORS.find(i=>i.key==='d1') }, { name:'KALBUJAR', ind: INDICATORS.find(i=>i.key==='d6') } ];
   // Mismo tratamiento para Almacén (pedido de Piero: "del mismo modo con almacén, no coloques su %")
   // — sin puesto ni % de cumplimiento, solo promedio y casos.
