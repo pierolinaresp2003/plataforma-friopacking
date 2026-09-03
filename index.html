@@ -1790,15 +1790,39 @@ function drawGasto(){
   const q = (document.getElementById('searchGasto').value||"").toLowerCase();
   const paretoFilter = document.getElementById('filterGastoPareto').value;
   let view = agg;
-  if(q) view = view.filter(g=>g.label.toLowerCase().includes(q));
+  // Buscar Subfamilias desde el nivel Familia — pedido de Piero, 03.09.2026 ("el buscador debe
+  // permitirme acceder a sub familias también"): antes, parado en Familias, solo se podía filtrar por
+  // nombre de Familia — para llegar a una Subfamilia (ej. "Cable") había que primero adivinar/entrar a
+  // su Familia. Si lo buscado no calza con ninguna Familia pero sí con alguna Subfamilia, se listan esas
+  // Subfamilias (con su Familia, por si el mismo nombre existiera en más de una) para entrar directo.
+  let searchingSubfamilias = false;
+  if(q){
+    view = agg.filter(g=>g.label.toLowerCase().includes(q));
+    if(level==='familia' && view.length===0){
+      const { agg: subAgg } = buildGastoAgg(scoped, r=>r.familia+' — '+r.subfamilia);
+      const subMatches = subAgg.filter(g=>g.rows[0].subfamilia.toLowerCase().includes(q));
+      if(subMatches.length){
+        searchingSubfamilias = true;
+        view = subMatches.map(g=>Object.assign({}, g, { familiaReal: g.rows[0].familia, subfamiliaReal: g.rows[0].subfamilia }));
+      }
+    }
+  }
   if(paretoFilter === 'top80') view = view.filter(g=>g.top80);
   if(paretoFilter === 'resto') view = view.filter(g=>!g.top80);
 
   // Todos los niveles menos el último (Forma de pago) son "clicables" — bajan un escalón más en el
   // mismo desglose Nacional/Importado -> Familia -> Subfamilia -> Producto -> Proveedor -> Forma de
-  // pago (pedido de Piero, 03.09.2026).
-  const drillable = levelIdx < GASTO_LEVELS.length - 1;
+  // pago (pedido de Piero, 03.09.2026). Un resultado de búsqueda de Subfamilia siempre es clicable:
+  // entra directo a esa Familia+Subfamilia (nivel Producto).
+  const drillable = searchingSubfamilias ? true : (levelIdx < GASTO_LEVELS.length - 1);
   const goDeeper = (label)=>{ gastoState[level] = label; drawGasto(); };
+  const goDeeperSubfamilia = (g)=>{
+    gastoState.familia = g.familiaReal; gastoState.subfamilia = g.subfamiliaReal;
+    document.getElementById('searchGasto').value = '';
+    drawGasto();
+  };
+  const onRowClick = (i)=> searchingSubfamilias ? goDeeperSubfamilia(view[i]) : goDeeper(view[i].label);
+  const displayLabel = (g)=> searchingSubfamilias ? (g.subfamiliaReal + ' — ' + g.familiaReal) : g.label;
   const maxMonto = view.reduce((m,g)=>g.monto>m?g.monto:m, 0);
   // Soles/Dólares como columnas propias al lado de cada barra (no como texto chico debajo del
   // nombre) — pedido explícito de Piero, 03.09.2026: "las 2 columnas deben estar ahí en esa parte del
@@ -1810,8 +1834,9 @@ function drawGasto(){
     const pct = maxMonto>0 ? g.monto/maxMonto*100 : 0;
     const color = g.top80 ? 'var(--seg-a)' : 'var(--track-empty)';
     const { soles, dolares } = montoPorMonedaOrigen(g.rows);
+    const lbl = displayLabel(g);
     return `<div class="bar-row${drillable?' clickable':''}" ${drillable?`data-i="${i}"`:''}>
-      <div class="bar-label" title="${escapeHtml(g.label)}">${escapeHtml(g.label)}</div>
+      <div class="bar-label" title="${escapeHtml(lbl)}">${escapeHtml(lbl)}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
       <div class="bar-pct" style="width:${COLW};">${soles?fmtPEN(soles):'—'}</div>
       <div class="bar-pct" style="width:${COLW};">${dolares?fmtUSD(dolares):'—'}</div>
@@ -1826,21 +1851,21 @@ function drawGasto(){
   document.getElementById('chartGasto').innerHTML = (headerHtml + barsHtml) || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
   if(drillable){
     document.querySelectorAll('#chartGasto .bar-row.clickable').forEach(elBar=>{
-      elBar.addEventListener('click', ()=> goDeeper(view[Number(elBar.dataset.i)].label));
+      elBar.addEventListener('click', ()=> onRowClick(Number(elBar.dataset.i)));
     });
   }
 
   // Misma tabla genérica para los 5 niveles (Familia/Subfamilia/Producto/Proveedor/Forma de pago):
   // Soles y Dólares van en 2 columnas separadas (pedido de Piero, 03.09.2026) en vez del badge único
   // de moneda que había antes — ambas ya en Soles-equivalente, se pueden sumar entre sí sin problema.
-  const groupLabel = level==='familia' ? 'Familia' : level==='subfamilia' ? 'Subfamilia' : level==='producto' ? 'Producto' : level==='proveedor' ? 'Proveedor' : 'Forma de pago';
-  const nextPlural = drillable ? GASTO_LEVELS[levelIdx+1].plural.toLowerCase() : null;
+  const groupLabel = searchingSubfamilias ? 'Subfamilia' : (level==='familia' ? 'Familia' : level==='subfamilia' ? 'Subfamilia' : level==='producto' ? 'Producto' : level==='proveedor' ? 'Proveedor' : 'Forma de pago');
+  const nextPlural = searchingSubfamilias ? GASTO_LEVELS[2].plural.toLowerCase() : (drillable ? GASTO_LEVELS[levelIdx+1].plural.toLowerCase() : null);
   const table = document.getElementById('tableGasto');
   table.querySelector('thead').innerHTML = `<tr><th>${groupLabel}</th><th>Gasto en Soles</th><th>Gasto en Dólares</th><th>Líneas</th><th>Gasto</th><th>% del total</th><th>% acumulado</th><th>Pareto</th></tr>`;
   table.querySelector('tbody').innerHTML = view.map((g,i)=>{
     const { soles, dolares } = montoPorMonedaOrigen(g.rows);
     return `<tr data-i="${i}"${drillable?' style="cursor:pointer;"':''}>
-        <td style="white-space:normal;min-width:220px;">${escapeHtml(g.label)}${drillable?` <span style="color:var(--brand-ink);font-size:11px;">🔍 ver ${nextPlural}</span>`:''}</td>
+        <td style="white-space:normal;min-width:220px;">${escapeHtml(displayLabel(g))}${drillable?` <span style="color:var(--brand-ink);font-size:11px;">🔍 ver ${nextPlural}</span>`:''}</td>
         <td>${soles ? fmtPEN(soles) : '—'}</td>
         <td>${dolares ? fmtUSD(dolares) : '—'}</td>
         <td>${g.n.toLocaleString('es-PE')}</td>
@@ -1852,7 +1877,7 @@ function drawGasto(){
   }).join("") || `<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
   if(drillable){
     table.querySelectorAll('tbody tr[data-i]').forEach(tr=>{
-      tr.addEventListener('click', ()=> goDeeper(view[Number(tr.dataset.i)].label));
+      tr.addEventListener('click', ()=> onRowClick(Number(tr.dataset.i)));
     });
   }
 }
