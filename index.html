@@ -1527,13 +1527,19 @@ function formaPagoForDocumento(documento){
 // forzar en un bucket sin inventar una regla — por eso se muestran aparte.
 // Homologa la descripción del producto para el nivel "Producto" de Concentración de Gasto (pedido de
 // Piero, 03.09.2026: "homologues cada producto porque hay códigos que están repetidos... sin repetir
-// códigos"): agrupa por la DESCRIPCIÓN (no por el código, que es el campo poco confiable acá) para que
-// el mismo producto vendido bajo códigos distintos caiga bajo un solo nombre — sin recortar ni tocar
-// el contenido que distingue un producto de otro (ej. "CABLE RZ1 4MM2" nunca se junta con "CABLE RVK
-// 4MM2" porque se conserva el texto completo, solo se limpian espacios/mayúsculas). Si la línea no trae
+// códigos", y 03.09.2026: "hay válvulas de freón, otras de amoniaco... homologando códigos repetidos"):
+// agrupa por la DESCRIPCIÓN (no por el código, que es el campo poco confiable acá) para que el mismo
+// producto vendido bajo códigos distintos caiga bajo un solo nombre — sin recortar ni tocar el
+// contenido que distingue un producto de otro (ej. "CABLE RZ1 4MM2" nunca se junta con "CABLE RVK
+// 4MM2", ni "VÁLVULA... FREÓN" con "VÁLVULA... AMONIACO", porque se conserva el texto completo). Lo
+// único que se limpia son diferencias de formato que NO cambian qué es el producto: espacios de más
+// (extremos, dobles, o alrededor de "/" y ","), mayúsculas/minúsculas, y un punto final suelto — eso
+// es lo que hace que el mismo producto con el mismo texto pero tipeado ligeramente distinto (u otro
+// código) quede como códigos repetidos en vez de como 2 productos distintos. Si la línea no trae
 // descripción, se usa el código como respaldo.
 function limpiaProducto(descripcionRaw, codigoRaw){
-  const desc = (descripcionRaw||"").toString().trim().replace(/\s+/g,' ');
+  let desc = (descripcionRaw||"").toString().trim().replace(/\s+/g,' ');
+  desc = desc.replace(/\s*\/\s*/g, '/').replace(/\s*,\s*/g, ', ').replace(/\.+$/, '').trim();
   if(desc) return desc.toUpperCase();
   const cod = (codigoRaw||"").toString().trim();
   return cod ? ('CÓD. ' + cod.toUpperCase()) : 'Sin descripción';
