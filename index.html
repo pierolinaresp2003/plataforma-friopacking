@@ -1223,7 +1223,14 @@ function processWorkbook(wb, filename){
       // "Cumple" del Indicador 4 = llegó dentro del plazo pactado, contado desde Aprobación (no
       // comparado directo contra ParaFechaOrden — ver tolerancia4For/limite4For arriba).
       const fLimite4 = camino==='compra' ? limite4For({ fOrden, fAprob, fCompromiso }) : null;
-      const d4cumple = (camino==='compra' && fRecep && fLimite4) ? (fRecep <= fLimite4) : null;
+      // Comparar por DÍA calendario (UTC), no por instante exacto — Piero notó casos donde la Meta y la
+      // fecha de llegada mostraban el mismo día y aun así salía "No cumple" (03.09.2026). FechaRecepcion
+      // a veces trae una hora dentro del mismo día (ej. registrada a las 14:35), mientras que fLimite4
+      // siempre queda en medianoche UTC exacta (addBusinessDays) — comparando el instante crudo, esa
+      // hora hacía que "llegó el mismo día" contara como tarde. Se trunca fRecep a medianoche UTC antes
+      // de comparar, igual que ya se ve en pantalla (fmtDate solo muestra el día, no la hora).
+      const fRecepDia = fRecep ? new Date(Date.UTC(fRecep.getUTCFullYear(), fRecep.getUTCMonth(), fRecep.getUTCDate())) : null;
+      const d4cumple = (camino==='compra' && fRecepDia && fLimite4) ? (fRecepDia <= fLimite4) : null;
 
       // "Archivado" = el requerimiento/pedido se cerró sin seguir el camino normal (cancelado, etc.) —
       // no cuenta como "atención pendiente" aunque nunca haya tenido Pedido/OC.
