@@ -177,18 +177,18 @@
 
   .trend-wrap{margin:0 0 16px;}
   .trend-empty{font-size:12.5px;color:var(--ink-soft);padding:4px 0 10px;}
-  .trend-legend{display:flex;gap:16px;font-size:11.5px;color:var(--ink-soft);margin:0 0 6px;}
+  .trend-legend{display:flex;gap:16px;font-size:11.5px;color:var(--ink-soft);margin:0 0 6px;user-select:none;-webkit-user-select:none;}
   .trend-legend .lg-item{display:inline-flex;align-items:center;gap:6px;}
   .trend-legend .lg-swatch{width:16px;height:2px;border-radius:2px;background:var(--brand-2-dark);flex-shrink:0;}
   .trend-legend .lg-swatch.dashed{background:none;border-top:2px dashed var(--ink-soft);height:0;}
   .trend-legend .lg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .trend-tooltip{position:absolute;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:11.5px;color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.14);pointer-events:none;white-space:nowrap;z-index:20;display:none;}
-  .trend-zoombar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--ink-soft);margin:0 0 4px;}
+  .trend-zoombar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--ink-soft);margin:0 0 4px;user-select:none;-webkit-user-select:none;}
   .trend-zoombar-hint{opacity:.7;}
   .trend-zoombar a{color:var(--brand-ink);font-weight:700;text-decoration:none;flex-shrink:0;}
   .trend-svg .tr-zoom-overlay{fill:transparent;cursor:zoom-in;}
   .trend-tooltip b{color:var(--ink);}
-  .trend-svg{display:block;overflow:visible;max-width:100%;}
+  .trend-svg{display:block;overflow:visible;max-width:100%;user-select:none;-webkit-user-select:none;}
   .trend-svg .tr-grid{stroke:var(--border);stroke-width:1;}
   .trend-svg .tr-meta{stroke:var(--ink-soft);stroke-width:1.5;stroke-dasharray:4 3;fill:none;}
   .trend-svg .tr-line-real{stroke:var(--brand-2-dark);stroke-width:2;fill:none;}
@@ -466,9 +466,6 @@
   </div><!-- /main -->
 </div><!-- /app-shell -->
 
-<footer>
-  <b>Tiempos del Proceso de Atención</b> — Desde que se genera el requerimiento (<code>FechaRequerimiento</code>) hasta que el material sale del almacén rumbo a la obra (<code>FechaSalida</code>), dividido en 5 indicadores independientes. El camino se define por si la línea tiene <code>CodPedido</code> real (no vacío, no "-"): si lo tiene, pasó a Compras → <b>Camino 2 (compra)</b>; si no, se atendió directo desde stock → <b>Camino 1 (stock)</b>. <b>Camino 2 (compra)</b>: Indicador 1, <b>Tiempo de Generación de Pedido</b>, = días hábiles <code>FechaPedido − FechaRequerimiento</code> (Almacén, meta 2 d.h.). Indicador 2, <b>Tiempo de Emisión de OC</b>, = días hábiles <code>FechaOrden − FechaPedido</code> (Compras, meta 2 d.h.). Indicador 3, <b>Tiempo de Aprobación de OC</b>, = días hábiles <code>FechaAprobacionOC − FechaOrden</code> (Compras, meta 2 d.h.). Indicador 4, <b>Tiempo de Entrega de OC en Lurín</b>, = días hábiles <code>FechaRecepcion − FechaAprobacionOC</code>; la meta no es fija — es el plazo pactado en la OC (días hábiles entre <code>FechaOrden</code> y <code>ParaFechaOrden</code>) trasladado para empezar a contar desde <code>FechaAprobacionOC</code>, así queda bien anclado aunque el Indicador 3 haya tenido demora. <b>Camino 1 (stock)</b>: Indicador 5, <b>Tiempo de Despacho de Requerimiento</b>, = días hábiles <code>FechaSalida − FechaRequerimiento</code> para líneas atendidas directo desde stock, sin pasar por compra (Almacén, meta <b>15 d.h.</b> — regla confirmada por Piero, 02.09.2026). Cada indicador se calcula de forma independiente por línea — si a una línea le falta una fecha para un indicador, ese indicador queda "Sin información" sin afectar los demás indicadores de la misma línea ni sus promedios. Se excluyen del cálculo de un indicador los casos con fecha final anterior a la inicial. <b>Responsables (aclarado por Piero, 01.09.2026):</b> Indicador 1 (Tiempo de Generación de Pedido) es siempre <b>JCENTENO</b>, salvo en "pedidos directos" (generados sin requerimiento previo, identificados por aparecer en PedidoSinReq.xlsx) donde el responsable real se toma de ese archivo. Indicador 3 (Tiempo de Aprobación de OC) es siempre <b>MLUJAN</b>. Indicador 5 (Tiempo de Despacho de Requerimiento) es siempre <b>KALBUJAR</b>. Indicador 2 y 4 sí varían por línea — son las 2 métricas de "rendimiento por comprador" (<code>UsuarioCompras</code>).
-</footer>
 
 <script>
 (function(){
@@ -2697,7 +2694,7 @@ function drawIndicatorTrend(){
       : '');
 
   const zoomBar = zoomed
-    ? `<div class="trend-zoombar"><span>🔍 Zoom: ${escapeHtml(weeks[0].label)} – ${escapeHtml(weeks[weeks.length-1].label)}</span><a href="#" id="trendZoomReset">↺ Ver todas las semanas</a></div>`
+    ? `<div class="trend-zoombar"><span>🔍 Zoom: ${escapeHtml(weeks[0].label)} – ${escapeHtml(weeks[weeks.length-1].label)} · mantén clic y arrastra para moverte</span><a href="#" id="trendZoomReset">↺ Ver todas las semanas</a></div>`
     : `<div class="trend-zoombar trend-zoombar-hint"><span>Usa la rueda del mouse sobre el gráfico para hacer zoom</span></div>`;
 
   el.innerHTML = `${legendSvg}${zoomBar}<svg class="trend-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
@@ -2723,10 +2720,13 @@ function drawIndicatorTrend(){
   // ronda anterior): girar la rueda sobre el gráfico acerca/aleja un rango de semanas, centrado en la
   // posición del cursor. El eje Y se sigue recalculando solo sobre el rango visible (ver "const weeks"
   // arriba), así ambos ejes se "acercan" juntos sin lógica aparte por eje.
-  const svgEl = el.querySelector('.trend-svg');
   const overlay = document.getElementById('trendZoomOverlay');
+  // Se busca el <svg> actual en cada llamada (en vez de guardar la referencia una sola vez) porque
+  // durante un arrastre para mover el gráfico (ver más abajo) el contenido de `el` se vuelve a dibujar
+  // varias veces sin que termine el gesto — si se guardara la referencia quedaría "vieja" (un nodo ya
+  // desconectado del documento) y el cálculo de posición se rompería a mitad del arrastre.
   const svgXFromClientX = (clientX)=>{
-    const rect = svgEl.getBoundingClientRect();
+    const rect = el.querySelector('.trend-svg').getBoundingClientRect();
     return (clientX - rect.left) * (W / rect.width);
   };
   overlay.addEventListener('wheel', (e)=>{
@@ -2783,27 +2783,49 @@ function drawIndicatorTrend(){
     });
   });
 
-  // Clic sostenido + mover sobre el gráfico -> recorre los puntos mostrando el tooltip del más
-  // cercano, sin tener que apuntar exacto a cada uno (pedido de Piero, 03.09.2026; funciona con touch).
-  let trendDragging = false;
-  const showNearestTooltip = (clientX, clientY)=>{
-    const x = svgXFromClientX(clientX);
-    let nearestI = 0, bestD = Infinity;
-    weeks.forEach((w,i)=>{ const d = Math.abs(xFor(i)-x); if(d<bestD){ bestD=d; nearestI=i; } });
-    const w = weeks[nearestI];
-    tooltip.innerHTML = `<b>${escapeHtml(w.label)}</b><br>Real: ${w.promedio.toFixed(1)} d.h. · ${w.n} caso${w.n===1?'':'s'}`;
-    tooltip.style.display = 'block';
-    const rect = el.getBoundingClientRect();
-    tooltip.style.left = (clientX - rect.left + 12) + 'px';
-    tooltip.style.top = (clientY - rect.top - 10) + 'px';
-  };
-  overlay.addEventListener('mousedown', (e)=>{ trendDragging = true; showNearestTooltip(e.clientX, e.clientY); });
-  overlay.addEventListener('mousemove', (e)=>{ if(trendDragging) showNearestTooltip(e.clientX, e.clientY); });
-  overlay.addEventListener('mouseup', ()=>{ trendDragging = false; });
-  overlay.addEventListener('mouseleave', ()=>{ trendDragging = false; });
-  overlay.addEventListener('touchstart', (e)=>{ trendDragging = true; const t=e.touches[0]; showNearestTooltip(t.clientX, t.clientY); }, { passive:true });
-  overlay.addEventListener('touchmove', (e)=>{ if(trendDragging){ const t=e.touches[0]; showNearestTooltip(t.clientX, t.clientY); } }, { passive:true });
-  overlay.addEventListener('touchend', ()=>{ trendDragging = false; tooltip.style.display = 'none'; });
+  // Mantener clic (o el dedo) y arrastrar el gráfico de izquierda a derecha para moverte dentro del
+  // rango con zoom aplicado (pedido de Piero, 03.09.2026) — reemplaza el arrastre para "recorrer" el
+  // tooltip de la ronda anterior: ahora el tooltip aparece al pasar el mouse sobre cada punto (ver
+  // arriba) y el arrastre queda libre para desplazar las semanas visibles. Sin zoom no hay nada más
+  // que mostrar a los costados, así que el arrastre no hace nada en la vista completa (overlay queda
+  // con cursor normal).
+  if(zoomed){
+    const curStart = trendZoom.startIdx, curEnd = trendZoom.endIdx;
+    const curLen = curEnd - curStart + 1;
+    const weekSpacing = weeks.length>1 ? (xFor(1)-xFor(0)) : plotW;
+    let panStartClientX = 0;
+
+    const onPanMove = (clientX)=>{
+      const dxSvg = svgXFromClientX(clientX) - svgXFromClientX(panStartClientX);
+      // arrastrar hacia la derecha "jala" semanas anteriores a la vista, como al deslizar un calendario.
+      const weekShift = Math.round(-dxSvg / weekSpacing);
+      const newStart = Math.max(0, Math.min(fullWeeks.length - curLen, curStart + weekShift));
+      const newEnd = newStart + curLen - 1;
+      if(newStart!==trendZoom.startIdx || newEnd!==trendZoom.endIdx){
+        trendZoom = { startIdx: newStart, endIdx: newEnd };
+        drawIndicatorTrend();
+      }
+    };
+    const onMouseMove = (e)=> onPanMove(e.clientX);
+    const onMouseUp = ()=>{
+      overlay.style.cursor = 'grab';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    overlay.style.cursor = 'grab';
+    overlay.addEventListener('mousedown', (e)=>{
+      e.preventDefault();
+      panStartClientX = e.clientX;
+      overlay.style.cursor = 'grabbing';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+    let touchPanning = false;
+    overlay.addEventListener('touchstart', (e)=>{ touchPanning = true; panStartClientX = e.touches[0].clientX; }, { passive:true });
+    overlay.addEventListener('touchmove', (e)=>{ if(touchPanning) onPanMove(e.touches[0].clientX); }, { passive:true });
+    overlay.addEventListener('touchend', ()=>{ touchPanning = false; });
+  }
 }
 
 function drawKpiCards(){
