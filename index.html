@@ -488,8 +488,15 @@ function dkey(d){ return d.toISOString().slice(0,10); }
 // numpy.busday_count-style: cuenta días hábiles desde start (incluido) hasta end (excluido)
 function busdayCount(start, end){
   if(!(start instanceof Date) || !(end instanceof Date) || isNaN(start) || isNaN(end)) return null;
-  let s = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()));
-  let e = new Date(Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()));
+  // getFullYear/getMonth/getDate (hora LOCAL) en vez de getUTCFullYear/getUTCMonth/getUTCDate: las
+  // fechas de Excel numéricas (parseExcelDate) quedan ancladas a medianoche UTC, así que en un
+  // navegador en Perú (UTC-5) esas 3 funciones locales devolvían el día CALENDARIO ANTERIOR (medianoche
+  // UTC = 7pm del día de antes en Lima) — esto corría 1 día hacia atrás cualquier fecha que viniera de
+  // una celda numérica de Excel, y encadenado con addBusinessDays desfasaba la Meta del Indicador 4 en
+  // hasta 2 días (detectado por Piero, 03.09.2026: OC 0001-0011793, ParaFechaOrden real 12/08 vs Meta
+  // mostrada 10/08). Corregido a getUTC*.
+  let s = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  let e = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()));
   if(e < s) return -busdayCount(e, s);
   let count = 0;
   let d = new Date(s);
@@ -506,7 +513,8 @@ function busdayCount(start, end){
 // Piero, 01.09.2026 tarde): ver tolerancia4For/limite4For más abajo.
 function addBusinessDays(start, n){
   if(!(start instanceof Date) || isNaN(start) || n==null) return null;
-  let d = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()));
+  // Mismo fix de zona horaria que busdayCount — ver comentario ahí arriba.
+  let d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
   let added = 0;
   while(added < n){
     d.setUTCDate(d.getUTCDate()+1);
