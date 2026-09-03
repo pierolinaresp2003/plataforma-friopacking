@@ -182,6 +182,11 @@
   .trend-legend .lg-swatch{width:16px;height:2px;border-radius:2px;background:var(--brand-2-dark);flex-shrink:0;}
   .trend-legend .lg-swatch.dashed{background:none;border-top:2px dashed var(--ink-soft);height:0;}
   .trend-tooltip{position:absolute;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:11.5px;color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.14);pointer-events:none;white-space:nowrap;z-index:20;display:none;}
+  .trend-zoombar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--ink-soft);margin:0 0 4px;}
+  .trend-zoombar-hint{opacity:.7;}
+  .trend-zoombar a{color:var(--brand-ink);font-weight:700;text-decoration:none;flex-shrink:0;}
+  .trend-svg .tr-zoom-overlay{fill:transparent;cursor:crosshair;}
+  .trend-svg .tr-zoom-selection{fill:var(--brand-2-dark);opacity:.12;stroke:var(--brand-2-dark);stroke-width:1;}
   .trend-tooltip b{color:var(--ink);}
   .trend-svg{display:block;overflow:visible;max-width:100%;}
   .trend-svg .tr-grid{stroke:var(--border);stroke-width:1;}
@@ -336,15 +341,11 @@
       <!-- Filas 2 y 3: tarjetas KPI de los 5 indicadores -->
       <div class="proc-kpi-grid" id="procKpiGrid"></div>
 
-      <!-- Fila 4: gráfico principal dinámico — aparece justo debajo de las tarjetas al hacer clic -->
+      <!-- Fila 4: gráfico principal dinámico — aparece justo debajo de las tarjetas al hacer clic.
+           El desglose "Ver por: Proyecto/Mes/Responsable/Producto" (barras horizontales debajo de este
+           gráfico) se quitó a pedido de Piero (03.09.2026, "por ahora no lo necesito"). -->
       <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);" id="mainChartTitle">Gráfico principal</h3>
       <div id="indicatorTrend" class="trend-wrap" style="position:relative;"></div>
-      <div class="toolbar">
-        <select id="groupByProceso"></select>
-      </div>
-      <div class="card" style="padding:18px 20px 12px;margin-bottom:18px;">
-        <div id="chartProceso"></div>
-      </div>
 
       <!-- Resumen gerencial -->
       <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Resumen gerencial: proceso de atención</h3>
@@ -2192,6 +2193,12 @@ function dateFromYMD(anio, mes, dia){
 }
 let selectedIndicatorKey = 'd1';
 let procesoListenersBound = false;
+// Zoom del gráfico de tendencia (pedido de Piero, 03.09.2026: "los números pequeños se pierden,
+// de repente la opción de hacer zoom"). Arrastrando sobre el gráfico se selecciona un rango de
+// semanas; al soltar, el gráfico se redibuja solo con esas semanas y el eje Y se reescala solo
+// (queda calculado sobre el máximo del rango visible, no del total) — así ambos ejes "se acercan".
+// Se reinicia cada vez que cambian el indicador o los filtros (ver drawProceso).
+let trendZoom = { startIdx: null, endIdx: null };
 
 function getProcesoRows(){ return DATA.procesoRows || []; }
 
@@ -2308,17 +2315,6 @@ function populateProcesoFilters(){
   anioSel.innerHTML = '<option value="all">Todos los años</option>' + anios.map(a=>`<option value="${a}">${a}</option>`).join('');
   if(anios.map(String).includes(current)) anioSel.value = current;
 }
-function populateGroupByProceso(){
-  const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
-  const sel = document.getElementById('groupByProceso');
-  const opts = ind.key==='d4'
-    ? [['proveedor','Proveedor'],['proyecto','Proyecto'],['familia','Familia'],['producto','Producto']]
-    : [['proyecto','Proyecto'],['mes','Mes'],['responsable','Responsable'],['producto','Producto']];
-  const current = sel.value;
-  sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">Ver por: ${l}</option>`).join('');
-  sel.value = opts.some(o=>o[0]===current) ? current : opts[0][0];
-}
-
 let procesoListenersBoundInner = false;
 function renderProceso(){
   const hasData = getProcesoRows().length > 0;
@@ -2332,12 +2328,10 @@ function renderProceso(){
     document.getElementById('indicatorTrend').innerHTML = '';
     document.querySelector('#tableProcesoResumen thead').innerHTML = '';
     document.querySelector('#tableProcesoResumen tbody').innerHTML = '';
-    document.getElementById('chartProceso').innerHTML = '';
     return;
   }
   document.getElementById('procesoDefNote').style.display = 'none';
 
-  populateGroupByProceso();
   if(!procesoListenersBoundInner){
     ['filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoOrigen','filterProcesoAnio','filterProcesoMes','filterProcesoSemana'].forEach(id=>{
       const el = document.getElementById(id);
@@ -2347,12 +2341,6 @@ function renderProceso(){
       const visible = visibleIndicators();
       if(visible.length && !visible.some(i=>i.key===selectedIndicatorKey)) selectedIndicatorKey = visible[0].key;
       drawProceso();
-    });
-    document.getElementById('groupByProceso').addEventListener('change', drawMainChart);
-    document.getElementById('chartProceso').addEventListener('click', (e)=>{
-      const row = e.target.closest('.bar-row,.cmp-row');
-      if(!row) return;
-      openDrilldownForGroup(row.dataset.group);
     });
     document.getElementById('procDetailClose').addEventListener('click', closeDrilldown);
     document.getElementById('btnEli5Proceso').addEventListener('click', (e)=> downloadProImage(buildProImageTiempos, 'resumen-whatsapp-tiempos-proceso', e.currentTarget));
@@ -2366,10 +2354,9 @@ function drawProceso(){
   // queda siempre en sincronía sin depender del orden de los listeners de Año/Mes vs. Semana.
   populateSemanaSelect(document.getElementById('filterProcesoSemana'), document.getElementById('filterProcesoAnio').value, document.getElementById('filterProcesoMes').value);
   drawKpiCards();
+  trendZoom = { startIdx: null, endIdx: null }; // cambiar de indicador/filtro reinicia cualquier zoom activo
   drawIndicatorTrend();
   drawSummaryTable();
-  populateGroupByProceso();
-  drawMainChart();
 }
 
 // Generar imagen (PNG) del módulo activo tal como se ve en pantalla — pedido de Piero (01.09.2026)
@@ -2851,16 +2838,20 @@ function niceAxisStep(maxVal, targetLines){
 
 function drawIndicatorTrend(){
   const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
+  document.getElementById('mainChartTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.name;
   const el = document.getElementById('indicatorTrend');
   const rows = filteredProcesoRows();
-  const weeks = trendDataForIndicator(rows, ind);
+  const fullWeeks = trendDataForIndicator(rows, ind);
+  const zoomed = trendZoom.startIdx!=null && trendZoom.endIdx!=null;
+  const weeks = zoomed ? fullWeeks.slice(trendZoom.startIdx, trendZoom.endIdx+1) : fullWeeks;
 
-  if(weeks.length < 2){
-    el.innerHTML = `<div class="trend-empty">Se necesitan al menos 2 semanas con datos para mostrar una tendencia (hay ${weeks.length} semana${weeks.length===1?'':'s'} con datos para este indicador con los filtros actuales).</div>`;
+  if(fullWeeks.length < 2){
+    el.innerHTML = `<div class="trend-empty">Se necesitan al menos 2 semanas con datos para mostrar una tendencia (hay ${fullWeeks.length} semana${fullWeeks.length===1?'':'s'} con datos para este indicador con los filtros actuales).</div>`;
     return;
   }
 
-  const W = 900, H = 190, padL = 34, padR = 14, padT = 14, padB = 26;
+  // Gráfico más grande (pedido de Piero, 03.09.2026) — antes H=190.
+  const W = 900, H = 320, padL = 40, padR = 14, padT = 14, padB = 28;
   const plotW = W - padL - padR, plotH = H - padT - padB;
 
   const allVals = [];
@@ -2918,15 +2909,79 @@ function drawIndicatorTrend(){
     ? `<div class="trend-legend"><span class="lg-item"><span class="lg-swatch"></span>Real</span><span class="lg-item"><span class="lg-swatch dashed"></span>Comprometido (plazo pactado en la OC)</span></div>`
     : '';
 
-  el.innerHTML = `${legendSvg}<svg class="trend-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+  const zoomBar = zoomed
+    ? `<div class="trend-zoombar"><span>🔍 Zoom: ${escapeHtml(weeks[0].label)} – ${escapeHtml(weeks[weeks.length-1].label)}</span><a href="#" id="trendZoomReset">↺ Ver todas las semanas</a></div>`
+    : `<div class="trend-zoombar trend-zoombar-hint"><span>Arrastra sobre el gráfico para hacer zoom en un rango de semanas</span></div>`;
+
+  el.innerHTML = `${legendSvg}${zoomBar}<svg class="trend-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
     ${gridSvg}
     ${metaSvg}
+    <rect id="trendZoomOverlay" class="tr-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
+    <rect id="trendZoomSelection" class="tr-zoom-selection" x="${padL}" y="${padT}" width="0" height="${plotH}" style="display:none;"></rect>
     <path class="tr-line-real" d="${realPath}"></path>
     ${hasComp ? `<path class="tr-line-comp" d="${compPath}"></path>` : ''}
     ${dotsReal}
     ${dotsComp}
     ${xLabelsSvg}
   </svg><div class="trend-tooltip" id="trendTooltip"></div>`;
+
+  if(zoomed){
+    document.getElementById('trendZoomReset').addEventListener('click', (e)=>{
+      e.preventDefault();
+      trendZoom = { startIdx: null, endIdx: null };
+      drawIndicatorTrend();
+    });
+  }
+
+  // Zoom por arrastre: seleccionar un rango horizontal sobre el gráfico redibuja la tendencia solo
+  // con esas semanas — el eje Y se recalcula automáticamente sobre ese rango (ver "const weeks"
+  // arriba), así ambos ejes se "acercan" a la vez sin necesitar un control aparte para cada uno.
+  const svgEl = el.querySelector('.trend-svg');
+  const overlay = document.getElementById('trendZoomOverlay');
+  const selectionRect = document.getElementById('trendZoomSelection');
+  let dragStartSvgX = null;
+  const svgXFromClientX = (clientX)=>{
+    const rect = svgEl.getBoundingClientRect();
+    return (clientX - rect.left) * (W / rect.width);
+  };
+  overlay.addEventListener('pointerdown', (e)=>{
+    dragStartSvgX = svgXFromClientX(e.clientX);
+    overlay.setPointerCapture(e.pointerId);
+    selectionRect.style.display = '';
+    selectionRect.setAttribute('x', dragStartSvgX);
+    selectionRect.setAttribute('width', 0);
+  });
+  overlay.addEventListener('pointermove', (e)=>{
+    if(dragStartSvgX==null) return;
+    const curX = svgXFromClientX(e.clientX);
+    const x0 = Math.max(padL, Math.min(dragStartSvgX, curX));
+    const x1 = Math.min(W-padR, Math.max(dragStartSvgX, curX));
+    selectionRect.setAttribute('x', x0);
+    selectionRect.setAttribute('width', Math.max(0, x1-x0));
+  });
+  const finishDrag = (e)=>{
+    if(dragStartSvgX==null) return;
+    const endSvgX = svgXFromClientX(e.clientX);
+    selectionRect.style.display = 'none';
+    const x0 = Math.min(dragStartSvgX, endSvgX), x1 = Math.max(dragStartSvgX, endSvgX);
+    dragStartSvgX = null;
+    if(x1 - x0 < 6) return; // arrastre insignificante -> tratar como clic, no aplicar zoom
+    // índice de semana más cercano a cada borde de la selección
+    let iStart = 0, iEnd = weeks.length-1;
+    let bestDStart = Infinity, bestDEnd = Infinity;
+    weeks.forEach((w,i)=>{
+      const x = xFor(i);
+      const dStart = Math.abs(x - x0), dEnd = Math.abs(x - x1);
+      if(dStart < bestDStart){ bestDStart = dStart; iStart = i; }
+      if(dEnd < bestDEnd){ bestDEnd = dEnd; iEnd = i; }
+    });
+    if(iEnd - iStart < 1) return; // menos de 2 semanas seleccionadas -> no vale la pena
+    const baseIdx = zoomed ? trendZoom.startIdx : 0;
+    trendZoom = { startIdx: baseIdx + iStart, endIdx: baseIdx + iEnd };
+    drawIndicatorTrend();
+  };
+  overlay.addEventListener('pointerup', finishDrag);
+  overlay.addEventListener('pointercancel', ()=>{ dragStartSvgX = null; selectionRect.style.display = 'none'; });
 
   const tooltip = document.getElementById('trendTooltip');
   el.querySelectorAll('circle').forEach(dot=>{
@@ -3023,58 +3078,6 @@ function drawSummaryTable(){
   });
 }
 
-function drawMainChart(){
-  const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
-  document.getElementById('mainChartTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.name;
-  const groupField = document.getElementById('groupByProceso').value;
-  const rows = filteredProcesoRows();
-  let agg = groupRowsFor(rows, ind, groupField);
-  agg.sort((a,b)=>(b.promedio||0)-(a.promedio||0));
-  const top = agg.slice(0,15);
-  const empty = `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
-
-  if(ind.key==='d4'){
-    const maxVal = top.reduce((m,g)=>Math.max(m, g.promedio||0, g.compromisoProm||0), 0);
-    document.getElementById('chartProceso').innerHTML = top.map(g=>{
-      const realPct = maxVal>0 ? (g.promedio/maxVal*100) : 0;
-      const compPct = (maxVal>0 && g.compromisoProm!=null) ? (g.compromisoProm/maxVal*100) : 0;
-      const late = g.compromisoProm!=null && g.promedio > g.compromisoProm;
-      const color = g.compromisoProm==null ? 'var(--seg-a)' : (late ? 'var(--red)' : 'var(--green)');
-      return `<div class="cmp-row" data-group="${escapeHtml(g.label)}">
-        <div class="bar-label" title="${escapeHtml(g.displayLabel)}">${escapeHtml(g.displayLabel)}</div>
-        <div class="cmp-track">
-          ${g.compromisoProm!=null?`<div class="cmp-target" style="width:${compPct}%"></div>`:''}
-          <div class="cmp-fill" style="width:${realPct}%;background:${color}"></div>
-        </div>
-        <div class="cmp-vals">${g.promedio.toFixed(1)} d.h. real${g.compromisoProm!=null?' vs '+g.compromisoProm.toFixed(1)+' comprometido':''}</div>
-      </div>`;
-    }).join('') || empty;
-  } else {
-    const maxVal = top.reduce((m,g)=>Math.max(m, g.promedio||0), 0);
-    document.getElementById('chartProceso').innerHTML = top.map(g=>{
-      const pct = maxVal>0 ? (g.promedio/maxVal*100) : 0;
-      const metaPct = (ind.meta!=null && maxVal>0) ? Math.min(100, ind.meta/maxVal*100) : null;
-      const over = ind.meta!=null && g.promedio > ind.meta;
-      const color = over ? 'var(--red)' : 'var(--seg-a)';
-      return `<div class="bar-row" data-group="${escapeHtml(g.label)}">
-        <div class="bar-label" title="${escapeHtml(g.displayLabel)}">${escapeHtml(g.displayLabel)}</div>
-        <div class="bar-track">
-          <div class="bar-fill" style="width:${pct}%;background:${color}"></div>
-          ${metaPct!=null?`<div class="meta-line" style="left:${metaPct}%"></div>`:''}
-        </div>
-        <div class="bar-pct" style="width:90px;">${g.promedio.toFixed(1)} d.h.</div>
-      </div>`;
-    }).join('') || empty;
-  }
-}
-
-function openDrilldownForGroup(label){
-  if(label==null) return;
-  const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
-  const groupField = document.getElementById('groupByProceso').value;
-  const rows = filteredProcesoRows().filter(r=>r.camino===ind.camino && r[ind.key]!=null && groupKeyFor(r, ind, groupField)===label);
-  openDrilldown(ind, rows, label);
-}
 function openDrilldownForIndicator(ind){
   const rows = filteredProcesoRows().filter(r=>r.camino===ind.camino);
   openDrilldown(ind, rows, null);
