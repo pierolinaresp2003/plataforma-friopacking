@@ -2782,6 +2782,28 @@ function drawIndicatorTrend(){
       openDrilldown(ind, weekRows, dot.dataset.week);
     });
   });
+
+  // Clic sostenido + mover sobre el gráfico -> recorre los puntos mostrando el tooltip del más
+  // cercano, sin tener que apuntar exacto a cada uno (pedido de Piero, 03.09.2026; funciona con touch).
+  let trendDragging = false;
+  const showNearestTooltip = (clientX, clientY)=>{
+    const x = svgXFromClientX(clientX);
+    let nearestI = 0, bestD = Infinity;
+    weeks.forEach((w,i)=>{ const d = Math.abs(xFor(i)-x); if(d<bestD){ bestD=d; nearestI=i; } });
+    const w = weeks[nearestI];
+    tooltip.innerHTML = `<b>${escapeHtml(w.label)}</b><br>Real: ${w.promedio.toFixed(1)} d.h. · ${w.n} caso${w.n===1?'':'s'}`;
+    tooltip.style.display = 'block';
+    const rect = el.getBoundingClientRect();
+    tooltip.style.left = (clientX - rect.left + 12) + 'px';
+    tooltip.style.top = (clientY - rect.top - 10) + 'px';
+  };
+  overlay.addEventListener('mousedown', (e)=>{ trendDragging = true; showNearestTooltip(e.clientX, e.clientY); });
+  overlay.addEventListener('mousemove', (e)=>{ if(trendDragging) showNearestTooltip(e.clientX, e.clientY); });
+  overlay.addEventListener('mouseup', ()=>{ trendDragging = false; });
+  overlay.addEventListener('mouseleave', ()=>{ trendDragging = false; });
+  overlay.addEventListener('touchstart', (e)=>{ trendDragging = true; const t=e.touches[0]; showNearestTooltip(t.clientX, t.clientY); }, { passive:true });
+  overlay.addEventListener('touchmove', (e)=>{ if(trendDragging){ const t=e.touches[0]; showNearestTooltip(t.clientX, t.clientY); } }, { passive:true });
+  overlay.addEventListener('touchend', ()=>{ trendDragging = false; tooltip.style.display = 'none'; });
 }
 
 function drawKpiCards(){
