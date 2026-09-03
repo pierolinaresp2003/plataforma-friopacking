@@ -1800,19 +1800,32 @@ function drawGasto(){
   const drillable = levelIdx < GASTO_LEVELS.length - 1;
   const goDeeper = (label)=>{ gastoState[level] = label; drawGasto(); };
   const maxMonto = view.reduce((m,g)=>g.monto>m?g.monto:m, 0);
-  document.getElementById('chartGasto').innerHTML = view.slice(0,20).map((g,i)=>{
+  // Soles/Dólares como columnas propias al lado de cada barra (no como texto chico debajo del
+  // nombre) — pedido explícito de Piero, 03.09.2026: "las 2 columnas deben estar ahí en esa parte del
+  // pareto al lado, soles y dólares, ese es el cambio". Encabezado propio (chartGasto es un <div>, no
+  // una <table>, así que el encabezado se arma a mano con el mismo layout flex que las filas) para que
+  // quede claro qué columna es cuál.
+  const COLW = '92px';
+  const barsHtml = view.slice(0,20).map((g,i)=>{
     const pct = maxMonto>0 ? g.monto/maxMonto*100 : 0;
     const color = g.top80 ? 'var(--seg-a)' : 'var(--track-empty)';
-    // Desglose Soles/Dólares (montos reales, sin convertir) también acá arriba del todo, junto al
-    // nombre — no solo en la tabla de abajo — para que se vea de entrada sin tener que hacer scroll
-    // (pedido de Piero, 03.09.2026: "debe existir una columna en soles y otra en dólares").
     const { soles, dolares } = montoPorMonedaOrigen(g.rows);
     return `<div class="bar-row${drillable?' clickable':''}" ${drillable?`data-i="${i}"`:''}>
-      <div class="bar-label" title="${escapeHtml(g.label)}">${escapeHtml(g.label)}<div style="font-size:10.5px;font-weight:400;color:var(--muted);white-space:nowrap;">${soles?fmtPEN(soles):'—'} · ${dolares?fmtUSD(dolares):'—'}</div></div>
+      <div class="bar-label" title="${escapeHtml(g.label)}">${escapeHtml(g.label)}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
-      <div class="bar-pct" style="width:100px;">${fmtPEN(g.monto)}</div>
+      <div class="bar-pct" style="width:${COLW};">${soles?fmtPEN(soles):'—'}</div>
+      <div class="bar-pct" style="width:${COLW};">${dolares?fmtUSD(dolares):'—'}</div>
+      <div class="bar-pct" style="width:${COLW};">${fmtPEN(g.monto)}</div>
     </div>`;
-  }).join("") || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
+  }).join("");
+  const headerHtml = view.length ? `<div class="bar-row" style="font-size:10.5px;font-weight:700;color:var(--muted);padding-bottom:2px;">
+      <div class="bar-label"></div>
+      <div class="bar-track"></div>
+      <div class="bar-pct" style="width:${COLW};">SOLES</div>
+      <div class="bar-pct" style="width:${COLW};">DÓLARES</div>
+      <div class="bar-pct" style="width:${COLW};">GASTO</div>
+    </div>` : '';
+  document.getElementById('chartGasto').innerHTML = (headerHtml + barsHtml) || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
   if(drillable){
     document.querySelectorAll('#chartGasto .bar-row.clickable').forEach(elBar=>{
       elBar.addEventListener('click', ()=> goDeeper(view[Number(elBar.dataset.i)].label));
