@@ -1649,7 +1649,7 @@ function montoPorMonedaOrigen(rows){
 // Nacional sin drill, como al cargar el Excel). origen -> familia -> subfamilia -> producto ->
 // proveedor -> forma de pago (pedido de Piero, 03.09.2026: antes Subfamilia iba directo a Proveedor
 // sin pasar por el detalle de Producto, y Proveedor era el nivel final sin desglosar forma de pago).
-let gastoState = { origen: 'nacional', familia: null, subfamilia: null, producto: null, proveedor: null };
+let gastoState = { familia: null, subfamilia: null, producto: null, proveedor: null };
 // Un nivel por cada escalón del drill-down, en orden — así el render de más abajo (gráfico + tabla) no
 // necesita un branch especial por nivel, solo cambia qué campo agrupa (`labelFn`) y cómo se llama
 // (`plural`, para los KPIs y el texto "ver X").
@@ -1668,55 +1668,47 @@ function gastoLevelIndex(){
   return 0;
 }
 function gastoRowsInScope(rows){
-  let r = rows.filter(x=>x.origen===gastoState.origen);
+  let r = rows;
   if(gastoState.familia!=null) r = r.filter(x=>x.familia===gastoState.familia);
   if(gastoState.subfamilia!=null) r = r.filter(x=>x.subfamilia===gastoState.subfamilia);
   if(gastoState.producto!=null) r = r.filter(x=>x.producto===gastoState.producto);
   if(gastoState.proveedor!=null) r = r.filter(x=>x.proveedor===gastoState.proveedor);
   return r;
 }
+// Ya no son botones para elegir Nacional o Importado antes de ver nada — pedido de Piero, 03.09.2026:
+// "la selección grande de gasto nacional o importado hace que los productos se dividan... prefiero ver
+// valvulas y definir de ahí cuánto se compró nacional cuánto importado". Ahora son solo informativas,
+// y reflejan el nivel en el que Piero está parado (Familia/Subfamilia/Producto/Proveedor) en vez de
+// obligar a elegir un origen antes de poder ver Familias/Productos combinados de ambos.
 function renderGastoOrigenGrid(rows){
   const nacionalRows = rows.filter(r=>r.origen==='nacional');
   const importadoRows = rows.filter(r=>r.origen==='importado');
   const totalNacional = nacionalRows.reduce((s,r)=>s+r.montoPEN,0);
   const totalImportado = importadoRows.reduce((s,r)=>s+r.montoPEN,0);
   const totalAll = totalNacional + totalImportado;
-  const card = (key, label, icon, monto, monedaRows)=>{
+  const card = (label, icon, monto, monedaRows)=>{
     const pct = totalAll>0 ? (monto/totalAll*100) : 0;
-    const selected = gastoState.origen===key ? ' selected' : '';
     const { soles, dolares } = montoPorMonedaOrigen(monedaRows);
-    return `<div class="card proc-kpi${selected}" data-origen="${key}">
+    return `<div class="card proc-kpi">
       <div class="proc-kpi-top"><span class="proc-num">${icon}</span><span class="pill muted">${pct.toFixed(0)}% del total</span></div>
       <div class="proc-name">Gasto ${label}</div>
       <div class="proc-headline">${fmtPEN(monto)}</div>
       <div class="proc-caption">${monedaRows.length.toLocaleString('es-PE')} líneas de compra · ${fmtPEN(soles)} en Soles · ${fmtUSD(dolares)} en Dólares</div>
     </div>`;
   };
-  const grid = document.getElementById('gastoOrigenGrid');
-  grid.innerHTML = card('nacional','Nacional','🇵🇪', totalNacional, nacionalRows)
-    + card('importado','Importado','🌎', totalImportado, importadoRows);
-  grid.querySelectorAll('.proc-kpi').forEach(c=>{
-    c.addEventListener('click', ()=>{
-      const key = c.dataset.origen;
-      if(gastoState.origen !== key){
-        gastoState = { origen: key, familia: null, subfamilia: null, producto: null, proveedor: null };
-      }
-      drawGasto();
-    });
-  });
+  document.getElementById('gastoOrigenGrid').innerHTML = card('Nacional','🇵🇪', totalNacional, nacionalRows)
+    + card('Importado','🌎', totalImportado, importadoRows);
 }
 function renderGastoBreadcrumb(){
   const el = document.getElementById('gastoBreadcrumb');
-  const origenLabel = gastoState.origen === 'nacional' ? '🇵🇪 Nacional' : '🌎 Importado';
-  let html = gastoState.familia
-    ? `<span class="crumb-link" data-level="origen">${origenLabel}</span>`
-    : `<span class="crumb-current">${origenLabel}</span>`;
-  if(gastoState.familia){
-    html += `<span class="crumb-sep">›</span>`;
-    html += gastoState.subfamilia
-      ? `<span class="crumb-link" data-level="familia">${escapeHtml(gastoState.familia)}</span>`
-      : `<span class="crumb-current">${escapeHtml(gastoState.familia)}</span>`;
-  }
+  // Ya no arranca en Nacional/Importado (ver renderGastoOrigenGrid) — el primer escalón real es
+  // Familia. Si ya se entró a alguna Familia, "Todas las familias" hace de raíz para volver arriba
+  // (antes ese rol lo cumplía el crumb de Nacional/Importado).
+  if(!gastoState.familia){ el.innerHTML = ''; return; }
+  let html = `<span class="crumb-link" data-level="raiz">Todas las familias</span><span class="crumb-sep">›</span>`;
+  html += gastoState.subfamilia
+    ? `<span class="crumb-link" data-level="familia">${escapeHtml(gastoState.familia)}</span>`
+    : `<span class="crumb-current">${escapeHtml(gastoState.familia)}</span>`;
   if(gastoState.subfamilia){
     html += `<span class="crumb-sep">›</span>`;
     html += gastoState.producto
@@ -1736,7 +1728,7 @@ function renderGastoBreadcrumb(){
   el.querySelectorAll('.crumb-link').forEach(link=>{
     link.addEventListener('click', ()=>{
       const lvl = link.dataset.level;
-      if(lvl==='origen'){ gastoState.familia=null; gastoState.subfamilia=null; gastoState.producto=null; gastoState.proveedor=null; }
+      if(lvl==='raiz'){ gastoState.familia=null; gastoState.subfamilia=null; gastoState.producto=null; gastoState.proveedor=null; }
       else if(lvl==='familia'){ gastoState.subfamilia=null; gastoState.producto=null; gastoState.proveedor=null; }
       else if(lvl==='subfamilia'){ gastoState.producto=null; gastoState.proveedor=null; }
       else if(lvl==='producto'){ gastoState.proveedor=null; }
@@ -1776,10 +1768,14 @@ function drawGasto(){
   document.getElementById('gastoDefNote').innerHTML = '';
 
   const rows = filteredGastoRows();
-  renderGastoOrigenGrid(rows);
   renderGastoBreadcrumb();
 
+  // Las tarjetas Nacional/Importado ahora muestran el desglose del nivel en el que Piero está parado
+  // (no siempre el total general) — se calculan sobre "scoped", que ya respeta la Familia/Subfamilia/
+  // Producto/Proveedor elegidos, para poder "definir de ahí cuánto se compró nacional cuánto
+  // importado" en vez de tener que elegir un origen antes de ver nada (pedido de Piero, 03.09.2026).
   const scoped = gastoRowsInScope(rows);
+  renderGastoOrigenGrid(scoped);
   const levelIdx = gastoLevelIndex();
   const levelDef = GASTO_LEVELS[levelIdx];
   const level = levelDef.key;
@@ -2616,20 +2612,15 @@ function buildProImageGasto(){
   const totalImportado = importadoRows.reduce((s,r)=>s+r.montoPEN,0);
   const totalAll = totalNacional + totalImportado;
 
-  // El resumen refleja el bloque (Nacional/Importado) que Piero tenga seleccionado en pantalla al
-  // momento de generar la imagen — mismo criterio que el resto de "Resumen para compartir" (reflejan
-  // lo que se está viendo, no un agregado fijo).
-  const origen = gastoState.origen;
-  const origenRows = origen==='nacional' ? nacionalRows : importadoRows;
-  const origenLabel = origen==='nacional' ? 'Nacional' : 'Importado';
-
+  // Ya no depende de un origen "seleccionado" (Nacional/Importado dejó de ser un filtro obligatorio
+  // en el módulo, 03.09.2026) — el resumen combina ambos, igual que la vista principal.
   const kpis = [
     { num:'🇵🇪', label:'GASTO NACIONAL', value: fmtPEN(totalNacional), valueLabel:'MONTO', metaLabel:'PROPORCIÓN', metaValue: (totalAll?(totalNacional/totalAll*100).toFixed(0):0)+'% del total' },
     { num:'🌎', label:'GASTO IMPORTADO', value: fmtPEN(totalImportado), valueLabel:'MONTO', metaLabel:'PROPORCIÓN', metaValue: (totalAll?(totalImportado/totalAll*100).toFixed(0):0)+'% del total' },
     { num:'💰', label:'GASTO TOTAL DEL PERÍODO', value: fmtPEN(totalAll), valueLabel:'MONTO', metaLabel:'VOLUMEN', metaValue: rows.length.toLocaleString('es-PE')+' líneas' },
   ];
 
-  const { agg: familiaAgg } = buildGastoAgg(origenRows, r=>r.familia);
+  const { agg: familiaAgg } = buildGastoAgg(rows, r=>r.familia);
   const topFamilias = familiaAgg.slice(0,8).map((g,i)=>({
     rank: i+1, name: g.label,
     cells: [ fmtPEN(g.monto), g.pct.toFixed(1)+'%' ],
@@ -2637,7 +2628,7 @@ function buildProImageGasto(){
     barColor: g.top80 ? '#2a78d6' : '#c7d0d9',
   }));
 
-  const { agg: provAgg } = buildGastoAgg(origenRows, r=>r.proveedor);
+  const { agg: provAgg } = buildGastoAgg(rows, r=>r.proveedor);
   const topProveedores = provAgg.slice(0,8).map((g,i)=>{
     const buckets = {};
     for(const r of g.rows) buckets[r.creditoBucket] = (buckets[r.creditoBucket]||0) + r.montoPEN;
@@ -2653,11 +2644,11 @@ function buildProImageGasto(){
 
   return {
     title: 'CONCENTRACIÓN DE GASTO',
-    subtitle: 'NACIONAL / IMPORTADO · FAMILIA · PROVEEDOR — VISTA: ' + origenLabel.toUpperCase(),
+    subtitle: 'NACIONAL / IMPORTADO · FAMILIA · PROVEEDOR',
     kpis,
     tables: [
-      { icon:'📦', title:'Top familias — '+origenLabel, subtitle:'Ordenadas de mayor a menor gasto en el período filtrado', nameLabel:'FAMILIA', columns:['GASTO','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: topFamilias, legendItems:[{color:'#2a78d6',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
-      { icon:'🏭', title:'Top proveedores — '+origenLabel, subtitle:'Con su forma de pago principal (mayor monto)', nameLabel:'PROVEEDOR', columns:['GASTO','FORMA DE PAGO PRINCIPAL'], barLabel:'% ACUMULADO', rows: topProveedores, legendItems:[{color:'#2a78d6',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
+      { icon:'📦', title:'Top familias', subtitle:'Ordenadas de mayor a menor gasto en el período filtrado (Nacional + Importado)', nameLabel:'FAMILIA', columns:['GASTO','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: topFamilias, legendItems:[{color:'#2a78d6',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
+      { icon:'🏭', title:'Top proveedores', subtitle:'Con su forma de pago principal (mayor monto)', nameLabel:'PROVEEDOR', columns:['GASTO','FORMA DE PAGO PRINCIPAL'], barLabel:'% ACUMULADO', rows: topProveedores, legendItems:[{color:'#2a78d6',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
     ],
     banner: { tone:'info', items:[ {value: fmtPEN(totalAll), label:'Gasto total del período (Nacional + Importado)'} ], action:null },
     footnote: 'Solo Órdenes de Compra (no de Servicio) con Estado Atendido Total/Parcial o Aprobado. Monto convertido a Soles con tipo de cambio de referencia fijo (US$ y €). Forma de pago desde la hoja "R.EOC" (solo cubre órdenes desde 01.01.2026).',
