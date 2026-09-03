@@ -729,21 +729,22 @@ function buildSnapshot(){
         cr: a.codRequerimiento, cp: a.codPedido, rp: a.responsable, fd: isoDay(a.fDesde),
       })),
     },
-    // gastoSchemaVersion sube a 2 el 03.09.2026 con la reestructuración de Concentración de Gasto
-    // (Nacional/Importado -> Familia -> Subfamilia -> Proveedor, con moneda y forma de pago). Un
-    // snapshot viejo (< 2) solo trae pv/fa/a/m/d/mo — loadFromSnapshot rellena og/sf/mn/cb con
-    // valores por defecto para que igual se pueda ver (todo bajo "nacional", sin desglose de moneda
-    // ni forma de pago) en vez de romperse.
-    gastoSchemaVersion: 2,
+    // gastoSchemaVersion sube a 3 el 03.09.2026 con el nivel "Producto" homologado (antes Subfamilia
+    // iba directo a Proveedor). Un snapshot viejo (< 3) solo trae pv/fa/sf/og/mn/cb/a/m/d/mo, sin "pr"
+    // — loadFromSnapshot rellena Producto con un valor por defecto para que igual se pueda ver (sin ese
+    // nivel de detalle) en vez de romperse; no hay forma de reconstruir la descripción homologada sin
+    // volver a procesar el Consulta.xlsx original.
+    gastoSchemaVersion: 3,
     gasto: GASTO_DATA ? {
       filename: GASTO_DATA.filename,
       totalRows: GASTO_DATA.totalRows,
       excluded: GASTO_DATA.excluded,
       // registros livianos (claves cortas) para que quien vea el snapshot pueda seguir filtrando y
-      // haciendo el mismo drill-down (Nacional/Importado > Familia > Subfamilia > Proveedor) sin tener
-      // que volver a subir Consulta.xlsx — el archivo puede tener decenas de miles de filas históricas.
+      // haciendo el mismo drill-down (Nacional/Importado > Familia > Subfamilia > Producto > Proveedor
+      // > Forma de pago) sin tener que volver a subir Consulta.xlsx — el archivo puede tener decenas de
+      // miles de filas históricas.
       rows: GASTO_DATA.rows.map(r => ({
-        pv: r.proveedor, fa: r.familia, sf: r.subfamilia, og: r.origen, mn: r.moneda, cb: r.creditoBucket,
+        pv: r.proveedor, fa: r.familia, sf: r.subfamilia, pr: r.producto, og: r.origen, mn: r.moneda, cb: r.creditoBucket,
         a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100,
       })),
     } : null,
@@ -880,11 +881,13 @@ function loadFromSnapshot(snap){
     totalRows: snap.gasto.totalRows || 0,
     excluded: snap.gasto.excluded || 0,
     // snapshot viejo (gastoSchemaVersion < 2, antes de la reestructuración del 03.09.2026): og/sf/mn/cb
-    // no existen — se rellenan con valores por defecto (todo "nacional", sin subfamilia/moneda/forma de
-    // pago) para que el módulo siga mostrando algo en vez de romperse; no hay forma de reconstruir esos
-    // datos sin volver a procesar el Consulta.xlsx original.
+    // no existen, y (< 3, antes del nivel Producto del 03.09.2026) "pr" tampoco — se rellenan con
+    // valores por defecto para que el módulo siga mostrando algo en vez de romperse; no hay forma de
+    // reconstruir esos datos sin volver a procesar el Consulta.xlsx original.
     rows: snap.gasto.rows.map(r => ({
-      proveedor: r.pv, familia: r.fa, subfamilia: r.sf || "Sin subfamilia", origen: r.og || "nacional",
+      proveedor: r.pv, familia: r.fa, subfamilia: r.sf || "Sin subfamilia",
+      producto: r.pr || "(sin detalle de producto en este snapshot)",
+      origen: r.og || "nacional",
       moneda: r.mn || null, creditoBucket: r.cb || "Sin dato",
       anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo,
     })),
