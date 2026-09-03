@@ -1803,8 +1803,12 @@ function drawGasto(){
   document.getElementById('chartGasto').innerHTML = view.slice(0,20).map((g,i)=>{
     const pct = maxMonto>0 ? g.monto/maxMonto*100 : 0;
     const color = g.top80 ? 'var(--seg-a)' : 'var(--track-empty)';
+    // Desglose Soles/Dólares (montos reales, sin convertir) también acá arriba del todo, junto al
+    // nombre — no solo en la tabla de abajo — para que se vea de entrada sin tener que hacer scroll
+    // (pedido de Piero, 03.09.2026: "debe existir una columna en soles y otra en dólares").
+    const { soles, dolares } = montoPorMonedaOrigen(g.rows);
     return `<div class="bar-row${drillable?' clickable':''}" ${drillable?`data-i="${i}"`:''}>
-      <div class="bar-label" title="${escapeHtml(g.label)}">${escapeHtml(g.label)}</div>
+      <div class="bar-label" title="${escapeHtml(g.label)}">${escapeHtml(g.label)}<div style="font-size:10.5px;font-weight:400;color:var(--muted);white-space:nowrap;">${soles?fmtPEN(soles):'—'} · ${dolares?fmtUSD(dolares):'—'}</div></div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
       <div class="bar-pct" style="width:100px;">${fmtPEN(g.monto)}</div>
     </div>`;
