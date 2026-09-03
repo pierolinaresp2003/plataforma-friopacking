@@ -729,12 +729,13 @@ function buildSnapshot(){
         cr: a.codRequerimiento, cp: a.codPedido, rp: a.responsable, fd: isoDay(a.fDesde),
       })),
     },
-    // gastoSchemaVersion sube a 3 el 03.09.2026 con el nivel "Producto" homologado (antes Subfamilia
-    // iba directo a Proveedor). Un snapshot viejo (< 3) solo trae pv/fa/sf/og/mn/cb/a/m/d/mo, sin "pr"
-    // — loadFromSnapshot rellena Producto con un valor por defecto para que igual se pueda ver (sin ese
-    // nivel de detalle) en vez de romperse; no hay forma de reconstruir la descripción homologada sin
-    // volver a procesar el Consulta.xlsx original.
-    gastoSchemaVersion: 3,
+    // gastoSchemaVersion sube a 4 el 03.09.2026: se agrega "no" (montoNativo, el monto real en la
+    // moneda de la línea, sin convertir) para que Soles/Dólares en la UI sean el monto real y no un
+    // equivalente en soles con el símbolo cambiado (pedido de Piero: "no debes convertir"). Un snapshot
+    // viejo (< 4) no trae "no" — loadFromSnapshot usa "mo" (el equivalente en soles) como aproximación
+    // para no romperse, aclarando que es un cálculo viejo. Un snapshot viejo (< 3) tampoco trae "pr"
+    // (nivel "Producto", agregado el mismo día) y se rellena con un valor por defecto.
+    gastoSchemaVersion: 4,
     gasto: GASTO_DATA ? {
       filename: GASTO_DATA.filename,
       totalRows: GASTO_DATA.totalRows,
@@ -745,7 +746,7 @@ function buildSnapshot(){
       // miles de filas históricas.
       rows: GASTO_DATA.rows.map(r => ({
         pv: r.proveedor, fa: r.familia, sf: r.subfamilia, pr: r.producto, og: r.origen, mn: r.moneda, cb: r.creditoBucket,
-        a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100,
+        a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100, no: Math.round(r.montoNativo*100)/100,
       })),
     } : null,
   };
@@ -883,13 +884,16 @@ function loadFromSnapshot(snap){
     // snapshot viejo (gastoSchemaVersion < 2, antes de la reestructuración del 03.09.2026): og/sf/mn/cb
     // no existen, y (< 3, antes del nivel Producto del 03.09.2026) "pr" tampoco — se rellenan con
     // valores por defecto para que el módulo siga mostrando algo en vez de romperse; no hay forma de
-    // reconstruir esos datos sin volver a procesar el Consulta.xlsx original.
+    // reconstruir esos datos sin volver a procesar el Consulta.xlsx original. Igual para (< 4, antes de
+    // dejar de convertir Soles/Dólares el 03.09.2026): "no" (montoNativo) no existe, se usa "mo" (el
+    // equivalente en soles de ese entonces) como aproximación — un snapshot viejo puede verse algo
+    // distinto en esas 2 columnas hasta que se vuelva a publicar con el Excel.
     rows: snap.gasto.rows.map(r => ({
       proveedor: r.pv, familia: r.fa, subfamilia: r.sf || "Sin subfamilia",
       producto: r.pr || "(sin detalle de producto en este snapshot)",
       origen: r.og || "nacional",
       moneda: r.mn || null, creditoBucket: r.cb || "Sin dato",
-      anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo,
+      anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo, montoNativo: (r.no!=null ? r.no : r.mo),
     })),
   } : null;
   populateGastoAnios();
@@ -1417,7 +1421,14 @@ function processConsulta(wb, filename){
     }
     if(precioUnit == null || isNaN(precioUnit)){ excluded++; continue; }
 
-    const montoPEN = cantidad * precioUnit * tc;
+    // montoNativo = en la moneda real de la línea (Soles o Dólares/Euros), SIN convertir — es lo que
+    // se muestra en las columnas "Gasto en Soles" / "Gasto en Dólares" (pedido de Piero, 03.09.2026:
+    // "no debes convertir, debes darme el monto tanto en dólares como en soles"). montoPEN sigue
+    // existiendo aparte y es el que se usa para el total "Gasto", el Pareto y el ranking — para eso sí
+    // hace falta un solo número comparable, así que ahí se mantiene la conversión con el tipo de cambio
+    // de referencia fijo.
+    const montoNativo = cantidad * precioUnit;
+    const montoPEN = montoNativo * tc;
     if(!(montoPEN > 0)){ excluded++; continue; } // líneas sin precio registrado (0) no aportan gasto
 
     // Documento identifica la orden ("OCO 0001-..." / "OCO 0002-...") y es la llave para: (a) clasificar
@@ -1442,7 +1453,7 @@ function processConsulta(wb, filename){
       origen: origenForDocumento(documento),
       moneda,
       creditoBucket: creditoBucketFor(formaPagoTexto),
-      fecha, montoPEN,
+      fecha, montoPEN, montoNativo,
       anio: fecha.getUTCFullYear(), mes: fecha.getUTCMonth()+1, dia: fecha.getUTCDate(),
     });
   }
@@ -1613,15 +1624,18 @@ function monedaLabel(m){
   return t || '—';
 }
 // Gasto en 2 columnas (Soles / Dólares) para cualquier nivel de la tabla — pedido de Piero, 03.09.2026
-// ("deben haber esas 2 columnas"), reemplaza el badge único de moneda de la ronda anterior. Ambas ya
-// están en Soles-equivalente (mismo tipo de cambio de referencia fijo del resto del módulo, ver
-// TIPO_CAMBIO), así que se pueden sumar entre sí sin problema — "Dólares" incluye también los pocos
-// Euros que aparecen, no hay una columna aparte para una moneda tan minoritaria.
+// ("deben haber esas 2 columnas"), reemplaza el badge único de moneda de la ronda anterior. A partir
+// del 03.09.2026 estos 2 montos son el REAL en cada moneda (r.montoNativo, sin tipo de cambio de por
+// medio) — Piero pidió explícitamente no convertir acá ("debes darme el monto tanto en dólares como en
+// soles"). El total "Gasto"/Pareto/ranking del módulo sigue usando el equivalente en soles (montoPEN)
+// aparte, porque para comparar/ordenar sí hace falta un solo número. "Dólares" incluye también los
+// pocos Euros que aparecen (a su valor nominal en euros, sin convertir), no hay una columna aparte para
+// una moneda tan minoritaria — es la misma simplificación que ya existía.
 function montoPorMonedaOrigen(rows){
   let soles = 0, dolares = 0;
   for(const r of rows){
-    if(monedaLabel(r.moneda) === 'S/') soles += r.montoPEN;
-    else dolares += r.montoPEN;
+    if(monedaLabel(r.moneda) === 'S/') soles += r.montoNativo;
+    else dolares += r.montoNativo;
   }
   return { soles, dolares };
 }
@@ -1669,7 +1683,7 @@ function renderGastoOrigenGrid(rows){
       <div class="proc-kpi-top"><span class="proc-num">${icon}</span><span class="pill muted">${pct.toFixed(0)}% del total</span></div>
       <div class="proc-name">Gasto ${label}</div>
       <div class="proc-headline">${fmtPEN(monto)}</div>
-      <div class="proc-caption">${monedaRows.length.toLocaleString('es-PE')} líneas de compra · ${fmtPEN(soles)} en Soles · ${fmtUSD(dolares)} en Dólares (equiv.)</div>
+      <div class="proc-caption">${monedaRows.length.toLocaleString('es-PE')} líneas de compra · ${fmtPEN(soles)} en Soles · ${fmtUSD(dolares)} en Dólares</div>
     </div>`;
   };
   const grid = document.getElementById('gastoOrigenGrid');
@@ -1753,7 +1767,7 @@ function renderGasto(){
 }
 function drawGasto(){
   populateSemanaSelect(document.getElementById('filterGastoSemana'), document.getElementById('filterGastoAnio').value, document.getElementById('filterGastoMes').value);
-  document.getElementById('gastoDefNote').innerHTML = `<b>Qué cuenta como gasto:</b> solo líneas de <b>Órdenes de Compra</b> (no Órdenes de Servicio) con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> — se excluye lo Pendiente (aún sin aprobar). Monto = Cantidad × Precio Unitario con descuento, en la moneda de cada línea, convertido a Soles con un tipo de cambio de referencia fijo (US$ = S/ ${TIPO_CAMBIO['US$'].toFixed(3)}, € = S/ ${TIPO_CAMBIO['€'].toFixed(2)}, tomados el 01.09.2026) — es una aproximación, no el tipo de cambio real de cada operación histórica. <b>Nacional/Importado</b> se toma del propio código de la orden (Documento). El <b>Producto</b> homologa la descripción del ítem (columna Producto Descripción de Consulta.xlsx) para agrupar bajo un mismo nombre códigos distintos que en realidad son el mismo producto — no recorta ni mezcla nada que distinga productos entre sí (ej. un cable RZ1 nunca se junta con un RVK). La <b>forma de pago</b> viene de la hoja "R.EOC" (solo cubre órdenes desde 01.01.2026) — lo que no tiene un número de días de crédito claro (anticipos parciales, "a tratar", etc.) o no tiene forma de pago registrada se agrupa en "Otra / sin dato". El <b>80% principal (Pareto)</b> son los ítems que, ordenados de mayor a menor gasto, acumulan el 80% del gasto de ese nivel en el período filtrado.`;
+  document.getElementById('gastoDefNote').innerHTML = `<b>Qué cuenta como gasto:</b> solo líneas de <b>Órdenes de Compra</b> (no Órdenes de Servicio) con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> — se excluye lo Pendiente (aún sin aprobar). Monto = Cantidad × Precio Unitario con descuento. Las columnas y bloques <b>en Soles / en Dólares</b> muestran el monto real en la moneda de cada línea, <b>sin convertir</b>. El total <b>Gasto</b> de cada fila (y el Pareto/ranking) sí necesita un solo número para poder ordenar, así que ese usa un tipo de cambio de referencia fijo (US$ = S/ ${TIPO_CAMBIO['US$'].toFixed(3)}, € = S/ ${TIPO_CAMBIO['€'].toFixed(2)}, tomados el 01.09.2026) — es una aproximación, no el tipo de cambio real de cada operación histórica. <b>Nacional/Importado</b> se toma del propio código de la orden (Documento). El <b>Producto</b> homologa la descripción del ítem (columna Producto Descripción de Consulta.xlsx) para agrupar bajo un mismo nombre códigos distintos que en realidad son el mismo producto — no recorta ni mezcla nada que distinga productos entre sí (ej. un cable RZ1 nunca se junta con un RVK). La <b>forma de pago</b> viene de la hoja "R.EOC" (solo cubre órdenes desde 01.01.2026) — lo que no tiene un número de días de crédito claro (anticipos parciales, "a tratar", etc.) o no tiene forma de pago registrada se agrupa en "Otra / sin dato". El <b>80% principal (Pareto)</b> son los ítems que, ordenados de mayor a menor gasto, acumulan el 80% del gasto de ese nivel en el período filtrado.`;
 
   const rows = filteredGastoRows();
   renderGastoOrigenGrid(rows);
