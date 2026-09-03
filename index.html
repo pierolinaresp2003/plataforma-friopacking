@@ -1598,6 +1598,13 @@ function buildGastoAgg(rows, labelFn){
 function fmtPEN(n){
   return 'S/ ' + Math.round(n).toLocaleString('es-PE');
 }
+// Igual que fmtPEN pero con el símbolo $ en vez de S/ — pedido de Piero, 03.09.2026: la columna
+// "Gasto en Dólares" es un equivalente en soles (mismo tipo de cambio fijo del resto del módulo) pero
+// mostrarlo con "S/" adelante confundía porque parecía un monto en soles. Formatea el mismo número,
+// solo cambia el símbolo, para dejar claro de un vistazo que esa cifra es de compras en dólares/euros.
+function fmtUSD(n){
+  return '$ ' + Math.round(n).toLocaleString('es-PE');
+}
 function monedaLabel(m){
   const t = (m||'').toString().trim();
   if(t === 'S/.' || t === 'S/' || t === 'PEN') return 'S/';
@@ -1662,7 +1669,7 @@ function renderGastoOrigenGrid(rows){
       <div class="proc-kpi-top"><span class="proc-num">${icon}</span><span class="pill muted">${pct.toFixed(0)}% del total</span></div>
       <div class="proc-name">Gasto ${label}</div>
       <div class="proc-headline">${fmtPEN(monto)}</div>
-      <div class="proc-caption">${monedaRows.length.toLocaleString('es-PE')} líneas de compra · ${fmtPEN(soles)} en Soles · ${fmtPEN(dolares)} en Dólares (equiv.)</div>
+      <div class="proc-caption">${monedaRows.length.toLocaleString('es-PE')} líneas de compra · ${fmtPEN(soles)} en Soles · ${fmtUSD(dolares)} en Dólares (equiv.)</div>
     </div>`;
   };
   const grid = document.getElementById('gastoOrigenGrid');
@@ -1806,7 +1813,7 @@ function drawGasto(){
     return `<tr data-i="${i}"${drillable?' style="cursor:pointer;"':''}>
         <td style="white-space:normal;min-width:220px;">${escapeHtml(g.label)}${drillable?` <span style="color:var(--brand-ink);font-size:11px;">🔍 ver ${nextPlural}</span>`:''}</td>
         <td>${soles ? fmtPEN(soles) : '—'}</td>
-        <td>${dolares ? fmtPEN(dolares) : '—'}</td>
+        <td>${dolares ? fmtUSD(dolares) : '—'}</td>
         <td>${g.n.toLocaleString('es-PE')}</td>
         <td>${fmtPEN(g.monto)}</td>
         <td>${g.pct.toFixed(1)}%</td>
