@@ -1338,6 +1338,13 @@ function processPedidoSinReq(wb, filename){
 // mercado EUR. Es una aproximación explícita, confirmada con Piero como forma de arrancar; ajustar acá
 // si se necesita otro valor o una tabla de tipo de cambio por fecha más adelante.
 const TIPO_CAMBIO = { 'US$': 3.375, 'USD': 3.375, '€': 3.90, 'EUR': 3.90 };
+// La columna Moneda de Consulta.xlsx a veces trae espacios de más (al inicio, en medio o al final,
+// ej. "S / ." o "US $") — normalizeMoneda() le quita TODOS los espacios (no solo los de los extremos,
+// como hacía un trim() normal) para que la comparación con "S/." y las llaves de TIPO_CAMBIO no falle
+// por eso (detectado por Piero, 03.09.2026: "ojo que la columna G tiene espacios al final").
+function normalizeMoneda(raw){
+  return (raw==null ? "" : raw.toString()).replace(/\s+/g, "");
+}
 let GASTO_DATA = null; // { rows: [{proveedor, familia, subfamilia, origen, moneda, creditoBucket, fecha, anio, mes, dia, montoPEN}], excluded, totalRows, filename, fromSnapshot }
 
 function processConsulta(wb, filename){
@@ -1394,7 +1401,7 @@ function processConsulta(wb, filename){
     const fecha = col.fecha!==-1 ? parseExcelDate(r[col.fecha]) : null;
     if(!fecha){ excluded++; continue; }
 
-    const moneda = r[monedaIdx]!=null ? r[monedaIdx].toString().trim() : "";
+    const moneda = normalizeMoneda(r[monedaIdx]);
     const cantidad = col.cantidad!==-1 ? Number(r[col.cantidad]) : null;
     if(cantidad == null || isNaN(cantidad)){ excluded++; continue; }
 
