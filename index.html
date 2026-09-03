@@ -301,8 +301,6 @@
       </div>
 
       <div class="toolbar">
-        <input type="search" id="searchProceso" placeholder="Buscar proyecto, producto, proveedor o familia...">
-        <select id="filterProcesoProyecto"><option value="all">Todos los proyectos</option></select>
         <select id="filterProcesoProveedor"><option value="all">Todos los proveedores</option></select>
         <select id="filterProcesoFamilia"><option value="all">Todas las familias</option></select>
         <select id="filterProcesoResponsable"><option value="all">Todos (responsable de compra)</option></select>
@@ -2199,8 +2197,6 @@ function getProcesoRows(){ return DATA.procesoRows || []; }
 
 function filteredProcesoRows(){
   const rows = getProcesoRows();
-  const q = (document.getElementById('searchProceso').value||"").toLowerCase();
-  const fProyecto = document.getElementById('filterProcesoProyecto').value;
   const fProveedor = document.getElementById('filterProcesoProveedor').value;
   const fFamilia = document.getElementById('filterProcesoFamilia').value;
   const fResp = document.getElementById('filterProcesoResponsable').value;
@@ -2209,8 +2205,6 @@ function filteredProcesoRows(){
   const fMes = document.getElementById('filterProcesoMes').value;
   const fSemana = document.getElementById('filterProcesoSemana').value;
   return rows.filter(r=>{
-    if(q && !((r.proyecto+' '+r.producto+' '+r.proveedor+' '+r.familia).toLowerCase().includes(q))) return false;
-    if(fProyecto!=='all' && r.proyecto !== fProyecto) return false;
     if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
     if(fFamilia!=='all' && r.familia !== fFamilia) return false;
     if(fResp!=='all' && r.usuarioCompras !== fResp) return false;
@@ -2305,7 +2299,6 @@ function populateSelectDistinct(selectEl, values, allLabel){
 }
 function populateProcesoFilters(){
   const rows = getProcesoRows();
-  populateSelectDistinct(document.getElementById('filterProcesoProyecto'), rows.map(r=>r.proyecto), 'Todos los proyectos');
   populateSelectDistinct(document.getElementById('filterProcesoProveedor'), rows.map(r=>r.proveedor), 'Todos los proveedores');
   populateSelectDistinct(document.getElementById('filterProcesoFamilia'), rows.map(r=>r.familia), 'Todas las familias');
   populateSelectDistinct(document.getElementById('filterProcesoResponsable'), rows.map(r=>r.usuarioCompras), 'Todos (responsable de compra)');
@@ -2346,7 +2339,7 @@ function renderProceso(){
 
   populateGroupByProceso();
   if(!procesoListenersBoundInner){
-    ['searchProceso','filterProcesoProyecto','filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoOrigen','filterProcesoAnio','filterProcesoMes','filterProcesoSemana'].forEach(id=>{
+    ['filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoOrigen','filterProcesoAnio','filterProcesoMes','filterProcesoSemana'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawProceso);
     });
