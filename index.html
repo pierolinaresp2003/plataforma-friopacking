@@ -181,6 +181,7 @@
   .trend-legend .lg-item{display:inline-flex;align-items:center;gap:6px;}
   .trend-legend .lg-swatch{width:16px;height:2px;border-radius:2px;background:var(--brand-2-dark);flex-shrink:0;}
   .trend-legend .lg-swatch.dashed{background:none;border-top:2px dashed var(--ink-soft);height:0;}
+  .trend-legend .lg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .trend-tooltip{position:absolute;background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:11.5px;color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.14);pointer-events:none;white-space:nowrap;z-index:20;display:none;}
   .trend-zoombar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--ink-soft);margin:0 0 4px;}
   .trend-zoombar-hint{opacity:.7;}
@@ -223,9 +224,6 @@
   .moneda-tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--ink-soft);margin-right:3px;}
   .pill.muted{background:var(--surface-2);color:var(--ink-soft);}
 
-  .summary-table td.hl-worst{background:var(--red-bg);}
-  .summary-table tr.hl-row td{position:relative;}
-  .hl-tag{display:inline-block;margin-left:6px;font-size:10px;font-weight:700;color:var(--red);}
 
   .bar-track{position:relative;}
   .meta-line{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink-soft);opacity:.55;}
@@ -355,11 +353,8 @@
       <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);" id="mainChartTitle">Gráfico principal</h3>
       <div id="indicatorTrend" class="trend-wrap" style="position:relative;"></div>
 
-      <!-- Resumen gerencial -->
-      <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Resumen gerencial: proceso de atención</h3>
-      <div class="table-card card" style="margin-bottom:20px;">
-        <table id="tableProcesoResumen" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
+      <!-- La tabla "Resumen gerencial: proceso de atención" se quitó a pedido de Piero (03.09.2026) —
+      la información de meta/cumplimiento por etapa ya está en las tarjetas KPI de arriba. -->
 
       <!-- Las tablas "Rendimiento por comprador" y "Rendimiento por persona de Almacén" se quitaron a
       pedido de Piero (01.09.2026, misma tarde que el filtro de origen) — las vio con datos reales y
@@ -1569,6 +1564,21 @@ function monedaLabel(m){
   if(t === '€' || t === 'EUR') return '€';
   return t || '—';
 }
+// Celda "Moneda" para cualquier nivel de la tabla (Familia/Subfamilia/Proveedor) — pedido de Piero,
+// 03.09.2026 ("debes ver bien qué tipo de compras se hizo con qué moneda"): antes esto solo se veía en
+// el nivel Proveedor y sin montos, solo como etiqueta de qué monedas aparecían. Ahora, en TODOS los
+// niveles, se ve qué % del gasto de ese grupo fue en cada moneda (el monto sigue en Soles-equivalente,
+// mismo tipo de cambio de referencia fijo que el resto del módulo — no hay un monto "real" en dólares
+// distinto de esa conversión, ver nota debajo del gráfico).
+function monedaBreakdownCell(rows){
+  const byMoneda = {};
+  for(const r of rows) byMoneda[monedaLabel(r.moneda)] = (byMoneda[monedaLabel(r.moneda)]||0) + r.montoPEN;
+  const entries = Object.entries(byMoneda).sort((a,b)=>b[1]-a[1]);
+  if(entries.length === 0) return '—';
+  if(entries.length === 1) return `<span class="moneda-tag">${entries[0][0]}</span>`;
+  const total = entries.reduce((s,[,v])=>s+v,0);
+  return entries.map(([label,v])=>`<span class="moneda-tag">${label} ${total>0?(v/total*100).toFixed(0):0}%</span>`).join(' ');
+}
 // Estado de navegación del módulo (no se guarda en snapshot — cada quien que vea el link empieza en
 // Nacional sin drill, como al cargar el Excel). origen -> familia -> subfamilia -> proveedor.
 let gastoState = { origen: 'nacional', familia: null, subfamilia: null };
@@ -1711,13 +1721,12 @@ function drawGasto(){
   if(level === 'proveedor'){
     table.querySelector('thead').innerHTML = `<tr><th>Proveedor</th><th>Moneda</th><th>Monto</th><th>Líneas</th><th>Contado</th><th>Créd. 0-30d</th><th>Créd. 30-60d</th><th>Créd. 60+d</th><th>Otra / sin dato</th></tr>`;
     table.querySelector('tbody').innerHTML = view.map(g=>{
-      const monedas = Array.from(new Set(g.rows.map(r=>monedaLabel(r.moneda))));
       const buckets = {};
       for(const r of g.rows) buckets[r.creditoBucket] = (buckets[r.creditoBucket]||0) + r.montoPEN;
       const otra = (buckets['Otra forma de pago']||0) + (buckets['Sin dato']||0);
       return `<tr>
         <td style="white-space:normal;min-width:220px;">${g.label}</td>
-        <td>${monedas.map(m=>`<span class="moneda-tag">${m}</span>`).join('')}</td>
+        <td>${monedaBreakdownCell(g.rows)}</td>
         <td>${fmtPEN(g.monto)}</td>
         <td>${g.n.toLocaleString('es-PE')}</td>
         <td>${buckets['Contado'] ? fmtPEN(buckets['Contado']) : '—'}</td>
@@ -1729,16 +1738,17 @@ function drawGasto(){
     }).join("") || `<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
   } else {
     const groupLabel = level === 'familia' ? 'Familia' : 'Subfamilia';
-    table.querySelector('thead').innerHTML = `<tr><th>${groupLabel}</th><th>Líneas</th><th>Gasto</th><th>% del total</th><th>% acumulado</th><th>Pareto</th></tr>`;
+    table.querySelector('thead').innerHTML = `<tr><th>${groupLabel}</th><th>Moneda</th><th>Líneas</th><th>Gasto</th><th>% del total</th><th>% acumulado</th><th>Pareto</th></tr>`;
     table.querySelector('tbody').innerHTML = view.map((g,i)=>`
       <tr data-i="${i}" style="cursor:pointer;">
         <td style="white-space:normal;min-width:220px;">${g.label} <span style="color:var(--brand-ink);font-size:11px;">🔍 ver ${groupLabel==='Familia'?'subfamilias':'proveedores'}</span></td>
+        <td>${monedaBreakdownCell(g.rows)}</td>
         <td>${g.n.toLocaleString('es-PE')}</td>
         <td>${fmtPEN(g.monto)}</td>
         <td>${g.pct.toFixed(1)}%</td>
         <td>${g.pctAcum.toFixed(1)}%</td>
         <td>${g.top80 ? '<span class="pill late">80% principal</span>' : '<span class="pill">20% restante</span>'}</td>
-      </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
+      </tr>`).join("") || `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
     table.querySelectorAll('tbody tr[data-i]').forEach(tr=>{
       tr.addEventListener('click', ()=>{
         const label = view[Number(tr.dataset.i)].label;
@@ -2112,8 +2122,6 @@ function renderProceso(){
       : '<b>No se pudo calcular este proceso:</b> ninguna línea del archivo tuvo datos suficientes.';
     document.getElementById('procKpiGrid').innerHTML = '';
     document.getElementById('indicatorTrend').innerHTML = '';
-    document.querySelector('#tableProcesoResumen thead').innerHTML = '';
-    document.querySelector('#tableProcesoResumen tbody').innerHTML = '';
     return;
   }
   document.getElementById('procesoDefNote').style.display = 'none';
@@ -2142,7 +2150,6 @@ function drawProceso(){
   drawKpiCards();
   trendZoom = { startIdx: null, endIdx: null }; // cambiar de indicador/filtro reinicia cualquier zoom activo
   drawIndicatorTrend();
-  drawSummaryTable();
 }
 
 // Generar imagen (PNG) del módulo activo tal como se ve en pantalla — pedido de Piero (01.09.2026)
@@ -2586,15 +2593,25 @@ function trendDataForIndicator(rows, ind){
 
 // Calcula un paso de eje "redondo" (1, 2 o 5 × 10^n) para ~targetLines gridlines,
 // en vez de dividir el máximo en partes iguales (eso daba números como 3.5/10.5).
-function niceAxisStep(maxVal, targetLines){
-  if(maxVal<=0) return { step:1, niceMax:1 };
-  const rawStep = maxVal / targetLines;
+// Rango de eje Y "ajustado a lo que se proyecta" (pedido de Piero, 03.09.2026): antes el eje siempre
+// arrancaba en 0, lo que aplastaba la variación real cuando los valores no bajan de, por ejemplo, 5
+// d.h. — ahora el mínimo también se calcula desde los datos visibles (nunca negativo, los días hábiles
+// no lo son), con el mismo aire del 15% y los mismos pasos "redondos" (1/2/5 x 10^n) que ya usaba el
+// máximo. La meta y el valor comprometido (Indicador 4) siempre se incluyen en `values` en la llamada,
+// así la línea de meta nunca queda fuera del rango visible aunque los datos estén lejos de ella.
+function niceAxisRange(values, targetLines){
+  const dataMax = Math.max(...values);
+  const dataMin = Math.min(...values);
+  if(dataMax<=0) return { step:1, niceMin:0, niceMax:1 };
+  const span = Math.max(dataMax - dataMin, dataMax*0.05, 0.1); // evita un rango casi nulo si los valores son muy parecidos
+  const rawStep = span / targetLines;
   const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const norm = rawStep / mag;
   const niceNorm = norm<=1 ? 1 : norm<=2 ? 2 : norm<=5 ? 5 : 10;
   const step = niceNorm * mag;
-  const niceMax = Math.ceil(maxVal/step) * step;
-  return { step, niceMax };
+  const niceMax = Math.ceil((dataMax + span*0.15) / step) * step;
+  const niceMin = Math.max(0, Math.floor((dataMin - span*0.15) / step) * step);
+  return { step, niceMin, niceMax };
 }
 
 function drawIndicatorTrend(){
@@ -2618,11 +2635,12 @@ function drawIndicatorTrend(){
   const allVals = [];
   weeks.forEach(w=>{ allVals.push(w.promedio); if(w.compromiso!=null) allVals.push(w.compromiso); });
   if(ind.meta!=null) allVals.push(ind.meta);
-  const rawMax = Math.max(...allVals, 1) * 1.15; // 15% de aire arriba
-  // Ejes con números "redondos" (1/2/5 x 10^n) en vez de fracciones raras como 3.5/10.5 —
-  // diseño más simple y claro pedido por Piero (01.09.2026).
-  const { step: gridStep, niceMax: maxVal } = niceAxisStep(rawMax, 4);
-  const minVal = 0;
+  if(allVals.length < 1) allVals.push(1);
+  // Ejes con números "redondos" (1/2/5 x 10^n) en vez de fracciones raras como 3.5/10.5 — diseño más
+  // simple y claro (pedido de Piero, 01.09.2026) — y desde el 03.09.2026 el rango se ajusta también
+  // por abajo a lo que realmente se está graficando (ver niceAxisRange), no solo por arriba, para que
+  // las desviaciones se vean más grandes en vez de aplastadas contra un piso de 0 forzado.
+  const { step: gridStep, niceMin: minVal, niceMax: maxVal } = niceAxisRange(allVals, 4);
 
   const xFor = (i)=> padL + (weeks.length===1 ? plotW/2 : (i/(weeks.length-1)) * plotW);
   const yFor = (v)=> padT + plotH - ((v-minVal)/(maxVal-minVal)) * plotH;
@@ -2656,19 +2674,27 @@ function drawIndicatorTrend(){
   const xLabelsSvg = weeks.map((w,i)=> (i % xLabelStep===0 || i===weeks.length-1)
     ? `<text x="${xFor(i)}" y="${H-6}" text-anchor="middle">${escapeHtml(w.label)}</text>` : '').join('');
 
+  // Puntos coloreados por severidad (pedido de Piero, 03.09.2026: "para ver bien las desviaciones") —
+  // mismo criterio de color que ya se usa en Alertas de Atención (proSeverityColor: verde/ámbar/rojo
+  // según cuántas veces la meta). Solo aplica a indicadores con meta numérica fija (no el 4, que no
+  // tiene una meta única sino un plazo pactado por OC).
+  const hasSeverity = ind.key!=='d4' && ind.meta!=null;
   const dotsReal = weeks.map((w,i)=>{
     const [x,y] = [xFor(i), yFor(w.promedio)];
-    return `<circle class="tr-dot-real" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-key="${escapeHtml(w.key)}" data-val="${w.promedio.toFixed(1)}" data-n="${w.n}" data-series="real"></circle>`;
+    const fillStyle = hasSeverity ? ` style="fill:${proSeverityColor(w.promedio, ind.meta)}"` : '';
+    return `<circle class="tr-dot-real" cx="${x}" cy="${y}" r="4"${fillStyle} data-week="${escapeHtml(w.label)}" data-key="${escapeHtml(w.key)}" data-val="${w.promedio.toFixed(1)}" data-n="${w.n}" data-series="real"></circle>`;
   }).join('');
   const dotsComp = hasComp ? weeks.filter(w=>w.compromiso!=null).map(w=>{
     const i = weeks.indexOf(w);
     const [x,y] = [xFor(i), yFor(w.compromiso)];
-    return `<circle class="tr-dot-comp" cx="${x}" cy="${y}" r="3.5" data-week="${escapeHtml(w.label)}" data-key="${escapeHtml(w.key)}" data-val="${w.compromiso.toFixed(1)}" data-n="${w.n}" data-series="comp"></circle>`;
+    return `<circle class="tr-dot-comp" cx="${x}" cy="${y}" r="4" data-week="${escapeHtml(w.label)}" data-key="${escapeHtml(w.key)}" data-val="${w.compromiso.toFixed(1)}" data-n="${w.n}" data-series="comp"></circle>`;
   }).join('') : '';
 
   const legendSvg = hasComp
     ? `<div class="trend-legend"><span class="lg-item"><span class="lg-swatch"></span>Real</span><span class="lg-item"><span class="lg-swatch dashed"></span>Comprometido (plazo pactado en la OC)</span></div>`
-    : '';
+    : (hasSeverity
+      ? `<div class="trend-legend"><span class="lg-item"><span class="lg-dot" style="background:#0ca30c"></span>Dentro / cerca de la meta</span><span class="lg-item"><span class="lg-dot" style="background:#e2960a"></span>Hasta 2x la meta</span><span class="lg-item"><span class="lg-dot" style="background:#d03b3b"></span>Más de 2x la meta</span></div>`
+      : '');
 
   const zoomBar = zoomed
     ? `<div class="trend-zoombar"><span>🔍 Zoom: ${escapeHtml(weeks[0].label)} – ${escapeHtml(weeks[weeks.length-1].label)}</span><a href="#" id="trendZoomReset">↺ Ver todas las semanas</a></div>`
@@ -2797,37 +2823,6 @@ function drawKpiCards(){
       drawProceso();
       openDrilldownForIndicator(ind);
     });
-  });
-}
-
-function drawSummaryTable(){
-  const rows = filteredProcesoRows();
-  const summaries = INDICATORS.map(ind=>({ ind, st: aggStatsForIndicator(rows, ind) }));
-  let worstProm=null, worstCumple=null, worstOut=null;
-  for(const s of summaries){
-    if(s.st.promedio!=null && (worstProm==null || s.st.promedio>worstProm.st.promedio)) worstProm = s;
-    if(s.st.cumplePct!=null && (worstCumple==null || s.st.cumplePct<worstCumple.st.cumplePct)) worstCumple = s;
-    if(s.st.cumpleDenom>0 && (worstOut==null || s.st.noCumpleN>worstOut.st.noCumpleN)) worstOut = s;
-  }
-  const table = document.getElementById('tableProcesoResumen');
-  table.querySelector('thead').innerHTML = '<tr><th>Etapa</th><th>Responsable</th><th>Promedio</th><th>Meta</th><th>Cumplimiento</th></tr>';
-  table.querySelector('tbody').innerHTML = summaries.map(s=>{
-    const ind = s.ind, st = s.st;
-    const tags = [];
-    if(worstProm===s) tags.push('<span class="hl-tag">⚠ mayor promedio</span>');
-    if(worstCumple===s) tags.push('<span class="hl-tag">⚠ menor cumplimiento</span>');
-    if(worstOut===s) tags.push('<span class="hl-tag">⚠ más fuera de meta</span>');
-    const metaTxt = ind.key==='d4' ? 'Según OC' : (ind.meta!=null ? ind.meta+' d.h.' : '—');
-    return `<tr class="${tags.length?'hl-row':''}" data-ind="${ind.key}" style="cursor:pointer;">
-      <td>${ind.num}. ${ind.stage}${tags.join('')}</td>
-      <td><span class="chip ${AREA_CHIP_CLASS[ind.area]}">${ind.areaLabel}</span></td>
-      <td${worstProm===s?' class="hl-worst"':''}>${st.promedio==null?'—':st.promedio.toFixed(1)+' d.h.'}</td>
-      <td>${metaTxt}</td>
-      <td${worstCumple===s?' class="hl-worst"':''}>${st.cumplePct==null?'—':st.cumplePct.toFixed(0)+'%'}</td>
-    </tr>`;
-  }).join('');
-  table.querySelectorAll('tbody tr').forEach(tr=>{
-    tr.addEventListener('click', ()=>{ selectedIndicatorKey = tr.dataset.ind; drawProceso(); });
   });
 }
 
