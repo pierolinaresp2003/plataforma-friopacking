@@ -185,8 +185,7 @@
   .trend-zoombar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--ink-soft);margin:0 0 4px;}
   .trend-zoombar-hint{opacity:.7;}
   .trend-zoombar a{color:var(--brand-ink);font-weight:700;text-decoration:none;flex-shrink:0;}
-  .trend-svg .tr-zoom-overlay{fill:transparent;cursor:crosshair;}
-  .trend-svg .tr-zoom-selection{fill:var(--brand-2-dark);opacity:.12;stroke:var(--brand-2-dark);stroke-width:1;}
+  .trend-svg .tr-zoom-overlay{fill:transparent;cursor:zoom-in;}
   .trend-tooltip b{color:var(--ink);}
   .trend-svg{display:block;overflow:visible;max-width:100%;}
   .trend-svg .tr-grid{stroke:var(--border);stroke-width:1;}
@@ -212,6 +211,16 @@
   .proc-kpi .proc-headline.muted{color:var(--muted);}
   .proc-kpi .proc-caption{font-size:11.5px;color:var(--ink-soft);margin-top:6px;}
   .proc-kpi .proc-foot{margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .gasto-origen-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px;}
+  @media (max-width:640px){ .gasto-origen-grid{grid-template-columns:1fr;} }
+  .gasto-crumb{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;margin-bottom:14px;color:var(--ink-soft);}
+  .gasto-crumb .crumb-link{color:var(--brand-ink);font-weight:700;cursor:pointer;}
+  .gasto-crumb .crumb-link:hover{text-decoration:underline;}
+  .gasto-crumb .crumb-sep{color:var(--muted);}
+  .gasto-crumb .crumb-current{color:var(--ink);font-weight:700;}
+  .bar-row.clickable{cursor:pointer;}
+  .bar-row.clickable:hover .bar-label{color:var(--brand-ink);}
+  .moneda-tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--ink-soft);margin-right:3px;}
   .pill.muted{background:var(--surface-2);color:var(--ink-soft);}
 
   .summary-table td.hl-worst{background:var(--red-bg);}
@@ -245,7 +254,6 @@
     <div class="navitem active" data-section="proceso">🕐 Tiempos del Proceso de Atención</div>
     <div class="navitem" data-section="gasto">💰 Concentración de Gasto</div>
     <div class="navitem" data-section="alertas">⚠️ Alertas de Atención</div>
-    <div class="navitem" data-section="compras">📦 Reporte Semanal de Compras</div>
   </nav>
   <div class="sidebar-foot">Grupo Friopacking<br>Logística</div>
 </aside>
@@ -376,14 +384,11 @@
         <button class="btn secondary" id="btnProImgGasto" type="button">📱 Resumen para compartir</button>
         <button class="btn secondary" id="btnImgGasto" type="button">🖼️ Generar imagen del módulo</button>
       </div>
-      <div class="kpi-grid" id="kpiGridGasto"></div>
       <div class="note" id="gastoDefNote"></div>
+      <div class="gasto-origen-grid" id="gastoOrigenGrid"></div>
+      <div class="gasto-crumb" id="gastoBreadcrumb"></div>
       <div class="toolbar">
-        <input type="search" id="searchGasto" placeholder="Buscar proveedor o familia...">
-        <select id="groupByGasto">
-          <option value="proveedor">Agrupar por proveedor</option>
-          <option value="familia">Agrupar por familia de producto</option>
-        </select>
+        <input type="search" id="searchGasto" placeholder="Buscar...">
         <select id="filterGastoAnio"><option value="all">Todos los años</option></select>
         <select id="filterGastoMes">
           <option value="all">Todos los meses</option>
@@ -407,7 +412,8 @@
           <option value="resto">Solo el 20% restante</option>
         </select>
       </div>
-      <div class="card" style="padding:18px 20px 8px;margin-bottom:18px;">
+      <div class="kpi-grid" id="kpiGridGasto"></div>
+      <div class="card" style="padding:18px 20px 8px;margin-bottom:18px;" id="chartGastoCard">
         <div id="chartGasto"></div>
       </div>
       <div class="table-card card"><table id="tableGasto"><thead></thead><tbody></tbody></table></div>
@@ -458,59 +464,6 @@
         <table id="tableAlertaPedido" class="summary-table"><thead></thead><tbody></tbody></table>
       </div>
     </div><!-- /section-alertas -->
-
-    <div id="section-compras" class="section">
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
-        <button class="btn secondary" id="btnProImgCompras" type="button">📱 Resumen para compartir</button>
-        <button class="btn secondary" id="btnImgCompras" type="button">🖼️ Generar imagen del módulo</button>
-      </div>
-      <div class="note" id="comprasDefNote" style="margin-bottom:14px;"></div>
-      <div class="toolbar">
-        <select id="filterComprasAnio"><option value="all">Todos los años</option></select>
-        <select id="filterComprasMes">
-          <option value="all">Todos los meses</option>
-          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
-          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
-          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
-          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
-        </select>
-        <select id="filterComprasSemana"><option value="all">Todas las semanas</option></select>
-      </div>
-
-      <h3 style="margin:6px 0 6px;font-size:15px;color:var(--ink);">Compras por semana: Nacional vs. Importado</h3>
-      <div class="kpi-grid" id="kpiGridCompras"></div>
-      <div class="card" style="padding:18px 20px 8px;margin:18px 0;">
-        <div id="chartComprasSemana"></div>
-      </div>
-      <div class="table-card card" style="margin-bottom:24px;">
-        <table id="tableComprasSemana" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
-
-      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Formas de pago</h3>
-      <div class="toolbar">
-        <input type="search" id="searchFormaPago" placeholder="Buscar forma de pago...">
-      </div>
-      <div class="card" style="padding:18px 20px 8px;margin-bottom:18px;">
-        <div id="chartFormaPago"></div>
-      </div>
-      <div class="table-card card" style="margin-bottom:24px;">
-        <table id="tableFormaPago" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
-
-      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Ranking de compradores</h3>
-      <div class="toolbar">
-        <input type="search" id="searchRankingCompradores" placeholder="Buscar comprador...">
-      </div>
-      <div class="table-card card" style="margin-bottom:24px;">
-        <table id="tableRankingCompradores" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
-
-      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Cierre de requerimientos</h3>
-      <div class="kpi-grid" id="kpiGridCierre"></div>
-      <div class="table-card card" style="margin-top:18px;">
-        <table id="tableCierreSemana" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
-    </div><!-- /section-compras -->
 
   </div>
 
@@ -777,29 +730,24 @@ function buildSnapshot(){
         tp: a.tipo, py: a.proyecto, pr: a.producto, ip: a.idProducto, pv: a.proveedor, og: a.origen,
         cr: a.codRequerimiento, cp: a.codPedido, rp: a.responsable, fd: isoDay(a.fDesde),
       })),
-      // Cierre de requerimientos (Reporte Semanal de Compras, 02.09.2026): registros livianos de
-      // projectRows (existía en el código desde antes, sin usar, para "Cumplimiento por Proyecto") con
-      // los campos agregados para poder agrupar por semana y nacional/importado sin volver a subir el Excel.
-      cierre: (DATA.projectRows||[]).map(p => ({
-        py: p.proyecto, ar: p.archivado, ce: p.entregado, og: p.origen, fr: isoDay(p.fReq),
-      })),
     },
+    // gastoSchemaVersion sube a 2 el 03.09.2026 con la reestructuración de Concentración de Gasto
+    // (Nacional/Importado -> Familia -> Subfamilia -> Proveedor, con moneda y forma de pago). Un
+    // snapshot viejo (< 2) solo trae pv/fa/a/m/d/mo — loadFromSnapshot rellena og/sf/mn/cb con
+    // valores por defecto para que igual se pueda ver (todo bajo "nacional", sin desglose de moneda
+    // ni forma de pago) en vez de romperse.
+    gastoSchemaVersion: 2,
     gasto: GASTO_DATA ? {
       filename: GASTO_DATA.filename,
       totalRows: GASTO_DATA.totalRows,
       excluded: GASTO_DATA.excluded,
-      // registros livianos (claves cortas) para que quien vea el snapshot pueda seguir filtrando por
-      // año/mes/día sin tener que volver a subir Consulta.xlsx — el archivo puede tener decenas de
-      // miles de filas históricas, así que solo se publican los 5 campos que hacen falta para esto.
-      rows: GASTO_DATA.rows.map(r => ({ pv: r.proveedor, fa: r.familia, a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100 })),
-    } : null,
-    // Reporte Semanal de Compras (02.09.2026): hoja "R.EOC" de Consulta.xlsx, publicada aparte de
-    // "gasto" (que usa la hoja "Consulta") porque son dos fuentes distintas del mismo archivo.
-    reoc: REOC_DATA ? {
-      filename: REOC_DATA.filename,
-      totalRows: REOC_DATA.totalRows,
-      excluded: REOC_DATA.excluded,
-      rows: REOC_DATA.rows.map(r => ({ a: r.anio, m: r.mes, sm: r.semana, og: r.origen, fp: r.formaPago, mo: Math.round(r.montoPEN*100)/100 })),
+      // registros livianos (claves cortas) para que quien vea el snapshot pueda seguir filtrando y
+      // haciendo el mismo drill-down (Nacional/Importado > Familia > Subfamilia > Proveedor) sin tener
+      // que volver a subir Consulta.xlsx — el archivo puede tener decenas de miles de filas históricas.
+      rows: GASTO_DATA.rows.map(r => ({
+        pv: r.proveedor, fa: r.familia, sf: r.subfamilia, og: r.origen, mn: r.moneda, cb: r.creditoBucket,
+        a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100,
+      })),
     } : null,
   };
 }
@@ -902,12 +850,7 @@ function loadFromSnapshot(snap){
     totalRows: snap.totalRows || 0,
     hasFechaRequerimientoCol: !!(snap.proceso && snap.proceso.hasFechaRequerimientoCol),
     orders: [], // no se usa en modo snapshot
-    // Un snapshot publicado ANTES del 02.09.2026 no trae "proceso.cierre" — queda vacío en ese caso
-    // (el módulo de Reporte Semanal de Compras simplemente no muestra el bloque de cierre hasta que
-    // se vuelva a publicar con el archivo actual).
-    projectRows: (snap.proceso && snap.proceso.cierre) ? snap.proceso.cierre.map(p => ({
-      proyecto: p.py, archivado: p.ar, entregado: p.ce, origen: p.og || 'nacional', fReq: fromIsoDay(p.fr),
-    })) : [],
+    projectRows: [], // no se usa en modo snapshot (dormant, ver processWorkbook)
     proveedorOrders: [], // idem
     procesoRows: (snap.proceso && snap.proceso.rows) ? snap.proceso.rows.map(r => ({
       proyecto: r.py, producto: r.pr, idProducto: r.ip, familia: r.fa, proveedor: r.pv,
@@ -938,19 +881,17 @@ function loadFromSnapshot(snap){
     filename: snap.gasto.filename,
     totalRows: snap.gasto.totalRows || 0,
     excluded: snap.gasto.excluded || 0,
-    rows: snap.gasto.rows.map(r => ({ proveedor: r.pv, familia: r.fa, anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo })),
-  } : null;
-  // "reoc" no existe en snapshots publicados antes del 02.09.2026 — el Reporte Semanal de Compras
-  // simplemente queda vacío (sin errores) hasta que se vuelva a publicar con el archivo actual.
-  REOC_DATA = (snap.reoc && snap.reoc.rows) ? {
-    fromSnapshot: true,
-    filename: snap.reoc.filename,
-    totalRows: snap.reoc.totalRows || 0,
-    excluded: snap.reoc.excluded || 0,
-    rows: snap.reoc.rows.map(r => ({ anio: r.a, mes: r.m, semana: r.sm, origen: r.og || 'nacional', formaPago: r.fp, montoPEN: r.mo })),
+    // snapshot viejo (gastoSchemaVersion < 2, antes de la reestructuración del 03.09.2026): og/sf/mn/cb
+    // no existen — se rellenan con valores por defecto (todo "nacional", sin subfamilia/moneda/forma de
+    // pago) para que el módulo siga mostrando algo en vez de romperse; no hay forma de reconstruir esos
+    // datos sin volver a procesar el Consulta.xlsx original.
+    rows: snap.gasto.rows.map(r => ({
+      proveedor: r.pv, familia: r.fa, subfamilia: r.sf || "Sin subfamilia", origen: r.og || "nacional",
+      moneda: r.mn || null, creditoBucket: r.cb || "Sin dato",
+      anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo,
+    })),
   } : null;
   populateGastoAnios();
-  populateComprasAnios();
   populateProcesoFilters();
   setStatus("Viendo datos publicados de " + (snap.filename || "un archivo") + ".", "ok");
   // El aviso "estás viendo la última versión publicada" ya no se muestra (a pedido de Piero,
@@ -1052,11 +993,12 @@ document.getElementById('fileInput').addEventListener('change', async function(e
       maestroOk = res.ok;
       setFileState('maestro', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
     } else if(sig && sig.key === 'consulta'){
+      // R.EOC (forma de pago) se procesa primero: vive en el mismo Consulta.xlsx (hoja aparte), y
+      // processConsulta la necesita ya cargada (FORMAPAGO_MAP) para poder resolver la forma de pago de
+      // cada línea de "Consulta" por su Documento. Si la hoja no está, no se rompe nada: Concentración
+      // de Gasto simplemente muestra "sin dato" en forma de pago hasta que se cargue un archivo que la tenga.
+      const resReoc = processREOCFormaPago(wb, file.name);
       const res = processConsulta(wb, file.name);
-      // R.EOC vive en el mismo Consulta.xlsx (hoja aparte) — se procesa en la misma pasada, sin pedir
-      // un archivo nuevo. Si la hoja no está (Consulta.xlsx recortado), no se rompe nada: el Reporte
-      // Semanal de Compras simplemente queda sin ese bloque hasta que se cargue un archivo que sí la tenga.
-      const resReoc = processREOC(wb, file.name);
       const combinedMsg = res.message + (resReoc.ok ? " · " + resReoc.message : " · ⚠ " + resReoc.message);
       setFileState('consulta', res.ok ? '✅' : '❌', combinedMsg, res.ok ? 'ok' : 'err');
     } else if(sig && sig.key === 'pedidosinreq'){
@@ -1395,7 +1337,7 @@ function processPedidoSinReq(wb, filename){
 // mercado EUR. Es una aproximación explícita, confirmada con Piero como forma de arrancar; ajustar acá
 // si se necesita otro valor o una tabla de tipo de cambio por fecha más adelante.
 const TIPO_CAMBIO = { 'US$': 3.375, 'USD': 3.375, '€': 3.90, 'EUR': 3.90 };
-let GASTO_DATA = null; // { rows: [{proveedor, familia, fecha, anio, mes, dia, montoPEN}], excluded, totalRows, filename, fromSnapshot }
+let GASTO_DATA = null; // { rows: [{proveedor, familia, subfamilia, origen, moneda, creditoBucket, fecha, anio, mes, dia, montoPEN}], excluded, totalRows, filename, fromSnapshot }
 
 function processConsulta(wb, filename){
   let sheetName = wb.SheetNames.find(n => n.trim().toLowerCase() === "consulta");
@@ -1417,6 +1359,7 @@ function processConsulta(wb, filename){
 
   const col = {
     origen: findCol(headerRow, ["Origen"]),
+    documento: findCol(headerRow, ["Documento"]),
     estado: findCol(headerRow, ["Estado"]),
     provNombre: findCol(headerRow, ["Proveedor Razon Social","Proveedor Razón Social"]),
     moneda: findCol(headerRow, ["Moneda"]),
@@ -1425,6 +1368,7 @@ function processConsulta(wb, filename){
     precioMN: findCol(headerRow, ["Precio M.N. Unitario Dscto.","Precio M.N. Unitario Dscto"]),
     precioME: findCol(headerRow, ["Precio M.E. Unitario Dscto.","Precio M.E. Unitario Dscto"]),
     grupo: findCol(headerRow, ["Producto Grupo"]),
+    subgrupo: findCol(headerRow, ["Producto SubGrupo"]),
   };
 
   const dataRows = rows.slice(headerRowIdx+1);
@@ -1462,9 +1406,19 @@ function processConsulta(wb, filename){
     const montoPEN = cantidad * precioUnit * tc;
     if(!(montoPEN > 0)){ excluded++; continue; } // líneas sin precio registrado (0) no aportan gasto
 
+    // Documento identifica la orden ("OCO 0001-..." / "OCO 0002-...") y es la llave para: (a) clasificar
+    // Nacional/Importado por su propio prefijo, y (b) cruzar con R.EOC y traer la forma de pago real de
+    // esa orden — ya resuelta acá (no cruda) siguiendo el mismo patrón del resto de la plataforma.
+    const documento = col.documento!==-1 ? (r[col.documento]||"").toString().trim() : "";
+    const formaPagoTexto = formaPagoForDocumento(documento);
+
     gastoRows.push({
       proveedor: col.provNombre!==-1 ? ((r[col.provNombre]||"").toString().trim() || "(sin proveedor)") : "(sin proveedor)",
       familia: col.grupo!==-1 ? ((r[col.grupo]||"").toString().trim() || "Sin familia") : "Sin familia",
+      subfamilia: col.subgrupo!==-1 ? ((r[col.subgrupo]||"").toString().trim() || "Sin subfamilia") : "Sin subfamilia",
+      origen: origenForDocumento(documento),
+      moneda,
+      creditoBucket: creditoBucketFor(formaPagoTexto),
       fecha, montoPEN,
       anio: fecha.getUTCFullYear(), mes: fecha.getUTCMonth()+1, dia: fecha.getUTCDate(),
     });
@@ -1486,111 +1440,77 @@ function processConsulta(wb, filename){
 // abajo). A diferencia de la hoja "Consulta" (que no trae tipo de cambio por línea), R.EOC SÍ trae
 // "Tipocambio" real por orden — se usa ese valor real en vez del tipo de cambio de referencia fijo de
 // Concentración de Gasto, y solo se cae al fijo si esa celda viene vacía o inválida.
-const TIPO_CAMBIO_FALLBACK = { 'Dolares Americanos': 3.375, 'Euros': 3.90 };
-let REOC_DATA = null; // { rows: [{fecha, anio, mes, semana, origen, montoPEN, formaPago}], excluded, totalRows, filename, fromSnapshot }
+// ---------- Forma de pago (hoja "R.EOC", mismo Consulta.xlsx) — usada por Concentración de Gasto ----------
+// R.EOC trae "Forma_pago" en texto libre por orden. Se arma un mapa Documento -> forma de pago para
+// cruzarlo con las líneas de la hoja "Consulta" por su propio campo "Documento" (mismo texto exacto,
+// ej. "OCO 0001-0002110" — verificado contra el archivo real de Piero, 03.09.2026). R.EOC solo cubre
+// órdenes desde 01/01/2026: un Documento de años anteriores simplemente no tiene forma de pago disponible.
+let FORMAPAGO_MAP = null; // Map<Documento, formaPagoTexto> | null
 
-// Nacional/Importado en R.EOC: la columna "Concatenado" trae el mismo prefijo "0001-"/"0002-" ya
-// verificado en Reporte Maestro.xlsx (CodOrden/CodPedido/CodRequerimiento) — 0001 = nacional, 0002 =
-// importado (master-data-fuentes.md, sección 6). No se usa RucProveedor aquí porque R.EOC no lo trae.
-function origenForPrefix(concatenado){
-  const c = (concatenado||"").toString().trim();
-  return c.startsWith('0002') ? 'importado' : 'nacional';
-}
-
-function processREOC(wb, filename){
+function processREOCFormaPago(wb, filename){
   const sheetName = wb.SheetNames.find(n => n.trim().toLowerCase() === "r.eoc");
   if(!sheetName){
-    REOC_DATA = null;
-    return { ok:false, message: 'no encontré la hoja "R.EOC" en este archivo — el Reporte Semanal de Compras necesita esa hoja además de "Consulta".' };
+    FORMAPAGO_MAP = null;
+    return { ok:false, message: 'no encontré la hoja "R.EOC" — el detalle de forma de pago en Concentración de Gasto no va a estar disponible.' };
   }
   const sheet = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
-
-  // Columnas reales verificadas contra el archivo de Piero (02.09.2026): Concatenado, Idunico,
-  // Idsucursal, Idalmacen, Iddocumento, Total, Idclieprov, Fecha, Documento, Idestado, Suc_dsc,
-  // Alm_dsc, Razon_social, Est_dsc, Mon_dsc, Nro_manual, Nota, Order_confirmation, Idarea, Area_dsc,
-  // Idresponsable, Resp_dsc, Diferenciafechae, F_aprobado, Idusuarioc, Color, Tipocambio, Forma_pago, Enviado.
-  const NEEDED = ["Concatenado","Total","Fecha","Est_dsc","Mon_dsc","Forma_pago"];
+  const NEEDED = ["Documento","Forma_pago"];
   let headerRowIdx = -1, headerRow = null;
   for(let i=0;i<Math.min(15, rows.length); i++){
     const row = rows[i] || [];
     const strs = row.map(c => (c||"").toString().trim().toLowerCase());
     const hits = NEEDED.filter(n => strs.includes(n.toLowerCase())).length;
-    if(hits >= 4){ headerRowIdx = i; headerRow = row; break; }
+    if(hits >= 2){ headerRowIdx = i; headerRow = row; break; }
   }
   if(headerRowIdx === -1){
-    REOC_DATA = null;
+    FORMAPAGO_MAP = null;
     return { ok:false, message: 'encontré la hoja "R.EOC" pero no reconocí sus columnas en las primeras 15 filas.' };
   }
-
-  const col = {
-    concatenado: findCol(headerRow, ["Concatenado"]),
-    total: findCol(headerRow, ["Total"]),
-    fecha: findCol(headerRow, ["Fecha"]),
-    estado: findCol(headerRow, ["Est_dsc"]),
-    moneda: findCol(headerRow, ["Mon_dsc"]),
-    tipocambio: findCol(headerRow, ["Tipocambio"]),
-    formaPago: findCol(headerRow, ["Forma_pago"]),
-  };
-
-  const dataRows = rows.slice(headerRowIdx+1);
-  let totalRows = 0, excluded = 0;
-  const reocRows = [];
-
-  for(const r of dataRows){
+  const col = { documento: findCol(headerRow, ["Documento"]), formaPago: findCol(headerRow, ["Forma_pago"]) };
+  const map = new Map();
+  for(const r of rows.slice(headerRowIdx+1)){
     if(!r || r.every(c => c==null || c==="")) continue;
-    const concatenado = col.concatenado!==-1 ? (r[col.concatenado]||"").toString().trim() : "";
-    if(!concatenado) continue;
-    totalRows++;
-
-    // Mismo criterio ya usado en Concentración de Gasto: Atendido (Total/Parcial) + Aprobado, se
-    // excluye Pendiente/Anulado/Rechazado/Archivado (no son gasto real todavía o no se concretaron).
-    const estado = col.estado!==-1 ? (r[col.estado]||"").toString().trim() : "";
-    if(!["Atendido Total","Atendido Parcial","Aprobado"].includes(estado)){ excluded++; continue; }
-
-    const fecha = col.fecha!==-1 ? parseExcelDate(r[col.fecha]) : null;
-    if(!fecha){ excluded++; continue; }
-
-    const total = col.total!==-1 ? Number(r[col.total]) : null;
-    if(total == null || isNaN(total)){ excluded++; continue; }
-
-    const moneda = col.moneda!==-1 ? (r[col.moneda]||"").toString().trim() : "";
-    let tc;
-    if(moneda === "Soles"){
-      tc = 1;
-    } else {
-      const tcReal = col.tipocambio!==-1 ? Number(r[col.tipocambio]) : null;
-      if(tcReal && tcReal > 0){
-        tc = tcReal; // tipo de cambio real de esa orden puntual, más preciso que el fijo de referencia
-      } else if(TIPO_CAMBIO_FALLBACK[moneda] != null){
-        tc = TIPO_CAMBIO_FALLBACK[moneda]; // solo si la celda de Tipocambio vino vacía/inválida
-      } else {
-        excluded++; continue; // moneda no reconocida
-      }
-    }
-    const montoPEN = total * tc;
-
-    reocRows.push({
-      fecha, montoPEN,
-      anio: fecha.getUTCFullYear(), mes: fecha.getUTCMonth()+1,
-      semana: weekKeyFor(fecha),
-      origen: origenForPrefix(concatenado),
-      formaPago: col.formaPago!==-1 ? ((r[col.formaPago]||"").toString().trim() || "(sin forma de pago)") : "(sin forma de pago)",
-    });
+    const doc = col.documento!==-1 ? (r[col.documento]||"").toString().trim() : "";
+    if(!doc) continue;
+    const fp = col.formaPago!==-1 ? (r[col.formaPago]||"").toString().trim() : "";
+    if(fp) map.set(doc, fp);
   }
-
-  REOC_DATA = { fromSnapshot:false, rows: reocRows, excluded, totalRows, filename };
-  populateComprasAnios();
-  render();
-
-  if(reocRows.length === 0){
-    return { ok:false, message: 'encontré la hoja "R.EOC" pero ninguna línea cumplió los criterios (Atendido/Aprobado, con moneda reconocida).' };
-  }
-  return { ok:true, message: "Reporte Semanal: " + reocRows.length.toLocaleString('es-PE') + " líneas de OC válidas (de " + totalRows.toLocaleString('es-PE') + ")" + (excluded ? " · " + excluded.toLocaleString('es-PE') + " excluidas" : "") + "." };
+  FORMAPAGO_MAP = map;
+  return { ok:true, message: map.size.toLocaleString('es-PE') + " formas de pago reconocidas (desde 2026)." };
 }
 
-function getReocRows(){
-  return (REOC_DATA && REOC_DATA.rows) || [];
+function formaPagoForDocumento(documento){
+  if(!FORMAPAGO_MAP) return null;
+  return FORMAPAGO_MAP.get((documento||"").toString().trim()) || null;
+}
+
+// Clasifica el texto libre de Forma_pago en los 4 buckets pedidos por Piero (03.09.2026) + un 5º
+// "Otra forma de pago" para lo que no encaja limpio en ninguno (anticipos con % mixto, "a tratar",
+// textos sin días especificados) — decisión de Claude, señalada a Piero: verificado contra el archivo
+// real, cubre a la gran mayoría de las órdenes con forma de pago registrada en los 4 buckets pedidos;
+// el resto (anticipos parciales, "a tratar", etc.) no tiene un número de días de crédito limpio que
+// forzar en un bucket sin inventar una regla — por eso se muestran aparte.
+function creditoBucketFor(formaPagoTexto){
+  const t = (formaPagoTexto || "").toUpperCase();
+  if(!t) return "Sin dato";
+  if(t.includes("ANTICIPO") || t.includes("%")) return "Otra forma de pago";
+  if(t.includes("CONTADO") || t.includes("CONTRA ENTREGA")) return "Contado";
+  const m = t.match(/(\d+)\s*D[IÍ]AS/);
+  if(m){
+    const n = parseInt(m[1], 10);
+    if(n <= 30) return "Crédito 0-30 días";
+    if(n <= 60) return "Crédito 30-60 días";
+    return "Crédito 60+ días";
+  }
+  return "Otra forma de pago";
+}
+
+// Nacional/Importado: el campo "Documento" de la hoja "Consulta" trae el mismo prefijo "0001-"/"0002-"
+// ya verificado en Reporte Maestro.xlsx y R.EOC (0001 = nacional, 0002 = importado — master-data-
+// fuentes.md, sección 6; re-verificado contra Consulta.xlsx el 03.09.2026: "OCO 0001-..."/"OCO 0002-...").
+function origenForDocumento(documento){
+  return /0002-/.test((documento||"").toString()) ? 'importado' : 'nacional';
 }
 
 function getGastoRows(){
@@ -1615,14 +1535,17 @@ function filteredGastoRows(){
   if(semana !== 'all') rows = rows.filter(r=>weekKeyFor(dateFromYMD(r.anio, r.mes, r.dia))===semana);
   return rows;
 }
-function buildGastoAgg(groupKey, rows){
+// Agregador genérico: agrupa `rows` por lo que devuelva `labelFn`, calcula Pareto 80/20 sobre el
+// monto, y conserva las filas crudas de cada grupo (g.rows) — el nivel Proveedor las necesita para
+// desglosar moneda y forma de pago sin tener que re-filtrar desde cero.
+function buildGastoAgg(rows, labelFn){
   const groups = {};
   for(const r of rows){
-    const key = groupKey === 'familia' ? (r.familia || "Sin familia") : (r.proveedor || "(sin proveedor)");
+    const key = labelFn(r) || "(sin dato)";
     (groups[key] = groups[key] || []).push(r);
   }
   const agg = Object.entries(groups).map(([label, g])=>({
-    label, n: g.length, monto: g.reduce((s,r)=>s+r.montoPEN,0),
+    label, n: g.length, monto: g.reduce((s,r)=>s+r.montoPEN,0), rows: g,
   }));
   agg.sort((a,b)=>b.monto-a.monto);
   const total = agg.reduce((s,g)=>s+g.monto,0);
@@ -1639,10 +1562,81 @@ function buildGastoAgg(groupKey, rows){
 function fmtPEN(n){
   return 'S/ ' + Math.round(n).toLocaleString('es-PE');
 }
+function monedaLabel(m){
+  const t = (m||'').toString().trim();
+  if(t === 'S/.' || t === 'S/' || t === 'PEN') return 'S/';
+  if(t === 'US$' || t === 'USD' || t === '$') return 'US$';
+  if(t === '€' || t === 'EUR') return '€';
+  return t || '—';
+}
+// Estado de navegación del módulo (no se guarda en snapshot — cada quien que vea el link empieza en
+// Nacional sin drill, como al cargar el Excel). origen -> familia -> subfamilia -> proveedor.
+let gastoState = { origen: 'nacional', familia: null, subfamilia: null };
+function gastoRowsInScope(rows){
+  let r = rows.filter(x=>x.origen===gastoState.origen);
+  if(gastoState.familia!=null) r = r.filter(x=>x.familia===gastoState.familia);
+  if(gastoState.subfamilia!=null) r = r.filter(x=>x.subfamilia===gastoState.subfamilia);
+  return r;
+}
+function renderGastoOrigenGrid(rows){
+  const nacionalRows = rows.filter(r=>r.origen==='nacional');
+  const importadoRows = rows.filter(r=>r.origen==='importado');
+  const totalNacional = nacionalRows.reduce((s,r)=>s+r.montoPEN,0);
+  const totalImportado = importadoRows.reduce((s,r)=>s+r.montoPEN,0);
+  const totalAll = totalNacional + totalImportado;
+  const card = (key, label, icon, monto, n)=>{
+    const pct = totalAll>0 ? (monto/totalAll*100) : 0;
+    const selected = gastoState.origen===key ? ' selected' : '';
+    return `<div class="card proc-kpi${selected}" data-origen="${key}">
+      <div class="proc-kpi-top"><span class="proc-num">${icon}</span><span class="pill muted">${pct.toFixed(0)}% del total</span></div>
+      <div class="proc-name">Gasto ${label}</div>
+      <div class="proc-headline">${fmtPEN(monto)}</div>
+      <div class="proc-caption">${n.toLocaleString('es-PE')} líneas de compra</div>
+    </div>`;
+  };
+  const grid = document.getElementById('gastoOrigenGrid');
+  grid.innerHTML = card('nacional','Nacional','🇵🇪', totalNacional, nacionalRows.length)
+    + card('importado','Importado','🌎', totalImportado, importadoRows.length);
+  grid.querySelectorAll('.proc-kpi').forEach(c=>{
+    c.addEventListener('click', ()=>{
+      const key = c.dataset.origen;
+      if(gastoState.origen !== key){
+        gastoState = { origen: key, familia: null, subfamilia: null };
+      }
+      drawGasto();
+    });
+  });
+}
+function renderGastoBreadcrumb(){
+  const el = document.getElementById('gastoBreadcrumb');
+  const origenLabel = gastoState.origen === 'nacional' ? '🇵🇪 Nacional' : '🌎 Importado';
+  let html = gastoState.familia
+    ? `<span class="crumb-link" data-level="origen">${origenLabel}</span>`
+    : `<span class="crumb-current">${origenLabel}</span>`;
+  if(gastoState.familia){
+    html += `<span class="crumb-sep">›</span>`;
+    html += gastoState.subfamilia
+      ? `<span class="crumb-link" data-level="familia">${gastoState.familia}</span>`
+      : `<span class="crumb-current">${gastoState.familia}</span>`;
+  }
+  if(gastoState.subfamilia){
+    html += `<span class="crumb-sep">›</span><span class="crumb-current">${gastoState.subfamilia}</span>`;
+  }
+  el.innerHTML = html;
+  el.querySelectorAll('.crumb-link').forEach(link=>{
+    link.addEventListener('click', ()=>{
+      if(link.dataset.level==='origen'){ gastoState.familia=null; gastoState.subfamilia=null; }
+      else if(link.dataset.level==='familia'){ gastoState.subfamilia=null; }
+      drawGasto();
+    });
+  });
+}
 let gastoListenersBound = false;
 function renderGasto(){
   const hasData = GASTO_DATA && GASTO_DATA.rows && GASTO_DATA.rows.length > 0;
   if(!hasData){
+    document.getElementById('gastoOrigenGrid').innerHTML = '';
+    document.getElementById('gastoBreadcrumb').innerHTML = '';
     document.getElementById('kpiGridGasto').innerHTML = '';
     document.getElementById('gastoDefNote').innerHTML = GASTO_DATA
       ? '<b>No se pudo calcular este indicador:</b> no encontré líneas de Orden de Compra válidas en la hoja "Consulta" (revisa Estado, Moneda, Producto Cantidad y Precio Unitario).'
@@ -1654,7 +1648,6 @@ function renderGasto(){
   }
   if(!gastoListenersBound){
     document.getElementById('searchGasto').addEventListener('input', drawGasto);
-    document.getElementById('groupByGasto').addEventListener('change', drawGasto);
     document.getElementById('filterGastoAnio').addEventListener('change', drawGasto);
     document.getElementById('filterGastoMes').addEventListener('change', drawGasto);
     document.getElementById('filterGastoSemana').addEventListener('change', drawGasto);
@@ -1667,17 +1660,23 @@ function renderGasto(){
 }
 function drawGasto(){
   populateSemanaSelect(document.getElementById('filterGastoSemana'), document.getElementById('filterGastoAnio').value, document.getElementById('filterGastoMes').value);
-  document.getElementById('gastoDefNote').innerHTML = `<b>Qué cuenta como gasto:</b> solo líneas de <b>Órdenes de Compra</b> (no Órdenes de Servicio) con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> — se excluye lo Pendiente (aún sin aprobar). Monto = Cantidad × Precio Unitario con descuento, en la moneda de cada línea, convertido a Soles con un tipo de cambio de referencia fijo (US$ = S/ ${TIPO_CAMBIO['US$'].toFixed(3)}, € = S/ ${TIPO_CAMBIO['€'].toFixed(2)}, tomados el 01.09.2026) — es una aproximación, no el tipo de cambio real de cada operación histórica. El <b>80% principal (Pareto)</b> son los proveedores (o familias) que, ordenados de mayor a menor gasto, acumulan el 80% del gasto total del período filtrado.`;
+  document.getElementById('gastoDefNote').innerHTML = `<b>Qué cuenta como gasto:</b> solo líneas de <b>Órdenes de Compra</b> (no Órdenes de Servicio) con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> — se excluye lo Pendiente (aún sin aprobar). Monto = Cantidad × Precio Unitario con descuento, en la moneda de cada línea, convertido a Soles con un tipo de cambio de referencia fijo (US$ = S/ ${TIPO_CAMBIO['US$'].toFixed(3)}, € = S/ ${TIPO_CAMBIO['€'].toFixed(2)}, tomados el 01.09.2026) — es una aproximación, no el tipo de cambio real de cada operación histórica. <b>Nacional/Importado</b> se toma del propio código de la orden (Documento). La <b>forma de pago</b> viene de la hoja "R.EOC" (solo cubre órdenes desde 01.01.2026) — lo que no tiene un número de días de crédito claro (anticipos parciales, "a tratar", etc.) o no tiene forma de pago registrada se agrupa en "Otra / sin dato". El <b>80% principal (Pareto)</b> son los ítems que, ordenados de mayor a menor gasto, acumulan el 80% del gasto de ese nivel en el período filtrado.`;
 
   const rows = filteredGastoRows();
-  const groupKey = document.getElementById('groupByGasto').value;
-  const { agg, total } = buildGastoAgg(groupKey, rows);
+  renderGastoOrigenGrid(rows);
+  renderGastoBreadcrumb();
+
+  const scoped = gastoRowsInScope(rows);
+  const level = gastoState.subfamilia ? 'proveedor' : (gastoState.familia ? 'subfamilia' : 'familia');
+  const labelFn = level==='familia' ? (r=>r.familia) : level==='subfamilia' ? (r=>r.subfamilia) : (r=>r.proveedor);
+  const { agg, total } = buildGastoAgg(scoped, labelFn);
   const nTop80 = agg.filter(g=>g.top80).length;
+  const levelNoun = level==='familia' ? 'Familias' : level==='subfamilia' ? 'Subfamilias' : 'Proveedores';
 
   document.getElementById('kpiGridGasto').innerHTML = `
-    <div class="card kpi"><div class="label">Gasto total (período filtrado)</div><div class="value">${fmtPEN(total)}</div><div class="sub">${rows.length.toLocaleString('es-PE')} líneas</div></div>
-    <div class="card kpi"><div class="label">${groupKey==='familia'?'Familias':'Proveedores'} con compras</div><div class="value">${agg.length.toLocaleString('es-PE')}</div></div>
-    <div class="card kpi"><div class="label">${groupKey==='familia'?'Familias':'Proveedores'} en el 80% principal</div><div class="value">${nTop80.toLocaleString('es-PE')}</div><div class="sub">${agg.length ? (nTop80/agg.length*100).toFixed(0) : 0}% de ${agg.length.toLocaleString('es-PE')} concentra el 80% del gasto</div></div>
+    <div class="card kpi"><div class="label">Gasto en este nivel (período filtrado)</div><div class="value">${fmtPEN(total)}</div><div class="sub">${scoped.length.toLocaleString('es-PE')} líneas</div></div>
+    <div class="card kpi"><div class="label">${levelNoun} con compras</div><div class="value">${agg.length.toLocaleString('es-PE')}</div></div>
+    <div class="card kpi"><div class="label">${levelNoun} en el 80% principal</div><div class="value">${nTop80.toLocaleString('es-PE')}</div><div class="sub">${agg.length ? (nTop80/agg.length*100).toFixed(0) : 0}% de ${agg.length.toLocaleString('es-PE')} concentra el 80% del gasto</div></div>
   `;
 
   const q = (document.getElementById('searchGasto').value||"").toLowerCase();
@@ -1687,29 +1686,67 @@ function drawGasto(){
   if(paretoFilter === 'top80') view = view.filter(g=>g.top80);
   if(paretoFilter === 'resto') view = view.filter(g=>!g.top80);
 
+  const drillable = level !== 'proveedor'; // el nivel Proveedor es el final del desglose, ya no se puede seguir bajando
   const maxMonto = view.reduce((m,g)=>g.monto>m?g.monto:m, 0);
-  document.getElementById('chartGasto').innerHTML = view.slice(0,20).map(g=>{
+  document.getElementById('chartGasto').innerHTML = view.slice(0,20).map((g,i)=>{
     const pct = maxMonto>0 ? g.monto/maxMonto*100 : 0;
     const color = g.top80 ? 'var(--seg-a)' : 'var(--track-empty)';
-    return `<div class="bar-row">
+    return `<div class="bar-row${drillable?' clickable':''}" ${drillable?`data-i="${i}"`:''}>
       <div class="bar-label" title="${g.label}">${g.label}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
       <div class="bar-pct" style="width:100px;">${fmtPEN(g.monto)}</div>
     </div>`;
   }).join("") || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
+  if(drillable){
+    document.querySelectorAll('#chartGasto .bar-row.clickable').forEach(elBar=>{
+      elBar.addEventListener('click', ()=>{
+        const label = view[Number(elBar.dataset.i)].label;
+        if(level==='familia') gastoState.familia = label; else gastoState.subfamilia = label;
+        drawGasto();
+      });
+    });
+  }
 
   const table = document.getElementById('tableGasto');
-  const groupLabel = groupKey === 'familia' ? 'Familia' : 'Proveedor';
-  table.querySelector('thead').innerHTML = `<tr><th>${groupLabel}</th><th>Líneas</th><th>Gasto</th><th>% del total</th><th>% acumulado</th><th>Pareto</th></tr>`;
-  table.querySelector('tbody').innerHTML = view.map(g=>`
-    <tr>
-      <td style="white-space:normal;min-width:220px;">${g.label}</td>
-      <td>${g.n.toLocaleString('es-PE')}</td>
-      <td>${fmtPEN(g.monto)}</td>
-      <td>${g.pct.toFixed(1)}%</td>
-      <td>${g.pctAcum.toFixed(1)}%</td>
-      <td>${g.top80 ? '<span class="pill late">80% principal</span>' : '<span class="pill">20% restante</span>'}</td>
-    </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
+  if(level === 'proveedor'){
+    table.querySelector('thead').innerHTML = `<tr><th>Proveedor</th><th>Moneda</th><th>Monto</th><th>Líneas</th><th>Contado</th><th>Créd. 0-30d</th><th>Créd. 30-60d</th><th>Créd. 60+d</th><th>Otra / sin dato</th></tr>`;
+    table.querySelector('tbody').innerHTML = view.map(g=>{
+      const monedas = Array.from(new Set(g.rows.map(r=>monedaLabel(r.moneda))));
+      const buckets = {};
+      for(const r of g.rows) buckets[r.creditoBucket] = (buckets[r.creditoBucket]||0) + r.montoPEN;
+      const otra = (buckets['Otra forma de pago']||0) + (buckets['Sin dato']||0);
+      return `<tr>
+        <td style="white-space:normal;min-width:220px;">${g.label}</td>
+        <td>${monedas.map(m=>`<span class="moneda-tag">${m}</span>`).join('')}</td>
+        <td>${fmtPEN(g.monto)}</td>
+        <td>${g.n.toLocaleString('es-PE')}</td>
+        <td>${buckets['Contado'] ? fmtPEN(buckets['Contado']) : '—'}</td>
+        <td>${buckets['Crédito 0-30 días'] ? fmtPEN(buckets['Crédito 0-30 días']) : '—'}</td>
+        <td>${buckets['Crédito 30-60 días'] ? fmtPEN(buckets['Crédito 30-60 días']) : '—'}</td>
+        <td>${buckets['Crédito 60+ días'] ? fmtPEN(buckets['Crédito 60+ días']) : '—'}</td>
+        <td>${otra ? fmtPEN(otra) : '—'}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="9" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
+  } else {
+    const groupLabel = level === 'familia' ? 'Familia' : 'Subfamilia';
+    table.querySelector('thead').innerHTML = `<tr><th>${groupLabel}</th><th>Líneas</th><th>Gasto</th><th>% del total</th><th>% acumulado</th><th>Pareto</th></tr>`;
+    table.querySelector('tbody').innerHTML = view.map((g,i)=>`
+      <tr data-i="${i}" style="cursor:pointer;">
+        <td style="white-space:normal;min-width:220px;">${g.label} <span style="color:var(--brand-ink);font-size:11px;">🔍 ver ${groupLabel==='Familia'?'subfamilias':'proveedores'}</span></td>
+        <td>${g.n.toLocaleString('es-PE')}</td>
+        <td>${fmtPEN(g.monto)}</td>
+        <td>${g.pct.toFixed(1)}%</td>
+        <td>${g.pctAcum.toFixed(1)}%</td>
+        <td>${g.top80 ? '<span class="pill late">80% principal</span>' : '<span class="pill">20% restante</span>'}</td>
+      </tr>`).join("") || `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:24px;">Sin resultados</td></tr>`;
+    table.querySelectorAll('tbody tr[data-i]').forEach(tr=>{
+      tr.addEventListener('click', ()=>{
+        const label = view[Number(tr.dataset.i)].label;
+        if(level==='familia') gastoState.familia = label; else gastoState.subfamilia = label;
+        drawGasto();
+      });
+    });
+  }
 }
 
 function render(){
@@ -1718,7 +1755,6 @@ function render(){
   renderProceso();
   renderGasto();
   renderAlertas();
-  renderCompras();
 }
 
 // ---------- Alertas de Atención (Req sin Pedido / Pedido sin OC) ----------
@@ -1827,97 +1863,11 @@ function drawAlertas(){
   `;
 }
 
-// ---------- Reporte Semanal de Compras (nacional/importado, formas de pago, ranking de compradores, cierre) ----------
-// Pedido de Piero, 02.09.2026: "reporte semanal de todo lo que compramos (dividir importación y local)
-// identificar la diferencia en eso / identificar las formas de pago / ranking de compradores,
-// cumplimiento / medir de los req cuántos se cerraron". Decisiones confirmadas con Piero antes de
-// programar (AskUserQuestion): medida principal = monto en soles; diferencia = gasto/participación
-// nacional vs. importado; "cerrado" = tiene salida de almacén ("Enviado a Obra" con FechaSalida, o ya
-// "Recibido en Obra" — mismo criterio ya validado para "Cumplimiento por Proyecto", ver projectRows);
-// ranking de compradores = Tiempo de Emisión de OC (Indicador 2) y Tiempo de Entrega de OC (Indicador 4).
-// Colores nacional/importado: --seg-a / --seg-c (categóricos ya usados en la plataforma para distinguir
-// grupos que no son "bueno/malo" — se evita el verde/ámbar/rojo, reservado para semáforos de cumplimiento).
+// Colores nacional/importado (categóricos ya usados en la plataforma para distinguir grupos que no son
+// "bueno/malo" — se evita el verde/ámbar/rojo, reservado para semáforos de cumplimiento). Usado en
+// Concentración de Gasto para los 2 bloques Nacional/Importado.
 const ORIGEN_COLOR = { nacional: 'var(--seg-a)', importado: 'var(--seg-c)' };
 
-function populateComprasAnios(){
-  const sel = document.getElementById('filterComprasAnio');
-  if(!sel) return;
-  const current = sel.value;
-  const anios = new Set(getReocRows().map(r=>r.anio));
-  for(const p of (DATA.projectRows||[])){ if(p.fReq) anios.add(p.fReq.getUTCFullYear()); }
-  const list = Array.from(anios).sort((a,b)=>b-a);
-  sel.innerHTML = '<option value="all">Todos los años</option>' + list.map(a=>`<option value="${a}">${a}</option>`).join("");
-  if(list.map(String).includes(current)) sel.value = current;
-}
-function filteredReocRowsForCompras(){
-  let rows = getReocRows();
-  const anio = document.getElementById('filterComprasAnio').value;
-  const mes = document.getElementById('filterComprasMes').value;
-  const semana = document.getElementById('filterComprasSemana').value;
-  if(anio !== 'all') rows = rows.filter(r=>String(r.anio)===anio);
-  if(mes !== 'all') rows = rows.filter(r=>String(r.mes)===mes);
-  if(semana !== 'all') rows = rows.filter(r=>r.semana===semana); // r.semana ya viene precalculado (ver processREOC)
-  return rows;
-}
-function filteredProjectRowsForCompras(){
-  let rows = (DATA.projectRows||[]).filter(p=>!p.archivado && p.fReq); // activos = total - archivados, mismo criterio que Cumplimiento por Proyecto
-  const anio = document.getElementById('filterComprasAnio').value;
-  const mes = document.getElementById('filterComprasMes').value;
-  const semana = document.getElementById('filterComprasSemana').value;
-  if(anio !== 'all') rows = rows.filter(p=>String(p.fReq.getUTCFullYear())===anio);
-  if(mes !== 'all') rows = rows.filter(p=>String(p.fReq.getUTCMonth()+1)===mes);
-  if(semana !== 'all') rows = rows.filter(p=>weekKeyFor(p.fReq)===semana);
-  return rows;
-}
-// Compras por semana (nacional/importado): agrupa por semana ISO (lunes a domingo, mismo criterio que
-// la tendencia semanal de Tiempos del Proceso).
-function weeklyComprasAgg(rows){
-  const groups = {};
-  for(const r of rows){ (groups[r.semana] = groups[r.semana] || []).push(r); }
-  const weeks = Object.keys(groups).sort();
-  return weeks.map(semana=>{
-    const g = groups[semana];
-    const nacional = g.filter(r=>r.origen==='nacional').reduce((s,r)=>s+r.montoPEN,0);
-    const importado = g.filter(r=>r.origen==='importado').reduce((s,r)=>s+r.montoPEN,0);
-    const total = nacional + importado;
-    return {
-      semana, nacional, importado, total,
-      pctNacional: total>0 ? nacional/total*100 : null,
-      pctImportado: total>0 ? importado/total*100 : null,
-    };
-  });
-}
-function formaPagoAgg(rows){
-  const groups = {};
-  for(const r of rows){ (groups[r.formaPago] = groups[r.formaPago] || []).push(r); }
-  const total = rows.reduce((s,r)=>s+r.montoPEN,0);
-  const agg = Object.entries(groups).map(([label,g])=>({
-    label, n: g.length, monto: g.reduce((s,r)=>s+r.montoPEN,0),
-  }));
-  agg.sort((a,b)=>b.monto-a.monto);
-  for(const g of agg){ g.pct = total>0 ? g.monto/total*100 : 0; }
-  return { agg, total };
-}
-// Crédito vs. Contado por origen (pedido de Piero, 02.09.2026, para la imagen "Reporte Semanal de
-// Compras"): reutiliza el mismo campo Forma_pago de R.EOC ya usado en formaPagoAgg. Regla de
-// clasificación verificada contra los valores reales de Piero (Consulta.xlsx, hoja "R.EOC",
-// columna Forma_pago): "CONTADO" aparece literal en el texto -> contado; cualquier otro valor
-// (CREDITO A N DIAS, ANTICIPO..., FACTURA NEGOCIABLE..., etc.) se trata como crédito, es decir,
-// todo lo que no sea explícitamente contado.
-function creditoContadoAgg(rows){
-  function origenAgg(origen){
-    const g = rows.filter(r=>r.origen===origen);
-    const monto = g.reduce((s,r)=>s+r.montoPEN,0);
-    const contado = g.filter(r=>(r.formaPago||'').toUpperCase().includes('CONTADO')).reduce((s,r)=>s+r.montoPEN,0);
-    const credito = monto - contado;
-    return {
-      origen, monto, montoCredito: credito, montoContado: contado,
-      pctContado: monto>0 ? contado/monto*100 : null,
-      pctCredito: monto>0 ? credito/monto*100 : null,
-    };
-  }
-  return [ origenAgg('nacional'), origenAgg('importado') ];
-}
 // Ranking de compradores: reutiliza groupRowsFor/aggStatsForIndicator ya validados para el Indicador 2
 // (Tiempo de Emisión de OC) y el Indicador 4 (Tiempo de Entrega de OC) — misma lógica que la tabla
 // "Rendimiento por comprador" que existió en Tiempos del Proceso (quitada el 01.09.2026), reintroducida
@@ -1939,170 +1889,6 @@ function compradorRankingFromRows(rows){
   return Object.entries(byComprador).filter(([comprador])=> comprador.trim().toUpperCase()!=='MLUJAN')
     .map(([comprador, v])=>({ comprador, d2: v.d2 || null, d4: v.d4 || null }))
     .sort((a,b)=> (b.d2?b.d2.n:0) - (a.d2?a.d2.n:0));
-}
-// Filas de Tiempos del Proceso, filtradas por el Año/Mes propio del módulo de Compras (no los filtros
-// de Tiempos del Proceso) — usado tanto por la tabla en pantalla como por su imagen para compartir.
-function procesoRowsFilteredForCompras(){
-  let rows = getProcesoRows();
-  const anio = document.getElementById('filterComprasAnio').value;
-  const mes = document.getElementById('filterComprasMes').value;
-  const semana = document.getElementById('filterComprasSemana').value;
-  if(anio !== 'all') rows = rows.filter(r=>r.fReq && String(r.fReq.getUTCFullYear())===anio);
-  if(mes !== 'all') rows = rows.filter(r=>r.fReq && String(r.fReq.getUTCMonth()+1)===mes);
-  if(semana !== 'all') rows = rows.filter(r=>r.fReq && weekKeyFor(r.fReq)===semana);
-  return rows;
-}
-function compradorRankingRows(){
-  return compradorRankingFromRows(procesoRowsFilteredForCompras());
-}
-// Nota (02.09.2026): esta tabla dejó de ser un "ranking" de cumplimiento — Piero pidió quitar el %
-// de cumplimiento y el puesto de la tabla de compradores en la imagen de Tiempos del Proceso ("ya no
-// es un ranking"), mostrando en su lugar solo tiempo de Emisión de OC y volumen de OC por comprador
-// (ver `buildProImageTiempos`, que ahora arma sus filas directo desde `compradorRankingFromRows`).
-// La función `compradorRankingScored` (cumplimiento combinado Ind.2+4, orden por %) que alimentaba la
-// versión anterior de esta tabla ya no se usa en ningún lado — se quitó de aquí.
-function weeklyCierreAgg(rows){
-  const groups = {};
-  for(const p of rows){ const k = weekKeyFor(p.fReq); (groups[k] = groups[k] || []).push(p); }
-  const weeks = Object.keys(groups).sort();
-  return weeks.map(semana=>{
-    const g = groups[semana];
-    const cerrados = g.filter(p=>p.entregado).length;
-    return { semana, total: g.length, cerrados, pct: g.length ? cerrados/g.length*100 : null };
-  });
-}
-let comprasListenersBound = false;
-function renderCompras(){
-  const hasReoc = REOC_DATA && REOC_DATA.rows && REOC_DATA.rows.length > 0;
-  const hasCierre = DATA && DATA.projectRows && DATA.projectRows.length > 0;
-  if(!hasReoc && !hasCierre){
-    document.getElementById('comprasDefNote').innerHTML = 'Carga tu <b>Consulta.xlsx</b> (hoja "R.EOC", para nacional/importado y formas de pago) y/o tu <b>Reporte Maestro.xlsx</b> (para el ranking de compradores y el cierre de requerimientos) arriba para ver este reporte.';
-    ['kpiGridCompras','chartComprasSemana','kpiGridCierre'].forEach(id=>document.getElementById(id).innerHTML = '');
-    ['tableComprasSemana','tableFormaPago','tableRankingCompradores','tableCierreSemana'].forEach(id=>{
-      document.querySelector('#'+id+' thead').innerHTML = '';
-      document.querySelector('#'+id+' tbody').innerHTML = '';
-    });
-    document.getElementById('chartFormaPago').innerHTML = '';
-    return;
-  }
-  populateComprasAnios();
-  if(!comprasListenersBound){
-    ['filterComprasAnio','filterComprasMes','filterComprasSemana'].forEach(id=>document.getElementById(id).addEventListener('change', drawCompras));
-    document.getElementById('searchFormaPago').addEventListener('input', drawCompras);
-    document.getElementById('searchRankingCompradores').addEventListener('input', drawCompras);
-    document.getElementById('btnImgCompras').addEventListener('click', (e)=> downloadSectionImage('section-compras', 'reporte-semanal-compras', e.currentTarget));
-    document.getElementById('btnProImgCompras').addEventListener('click', (e)=> downloadProImage(buildProImageCompras, 'resumen-compras', e.currentTarget));
-    comprasListenersBound = true;
-  }
-  drawCompras();
-}
-function drawCompras(){
-  populateSemanaSelect(document.getElementById('filterComprasSemana'), document.getElementById('filterComprasAnio').value, document.getElementById('filterComprasMes').value);
-  document.getElementById('comprasDefNote').innerHTML = `<b>Qué cuenta como compra:</b> líneas de la hoja "R.EOC" con Estado <b>Atendido Total</b>, <b>Atendido Parcial</b> o <b>Aprobado</b> (mismo criterio que Concentración de Gasto). Monto convertido a Soles con el tipo de cambio real de cada orden cuando está disponible, o el de referencia si falta (US$ ${TIPO_CAMBIO_FALLBACK['Dolares Americanos'].toFixed(3)}, € ${TIPO_CAMBIO_FALLBACK['Euros'].toFixed(2)}). <b>Nacional/Importado:</b> según el prefijo del código de orden (0001 = nacional, 0002 = importado). <b>Requerimiento cerrado:</b> estado "Recibido en Obra", o "Enviado a Obra" con salida de almacén ya registrada — se excluyen los "Archivado". <b>Ranking de compradores:</b> mismos Indicador 2 (Tiempo de Emisión de OC) e Indicador 4 (Tiempo de Entrega de OC en Lurín) ya usados en Tiempos del Proceso.`;
-
-  // ---- Compras por semana: nacional vs. importado ----
-  const reocRows = filteredReocRowsForCompras();
-  const weekly = weeklyComprasAgg(reocRows);
-  const totalNacional = reocRows.filter(r=>r.origen==='nacional').reduce((s,r)=>s+r.montoPEN,0);
-  const totalImportado = reocRows.filter(r=>r.origen==='importado').reduce((s,r)=>s+r.montoPEN,0);
-  const totalGeneral = totalNacional + totalImportado;
-  const pctNac = totalGeneral>0 ? totalNacional/totalGeneral*100 : null;
-  const pctImp = totalGeneral>0 ? totalImportado/totalGeneral*100 : null;
-  document.getElementById('kpiGridCompras').innerHTML = reocRows.length ? `
-    <div class="card kpi"><div class="label">Gasto Nacional</div><div class="value" style="color:${ORIGEN_COLOR.nacional}">${fmtPEN(totalNacional)}</div><div class="sub">${pctNac!=null?pctNac.toFixed(0)+'% del total':''}</div></div>
-    <div class="card kpi"><div class="label">Gasto Importado</div><div class="value" style="color:${ORIGEN_COLOR.importado}">${fmtPEN(totalImportado)}</div><div class="sub">${pctImp!=null?pctImp.toFixed(0)+'% del total':''}</div></div>
-    <div class="card kpi"><div class="label">Diferencia (Nacional − Importado)</div><div class="value">${fmtPEN(totalNacional-totalImportado)}</div><div class="sub">${pctNac!=null?(pctNac-pctImp).toFixed(0)+' pp de diferencia en participación':''}</div></div>
-  ` : `<div style="color:var(--muted);padding:12px;">Carga Consulta.xlsx (hoja "R.EOC") para ver este bloque.</div>`;
-
-  const maxSemanal = weekly.reduce((m,w)=>Math.max(m,w.total),0);
-  document.getElementById('chartComprasSemana').innerHTML = (weekly.map(w=>{
-    const wNac = maxSemanal>0 ? w.nacional/maxSemanal*100 : 0;
-    const wImp = maxSemanal>0 ? w.importado/maxSemanal*100 : 0;
-    return `<div class="stack-row">
-      <div class="bar-label">${weekLabelFor(w.semana)}</div>
-      <div class="stack-bar">
-        <div class="stack-seg" style="width:${wNac}%;background:${ORIGEN_COLOR.nacional};" title="Nacional: ${fmtPEN(w.nacional)}"></div>
-        <div class="stack-seg" style="width:${wImp}%;background:${ORIGEN_COLOR.importado};" title="Importado: ${fmtPEN(w.importado)}"></div>
-      </div>
-      <div class="stack-total">${fmtPEN(w.total)}</div>
-    </div>`;
-  }).join("") || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin datos con el filtro actual</div>`)
-    + (weekly.length ? `<div class="stack-legend"><span><span class="sw" style="background:${ORIGEN_COLOR.nacional}"></span>Nacional</span><span><span class="sw" style="background:${ORIGEN_COLOR.importado}"></span>Importado</span></div>` : '');
-
-  const tSem = document.getElementById('tableComprasSemana');
-  tSem.querySelector('thead').innerHTML = `<tr><th>Semana</th><th>Nacional</th><th>Importado</th><th>Total</th><th>% Nacional</th><th>Diferencia (Nac − Imp)</th></tr>`;
-  tSem.querySelector('tbody').innerHTML = weekly.map(w=>`
-    <tr>
-      <td>${weekLabelFor(w.semana)}</td>
-      <td>${fmtPEN(w.nacional)}</td>
-      <td>${fmtPEN(w.importado)}</td>
-      <td>${fmtPEN(w.total)}</td>
-      <td>${w.pctNacional!=null ? w.pctNacional.toFixed(0)+'%' : '—'}</td>
-      <td>${fmtPEN(w.nacional-w.importado)}</td>
-    </tr>`).join("") || `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin datos con el filtro actual</td></tr>`;
-
-  // ---- Formas de pago ----
-  const qPago = (document.getElementById('searchFormaPago').value||"").toLowerCase();
-  const { agg: pagoAgg } = formaPagoAgg(reocRows);
-  const pagoView = qPago ? pagoAgg.filter(g=>g.label.toLowerCase().includes(qPago)) : pagoAgg;
-  const maxPago = pagoView.reduce((m,g)=>Math.max(m,g.monto),0);
-  document.getElementById('chartFormaPago').innerHTML = pagoView.slice(0,15).map(g=>{
-    const pct = maxPago>0 ? g.monto/maxPago*100 : 0;
-    return `<div class="bar-row">
-      <div class="bar-label" title="${escapeHtml(g.label)}">${escapeHtml(g.label)}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--seg-a)"></div></div>
-      <div class="bar-pct" style="width:100px;">${fmtPEN(g.monto)}</div>
-    </div>`;
-  }).join("") || `<div style="color:var(--muted);text-align:center;padding:20px;">Sin resultados</div>`;
-
-  const tPago = document.getElementById('tableFormaPago');
-  tPago.querySelector('thead').innerHTML = `<tr><th>Forma de pago</th><th>OC</th><th>Monto</th><th>% del total</th></tr>`;
-  tPago.querySelector('tbody').innerHTML = pagoView.map(g=>`
-    <tr>
-      <td style="white-space:normal;min-width:260px;">${escapeHtml(g.label)}</td>
-      <td>${g.n.toLocaleString('es-PE')}</td>
-      <td>${fmtPEN(g.monto)}</td>
-      <td>${g.pct.toFixed(1)}%</td>
-    </tr>`).join("") || `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">Sin resultados</td></tr>`;
-
-  // ---- Ranking de compradores ----
-  const qComp = (document.getElementById('searchRankingCompradores').value||"").toLowerCase();
-  let ranking = compradorRankingRows();
-  if(qComp) ranking = ranking.filter(r=>r.comprador.toLowerCase().includes(qComp));
-  const tRank = document.getElementById('tableRankingCompradores');
-  tRank.querySelector('thead').innerHTML = `<tr><th>Comprador</th><th>Tiempo de Emisión de OC — Prom.</th><th>Cumplimiento</th><th>Casos</th><th>Tiempo de Entrega de OC en Lurín — Prom.</th><th>Cumplimiento</th><th>Casos</th></tr>`;
-  tRank.querySelector('tbody').innerHTML = ranking.map(r=>`
-    <tr>
-      <td>${escapeHtml(r.comprador)}</td>
-      <td>${r.d2 ? r.d2.promedio.toFixed(1)+' d.h.' : '—'}</td>
-      <td>${r.d2 && r.d2.cumplePct!=null ? r.d2.cumplePct.toFixed(0)+'%' : '—'}</td>
-      <td>${r.d2 ? r.d2.n.toLocaleString('es-PE') : '0'}</td>
-      <td>${r.d4 ? r.d4.promedio.toFixed(1)+' d.h.' : '—'}</td>
-      <td>${r.d4 && r.d4.cumplePct!=null ? r.d4.cumplePct.toFixed(0)+'%' : '—'}</td>
-      <td>${r.d4 ? r.d4.n.toLocaleString('es-PE') : '0'}</td>
-    </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin resultados</td></tr>`;
-
-  // ---- Cierre de requerimientos ----
-  const cierreRows = filteredProjectRowsForCompras();
-  const cierreTotal = cierreRows.length;
-  const cierreCerrados = cierreRows.filter(p=>p.entregado).length;
-  const cierrePct = cierreTotal ? cierreCerrados/cierreTotal*100 : null;
-  document.getElementById('kpiGridCierre').innerHTML = cierreTotal ? `
-    <div class="card kpi"><div class="label">Requerimientos (período filtrado)</div><div class="value">${cierreTotal.toLocaleString('es-PE')}</div><div class="sub">Excluye "Archivado"</div></div>
-    <div class="card kpi"><div class="label">Cerrados</div><div class="value">${cierreCerrados.toLocaleString('es-PE')}</div><div class="sub">Recibido en Obra, o Enviado a Obra con salida</div></div>
-    <div class="card kpi"><div class="label">% Cerrados</div><div class="value">${cierrePct!=null?cierrePct.toFixed(0)+'%':'—'}</div></div>
-  ` : `<div style="color:var(--muted);padding:12px;">Carga Reporte Maestro.xlsx para ver este bloque.</div>`;
-
-  const cierreWeekly = weeklyCierreAgg(cierreRows);
-  const tCierre = document.getElementById('tableCierreSemana');
-  tCierre.querySelector('thead').innerHTML = `<tr><th>Semana (por Fecha de Requerimiento)</th><th>Requerimientos</th><th>Cerrados</th><th>% Cerrados</th></tr>`;
-  tCierre.querySelector('tbody').innerHTML = cierreWeekly.map(w=>`
-    <tr>
-      <td>${weekLabelFor(w.semana)}</td>
-      <td>${w.total.toLocaleString('es-PE')}</td>
-      <td>${w.cerrados.toLocaleString('es-PE')}</td>
-      <td>${w.pct!=null ? w.pct.toFixed(0)+'%' : '—'}</td>
-    </tr>`).join("") || `<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted);">Sin datos con el filtro actual</td></tr>`;
 }
 
 // ---------- Tiempos del Proceso de Atención (5 indicadores) ----------
@@ -2688,30 +2474,57 @@ function buildProImageTiempos(){
 }
 function buildProImageGasto(){
   const rows = filteredGastoRows();
-  const groupKey = document.getElementById('groupByGasto').value;
-  const { agg, total } = buildGastoAgg(groupKey, rows);
-  const nTop80 = agg.filter(g=>g.top80).length;
+  const nacionalRows = rows.filter(r=>r.origen==='nacional');
+  const importadoRows = rows.filter(r=>r.origen==='importado');
+  const totalNacional = nacionalRows.reduce((s,r)=>s+r.montoPEN,0);
+  const totalImportado = importadoRows.reduce((s,r)=>s+r.montoPEN,0);
+  const totalAll = totalNacional + totalImportado;
+
+  // El resumen refleja el bloque (Nacional/Importado) que Piero tenga seleccionado en pantalla al
+  // momento de generar la imagen — mismo criterio que el resto de "Resumen para compartir" (reflejan
+  // lo que se está viendo, no un agregado fijo).
+  const origen = gastoState.origen;
+  const origenRows = origen==='nacional' ? nacionalRows : importadoRows;
+  const origenLabel = origen==='nacional' ? 'Nacional' : 'Importado';
+
   const kpis = [
-    { num:'💰', label:'GASTO TOTAL DEL PERÍODO', value: fmtPEN(total), valueLabel:'MONTO', metaLabel:'VOLUMEN', metaValue: rows.length.toLocaleString('es-PE')+' líneas' },
-    { num:'🏭', label:(groupKey==='familia'?'FAMILIAS':'PROVEEDORES')+' CON COMPRAS', value: agg.length.toLocaleString('es-PE'), valueLabel:'CANTIDAD' },
-    { num:'📊', label:'CONCENTRACIÓN 80/20 (PARETO)', value: nTop80.toLocaleString('es-PE'), valueLabel:'EN EL 80% PRINCIPAL', metaLabel:'PROPORCIÓN', metaValue: (agg.length?(nTop80/agg.length*100).toFixed(0):0)+'% de '+(groupKey==='familia'?'las familias':'los proveedores') },
+    { num:'🇵🇪', label:'GASTO NACIONAL', value: fmtPEN(totalNacional), valueLabel:'MONTO', metaLabel:'PROPORCIÓN', metaValue: (totalAll?(totalNacional/totalAll*100).toFixed(0):0)+'% del total' },
+    { num:'🌎', label:'GASTO IMPORTADO', value: fmtPEN(totalImportado), valueLabel:'MONTO', metaLabel:'PROPORCIÓN', metaValue: (totalAll?(totalImportado/totalAll*100).toFixed(0):0)+'% del total' },
+    { num:'💰', label:'GASTO TOTAL DEL PERÍODO', value: fmtPEN(totalAll), valueLabel:'MONTO', metaLabel:'VOLUMEN', metaValue: rows.length.toLocaleString('es-PE')+' líneas' },
   ];
-  const nameLabel = groupKey==='familia' ? 'FAMILIA' : 'PROVEEDOR';
-  const topRows = agg.slice(0,8).map((g,i)=>({
+
+  const { agg: familiaAgg } = buildGastoAgg(origenRows, r=>r.familia);
+  const topFamilias = familiaAgg.slice(0,8).map((g,i)=>({
     rank: i+1, name: g.label,
     cells: [ fmtPEN(g.monto), g.pct.toFixed(1)+'%' ],
     pct: g.pctAcum, pctLabel: g.pctAcum.toFixed(0)+'%',
     barColor: g.top80 ? '#2a78d6' : '#c7d0d9',
   }));
+
+  const { agg: provAgg } = buildGastoAgg(origenRows, r=>r.proveedor);
+  const topProveedores = provAgg.slice(0,8).map((g,i)=>{
+    const buckets = {};
+    for(const r of g.rows) buckets[r.creditoBucket] = (buckets[r.creditoBucket]||0) + r.montoPEN;
+    const principal = Object.entries(buckets).sort((a,b)=>b[1]-a[1])[0];
+    const principalLabel = principal ? ((principal[0]==='Otra forma de pago'||principal[0]==='Sin dato') ? 'Otra / sin dato' : principal[0]) : '—';
+    return {
+      rank: i+1, name: g.label,
+      cells: [ fmtPEN(g.monto), principalLabel ],
+      pct: g.pctAcum, pctLabel: g.pctAcum.toFixed(0)+'%',
+      barColor: g.top80 ? '#2a78d6' : '#c7d0d9',
+    };
+  });
+
   return {
-    title: 'CONCENTRACIÓN DE GASTO POR PROVEEDOR',
-    subtitle: 'ANÁLISIS PARETO 80/20',
+    title: 'CONCENTRACIÓN DE GASTO',
+    subtitle: 'NACIONAL / IMPORTADO · FAMILIA · PROVEEDOR — VISTA: ' + origenLabel.toUpperCase(),
     kpis,
     tables: [
-      { icon:'📦', title:'Top '+nameLabel.toLowerCase()+'s por gasto', subtitle:'Ordenados de mayor a menor gasto en el período filtrado', nameLabel, columns:['GASTO','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: topRows, legendItems:[{color:'#2a78d6',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
+      { icon:'📦', title:'Top familias — '+origenLabel, subtitle:'Ordenadas de mayor a menor gasto en el período filtrado', nameLabel:'FAMILIA', columns:['GASTO','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: topFamilias, legendItems:[{color:'#2a78d6',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
+      { icon:'🏭', title:'Top proveedores — '+origenLabel, subtitle:'Con su forma de pago principal (mayor monto)', nameLabel:'PROVEEDOR', columns:['GASTO','FORMA DE PAGO PRINCIPAL'], barLabel:'% ACUMULADO', rows: topProveedores, legendItems:[{color:'#2a78d6',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
     ],
-    banner: { tone:'info', items:[ {value:nTop80+' / '+agg.length, label:(groupKey==='familia'?'Familias':'Proveedores')+' concentran el 80% del gasto'} ], action:null },
-    footnote: 'Solo Órdenes de Compra (no de Servicio) con Estado Atendido Total/Parcial o Aprobado. Monto convertido a Soles con tipo de cambio de referencia fijo (US$ y €).',
+    banner: { tone:'info', items:[ {value: fmtPEN(totalAll), label:'Gasto total del período (Nacional + Importado)'} ], action:null },
+    footnote: 'Solo Órdenes de Compra (no de Servicio) con Estado Atendido Total/Parcial o Aprobado. Monto convertido a Soles con tipo de cambio de referencia fijo (US$ y €). Forma de pago desde la hoja "R.EOC" (solo cubre órdenes desde 01.01.2026).',
   };
 }
 function buildProImageAlertas(){
@@ -2747,58 +2560,6 @@ function buildProImageAlertas(){
     footnote: 'Días hábiles transcurridos calculados contra hoy (no contra una fecha guardada) — la lista cambia cada día aunque no se vuelva a cargar el archivo. Se excluyen los casos "Archivado".',
   };
 }
-function buildProImageCompras(){
-  const reocRows = filteredReocRowsForCompras();
-  const totalNacional = reocRows.filter(r=>r.origen==='nacional').reduce((s,r)=>s+r.montoPEN,0);
-  const totalImportado = reocRows.filter(r=>r.origen==='importado').reduce((s,r)=>s+r.montoPEN,0);
-  const totalGeneral = totalNacional + totalImportado;
-  const pctNac = totalGeneral>0 ? totalNacional/totalGeneral*100 : null;
-  const pctImp = totalGeneral>0 ? totalImportado/totalGeneral*100 : null;
-  const cierreRows = filteredProjectRowsForCompras();
-  const cierreTotal = cierreRows.length;
-  const cierreCerrados = cierreRows.filter(p=>p.entregado).length;
-  const cierrePct = cierreTotal ? cierreCerrados/cierreTotal*100 : null;
-  // KPIs (corrección de Piero, 02.09.2026: la imagen ya no debe calcular una "diferencia" nacional −
-  // importado — en su lugar cada tarjeta trae su propio aro de % de participación sobre el gasto total).
-  const kpis = [
-    { num:'🇵🇪', label:'GASTO NACIONAL', value: fmtPEN(totalNacional), valueLabel:'MONTO', metaLabel:'PARTICIPACIÓN', metaValue: pctNac!=null?pctNac.toFixed(0)+'% del total':'—', color:'#2a78d6', pct: pctNac },
-    { num:'🌎', label:'GASTO IMPORTADO', value: fmtPEN(totalImportado), valueLabel:'MONTO', metaLabel:'PARTICIPACIÓN', metaValue: pctImp!=null?pctImp.toFixed(0)+'% del total':'—', color:'#4a3aa7', pct: pctImp },
-    { num:'✅', label:'CIERRE DE REQUERIMIENTOS', value: cierrePct!=null?cierrePct.toFixed(0)+'%':'—', valueLabel:'% CERRADOS', metaLabel:'CASOS', metaValue: cierreCerrados.toLocaleString('es-PE')+' de '+cierreTotal.toLocaleString('es-PE'), pct: cierrePct },
-  ];
-  const { agg: pagoAgg } = formaPagoAgg(reocRows);
-  const pagoRows = pagoAgg.slice(0,6).map((g,i)=>({
-    rank: i+1, name: g.label.length>22 ? g.label.slice(0,20)+'…' : g.label,
-    cells: [ fmtPEN(g.monto) ],
-    pct: g.pct, pctLabel: g.pct.toFixed(0)+'%',
-    barColor: '#2a78d6',
-  }));
-  // Crédito vs. Contado por origen (corrección de Piero, 02.09.2026): reemplaza el Ranking de
-  // Compradores en esta imagen — no mide desempeño, es una foto de cómo se paga el gasto del período.
-  // La barra muestra % Contado (pct); el % Crédito, al ser el complemento, se muestra como columna de
-  // texto junto al monto total, para no repetir dos barras en la misma fila.
-  const ccAgg = creditoContadoAgg(reocRows);
-  const origenLabel = { nacional:'NACIONAL', importado:'IMPORTADO' };
-  const origenColor = { nacional:'#2a78d6', importado:'#4a3aa7' };
-  const ccRows = ccAgg.map((g,i)=>({
-    rank: i+1, name: origenLabel[g.origen],
-    cells: [ fmtPEN(g.monto), g.pctCredito!=null ? g.pctCredito.toFixed(0)+'%' : '—' ],
-    pct: g.pctContado, pctLabel: g.pctContado!=null ? g.pctContado.toFixed(0)+'%' : '—',
-    barColor: origenColor[g.origen],
-  }));
-  const banner = { tone: (cierrePct!=null && cierrePct<50) ? 'alert' : 'info', items:[ {value:cierreCerrados.toLocaleString('es-PE')+' / '+cierreTotal.toLocaleString('es-PE'), label:'Requerimientos cerrados en el período filtrado'} ], action: cierrePct!=null ? ('Cierre actual: '+cierrePct.toFixed(0)+'%') : null };
-  return {
-    title: 'REPORTE SEMANAL DE COMPRAS',
-    subtitle: 'NACIONAL / IMPORTADO · FORMAS DE PAGO · CRÉDITO Y CONTADO · CIERRE',
-    kpis,
-    tables: [
-      { icon:'💳', title:'Formas de Pago', subtitle:'Top formas de pago por monto en el período filtrado', nameLabel:'FORMA DE PAGO', columns:['MONTO'], barLabel:'% DEL TOTAL', rows: pagoRows, avatarIcon:'💳' },
-      { icon:'🏦', title:'Crédito vs. Contado por Origen', subtitle:'% del gasto pagado a crédito y al contado, según origen nacional o importado', nameLabel:'ORIGEN', columns:['MONTO TOTAL','% CRÉDITO'], barLabel:'% CONTADO', rows: ccRows },
-    ],
-    banner,
-    footnote: 'Nacional/Importado según el prefijo del código de orden en la hoja "R.EOC" (0001/0002). Contado = Forma_pago contiene "CONTADO"; el resto (crédito a N días, anticipos, factura negociable, etc.) se cuenta como crédito. Cerrado = "Recibido en Obra", o "Enviado a Obra" con salida de almacén ya registrada — excluye "Archivado".',
-  };
-}
-
 // Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = promedio simple
 // de días hábiles, sin excluir ni ajustar nada — pedido de Piero, 01.09.2026), con la meta como línea
 // punteada de referencia. Para el Indicador 4 (sin meta fija) se dibujan dos líneas: real vs. el
@@ -2911,13 +2672,12 @@ function drawIndicatorTrend(){
 
   const zoomBar = zoomed
     ? `<div class="trend-zoombar"><span>🔍 Zoom: ${escapeHtml(weeks[0].label)} – ${escapeHtml(weeks[weeks.length-1].label)}</span><a href="#" id="trendZoomReset">↺ Ver todas las semanas</a></div>`
-    : `<div class="trend-zoombar trend-zoombar-hint"><span>Arrastra sobre el gráfico para hacer zoom en un rango de semanas</span></div>`;
+    : `<div class="trend-zoombar trend-zoombar-hint"><span>Usa la rueda del mouse sobre el gráfico para hacer zoom</span></div>`;
 
   el.innerHTML = `${legendSvg}${zoomBar}<svg class="trend-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
     ${gridSvg}
     ${metaSvg}
     <rect id="trendZoomOverlay" class="tr-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
-    <rect id="trendZoomSelection" class="tr-zoom-selection" x="${padL}" y="${padT}" width="0" height="${plotH}" style="display:none;"></rect>
     <path class="tr-line-real" d="${realPath}"></path>
     ${hasComp ? `<path class="tr-line-comp" d="${compPath}"></path>` : ''}
     ${dotsReal}
@@ -2933,55 +2693,48 @@ function drawIndicatorTrend(){
     });
   }
 
-  // Zoom por arrastre: seleccionar un rango horizontal sobre el gráfico redibuja la tendencia solo
-  // con esas semanas — el eje Y se recalcula automáticamente sobre ese rango (ver "const weeks"
-  // arriba), así ambos ejes se "acercan" a la vez sin necesitar un control aparte para cada uno.
+  // Zoom con la rueda del mouse (pedido de Piero, 03.09.2026 — reemplaza el zoom por arrastre de la
+  // ronda anterior): girar la rueda sobre el gráfico acerca/aleja un rango de semanas, centrado en la
+  // posición del cursor. El eje Y se sigue recalculando solo sobre el rango visible (ver "const weeks"
+  // arriba), así ambos ejes se "acercan" juntos sin lógica aparte por eje.
   const svgEl = el.querySelector('.trend-svg');
   const overlay = document.getElementById('trendZoomOverlay');
-  const selectionRect = document.getElementById('trendZoomSelection');
-  let dragStartSvgX = null;
   const svgXFromClientX = (clientX)=>{
     const rect = svgEl.getBoundingClientRect();
     return (clientX - rect.left) * (W / rect.width);
   };
-  overlay.addEventListener('pointerdown', (e)=>{
-    dragStartSvgX = svgXFromClientX(e.clientX);
-    overlay.setPointerCapture(e.pointerId);
-    selectionRect.style.display = '';
-    selectionRect.setAttribute('x', dragStartSvgX);
-    selectionRect.setAttribute('width', 0);
-  });
-  overlay.addEventListener('pointermove', (e)=>{
-    if(dragStartSvgX==null) return;
-    const curX = svgXFromClientX(e.clientX);
-    const x0 = Math.max(padL, Math.min(dragStartSvgX, curX));
-    const x1 = Math.min(W-padR, Math.max(dragStartSvgX, curX));
-    selectionRect.setAttribute('x', x0);
-    selectionRect.setAttribute('width', Math.max(0, x1-x0));
-  });
-  const finishDrag = (e)=>{
-    if(dragStartSvgX==null) return;
-    const endSvgX = svgXFromClientX(e.clientX);
-    selectionRect.style.display = 'none';
-    const x0 = Math.min(dragStartSvgX, endSvgX), x1 = Math.max(dragStartSvgX, endSvgX);
-    dragStartSvgX = null;
-    if(x1 - x0 < 6) return; // arrastre insignificante -> tratar como clic, no aplicar zoom
-    // índice de semana más cercano a cada borde de la selección
-    let iStart = 0, iEnd = weeks.length-1;
-    let bestDStart = Infinity, bestDEnd = Infinity;
-    weeks.forEach((w,i)=>{
-      const x = xFor(i);
-      const dStart = Math.abs(x - x0), dEnd = Math.abs(x - x1);
-      if(dStart < bestDStart){ bestDStart = dStart; iStart = i; }
-      if(dEnd < bestDEnd){ bestDEnd = dEnd; iEnd = i; }
-    });
-    if(iEnd - iStart < 1) return; // menos de 2 semanas seleccionadas -> no vale la pena
-    const baseIdx = zoomed ? trendZoom.startIdx : 0;
-    trendZoom = { startIdx: baseIdx + iStart, endIdx: baseIdx + iEnd };
+  overlay.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const curStart = zoomed ? trendZoom.startIdx : 0;
+    const curEnd = zoomed ? trendZoom.endIdx : fullWeeks.length-1;
+    const curLen = curEnd - curStart + 1;
+
+    // semana más cercana al cursor, dentro del rango visible actual -> índice global en fullWeeks
+    const x = svgXFromClientX(e.clientX);
+    let localIdx = 0, bestD = Infinity;
+    weeks.forEach((w,i)=>{ const d = Math.abs(xFor(i)-x); if(d<bestD){ bestD=d; localIdx=i; } });
+    const pivotIdx = curStart + localIdx;
+    const fraction = curLen>1 ? localIdx/(curLen-1) : 0.5;
+
+    const ZOOM_FACTOR = 0.8;
+    const zoomingIn = e.deltaY < 0;
+    let newLen = zoomingIn ? Math.round(curLen*ZOOM_FACTOR) : Math.round(curLen/ZOOM_FACTOR);
+    newLen = Math.max(2, Math.min(fullWeeks.length, newLen));
+
+    if(newLen >= fullWeeks.length){
+      if(!zoomed) return; // ya está en la vista completa, nada que hacer
+      trendZoom = { startIdx: null, endIdx: null };
+      drawIndicatorTrend();
+      return;
+    }
+
+    let newStart = Math.round(pivotIdx - fraction*(newLen-1));
+    newStart = Math.max(0, Math.min(fullWeeks.length-newLen, newStart));
+    const newEnd = newStart + newLen - 1;
+    if(newStart===curStart && newEnd===curEnd) return; // sin cambio real (ya en el límite)
+    trendZoom = { startIdx: newStart, endIdx: newEnd };
     drawIndicatorTrend();
-  };
-  overlay.addEventListener('pointerup', finishDrag);
-  overlay.addEventListener('pointercancel', ()=>{ dragStartSvgX = null; selectionRect.style.display = 'none'; });
+  }, { passive:false });
 
   const tooltip = document.getElementById('trendTooltip');
   el.querySelectorAll('circle').forEach(dot=>{
