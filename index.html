@@ -1323,7 +1323,12 @@ function processWorkbook(wb, filename){
       // de los "pedidos directos" de PedidoSinReq.xlsx, que no traen esa columna (ver PEDIDO_SIN_REQ_ROWS).
       const idProductoAt = col.idProducto!==-1 ? (r[col.idProducto]||"").toString().trim() : "";
       const familiaAt = col.familia!==-1 ? ((r[col.familia]||"").toString().trim() || "Sin familia") : "Sin familia";
-      if(idProductoAt && !FAMILIA_BY_PRODUCTO[idProductoAt]) FAMILIA_BY_PRODUCTO[idProductoAt] = familiaAt;
+      // Ronda 39 (04.09.2026): antes esto grababa la familia de la PRIMERA fila de cada producto, incluso
+      // si era "Sin familia" — eso bloqueaba para siempre una familia real vista en una fila posterior del
+      // mismo producto (bug real, verificado: 93 productos de Reporte Maestro.xlsx tenían "Sin familia" en
+      // alguna fila pero SÍ una familia real en otra). Ahora solo se graba un valor real, y solo si todavía
+      // no hay uno guardado — así una familia real, la vea antes o después, siempre queda disponible.
+      if(idProductoAt && familiaAt!=='Sin familia' && !FAMILIA_BY_PRODUCTO[idProductoAt]) FAMILIA_BY_PRODUCTO[idProductoAt] = familiaAt;
 
       if(d1==null && d2==null && d3==null && d4==null && d6==null) continue; // nada calculable
 
@@ -1614,12 +1619,18 @@ function processConsulta(wb, filename){
     const descripcionIdx = col.descripcion!==-1 ? col.descripcion : 9;
     const codigoRaw = r[codigoIdx]!=null ? r[codigoIdx].toString().trim() : "";
     const descripcionRaw = r[descripcionIdx]!=null ? r[descripcionIdx].toString().trim() : "";
+    const grupoRaw = col.grupo!==-1 ? (r[col.grupo]||"").toString().trim() : "";
+    // Consulta.xlsx alimenta también FAMILIA_BY_PRODUCTO (ronda 39, 04.09.2026) — mismo catálogo de
+    // producto que Reporte Maestro.xlsx (Producto Codigo = IdProducto, 94% de solape verificado), así que
+    // su Grupo real sirve de respaldo para productos sin Familia en Reporte Maestro, y viceversa.
+    if(codigoRaw && grupoRaw && grupoRaw!=='#N/A' && !FAMILIA_BY_PRODUCTO[codigoRaw]) FAMILIA_BY_PRODUCTO[codigoRaw] = grupoRaw;
 
     gastoRows.push({
       proveedor: col.provNombre!==-1 ? ((r[col.provNombre]||"").toString().trim() || "(sin proveedor)") : "(sin proveedor)",
       // categoriaGenericaFor (04.09.2026 ronda 38, pedido de Piero: "que ambos compartan esa lógica de
-      // productos") — mismas categorías consolidadas que el Reporte de Compras por responsable.
-      familia: categoriaGenericaFor(col.grupo!==-1 ? (r[col.grupo]||"").toString().trim() : ""),
+      // productos") — mismas categorías consolidadas que el Reporte de Compras por responsable. Ronda 39:
+      // se le pasa también código+descripción para el respaldo por catálogo/palabras clave (ver la función).
+      familia: categoriaGenericaFor(grupoRaw, codigoRaw, descripcionRaw),
       subfamilia: col.subgrupo!==-1 ? ((r[col.subgrupo]||"").toString().trim() || "Sin subfamilia") : "Sin subfamilia",
       producto: limpiaProducto(descripcionRaw, codigoRaw),
       origen: origenForDocumento(documento),
@@ -3138,18 +3149,86 @@ function fmtMonedaCompras(n, symbol){
 //    (ej. "PART. DE VÁLVULA" y "VÁLVULA" quedan como una sola categoría "VÁLVULA").
 // 2) Variantes de escritura del mismo concepto se unifican (ej. "EQUIPOS DE PROTECCION PERSONAL - SIN
 //    COSTO" es la misma categoría que "EQUIPO DE PROTECCIÓN PERSONAL", solo con otro texto).
-// 3) "#N/A" (316 líneas reales con ese texto crudo, dato faltante en el Excel de Piero) se muestra como
-//    "Sin familia" en vez del texto crudo "#N/A".
-function categoriaGenericaFor(nombreFamilia){
+// 3) "#N/A" (316 líneas reales con ese texto crudo, dato faltante en el Excel de Piero) ya NO se muestra
+//    como "Sin familia" — ver la cadena de respaldo agregada en la ronda 39 abajo.
+//
+// Ronda 39 (04.09.2026), pedido de Piero: "hay varias que dicen 'sin familia' pero en realidad sí tienen
+// familia porque su descripción ya los podría asociar a una familia... no puede quedar nada como 'sin
+// familia'". Verificado contra los 2 archivos reales: de los productos sin Familia en Reporte
+// Maestro.xlsx, el 100% (93 de 93) SÍ tiene una Familia real en OTRA fila del mismo archivo — antes no se
+// aprovechaba porque `FAMILIA_BY_PRODUCTO` se llenaba con el valor de la PRIMERA fila de cada producto (a
+// veces "Sin familia"), que bloqueaba para siempre una familia real vista después (ver fix en el loop de
+// processWorkbook). Quedan 39 productos (de un universo de 3,491 entre Reporte Maestro y PedidoSinReq)
+// que tampoco tienen Grupo real en Consulta.xlsx — para esos, `familiaByDescripcion` (abajo) clasifica por
+// palabras clave de la descripción, usando exactamente las "familias generales" reales que Piero señaló
+// que ya se usan en Concentración de Gasto (Producto Grupo de Consulta.xlsx — 90 valores verificados,
+// incluye sus 4 ejemplos: PANEL, EVAPORADOR, UNIDAD CONDENSADORA, MATERIAL PARA INSTALACIÓN ELÉCTRICA).
+// Con estos 2 respaldos, ya no debería quedar ningún producto real como "Sin familia".
+//
+// idProducto/descripcion son opcionales — si no se pasan (o no alcanza para resolverlo), la función igual
+// devuelve siempre una categoría real, nunca "Sin familia".
+function categoriaGenericaFor(nombreFamilia, idProducto, descripcion){
   let f = (nombreFamilia||'').toString().trim().toUpperCase();
-  if(!f || f==='#N/A' || f==='SIN FAMILIA') return 'Sin familia';
-  f = f.replace(/^PART\.?\s+DE\s+/, '').replace(/^PARTE\s+DE\s+/, '').trim();
-  const NORMALIZA = {
-    'EQUIPOS DE PROTECCION PERSONAL - SIN COSTO': 'EQUIPO DE PROTECCIÓN PERSONAL',
-    'EQUIPOS DE PROTECCIÓN PERSONAL - SIN COSTO': 'EQUIPO DE PROTECCIÓN PERSONAL',
-    'EQUIPOS DE PROTECCION PERSONAL': 'EQUIPO DE PROTECCIÓN PERSONAL',
-  };
-  return NORMALIZA[f] || f;
+  if(f && f!=='#N/A' && f!=='SIN FAMILIA'){
+    f = f.replace(/^PART\.?\s+DE\s+/, '').replace(/^PARTE\s+DE\s+/, '').trim();
+    const NORMALIZA = {
+      'EQUIPOS DE PROTECCION PERSONAL - SIN COSTO': 'EQUIPO DE PROTECCIÓN PERSONAL',
+      'EQUIPOS DE PROTECCIÓN PERSONAL - SIN COSTO': 'EQUIPO DE PROTECCIÓN PERSONAL',
+      'EQUIPOS DE PROTECCION PERSONAL': 'EQUIPO DE PROTECCIÓN PERSONAL',
+    };
+    return NORMALIZA[f] || f;
+  }
+  // Sin familia real en esta fila: 1) backfill por catálogo — el mismo producto puede tener familia real
+  // en otra fila de Reporte Maestro.xlsx o un Grupo real en Consulta.xlsx (FAMILIA_BY_PRODUCTO combina
+  // ambas fuentes, ver processWorkbook/processConsulta).
+  const idp = (idProducto||'').toString().trim();
+  const backfill = idp && FAMILIA_BY_PRODUCTO[idp];
+  if(backfill) return categoriaGenericaFor(backfill);
+  // 2) último recurso: clasificar por palabras clave de la descripción del producto.
+  return familiaByDescripcion(descripcion);
+}
+// familiaByDescripcion — ver comentario de la ronda 39 arriba. Único último recurso dentro de
+// categoriaGenericaFor: solo se llega acá cuando ni la propia fila ni el cruce con el otro archivo
+// trajeron una familia real. Por eso SIEMPRE devuelve una categoría real (nunca vacío/"Sin familia") — el
+// genérico final es "OTROS", que también es una categoría real de Consulta.xlsx, verificada (40 casos).
+// Reglas ordenadas de más específico a más genérico para no perder casos dentro de una regla amplia
+// (ej. "MOTOR DE VENTILADOR" debe caer en Ventilador, no en el genérico Motor).
+function familiaByDescripcion(descripcion){
+  const d = (descripcion||'').toString().toUpperCase();
+  if(!d) return 'OTROS';
+  if(/UNIDAD COND/.test(d)) return 'UNIDAD CONDENSADORA';
+  if(/PANEL DE CONTROL|CONTROLADOR ELECTR/.test(d)) return 'CONTROLADOR ELECTRÓNICO';
+  if(/CONDENSADOR/.test(d)) return 'CONDENSADOR';
+  if(/EVAPORADOR|SERPENTIN/.test(d)) return 'EVAPORADOR';
+  if(/VENTILADOR/.test(d)) return 'VENTILADOR';
+  if(/COMPRESOR|OVERHAUL KIT|\bR717\b|\bR22\b|\bR404A?\b|\bR507A?\b|\bRPM\b/.test(d)) return 'COMPRESOR';
+  if(/CHILLER/.test(d)) return 'CHILLER';
+  if(/HIDROCOOLER/.test(d)) return 'HIDROCOOLER';
+  if(/ENFRIADOR/.test(d)) return 'ENFRIADOR';
+  if(/VALVULA|VÁLVULA/.test(d)) return 'VÁLVULA';
+  if(/BOMBA/.test(d)) return 'BOMBA';
+  if(/\bMOTOR\b/.test(d)) return 'MOTOR';
+  if(/TANQUE/.test(d)) return 'TANQUE';
+  if(/TABLERO/.test(d)) return 'TABLERO';
+  if(/CABLE|INTERRUPTOR|CONTACTOR|BREAKER|LUMINARIA|FOCO LED|TOMACORRIENTE|ENCHUFE/.test(d)) return 'MATERIAL PARA INSTALACIÓN ELÉCTRICA';
+  if(/PUERTA/.test(d)) return 'PUERTA';
+  if(/\bPANEL\b/.test(d)) return 'PANEL';
+  if(/CORTINA/.test(d)) return 'CORTINA';
+  if(/VENTANA/.test(d)) return 'VENTANA';
+  if(/NIVELADOR/.test(d)) return 'NIVELADOR';
+  if(/TUBO DE|TUBERIA|TUBERÍA|MANGUERA/.test(d)) return 'TUBERÍA';
+  if(/UNION UNIVERSAL|CODO |NIPLE|ADAPTADOR|ACCESORIO.*TUBER/.test(d)) return 'ACCESORIO DE TUBERIA';
+  if(/SELLO HERMET|SELLO HERMÉT/.test(d)) return 'SELLO HERMÉTICO';
+  if(/MALLA/.test(d)) return 'MALLA';
+  if(/\bLONA\b/.test(d)) return 'LONA';
+  if(/BOTA DE SEGURIDAD|GUANTE|LENTE DE SEGURIDAD|CASCO|ARNES|RESPIRADOR|TAPON DE OIDO/.test(d)) return 'EQUIPO DE PROTECCIÓN PERSONAL';
+  if(/BLUSA|CAMISA|PANTALON|\bPOLO\b|CASACA|UNIFORME/.test(d)) return 'UNIFORME';
+  if(/SEÑAL DE SEGURIDAD|SEÑALETICA/.test(d)) return 'SEÑAL DE SEGURIDAD';
+  if(/ARTICULO DE LIMPIEZA|ARTÍCULO DE LIMPIEZA|ESCOBA|DETERGENTE/.test(d)) return 'ARTÍCULO DE LIMPIEZA';
+  if(/UTILES DE OFICINA|ÚTILES DE OFICINA/.test(d)) return 'ÚTILES DE OFICINA';
+  if(/ESTRUCTURA METAL|ESTRUCTURA METÁL/.test(d)) return 'ESTRUCTURA METÁLICA';
+  if(/HERRAMIENTA/.test(d)) return 'HERRAMIENTAS';
+  return 'OTROS';
 }
 // Ícono por familia — mapeo por palabra clave (los nombres de familia son datos reales de Piero, no una
 // lista fija), con las 5 familias de su ejemplo cubiertas exactamente y un ícono genérico de respaldo.
@@ -3159,13 +3238,19 @@ function iconForFamilia(nombre){
   if(n.includes('TUBERIA') || n.includes('TUBO') || n.includes('ACCESORIO')) return '🔩';
   if(n.includes('FILTRO') || n.includes('SECADOR')) return '🛢️';
   if(n.includes('MISCEL')) return '⚙️';
-  if(n.includes('REFRIGERA') || n.includes('COMPRESOR') || n.includes('FRIO')) return '❄️';
-  if(n.includes('ELECTRIC') || n.includes('CABLE')) return '🔌';
+  // Ronda 39 (04.09.2026): CONDENSADOR/EVAPORADOR/UNIDAD CONDENSADORA/CHILLER/HIDROCOOLER/ENFRIADOR/
+  // VENTILADOR se agregan al mismo ícono de refrigeración — antes caían todas en el genérico 📦 porque
+  // solo se usaban las 5 familias del ejemplo original de Piero; ahora `categoriaGenericaFor` puede
+  // devolver cualquiera de las ~90 familias reales de Consulta.xlsx.
+  if(n.includes('REFRIGERA') || n.includes('COMPRESOR') || n.includes('FRIO') || n.includes('CONDENSADOR') || n.includes('EVAPORADOR') || n.includes('CHILLER') || n.includes('HIDROCOOLER') || n.includes('ENFRIADOR') || n.includes('VENTILADOR')) return '❄️';
+  if(n.includes('ELECTRIC') || n.includes('CABLE') || n.includes('TABLERO') || n.includes('CONTROLADOR')) return '🔌';
   if(n.includes('MOTOR') || n.includes('BOMBA')) return '⚡';
-  if(n.includes('PANEL') || n.includes('AISLAMIENTO') || n.includes('CONSTRUCCION') || n.includes('CEMENTO')) return '🧱';
+  if(n.includes('PANEL') || n.includes('AISLAMIENTO') || n.includes('CONSTRUCCION') || n.includes('CEMENTO') || n.includes('ESTRUCTURA METAL')) return '🧱';
   if(n.includes('HERRAMIENTA')) return '🛠️';
-  if(n.includes('SEGURIDAD') || n.includes('EPP')) return '🦺';
-  if(n.includes('QUIMICO') || n.includes('GAS') || n.includes('LUBRICANTE') || n.includes('PINTURA')) return '🧪';
+  if(n.includes('SEGURIDAD') || n.includes('EPP') || n.includes('UNIFORME')) return '🦺';
+  if(n.includes('QUIMICO') || n.includes('GAS') || n.includes('LUBRICANTE') || n.includes('PINTURA') || n.includes('LIMPIEZA')) return '🧪';
+  if(n.includes('PUERTA') || n.includes('VENTANA') || n.includes('CORTINA')) return '🚪';
+  if(n.includes('TANQUE')) return '🛢️';
   return '📦';
 }
 // "Descripción de la familia" de la tabla — no hay ese texto en la data (Reporte Maestro solo trae el
@@ -3281,12 +3366,12 @@ function buildProImageComprasResponsable(){
     const montoPorFamilia = {};
     for(const r of lines){
       if(r.montoNativo==null || isNaN(r.montoNativo)) continue;
-      const fam = categoriaGenericaFor(r.familia);
+      const fam = categoriaGenericaFor(r.familia, r.idProducto, r.producto);
       const lbl = monedaLabel(r.moneda);
       const eq = lbl==='S/' ? r.montoNativo : (lbl==='€' ? r.montoNativo*TIPO_CAMBIO['€'] : r.montoNativo*TIPO_CAMBIO['US$']);
       montoPorFamilia[fam] = (montoPorFamilia[fam]||0) + eq;
     }
-    let familiaPredominante = categoriaGenericaFor(lines[0].familia);
+    let familiaPredominante = categoriaGenericaFor(lines[0].familia, lines[0].idProducto, lines[0].producto);
     let maxEq = -1;
     for(const [fam,eq] of Object.entries(montoPorFamilia)){ if(eq>maxEq){ maxEq=eq; familiaPredominante=fam; } }
 
