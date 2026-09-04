@@ -2161,6 +2161,33 @@ function filteredProcesoRows(){
     return true;
   });
 }
+// Mismos filtros que filteredProcesoRows(), pero Año/Mes/Semana se comparan contra la fecha de la OC
+// (FechaOrden) en vez de la fecha del requerimiento — pedido de Piero, 04.09.2026: "debe filtrar por
+// fecha oc para saber lo que se generó en cada mes". Verificado contra su Reporte Maestro.xlsx real:
+// filtrando agosto por FechaRequerimiento (como hacía antes) daba 81 OC para PLINARES; por FechaOrden
+// (lo que Piero esperaba) da 85, la cifra correcta. Solo la usa el panel COMPRAS de la imagen de
+// Tiempos del Proceso (Cantidad de OC generadas, sus alertas y su % de cumplimiento); el resto de la
+// plataforma sigue filtrando por FechaRequerimiento, sin cambios.
+function filteredProcesoRowsByOrden(){
+  const rows = getProcesoRows();
+  const fProveedor = document.getElementById('filterProcesoProveedor').value;
+  const fFamilia = document.getElementById('filterProcesoFamilia').value;
+  const fResp = document.getElementById('filterProcesoResponsable').value;
+  const fOrigen = document.getElementById('filterProcesoOrigen').value;
+  const fAnio = document.getElementById('filterProcesoAnio').value;
+  const fMes = document.getElementById('filterProcesoMes').value;
+  const fSemana = document.getElementById('filterProcesoSemana').value;
+  return rows.filter(r=>{
+    if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
+    if(fFamilia!=='all' && r.familia !== fFamilia) return false;
+    if(fResp!=='all' && r.usuarioCompras !== fResp) return false;
+    if(fOrigen!=='all' && r.origen !== fOrigen) return false;
+    if(fAnio!=='all' && r.fOrden && r.fOrden.getUTCFullYear()!==Number(fAnio)) return false;
+    if(fMes!=='all' && r.fOrden && (r.fOrden.getUTCMonth()+1)!==Number(fMes)) return false;
+    if(fSemana!=='all' && r.fOrden && weekKeyFor(r.fOrden)!==fSemana) return false;
+    return true;
+  });
+}
 function visibleIndicators(){
   const fArea = document.getElementById('filterProcesoArea').value;
   return fArea==='all' ? INDICATORS : INDICATORS.filter(i=>i.area===fArea);
@@ -2745,8 +2772,9 @@ function buildProImageTiempos(){
   // Panel COMPRAS: mismo conteo de "cuántas OC generó cada comprador" ya validado (codOrden distinto
   // por comprador, MLUJAN excluido por no ser un comprador real) más el desglose de alertas por
   // severidad y el % de cumplimiento del Indicador 2 (Emisión de OC) — el paso que sí controla Compras.
+  const rowsPorFechaOc = filteredProcesoRowsByOrden();
   const compradorOcSets = {};
-  for(const r of rows){
+  for(const r of rowsPorFechaOc){
     if(r.camino!=='compra') continue;
     const comprador = (r.usuarioCompras||'').trim();
     if(!comprador || comprador.toUpperCase()==='MLUJAN') continue;
@@ -2754,7 +2782,7 @@ function buildProImageTiempos(){
     if(!oc) continue;
     (compradorOcSets[comprador] = compradorOcSets[comprador] || new Set()).add(oc);
   }
-  const sev2 = severityBucketsFor(rows, IND2);
+  const sev2 = severityBucketsFor(rowsPorFechaOc, IND2);
   const comprasRowsRaw = Object.keys(compradorOcSets).map(name=>{
     const s = sev2[name] || { leve:0, media:0, critica:0, n:0, cumpleN:0 };
     return { name, ocCount: compradorOcSets[name].size, leve:s.leve, media:s.media, critica:s.critica, pct: s.n ? (s.cumpleN/s.n*100) : null };
@@ -2762,7 +2790,7 @@ function buildProImageTiempos(){
   const comprasRows = comprasRowsRaw.map(r=>({ name:r.name, main:r.ocCount.toLocaleString('es-PE'), leve:r.leve, media:r.media, critica:r.critica, pct:r.pct }));
   const totalOC = Object.values(compradorOcSets).reduce((a,s)=>a+s.size,0);
   const totalAlertaCompras = Object.values(sev2).reduce((a,s)=>a+s.leve+s.media+s.critica,0);
-  const stIND2 = aggStatsForIndicator(rows, IND2);
+  const stIND2 = aggStatsForIndicator(rowsPorFechaOc, IND2);
 
   // Panel ALMACÉN: combina Indicador 1 (Generación de Pedido — normalmente JCENTENO, aunque puede
   // haber "pedidos directos" con otro responsable, ver responsableD1For) e Indicador 5/d6 (Despacho de
