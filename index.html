@@ -2188,6 +2188,14 @@ function filteredProcesoRowsByOrden(){
     return true;
   });
 }
+// Devuelve el set de filas correcto para un indicador: los que miden un paso de la OC (Emisión,
+// Aprobación, Entrega — Indicadores 2, 3 y 4) filtran Año/Mes/Semana por FechaOrden; el resto
+// (Generación de Pedido, Despacho de Requerimiento) sigue filtrando por FechaRequerimiento, como
+// siempre — pedido de Piero, 04.09.2026: "esa lógica debe ser aplicada para lo relacionado a
+// medición de oc".
+function rowsForIndicator(ind){
+  return (ind.key==='d2' || ind.key==='d3' || ind.key==='d4') ? filteredProcesoRowsByOrden() : filteredProcesoRows();
+}
 function visibleIndicators(){
   const fArea = document.getElementById('filterProcesoArea').value;
   return fArea==='all' ? INDICATORS : INDICATORS.filter(i=>i.area===fArea);
@@ -2755,7 +2763,7 @@ function buildProImageTiempos(){
   const iconByNum = { 1:'📋', 2:'🛒', 3:'🛡️', 4:'🚚', 5:'📄' };
   const colorByNum = { 1:'#1f9aa8', 2:'#e2960a', 3:'#0ca30c', 4:'#d03b3b', 5:'#7c3fd4' };
   const kpis = INDICATORS.map(ind=>{
-    const st = aggStatsForIndicator(rows, ind);
+    const st = aggStatsForIndicator(rowsForIndicator(ind), ind);
     const metaTxt = ind.key==='d4' ? 'Plazo pactado en OC' : (ind.meta!=null ? '≤ '+ind.meta+' d.h.' : 'Sin meta');
     return {
       num: String(ind.num).padStart(2,'0'),
@@ -2947,10 +2955,13 @@ function buildProImageAlertas(){
 // plazo pactado (promedio) de esa semana (mismo criterio que tolerancia4For). Pedido explícito de
 // Piero: "diagrama lineal que siga a través del tiempo x y".
 function trendDataForIndicator(rows, ind){
-  const applicable = rows.filter(r=>r.camino===ind.camino && r[ind.key]!=null && r.fReq);
+  // Indicadores 2/3/4 (medición de OC) agrupan las semanas por FechaOrden, igual que su filtro de
+  // Año/Mes/Semana (ver rowsForIndicator) — el resto sigue agrupando por FechaRequerimiento.
+  const dateKey = (ind.key==='d2' || ind.key==='d3' || ind.key==='d4') ? 'fOrden' : 'fReq';
+  const applicable = rows.filter(r=>r.camino===ind.camino && r[ind.key]!=null && r[dateKey]);
   const byWeek = {};
   for(const r of applicable){
-    const key = weekKeyFor(r.fReq);
+    const key = weekKeyFor(r[dateKey]);
     (byWeek[key] = byWeek[key] || []).push(r);
   }
   return Object.keys(byWeek).sort().map(key=>{
@@ -2992,7 +3003,7 @@ function drawIndicatorTrend(){
   const ind = INDICATORS.find(i=>i.key===selectedIndicatorKey);
   document.getElementById('mainChartTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.name;
   const el = document.getElementById('indicatorTrend');
-  const rows = filteredProcesoRows();
+  const rows = rowsForIndicator(ind);
   const fullWeeks = trendDataForIndicator(rows, ind);
   const zoomed = trendZoom.startIdx!=null && trendZoom.endIdx!=null;
   const weeks = zoomed ? fullWeeks.slice(trendZoom.startIdx, trendZoom.endIdx+1) : fullWeeks;
@@ -3155,7 +3166,8 @@ function drawIndicatorTrend(){
     // Clic en un punto del gráfico de tendencia -> detalle de esa semana debajo (pedido de Piero,
     // 01.09.2026: "al hacer click en un caso salga abajo el detalle").
     dot.addEventListener('click', ()=>{
-      const weekRows = filteredProcesoRows().filter(r=>r.camino===ind.camino && r[ind.key]!=null && r.fReq && weekKeyFor(r.fReq)===dot.dataset.key);
+      const dateKey = (ind.key==='d2' || ind.key==='d3' || ind.key==='d4') ? 'fOrden' : 'fReq';
+      const weekRows = rowsForIndicator(ind).filter(r=>r.camino===ind.camino && r[ind.key]!=null && r[dateKey] && weekKeyFor(r[dateKey])===dot.dataset.key);
       openDrilldown(ind, weekRows, dot.dataset.week);
     });
   });
@@ -3206,11 +3218,10 @@ function drawIndicatorTrend(){
 }
 
 function drawKpiCards(){
-  const rows = filteredProcesoRows();
   const visible = visibleIndicators();
   const grid = document.getElementById('procKpiGrid');
   grid.innerHTML = visible.map(ind=>{
-    const st = aggStatsForIndicator(rows, ind);
+    const st = aggStatsForIndicator(rowsForIndicator(ind), ind);
     const selected = ind.key===selectedIndicatorKey ? ' selected' : '';
     const metaTxt = ind.key==='d4' ? 'Según OC' : (ind.meta!=null ? '≤ '+ind.meta+' d.h.' : '—');
     const cumpleTxt = st.cumplePct==null ? 'Sin datos' : 'Cumple '+st.cumplePct.toFixed(0)+'%';
@@ -3248,7 +3259,7 @@ function drawKpiCards(){
 }
 
 function openDrilldownForIndicator(ind){
-  const rows = filteredProcesoRows().filter(r=>r.camino===ind.camino);
+  const rows = rowsForIndicator(ind).filter(r=>r.camino===ind.camino);
   openDrilldown(ind, rows, null);
 }
 function openDrilldown(ind, rows, groupLabel){
