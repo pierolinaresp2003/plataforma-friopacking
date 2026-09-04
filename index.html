@@ -2371,27 +2371,37 @@ function proRingSvg(pct, size){
     <text x="${size/2}" y="${size/2+6}" text-anchor="middle" font-family="Arial,sans-serif" font-size="${Math.round(size*0.23)}" font-weight="800" fill="${pct==null?'#8b98a4':'#0a1e64'}">${label}</text>
   </svg>`;
 }
-function proHeaderHtml(title, subtitle, dateLabel){
+function proHeaderHtml(title, subtitle, dateLabel, headerIcon){
   const logoEl = document.querySelector('.logo-lockup');
+  // `headerIcon` (nuevo, rediseño de la imagen de Tiempos del Proceso — 03.09.2026, referencia enviada
+  // por Piero): círculo con un ícono grande a la izquierda del título. Opcional — Gasto y Alertas no lo
+  // usan y quedan exactamente igual que antes.
+  const iconHtml = headerIcon ? `<div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;margin-top:2px;">${headerIcon}</div>` : '';
   return `
   <div style="background:linear-gradient(120deg,#0a1e64 55%,#123080 100%);border-radius:18px 18px 0 0;padding:34px 40px 28px;position:relative;overflow:hidden;">
     <div style="position:absolute;right:-40px;top:-40px;width:260px;height:260px;border-radius:50%;background:rgba(62,198,172,.14);"></div>
     <div style="position:absolute;right:70px;bottom:-70px;width:190px;height:190px;border-radius:50%;background:rgba(62,198,172,.10);"></div>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative;gap:20px;">
-      <div style="max-width:1000px;">
-        <div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:.3px;line-height:1.2;font-family:Arial,sans-serif;">${escapeHtml(title)}</div>
-        <div style="font-size:17px;font-weight:700;color:#7fe3cf;margin-top:6px;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(subtitle)}</div>
-        <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;margin-top:16px;font-family:Arial,sans-serif;">📅 Actualizado: ${escapeHtml(dateLabel)}</div>
+      <div style="display:flex;align-items:flex-start;gap:16px;max-width:1000px;">
+        ${iconHtml}
+        <div>
+          <div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:.3px;line-height:1.2;font-family:Arial,sans-serif;">${escapeHtml(title)}</div>
+          <div style="font-size:17px;font-weight:700;color:#7fe3cf;margin-top:6px;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(subtitle)}</div>
+          <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;margin-top:16px;font-family:Arial,sans-serif;">📅 Actualizado: ${escapeHtml(dateLabel)}</div>
+        </div>
       </div>
       ${logoEl ? `<img src="${logoEl.src}" style="height:50px;flex-shrink:0;" alt="Grupo Friopacking">` : ''}
     </div>
   </div>`;
 }
 function proKpiCardHtml(kpi, large){
-  // kpi: {num, label, value, valueLabel, metaLabel, metaValue, pct?, color?}
+  // kpi: {num, label, value, valueLabel, metaLabel, metaValue, pct?, color?, icon?}
   // `large` (pedido de Piero, 02.09.2026: al quitar el banner rojo y el pie de letra chica de la
   // imagen de Tiempos del Proceso, "agrandar el resto de indicadores" con el espacio liberado) agranda
   // tipografía/espaciado sin tocar min-width, para no romper el ajuste de 5 tarjetas por fila.
+  // `icon` (nuevo, rediseño 03.09.2026 según referencia de Piero): cuando viene presente se dibuja un
+  // cuadrado de color con el ícono del indicador y una insignia numerada superpuesta, en vez del
+  // círculo con el número (Gasto/Alertas no lo usan y siguen mostrando el círculo de siempre).
   const hasRing = kpi.pct !== undefined;
   const color = kpi.color || (hasRing ? proSemColor(kpi.pct) : '#3ec6ac');
   const pad = large ? '28px 24px' : '20px 18px';
@@ -2401,16 +2411,29 @@ function proKpiCardHtml(kpi, large){
   const valueFont = large ? 36 : 27;
   const metaFont = large ? 13 : 11.5;
   const ringSize = large ? 92 : 72;
+  const badgeHtml = kpi.icon
+    ? `<div style="position:relative;flex-shrink:0;">
+        <div style="width:${numSize}px;height:${numSize}px;border-radius:12px;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:${Math.round(numSize*0.5)}px;">${kpi.icon}</div>
+        <div style="position:absolute;top:-8px;right:-8px;background:#0a1e64;color:#fff;font-size:10px;font-weight:800;padding:2px 5px;border-radius:6px;font-family:Arial,sans-serif;">${kpi.num}</div>
+      </div>`
+    : `<div style="width:${numSize}px;height:${numSize}px;border-radius:50%;background:#0a1e64;color:#fff;display:flex;align-items:center;justify-content:center;font-size:${numFont}px;font-weight:800;font-family:Arial,sans-serif;flex-shrink:0;">${kpi.num}</div>`;
+  // Divide "1.5 días" en número grande + unidad chica debajo (solo cuando el valor trae esa forma
+  // exacta, como en Tiempos del Proceso); el resto de imágenes (montos, cantidades) sigue mostrando el
+  // valor tal cual, sin partir nada.
+  const valueMatch = /^(.+?)\s(días?)$/.exec(kpi.value || '');
+  const valueHtml = valueMatch
+    ? `<div style="font-size:${valueFont}px;font-weight:800;color:#0a1e64;line-height:1.05;font-family:Arial,sans-serif;">${escapeHtml(valueMatch[1])}</div><div style="font-size:${Math.round(valueFont*0.32)}px;color:#8b98a4;font-weight:700;font-family:Arial,sans-serif;">${escapeHtml(valueMatch[2])}</div>`
+    : `<div style="font-size:${valueFont}px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${escapeHtml(kpi.value)}</div>`;
   return `
   <div style="flex:1;min-width:230px;background:#fff;border-radius:14px;padding:${pad};border-top:5px solid ${color};box-shadow:0 1px 3px rgba(20,30,45,.10);">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:${large?18:14}px;min-height:${numSize}px;">
-      <div style="width:${numSize}px;height:${numSize}px;border-radius:50%;background:#0a1e64;color:#fff;display:flex;align-items:center;justify-content:center;font-size:${numFont}px;font-weight:800;font-family:Arial,sans-serif;flex-shrink:0;">${kpi.num}</div>
+      ${badgeHtml}
       <div style="font-size:${labelFont}px;font-weight:800;color:#0a1e64;line-height:1.25;font-family:Arial,sans-serif;">${escapeHtml(kpi.label)}</div>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
       <div>
         <div style="font-size:${valueLabelFont}px;color:#8b98a4;font-weight:700;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(kpi.valueLabel||'VALOR')}</div>
-        <div style="font-size:${valueFont}px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${escapeHtml(kpi.value)}</div>
+        ${valueHtml}
         ${kpi.metaValue ? `<div style="font-size:${metaFont}px;color:#8b98a4;font-weight:600;margin-top:2px;font-family:Arial,sans-serif;">${escapeHtml(kpi.metaLabel||'META')}: ${escapeHtml(kpi.metaValue)}</div>` : ''}
       </div>
       ${hasRing ? proRingSvg(kpi.pct, ringSize) : ''}
@@ -2484,6 +2507,95 @@ function proTablesRowHtml(tables, large){
   if(!tables || !tables.length) return '';
   return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 40px;">${tables.map(t=>proTableHtml(t, large)).join('')}</div>`;
 }
+// ---- Panel de área (COMPRAS / ALMACÉN), rediseño de la imagen de Tiempos del Proceso, 03.09.2026,
+// según la referencia visual que envió Piero: dos paneles de color lado a lado, cada uno con 3
+// tarjetas resumen y una tabla de responsables con desglose de alertas por severidad. Solo lo usa
+// buildProImageTiempos — Gasto y Alertas no pasan `areaPanels` y quedan exactamente igual que antes. ----
+function proStatBoxHtml(box){
+  // box: {icon, value, label, color}
+  const color = box.color || '#0a1e64';
+  return `
+  <div style="flex:1;min-width:150px;background:#fff;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 2px rgba(20,30,45,.08);">
+    <div style="width:34px;height:34px;border-radius:8px;background:${color}1a;color:${color};display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${box.icon||''}</div>
+    <div>
+      <div style="font-size:19px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;line-height:1.1;">${escapeHtml(String(box.value))}</div>
+      <div style="font-size:10px;font-weight:700;color:#8b98a4;letter-spacing:.2px;font-family:Arial,sans-serif;">${escapeHtml(box.label)}</div>
+    </div>
+  </div>`;
+}
+function proAreaTableHtml(t){
+  // t: {nameLabel, mainCol:{label}, extraCol?:{label}, rows:[{name, main, extra?, leve, media, critica, pct}]}
+  const rowsHtml = t.rows.map(r=>`<tr>
+    <td style="padding:9px 8px;">
+      <div style="display:flex;align-items:center;gap:9px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:#eef2f6;color:#0a1e64;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11.5px;font-family:Arial,sans-serif;flex-shrink:0;">${initialsFor(r.name)}</div>
+        <span style="font-weight:700;color:#0a1e64;font-size:12.5px;font-family:Arial,sans-serif;white-space:nowrap;">${escapeHtml(r.name)}</span>
+      </div>
+    </td>
+    <td style="padding:9px 8px;text-align:center;font-size:12.5px;color:#1c2733;font-family:Arial,sans-serif;">${r.main}</td>
+    ${t.extraCol ? `<td style="padding:9px 8px;text-align:center;font-size:12.5px;color:#1c2733;font-family:Arial,sans-serif;">${r.extra}</td>` : ''}
+    <td style="padding:9px 6px;text-align:center;font-size:12px;color:${r.leve?'#e2960a':'#c7d0d9'};font-family:Arial,sans-serif;font-weight:700;">${r.leve||0}</td>
+    <td style="padding:9px 6px;text-align:center;font-size:12px;color:${r.media?'#e2960a':'#c7d0d9'};font-family:Arial,sans-serif;font-weight:700;">${r.media||0}</td>
+    <td style="padding:9px 6px;text-align:center;font-size:12px;color:${r.critica?'#d03b3b':'#c7d0d9'};font-family:Arial,sans-serif;font-weight:700;">${r.critica||0}</td>
+    <td style="padding:9px 8px;text-align:center;font-size:12.5px;font-weight:800;color:${proSemColor(r.pct)};font-family:Arial,sans-serif;">${r.pct==null?'—':r.pct.toFixed(1)+'%'}</td>
+  </tr>`).join('');
+  const colspanTotal = 2 + (t.extraCol?1:0) + 3 + 1;
+  return `
+  <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+    <thead>
+      <tr>
+        <th rowspan="2" style="font-size:10px;color:#8b98a4;font-weight:800;text-align:left;padding-bottom:4px;font-family:Arial,sans-serif;vertical-align:bottom;">${escapeHtml(t.nameLabel||'RESPONSABLE')}</th>
+        <th rowspan="2" style="font-size:10px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:4px;font-family:Arial,sans-serif;vertical-align:bottom;white-space:nowrap;">${escapeHtml(t.mainCol.label)}</th>
+        ${t.extraCol ? `<th rowspan="2" style="font-size:10px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:4px;font-family:Arial,sans-serif;vertical-align:bottom;white-space:nowrap;">${escapeHtml(t.extraCol.label)}</th>` : ''}
+        <th colspan="3" style="font-size:9.5px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:3px;font-family:Arial,sans-serif;border-bottom:1px solid #e2e8ee;">ALERTA CASOS X RESPONSABLE (CONTEO POR NIVEL)</th>
+        <th rowspan="2" style="font-size:10px;color:#8b98a4;font-weight:800;text-align:center;padding-bottom:4px;font-family:Arial,sans-serif;vertical-align:bottom;white-space:nowrap;">% CUMPLIMIENTO</th>
+      </tr>
+      <tr>
+        <th style="font-size:9px;color:#e2960a;font-weight:800;text-align:center;padding:3px 4px;font-family:Arial,sans-serif;">LEVE<br>(1-2 d)</th>
+        <th style="font-size:9px;color:#e2960a;font-weight:800;text-align:center;padding:3px 4px;font-family:Arial,sans-serif;">MEDIA<br>(3-5 d)</th>
+        <th style="font-size:9px;color:#d03b3b;font-weight:800;text-align:center;padding:3px 4px;font-family:Arial,sans-serif;">CRÍTICA<br>(&gt;5 d)</th>
+      </tr>
+    </thead>
+    <tbody>${rowsHtml || `<tr><td colspan="${colspanTotal}" style="text-align:center;padding:14px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
+  </table>`;
+}
+function proAreaPanelHtml(p){
+  // p: {icon, title, headerColor, statBoxes:[...], table:{...}}
+  return `
+  <div style="flex:1;min-width:560px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="background:${p.headerColor};padding:12px 20px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:18px;">${p.icon}</span>
+      <span style="font-size:16px;font-weight:800;color:#fff;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(p.title)}</span>
+    </div>
+    <div style="padding:16px 20px 20px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px;">${p.statBoxes.map(proStatBoxHtml).join('')}</div>
+      ${proAreaTableHtml(p.table)}
+    </div>
+  </div>`;
+}
+function proAreaSectionHtml(panels){
+  if(!panels || !panels.length) return '';
+  return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:6px 40px 16px;">${panels.map(proAreaPanelHtml).join('')}</div>`;
+}
+function proFooterBarHtml(f){
+  // f: {objetivo, metaGlobalLabel, metaGlobalValue, nota}
+  if(!f) return '';
+  return `
+  <div style="margin:6px 40px 30px;background:#fff;border-radius:12px;padding:16px 22px;display:flex;align-items:center;gap:26px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(20,30,45,.08);">
+    <div style="display:flex;align-items:center;gap:12px;flex:2;min-width:340px;">
+      <span style="font-size:24px;">🏆</span>
+      <div><span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">OBJETIVO: </span><span style="font-size:12.5px;color:#5b6b7a;font-family:Arial,sans-serif;">${escapeHtml(f.objetivo)}</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;background:#eef2f6;border-radius:10px;padding:8px 16px;">
+      <span style="font-size:18px;">🎯</span>
+      <div><div style="font-size:10.5px;font-weight:700;color:#8b98a4;font-family:Arial,sans-serif;">${escapeHtml(f.metaGlobalLabel)}</div><div style="font-size:15px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${escapeHtml(f.metaGlobalValue)}</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;max-width:260px;">
+      <span style="font-size:16px;">ℹ️</span>
+      <span style="font-size:11px;color:#8b98a4;font-family:Arial,sans-serif;">${escapeHtml(f.nota)}</span>
+    </div>
+  </div>`;
+}
 function proBannerHtml(b){
   // b: {tone:'alert'|'info', icon, items:[{value,label}], action}
   if(!b) return '';
@@ -2500,18 +2612,21 @@ function proBannerHtml(b){
   </div>`;
 }
 function proImageHtml(opts){
-  // opts: {title, subtitle, kpis, tables, banner, footnote, large?}
+  // opts: {title, subtitle, kpis, tables, banner, footnote, large?, headerIcon?, areaPanels?, footerBar?}
   const fecha = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
-  // Cuando no hay banner ni pie de letra chica (Tiempos del Proceso, 02.09.2026), se agrega un margen
-  // inferior propio para que la imagen no termine pegada justo debajo de las tablas.
-  const bottomSpacer = (!opts.banner && !opts.footnote) ? `<div style="padding-bottom:34px;"></div>` : '';
+  // Cuando no hay banner, pie de letra chica, panel de áreas ni footer propio, se agrega un margen
+  // inferior para que la imagen no termine pegada justo debajo de las tablas (Tiempos del Proceso,
+  // 02.09.2026 — sigue aplicando cuando el rediseño de 03.09.2026 tampoco trae esos elementos).
+  const bottomSpacer = (!opts.banner && !opts.footnote && !opts.areaPanels && !opts.footerBar) ? `<div style="padding-bottom:34px;"></div>` : '';
   return `
   <div id="proImgInner" style="width:1500px;font-family:Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
-    ${proHeaderHtml(opts.title, opts.subtitle, fecha)}
+    ${proHeaderHtml(opts.title, opts.subtitle, fecha, opts.headerIcon)}
     ${proKpiRowHtml(opts.kpis, opts.large)}
     ${proTablesRowHtml(opts.tables, opts.large)}
+    ${proAreaSectionHtml(opts.areaPanels)}
     ${proBannerHtml(opts.banner)}
     ${opts.footnote ? `<div style="padding:2px 40px 26px;font-size:11px;color:#8b98a4;line-height:1.5;font-family:Arial,sans-serif;">${opts.footnote}</div>` : ''}
+    ${proFooterBarHtml(opts.footerBar)}
     ${bottomSpacer}
   </div>`;
 }
@@ -2557,13 +2672,51 @@ function alertCountsSimple(){
   }
   return { nReq: count('req_sin_pedido'), nPedido: count('pedido_sin_oc') };
 }
+// Conteo de "casos de alerta" por responsable para un indicador con meta fija: exceso de días hábiles
+// sobre la meta, clasificado en 3 niveles de severidad (Leve 1-2 d.h. de exceso, Media 3-5, Crítica
+// > 5 d.h.) — mismos umbrales que la referencia de imagen que envió Piero el 03.09.2026. Los casos
+// dentro de meta no suman a ningún nivel (no son "alerta"). Reutiliza responsableLabel/indCumple, ya
+// validados por el resto de Tiempos del Proceso.
+function severityBucketsFor(rows, ind){
+  const applicable = rows.filter(r=>r.camino===ind.camino && r[ind.key]!=null);
+  const byResp = {};
+  for(const r of applicable){
+    const resp = responsableLabel(r, ind);
+    const b = byResp[resp] = byResp[resp] || { leve:0, media:0, critica:0, n:0, cumpleN:0 };
+    b.n++;
+    if(indCumple(ind, r)) b.cumpleN++;
+    if(ind.meta!=null){
+      const exceso = r[ind.key] - ind.meta;
+      if(exceso>0){
+        if(exceso<=2) b.leve++;
+        else if(exceso<=5) b.media++;
+        else b.critica++;
+      }
+    }
+  }
+  return byResp;
+}
+// Rediseño completo de la imagen de Tiempos del Proceso (03.09.2026), a pedido de Piero: "quiero que
+// se cambie la imagen que se genere y que tenga un modelo y la información como esta estructura...
+// hazlo bien y usa el logo de grupo friopacking que ya tienes" — envió una referencia con tarjetas de
+// indicador numeradas con ícono y aro de cumplimiento, y dos paneles de área (Compras/Almacén) con
+// tarjetas resumen y una tabla de responsables con desglose de alertas por severidad. El logo ya se
+// toma automáticamente del propio encabezado de la plataforma (`proHeaderHtml` lee `.logo-lockup`),
+// no hace falta agregarlo aparte. Reintroduce el % de cumplimiento por responsable que se había
+// quitado el 02.09.2026 ("ya no es un ranking") porque la nueva referencia sí lo pide explícitamente,
+// ahora como parte de esta tabla de seguimiento (no como "ranking" con podio).
 function buildProImageTiempos(){
   const rows = filteredProcesoRows();
+  const IND1 = INDICATORS.find(i=>i.key==='d1'), IND2 = INDICATORS.find(i=>i.key==='d2'), IND6 = INDICATORS.find(i=>i.key==='d6');
+  const iconByNum = { 1:'📋', 2:'🛒', 3:'🛡️', 4:'🚚', 5:'📄' };
+  const colorByNum = { 1:'#1f9aa8', 2:'#e2960a', 3:'#0ca30c', 4:'#d03b3b', 5:'#7c3fd4' };
   const kpis = INDICATORS.map(ind=>{
     const st = aggStatsForIndicator(rows, ind);
     const metaTxt = ind.key==='d4' ? 'Plazo pactado en OC' : (ind.meta!=null ? '≤ '+ind.meta+' d.h.' : 'Sin meta');
     return {
       num: String(ind.num).padStart(2,'0'),
+      icon: iconByNum[ind.num],
+      color: colorByNum[ind.num],
       label: ind.stage.toUpperCase(),
       value: st.promedio==null ? '—' : st.promedio.toFixed(1)+' días',
       valueLabel: 'PROMEDIO',
@@ -2571,17 +2724,10 @@ function buildProImageTiempos(){
       pct: st.cumplePct,
     };
   });
-  // Tabla de compradores simplificada (pedido de Piero, 02.09.2026: "quita el % de cumplimiento...
-  // ya no es un ranking... simplemente para compradores coloca cuánto se tardan en emisión de oc [y]
-  // el volumen de cantidad de oc que generó cada comprador") — sin puesto, sin % de cumplimiento, y
-  // sin la columna de Entrega de OC (Ind. 4): solo Emisión de OC (Ind. 2), promedio y volumen. MLUJAN
-  // ya queda excluido desde `compradorRankingFromRows` (no es un comprador real).
-  //
-  // BUG corregido (02.09.2026, misma ronda, tras pregunta de Piero: "en agosto solo PLINARES hizo 85
-  // oc, por qué colocas que hizo 238?"): "volumen de OC" se había calculado como cantidad de LÍNEAS de
-  // requerimiento con Indicador 2 válido (`d2.n` de `groupRowsFor`), no cantidad de ÓRDENES DE COMPRA
-  // distintas — una sola OC suele traer varias líneas/productos, así que esa cuenta multiplicaba el
-  // volumen real. Ahora se cuenta `codOrden` distinto por comprador (Set), que sí es "cuántas OC generó".
+
+  // Panel COMPRAS: mismo conteo de "cuántas OC generó cada comprador" ya validado (codOrden distinto
+  // por comprador, MLUJAN excluido por no ser un comprador real) más el desglose de alertas por
+  // severidad y el % de cumplimiento del Indicador 2 (Emisión de OC) — el paso que sí controla Compras.
   const compradorOcSets = {};
   for(const r of rows){
     if(r.camino!=='compra') continue;
@@ -2591,32 +2737,78 @@ function buildProImageTiempos(){
     if(!oc) continue;
     (compradorOcSets[comprador] = compradorOcSets[comprador] || new Set()).add(oc);
   }
-  const compradorRows = compradorRankingFromRows(rows)
-    .filter(r=>r.d2)
-    .map(r=> Object.assign({}, r, { volumenOC: compradorOcSets[r.comprador] ? compradorOcSets[r.comprador].size : 0 }))
-    .sort((a,b)=> b.volumenOC - a.volumenOC)
-    .slice(0,8)
-    .map(r=>({ name: r.comprador, cells: [ r.d2.promedio.toFixed(1)+'d', r.volumenOC.toLocaleString('es-PE') ] }));
-  const almacenPersons = [ { name:'JCENTENO', ind: INDICATORS.find(i=>i.key==='d1') }, { name:'KALBUJAR', ind: INDICATORS.find(i=>i.key==='d6') } ];
-  // Mismo tratamiento para Almacén (pedido de Piero: "del mismo modo con almacén, no coloques su %")
-  // — sin puesto ni % de cumplimiento, solo promedio y casos.
-  const almacenRows = almacenPersons.map(p=>{
-    const st = aggStatsForIndicator(rows, p.ind);
-    return { name: p.name, cells: [ st.promedio==null?'—':st.promedio.toFixed(1)+'d', st.n.toLocaleString('es-PE') ] };
-  });
-  // Sin banner de alertas ni pie de letra chica (pedido de Piero, 02.09.2026: "la parte de rojo de
-  // abajo prefiero que la quites y agrandes el resto de indicadores... las letras pequeñas del final
-  // de la foto igual quítalas") — el espacio liberado se usa agrandando tarjetas y tablas (ver `large`
-  // en proKpiCardHtml/proTableHtml).
+  const sev2 = severityBucketsFor(rows, IND2);
+  const comprasRowsRaw = Object.keys(compradorOcSets).map(name=>{
+    const s = sev2[name] || { leve:0, media:0, critica:0, n:0, cumpleN:0 };
+    return { name, ocCount: compradorOcSets[name].size, leve:s.leve, media:s.media, critica:s.critica, pct: s.n ? (s.cumpleN/s.n*100) : null };
+  }).sort((a,b)=> b.ocCount - a.ocCount).slice(0,8);
+  const comprasRows = comprasRowsRaw.map(r=>({ name:r.name, main:r.ocCount.toLocaleString('es-PE'), leve:r.leve, media:r.media, critica:r.critica, pct:r.pct }));
+  const totalOC = Object.values(compradorOcSets).reduce((a,s)=>a+s.size,0);
+  const totalAlertaCompras = Object.values(sev2).reduce((a,s)=>a+s.leve+s.media+s.critica,0);
+  const stIND2 = aggStatsForIndicator(rows, IND2);
+
+  // Panel ALMACÉN: combina Indicador 1 (Generación de Pedido — normalmente JCENTENO, aunque puede
+  // haber "pedidos directos" con otro responsable, ver responsableD1For) e Indicador 5/d6 (Despacho de
+  // Requerimiento, siempre KALBUJAR) por persona, igual que compradorRankingFromRows hace para Compras.
+  const sev1 = severityBucketsFor(rows, IND1);
+  const sev6 = severityBucketsFor(rows, IND6);
+  const almacenNames = Array.from(new Set([...Object.keys(sev1), ...Object.keys(sev6)]));
+  const almacenRowsRaw = almacenNames.map(name=>{
+    const a = sev1[name], b = sev6[name];
+    const reqRevisados = a ? a.n : 0, reqDespachados = b ? b.n : 0;
+    const n = reqRevisados + reqDespachados;
+    const cumpleN = (a?a.cumpleN:0) + (b?b.cumpleN:0);
+    return {
+      name, reqRevisados, reqDespachados, total: n,
+      leve: (a?a.leve:0)+(b?b.leve:0), media: (a?a.media:0)+(b?b.media:0), critica: (a?a.critica:0)+(b?b.critica:0),
+      pct: n ? (cumpleN/n*100) : null,
+    };
+  }).sort((x,y)=> y.total - x.total);
+  const almacenRows = almacenRowsRaw.map(r=>({ name:r.name, main:r.reqRevisados.toLocaleString('es-PE'), extra:r.reqDespachados.toLocaleString('es-PE'), leve:r.leve, media:r.media, critica:r.critica, pct:r.pct }));
+  const stIND1 = aggStatsForIndicator(rows, IND1), stIND6 = aggStatsForIndicator(rows, IND6);
+  const totalAlertaAlmacen = Object.values(sev1).reduce((a,s)=>a+s.leve+s.media+s.critica,0) + Object.values(sev6).reduce((a,s)=>a+s.leve+s.media+s.critica,0);
+
+  const areaPanels = [
+    {
+      icon:'🛒', title:'COMPRAS', headerColor:'#0a1e64',
+      statBoxes: [
+        { icon:'📋', value: totalOC.toLocaleString('es-PE'), label:'CANTIDAD DE OC GENERADAS', color:'#0a1e64' },
+        { icon:'⚠️', value: totalAlertaCompras.toLocaleString('es-PE'), label:'ALERTA CASOS X RESPONSABLE (TOTAL)', color: totalAlertaCompras>0?'#d03b3b':'#0ca30c' },
+        { icon:'✅', value: stIND2.cumplePct==null?'—':stIND2.cumplePct.toFixed(1)+'%', label:'% CUMPLIMIENTO EMISIÓN DE OC', color: proSemColor(stIND2.cumplePct) },
+      ],
+      table: { nameLabel:'RESPONSABLE', mainCol:{label:'CANTIDAD DE OC GENERADAS'}, rows: comprasRows },
+    },
+    {
+      icon:'🏬', title:'ALMACÉN', headerColor:'#1f8f96',
+      statBoxes: [
+        { icon:'🔍', value: stIND1.n.toLocaleString('es-PE'), label:'REQ REVISADOS (GENERACIÓN DE PEDIDO)', color:'#1f9aa8' },
+        { icon:'🚚', value: stIND6.n.toLocaleString('es-PE'), label:'REQ DESPACHADOS', color:'#1f8f96' },
+        { icon:'⚠️', value: totalAlertaAlmacen.toLocaleString('es-PE'), label:'ALERTA CASOS X RESPONSABLE (TOTAL)', color: totalAlertaAlmacen>0?'#d03b3b':'#0ca30c' },
+      ],
+      table: { nameLabel:'RESPONSABLE', mainCol:{label:'REQ REVISADOS'}, extraCol:{label:'REQ DESPACHADOS'}, rows: almacenRows },
+    },
+  ];
+
+  // Meta global mostrada al pie: promedio real de los % de cumplimiento de los indicadores con meta
+  // fija (Ind. 1, 2, 3 y 6 — el Ind. 4 depende del plazo pactado con cada proveedor, no de una meta
+  // interna, así que no entra en este promedio). Se calcula sobre los datos reales del período
+  // filtrado, no se inventa una meta institucional que Piero no ha confirmado.
+  const pctsConMeta = kpis.filter((k,i)=> INDICATORS[i].meta!=null && k.pct!=null).map(k=>k.pct);
+  const cumplGlobal = pctsConMeta.length ? (pctsConMeta.reduce((a,b)=>a+b,0)/pctsConMeta.length) : null;
+
   return {
     title: 'INDICADORES DE TIEMPOS DEL PROCESO',
-    subtitle: 'COMPRADORES Y RESPONSABLES DE ALMACÉN',
+    subtitle: 'COMPRAS Y ALMACÉN',
+    headerIcon: '⏰',
     kpis,
     large: true,
-    tables: [
-      { icon:'📋', title:'Compradores', subtitle:'Tiempo de Emisión de OC (Ind. 2) — promedio y volumen por comprador', nameLabel:'COMPRADOR', columns:['PROMEDIO','VOLUMEN OC'], rows: compradorRows, showRank:false, showBar:false },
-      { icon:'🏬', title:'Responsables de Almacén', subtitle:'Generación de Pedido (Ind. 1) y Despacho de Requerimiento (Ind. 5)', nameLabel:'RESPONSABLE', columns:['PROMEDIO','CASOS'], rows: almacenRows, showRank:false, showBar:false },
-    ],
+    areaPanels,
+    footerBar: {
+      objetivo: 'Cumplir con las fechas comprometidas para garantizar la continuidad de los proyectos y la satisfacción del cliente.',
+      metaGlobalLabel: 'CUMPLIMIENTO GLOBAL PROMEDIO (Ind. 1, 2, 3 y 6)',
+      metaGlobalValue: cumplGlobal==null ? '—' : cumplGlobal.toFixed(1)+'%',
+      nota: 'd.h. = días hábiles',
+    },
   };
 }
 function buildProImageGasto(){
