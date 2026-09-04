@@ -727,6 +727,12 @@ function buildSnapshot(){
         // mostrando, marcadas, las líneas excluidas por la columna "¿Es regularización?" también sobre
         // el link publicado (ver openDrilldown). rg se guarda como 0/1 para no engordar el JSON.
         d4r: r.d4raw, rg: r.esRegularizacion ? 1 : 0,
+        // mn/mo/cd/et/fe (04.09.2026): moneda, montoNativo, condiciones, etd, fEntregaReal — para el
+        // detalle por comprador de la imagen de Tiempos del Proceso (ver buildProImageTiempos). Un
+        // snapshot publicado antes de esta ronda no trae estos campos — loadFromSnapshot los deja en
+        // null/"" (no hay valor "por defecto" engañoso posible aquí, a diferencia de "rp").
+        mn: r.moneda, mo: r.montoNativo==null?null:Math.round(r.montoNativo*100)/100, cd: r.condiciones,
+        et: isoDay(r.etd), fe: isoDay(r.fEntregaReal),
       })),
       // Alertas de atención (Req sin Pedido / Pedido sin OC) — se publican aparte porque son casos SIN
       // fecha final (siguen abiertos), y "proceso.rows" de arriba solo contiene casos con al menos un
@@ -876,6 +882,11 @@ function loadFromSnapshot(snap){
       // Un snapshot publicado ANTES de esta ronda (02.09.2026) no trae "d4r"/"rg" — se cae a d4raw=d4
       // (mismo valor, sin marcar ninguna como regularización) para no romper el detalle en ese caso.
       d4raw: (r.d4r !== undefined ? r.d4r : r.d4), esRegularizacion: !!r.rg,
+      // moneda/montoNativo/condiciones/etd/fEntregaReal (04.09.2026) — ausentes en un snapshot viejo,
+      // quedan en null/"" (el detalle por comprador simplemente no muestra esos datos hasta que se
+      // vuelva a publicar con el Excel actual).
+      moneda: r.mn || null, montoNativo: (r.mo!=null ? r.mo : null), condiciones: r.cd || "",
+      etd: fromIsoDay(r.et), fEntregaReal: fromIsoDay(r.fe),
     })) : [],
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
     // ese caso, simplemente no se muestran alertas hasta que se vuelva a publicar con el archivo actual.
@@ -1079,6 +1090,16 @@ function processWorkbook(wb, filename){
     // Entrega de OC) — verificado contra el archivo real: header exacto "¿Es regularización?", valores
     // "Regularización" (139 filas) o vacío (el resto).
     esRegularizacion: findCol(headerRow, ["¿Es regularización?","Es regularización","Regularización"]),
+    // Columnas nuevas para el detalle por comprador de la imagen de Tiempos del Proceso (04.09.2026,
+    // pedido de Piero: monto/moneda, categoría, condición de pago y tiempo de entrega del proveedor
+    // cuando se filtra por 1 solo comprador) — verificadas contra el archivo real (columnas X, AV, AW,
+    // BB, BC, BE de Reporte Maestro.xlsx).
+    cantidadOrden: findCol(headerRow, ["Cantidad de orden"]),
+    moneda: findCol(headerRow, ["MONEDA","Moneda"]),
+    precioUnitario: findCol(headerRow, ["PRECIO UNITARIO SIN IGV","Precio Unitario Sin Igv"]),
+    condiciones: findCol(headerRow, ["Condiciones"]),
+    etd: findCol(headerRow, ["ETD"]),
+    fEntregaReal: findCol(headerRow, ["F. Entrega Real","F Entrega Real"]),
   };
 
   const dataRows = rows.slice(headerRowIdx+1);
@@ -1279,6 +1300,17 @@ function processWorkbook(wb, filename){
         // Responsable real del Indicador 1 para este caso puntual (ver responsableD1For arriba) —
         // se recalcula solo con reresolveResponsableD1() si PedidoSinReq.xlsx se carga después.
         responsableD1: responsableD1For(codPedidoAt),
+        // Monto/moneda/condición de pago/tiempo de entrega proveedor (04.09.2026) — para el detalle por
+        // comprador de la imagen de Tiempos del Proceso. montoNativo = Cantidad de orden × Precio
+        // Unitario Sin IGV, SIN convertir (misma decisión ya tomada para Gasto: Piero pidió no convertir).
+        // etd/fEntregaReal solo vienen llenos en compras importadas (verificado: ~7% de las filas, todas
+        // con CodOrden 0002-, confirmado por Piero: "esas columnas son indicadores cuando es importación").
+        moneda: col.moneda!==-1 ? (r[col.moneda]||"").toString().trim() : null,
+        montoNativo: (col.cantidadOrden!==-1 && col.precioUnitario!==-1 && r[col.cantidadOrden]!=null && r[col.precioUnitario]!=null && !isNaN(Number(r[col.cantidadOrden])) && !isNaN(Number(r[col.precioUnitario])))
+          ? Number(r[col.cantidadOrden]) * Number(r[col.precioUnitario]) : null,
+        condiciones: col.condiciones!==-1 ? (r[col.condiciones]||"").toString().trim() : "",
+        etd: col.etd!==-1 ? parseExcelDate(r[col.etd]) : null,
+        fEntregaReal: col.fEntregaReal!==-1 ? parseExcelDate(r[col.fEntregaReal]) : null,
       });
     }
   }
@@ -1655,10 +1687,36 @@ function monedaLabel(m){
 function montoPorMonedaOrigen(rows){
   let soles = 0, dolares = 0;
   for(const r of rows){
+    // Guard agregado 04.09.2026 al reutilizar esta función para el detalle por comprador de Tiempos
+    // del Proceso: esas filas pueden traer montoNativo en null (columna no encontrada o celda vacía),
+    // algo que no pasaba con GASTO_DATA (ya descarta esas líneas al procesar Consulta.xlsx).
+    if(r.montoNativo == null || isNaN(r.montoNativo)) continue;
     if(monedaLabel(r.moneda) === 'S/') soles += r.montoNativo;
     else dolares += r.montoNativo;
   }
   return { soles, dolares };
+}
+// Igual que buildGastoAgg pero ordenando por CANTIDAD de filas en vez de monto — se usa para el
+// detalle por comprador de Tiempos del Proceso (categoría de compra, condición de pago), donde el
+// monto no se puede sumar directo entre grupos porque mezcla varias monedas sin convertir.
+function buildCountAgg(rows, labelFn){
+  const groups = {};
+  for(const r of rows){
+    const key = labelFn(r) || "(sin dato)";
+    (groups[key] = groups[key] || []).push(r);
+  }
+  const agg = Object.entries(groups).map(([label, g])=>({ label, n: g.length, rows: g }));
+  agg.sort((a,b)=>b.n-a.n);
+  const total = agg.reduce((s,g)=>s+g.n,0);
+  let acc = 0;
+  for(const g of agg){
+    const before = acc;
+    acc += g.n;
+    g.pct = total>0 ? g.n/total*100 : 0;
+    g.pctAcum = total>0 ? acc/total*100 : 0;
+    g.top80 = total>0 ? (before < total*0.8) : false;
+  }
+  return { agg, total };
 }
 // Estado de navegación del módulo (no se guarda en snapshot — cada quien que vea el link empieza en
 // Nacional sin drill, como al cargar el Excel). origen -> familia -> subfamilia -> producto ->
@@ -2612,6 +2670,24 @@ function proAreaSectionHtml(panels){
   if(!panels || !panels.length) return '';
   return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:6px 40px 16px;">${panels.map(proAreaPanelHtml).join('')}</div>`;
 }
+// Panel "DETALLE — <comprador>" (04.09.2026, pedido de Piero): solo aparece en la imagen de Tiempos
+// del Proceso cuando el filtro "Responsable de compra" tiene 1 comprador seleccionado (no "Todos") —
+// ver buildProImageTiempos. Reutiliza proStatBoxHtml (igual que COMPRAS/ALMACÉN) y proTableHtml (igual
+// que Gasto) para no crear estilos nuevos.
+function proCompradorDetailHtml(cd){
+  if(!cd) return '';
+  return `
+  <div style="margin:0 40px 16px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="background:#123080;padding:12px 20px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:18px;">🔎</span>
+      <span style="font-size:16px;font-weight:800;color:#fff;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(cd.title)}</span>
+    </div>
+    <div style="padding:16px 20px 20px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">${cd.statBoxes.map(proStatBoxHtml).join('')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;">${cd.tables.map(t=>proTableHtml(t, true)).join('')}</div>
+    </div>
+  </div>`;
+}
 function proFooterBarHtml(f){
   // f: {objetivo, metaGlobalLabel, metaGlobalValue, nota}
   if(!f) return '';
@@ -2647,7 +2723,10 @@ function proBannerHtml(b){
   </div>`;
 }
 function proImageHtml(opts){
-  // opts: {title, subtitle, kpis, tables, banner, footnote, large?, headerIcon?, areaPanels?, footerBar?, width?, dateLabel?}
+  // opts: {title, subtitle, kpis, tables, banner, footnote, large?, headerIcon?, areaPanels?, footerBar?, width?, dateLabel?, compradorDetail?}
+  // `compradorDetail` (04.09.2026): panel opcional "DETALLE — <comprador>" que solo pasa
+  // buildProImageTiempos, y solo cuando hay 1 comprador filtrado (ver proCompradorDetailHtml). Gasto y
+  // Alertas no lo usan y quedan exactamente igual que antes.
   // `width`/`dateLabel` (04.09.2026, pedido de Piero sobre Tiempos del Proceso: "hacer el reporte más
   // grande" para que no se corten los paneles de área, y mostrar el filtro activo en "Actualizado" en
   // vez de siempre la fecha de hoy) — opcionales; Gasto y Alertas no los pasan y siguen igual que antes
@@ -2664,6 +2743,7 @@ function proImageHtml(opts){
     ${proKpiRowHtml(opts.kpis, opts.large)}
     ${proTablesRowHtml(opts.tables, opts.large)}
     ${proAreaSectionHtml(opts.areaPanels)}
+    ${proCompradorDetailHtml(opts.compradorDetail)}
     ${proBannerHtml(opts.banner)}
     ${opts.footnote ? `<div style="padding:2px 40px 26px;font-size:11px;color:#8b98a4;line-height:1.5;font-family:Arial,sans-serif;">${opts.footnote}</div>` : ''}
     ${proFooterBarHtml(opts.footerBar)}
@@ -2849,6 +2929,63 @@ function buildProImageTiempos(){
   const pctsConMeta = kpis.filter((k,i)=> INDICATORS[i].meta!=null && k.pct!=null).map(k=>k.pct);
   const cumplGlobal = pctsConMeta.length ? (pctsConMeta.reduce((a,b)=>a+b,0)/pctsConMeta.length) : null;
 
+  // Detalle por comprador (04.09.2026, pedido de Piero): solo cuando el filtro "Responsable de compra"
+  // tiene 1 comprador seleccionado (no "Todos") — con "Todos" la imagen queda exactamente igual que
+  // antes. OC colocadas/nacional/importado y monto se cuentan sobre rowsPorFechaOc (mismo criterio ya
+  // validado de "Cantidad de OC generadas" — FechaOrden, codOrden distinto). Categoría de compra y
+  // condición de pago se agrupan por CANTIDAD de líneas, no por monto, porque el monto no se puede
+  // sumar entre monedas distintas sin convertir (decisión ya tomada para Gasto: no convertir).
+  const respFilterVal = document.getElementById('filterProcesoResponsable').value;
+  let compradorDetail = null;
+  if(respFilterVal !== 'all'){
+    const compradorRows = rowsPorFechaOc.filter(r=>r.camino==='compra');
+    const ocSet = new Set(), ocNacSet = new Set(), ocImpSet = new Set();
+    for(const r of compradorRows){
+      const oc = (r.codOrden||'').trim();
+      if(!oc) continue;
+      ocSet.add(oc);
+      (r.origen==='importado' ? ocImpSet : ocNacSet).add(oc);
+    }
+    const { soles, dolares } = montoPorMonedaOrigen(compradorRows);
+    const statBoxes = [
+      { icon:'📋', value: ocSet.size.toLocaleString('es-PE'), label:'OC COLOCADAS', color:'#0a1e64' },
+      { icon:'🇵🇪', value: ocNacSet.size.toLocaleString('es-PE'), label:'OC NACIONALES', color:'#1f9aa8' },
+      { icon:'🌎', value: ocImpSet.size.toLocaleString('es-PE'), label:'OC IMPORTADAS', color:'#7c3fd4' },
+      { icon:'💰', value: fmtPEN(soles), label:'MONTO EN SOLES', color:'#0ca30c' },
+      { icon:'💵', value: fmtUSD(dolares), label:'MONTO EN DÓLARES (incluye € a valor nominal)', color:'#e2960a' },
+    ];
+    // Tiempo de entrega del proveedor: solo aplica a compras importadas (columnas ETD/F. Entrega Real
+    // solo se llenan ahí, confirmado por Piero, 04.09.2026) — se omite del todo si el comprador no tiene
+    // OC importadas en el período, en vez de mostrar "—" sin sentido.
+    const impRows = compradorRows.filter(r=>r.origen==='importado');
+    if(impRows.length){
+      const desviaciones = impRows.filter(r=>r.etd && r.fEntregaReal).map(r=>busdayCount(r.etd, r.fEntregaReal)).filter(v=>v!=null);
+      const avgDesvio = desviaciones.length ? desviaciones.reduce((a,b)=>a+b,0)/desviaciones.length : null;
+      const impPendSet = new Set();
+      for(const r of impRows){ const oc=(r.codOrden||'').trim(); if(oc && r.etd && !r.fEntregaReal) impPendSet.add(oc); }
+      statBoxes.push({ icon:'⏳', value: impPendSet.size.toLocaleString('es-PE'), label:'OC IMPORTADAS AÚN SIN LLEGAR (de '+ocImpSet.size+')', color: impPendSet.size>0?'#e2960a':'#0ca30c' });
+      statBoxes.push({ icon:'🚢', value: avgDesvio==null?'—':(avgDesvio>=0?'+':'')+avgDesvio.toFixed(1)+' d.h.', label:'DESVÍO PROMEDIO VS. ETD (ENTREGA PROVEEDOR)', color: avgDesvio==null?'#8b98a4':(avgDesvio<=0?'#0ca30c':(avgDesvio<=5?'#e2960a':'#d03b3b')) });
+    }
+
+    const rowsFromAgg = (agg)=> agg.slice(0,5).map((g,i)=>({
+      rank:i+1, name:g.label,
+      cells:[ g.n.toLocaleString('es-PE'), g.pct.toFixed(1)+'%' ],
+      pct: g.pctAcum, pctLabel: g.pctAcum.toFixed(0)+'%',
+      barColor: g.top80 ? '#0a1e64' : '#c7d0d9',
+    }));
+    const { agg: catAgg } = buildCountAgg(compradorRows, r=>r.familia);
+    const { agg: condAgg } = buildCountAgg(compradorRows, r=>creditoBucketFor(r.condiciones));
+
+    compradorDetail = {
+      title: 'DETALLE — ' + respFilterVal,
+      statBoxes,
+      tables: [
+        { icon:'📦', title:'Categoría de compra', subtitle:'Top 5 por cantidad de líneas en el período filtrado', nameLabel:'CATEGORÍA', columns:['LÍNEAS','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: rowsFromAgg(catAgg), legendItems:[{color:'#0a1e64',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
+        { icon:'💳', title:'Condición de pago', subtitle:'OC del período agrupadas por condición pactada con el proveedor', nameLabel:'CONDICIÓN', columns:['LÍNEAS','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: rowsFromAgg(condAgg), legendItems:[{color:'#0a1e64',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
+      ],
+    };
+  }
+
   return {
     title: 'INDICADORES DE TIEMPOS DEL PROCESO',
     subtitle: 'COMPRAS Y ALMACÉN',
@@ -2858,6 +2995,7 @@ function buildProImageTiempos(){
     kpis,
     large: true,
     areaPanels,
+    compradorDetail,
     footerBar: {
       objetivo: 'Cumplir con las fechas comprometidas para garantizar la continuidad de los proyectos y la satisfacción del cliente.',
       metaGlobalLabel: 'CUMPLIMIENTO GLOBAL PROMEDIO (Ind. 1, 2, 3 y 6)',
