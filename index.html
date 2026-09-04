@@ -1389,6 +1389,11 @@ function processPedidoSinReq(wb, filename){
 // mercado EUR. Es una aproximación explícita, confirmada con Piero como forma de arrancar; ajustar acá
 // si se necesita otro valor o una tabla de tipo de cambio por fecha más adelante.
 const TIPO_CAMBIO = { 'US$': 3.375, 'USD': 3.375, '€': 3.90, 'EUR': 3.90 };
+// Logo limpio (sin el lema "Soluciones que mantienen tu mundo en frío") para el nuevo Reporte de Compras
+// por responsable (04.09.2026, pedido de Piero) — subido al proyecto Cowork. Se usa SOLO en el
+// encabezado de ese reporte nuevo; el resto de la plataforma sigue leyendo el logo grande de
+// `.logo-lockup` (que sí trae el lema) sin ningún cambio, tal como pidió Piero.
+const LOGO_GRUPOFRIOPACKING_B64 = "data:image/jpeg;base64,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";
 // La columna Moneda de Consulta.xlsx a veces trae espacios de más (al inicio, en medio o al final,
 // ej. "S / ." o "US $") — normalizeMoneda() le quita TODOS los espacios (no solo los de los extremos,
 // como hacía un trim() normal) para que la comparación con "S/." y las llaves de TIPO_CAMBIO no falle
@@ -1701,28 +1706,6 @@ function montoPorMonedaOrigen(rows){
     else dolares += r.montoNativo;
   }
   return { soles, dolares };
-}
-// Igual que buildGastoAgg pero ordenando por CANTIDAD de filas en vez de monto — se usa para el
-// detalle por comprador de Tiempos del Proceso (categoría de compra, condición de pago), donde el
-// monto no se puede sumar directo entre grupos porque mezcla varias monedas sin convertir.
-function buildCountAgg(rows, labelFn){
-  const groups = {};
-  for(const r of rows){
-    const key = labelFn(r) || "(sin dato)";
-    (groups[key] = groups[key] || []).push(r);
-  }
-  const agg = Object.entries(groups).map(([label, g])=>({ label, n: g.length, rows: g }));
-  agg.sort((a,b)=>b.n-a.n);
-  const total = agg.reduce((s,g)=>s+g.n,0);
-  let acc = 0;
-  for(const g of agg){
-    const before = acc;
-    acc += g.n;
-    g.pct = total>0 ? g.n/total*100 : 0;
-    g.pctAcum = total>0 ? acc/total*100 : 0;
-    g.top80 = total>0 ? (before < total*0.8) : false;
-  }
-  return { agg, total };
 }
 // Estado de navegación del módulo (no se guarda en snapshot — cada quien que vea el link empieza en
 // Nacional sin drill, como al cargar el Excel). origen -> familia -> subfamilia -> producto ->
@@ -2395,7 +2378,16 @@ function renderProceso(){
       drawProceso();
     });
     document.getElementById('procDetailClose').addEventListener('click', closeDrilldown);
-    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=> downloadProImage(buildProImageTiempos, 'resumen-whatsapp-tiempos-proceso', e.currentTarget));
+    // Comprador filtrado (≠ "Todos") -> Reporte de Compras por responsable, diseño dedicado (04.09.2026,
+    // confirmado con Piero: "Reemplaza todo") en vez del reporte general de Tiempos del Proceso.
+    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=>{
+      const comprador = document.getElementById('filterProcesoResponsable').value;
+      if(comprador !== 'all'){
+        downloadProImage(buildProImageComprasResponsable, 'reporte-compras-' + comprador.toLowerCase(), e.currentTarget, proComprasResponsableImageHtml);
+      } else {
+        downloadProImage(buildProImageTiempos, 'resumen-whatsapp-tiempos-proceso', e.currentTarget);
+      }
+    });
     procesoListenersBoundInner = true;
   }
   drawProceso();
@@ -2695,24 +2687,6 @@ function proAreaSectionHtml(panels){
   if(!panels || !panels.length) return '';
   return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:6px 40px 16px;">${panels.map(proAreaPanelHtml).join('')}</div>`;
 }
-// Panel "DETALLE — <comprador>" (04.09.2026, pedido de Piero): solo aparece en la imagen de Tiempos
-// del Proceso cuando el filtro "Responsable de compra" tiene 1 comprador seleccionado (no "Todos") —
-// ver buildProImageTiempos. Reutiliza proStatBoxHtml (igual que COMPRAS/ALMACÉN) y proTableHtml (igual
-// que Gasto) para no crear estilos nuevos.
-function proCompradorDetailHtml(cd){
-  if(!cd) return '';
-  return `
-  <div style="margin:0 40px 16px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="background:#123080;padding:12px 20px;display:flex;align-items:center;gap:10px;">
-      <span style="font-size:18px;">🔎</span>
-      <span style="font-size:16px;font-weight:800;color:#fff;letter-spacing:.4px;font-family:Arial,sans-serif;">${escapeHtml(cd.title)}</span>
-    </div>
-    <div style="padding:16px 20px 20px;">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">${cd.statBoxes.map(proStatBoxHtml).join('')}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:16px;">${cd.tables.map(t=>proTableHtml(t, true)).join('')}</div>
-    </div>
-  </div>`;
-}
 function proFooterBarHtml(f){
   // f: {objetivo, metaGlobalLabel, metaGlobalValue, nota}
   if(!f) return '';
@@ -2748,10 +2722,7 @@ function proBannerHtml(b){
   </div>`;
 }
 function proImageHtml(opts){
-  // opts: {title, subtitle, kpis, tables, banner, footnote, large?, headerIcon?, areaPanels?, footerBar?, width?, dateLabel?, compradorDetail?}
-  // `compradorDetail` (04.09.2026): panel opcional "DETALLE — <comprador>" que solo pasa
-  // buildProImageTiempos, y solo cuando hay 1 comprador filtrado (ver proCompradorDetailHtml). Gasto y
-  // Alertas no lo usan y quedan exactamente igual que antes.
+  // opts: {title, subtitle, kpis, tables, banner, footnote, large?, headerIcon?, areaPanels?, footerBar?, width?, dateLabel?}
   // `width`/`dateLabel` (04.09.2026, pedido de Piero sobre Tiempos del Proceso: "hacer el reporte más
   // grande" para que no se corten los paneles de área, y mostrar el filtro activo en "Actualizado" en
   // vez de siempre la fecha de hoy) — opcionales; Gasto y Alertas no los pasan y siguen igual que antes
@@ -2768,14 +2739,17 @@ function proImageHtml(opts){
     ${proKpiRowHtml(opts.kpis, opts.large)}
     ${proTablesRowHtml(opts.tables, opts.large)}
     ${proAreaSectionHtml(opts.areaPanels)}
-    ${proCompradorDetailHtml(opts.compradorDetail)}
     ${proBannerHtml(opts.banner)}
     ${opts.footnote ? `<div style="padding:2px 40px 26px;font-size:11px;color:#8b98a4;line-height:1.5;font-family:Arial,sans-serif;">${opts.footnote}</div>` : ''}
     ${proFooterBarHtml(opts.footerBar)}
     ${bottomSpacer}
   </div>`;
 }
-async function downloadProImage(buildFn, filenamePrefix, btn){
+async function downloadProImage(buildFn, filenamePrefix, btn, renderFn){
+  // `renderFn` (04.09.2026, pedido de Piero: usar un diseño completamente distinto "tal cual" cuando se
+  // filtra 1 comprador en Tiempos del Proceso) — opcional, por defecto el skeleton general proImageHtml;
+  // Gasto/Alertas/Compras no lo pasan y siguen igual que antes.
+  renderFn = renderFn || proImageHtml;
   if(typeof html2canvas === 'undefined'){
     alert('No se pudo generar la imagen: la librería no cargó (revisa tu conexión a internet e intenta de nuevo).');
     return;
@@ -2786,7 +2760,7 @@ async function downloadProImage(buildFn, filenamePrefix, btn){
   host.style.position = 'fixed';
   host.style.left = '-99999px';
   host.style.top = '0';
-  host.innerHTML = proImageHtml(buildFn());
+  host.innerHTML = renderFn(buildFn());
   document.body.appendChild(host);
   try{
     await new Promise(r=>setTimeout(r, 50));
@@ -2852,6 +2826,48 @@ function severityBucketsFor(rows, ind){
 // ahora como parte de esta tabla de seguimiento (no como "ranking" con podio).
 // Etiqueta de "Actualizado" para la imagen de Tiempos del Proceso: muestra el filtro de fecha activo
 // (semana / mes+año / mes / año) en vez de siempre la fecha de hoy (pedido de Piero, 04.09.2026).
+// Cuenta OC distintas (camino compra) de un comprador puntual en un período de fecha ARBITRARIO (por
+// FechaOrden), aplicando los mismos filtros de Proveedor/Familia/Origen que estén activos en pantalla —
+// usado solo por el comparativo "vs. período anterior" del Reporte de Compras por responsable
+// (04.09.2026, pedido de Piero, ver periodoAnteriorComparativo).
+function ocCountForPeriodOverride(comprador, matchFn){
+  const fProveedor = document.getElementById('filterProcesoProveedor').value;
+  const fFamilia = document.getElementById('filterProcesoFamilia').value;
+  const fOrigen = document.getElementById('filterProcesoOrigen').value;
+  const rows = getProcesoRows().filter(r=>{
+    if(r.camino!=='compra') return false;
+    if(r.usuarioCompras !== comprador) return false;
+    if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
+    if(fFamilia!=='all' && r.familia !== fFamilia) return false;
+    if(fOrigen!=='all' && r.origen !== fOrigen) return false;
+    if(!r.fOrden) return false;
+    return matchFn(r.fOrden);
+  });
+  return new Set(rows.map(r=>r.codOrden).filter(Boolean)).size;
+}
+// Comparativo "vs. período anterior" para el Reporte de Compras por responsable — confirmado con Piero
+// (AskUserQuestion, 04.09.2026): si el filtro activo es Semana, compara contra la semana anterior; si es
+// un Mes+Año puntual, contra el mes anterior. Con solo Año elegido (o "Todos"), no hay un "período
+// anterior" sin ambigüedad, así que se omite (devuelve null) en vez de inventar una comparación.
+function periodoAnteriorComparativo(comprador){
+  const anioSel = document.getElementById('filterProcesoAnio').value;
+  const mesSel = document.getElementById('filterProcesoMes').value;
+  const semanaSel = document.getElementById('filterProcesoSemana').value;
+  if(semanaSel !== 'all'){
+    const start = fromIsoDay(semanaSel);
+    const prevStart = new Date(start); prevStart.setUTCDate(prevStart.getUTCDate()-7);
+    const prevKey = weekKeyFor(prevStart);
+    const n = ocCountForPeriodOverride(comprador, d=>weekKeyFor(d)===prevKey);
+    return { label: 'vs. semana anterior', n };
+  }
+  if(mesSel !== 'all' && anioSel !== 'all'){
+    let mes = Number(mesSel), anio = Number(anioSel);
+    mes -= 1; if(mes < 1){ mes = 12; anio -= 1; }
+    const n = ocCountForPeriodOverride(comprador, d=> d.getUTCFullYear()===anio && (d.getUTCMonth()+1)===mes);
+    return { label: 'vs. mes anterior', n };
+  }
+  return null;
+}
 function procesoFilterDateLabel(){
   const anioSel = document.getElementById('filterProcesoAnio');
   const mesSel = document.getElementById('filterProcesoMes');
@@ -2954,63 +2970,6 @@ function buildProImageTiempos(){
   const pctsConMeta = kpis.filter((k,i)=> INDICATORS[i].meta!=null && k.pct!=null).map(k=>k.pct);
   const cumplGlobal = pctsConMeta.length ? (pctsConMeta.reduce((a,b)=>a+b,0)/pctsConMeta.length) : null;
 
-  // Detalle por comprador (04.09.2026, pedido de Piero): solo cuando el filtro "Responsable de compra"
-  // tiene 1 comprador seleccionado (no "Todos") — con "Todos" la imagen queda exactamente igual que
-  // antes. OC colocadas/nacional/importado y monto se cuentan sobre rowsPorFechaOc (mismo criterio ya
-  // validado de "Cantidad de OC generadas" — FechaOrden, codOrden distinto). Categoría de compra y
-  // condición de pago se agrupan por CANTIDAD de líneas, no por monto, porque el monto no se puede
-  // sumar entre monedas distintas sin convertir (decisión ya tomada para Gasto: no convertir).
-  const respFilterVal = document.getElementById('filterProcesoResponsable').value;
-  let compradorDetail = null;
-  if(respFilterVal !== 'all'){
-    const compradorRows = rowsPorFechaOc.filter(r=>r.camino==='compra');
-    const ocSet = new Set(), ocNacSet = new Set(), ocImpSet = new Set();
-    for(const r of compradorRows){
-      const oc = (r.codOrden||'').trim();
-      if(!oc) continue;
-      ocSet.add(oc);
-      (r.origen==='importado' ? ocImpSet : ocNacSet).add(oc);
-    }
-    const { soles, dolares } = montoPorMonedaOrigen(compradorRows);
-    const statBoxes = [
-      { icon:'📋', value: ocSet.size.toLocaleString('es-PE'), label:'OC COLOCADAS', color:'#0a1e64' },
-      { icon:'🇵🇪', value: ocNacSet.size.toLocaleString('es-PE'), label:'OC NACIONALES', color:'#1f9aa8' },
-      { icon:'🌎', value: ocImpSet.size.toLocaleString('es-PE'), label:'OC IMPORTADAS', color:'#7c3fd4' },
-      { icon:'💰', value: fmtPEN(soles), label:'MONTO EN SOLES', color:'#0ca30c' },
-      { icon:'💵', value: fmtUSD(dolares), label:'MONTO EN DÓLARES (incluye € a valor nominal)', color:'#e2960a' },
-    ];
-    // Tiempo de entrega del proveedor: solo aplica a compras importadas (columnas ETD/F. Entrega Real
-    // solo se llenan ahí, confirmado por Piero, 04.09.2026) — se omite del todo si el comprador no tiene
-    // OC importadas en el período, en vez de mostrar "—" sin sentido.
-    const impRows = compradorRows.filter(r=>r.origen==='importado');
-    if(impRows.length){
-      const desviaciones = impRows.filter(r=>r.etd && r.fEntregaReal).map(r=>busdayCount(r.etd, r.fEntregaReal)).filter(v=>v!=null);
-      const avgDesvio = desviaciones.length ? desviaciones.reduce((a,b)=>a+b,0)/desviaciones.length : null;
-      const impPendSet = new Set();
-      for(const r of impRows){ const oc=(r.codOrden||'').trim(); if(oc && r.etd && !r.fEntregaReal) impPendSet.add(oc); }
-      statBoxes.push({ icon:'⏳', value: impPendSet.size.toLocaleString('es-PE'), label:'OC IMPORTADAS AÚN SIN LLEGAR (de '+ocImpSet.size+')', color: impPendSet.size>0?'#e2960a':'#0ca30c' });
-      statBoxes.push({ icon:'🚢', value: avgDesvio==null?'—':(avgDesvio>=0?'+':'')+avgDesvio.toFixed(1)+' d.h.', label:'DESVÍO PROMEDIO VS. ETD (ENTREGA PROVEEDOR)', color: avgDesvio==null?'#8b98a4':(avgDesvio<=0?'#0ca30c':(avgDesvio<=5?'#e2960a':'#d03b3b')) });
-    }
-
-    const rowsFromAgg = (agg)=> agg.slice(0,5).map((g,i)=>({
-      rank:i+1, name:g.label,
-      cells:[ g.n.toLocaleString('es-PE'), g.pct.toFixed(1)+'%' ],
-      pct: g.pctAcum, pctLabel: g.pctAcum.toFixed(0)+'%',
-      barColor: g.top80 ? '#0a1e64' : '#c7d0d9',
-    }));
-    const { agg: catAgg } = buildCountAgg(compradorRows, r=>r.familia);
-    const { agg: condAgg } = buildCountAgg(compradorRows, r=>creditoBucketFor(r.condiciones));
-
-    compradorDetail = {
-      title: 'DETALLE — ' + respFilterVal,
-      statBoxes,
-      tables: [
-        { icon:'📦', title:'Categoría de compra', subtitle:'Top 5 por cantidad de líneas en el período filtrado', nameLabel:'CATEGORÍA', columns:['LÍNEAS','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: rowsFromAgg(catAgg), legendItems:[{color:'#0a1e64',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
-        { icon:'💳', title:'Condición de pago', subtitle:'OC del período agrupadas por condición pactada con el proveedor', nameLabel:'CONDICIÓN', columns:['LÍNEAS','% DEL TOTAL'], barLabel:'% ACUMULADO', rows: rowsFromAgg(condAgg), legendItems:[{color:'#0a1e64',label:'80% principal'},{color:'#c7d0d9',label:'20% restante'}] },
-      ],
-    };
-  }
-
   return {
     title: 'INDICADORES DE TIEMPOS DEL PROCESO',
     subtitle: 'COMPRAS Y ALMACÉN',
@@ -3020,7 +2979,6 @@ function buildProImageTiempos(){
     kpis,
     large: true,
     areaPanels,
-    compradorDetail,
     footerBar: {
       objetivo: 'Cumplir con las fechas comprometidas para garantizar la continuidad de los proyectos y la satisfacción del cliente.',
       metaGlobalLabel: 'CUMPLIMIENTO GLOBAL PROMEDIO (Ind. 1, 2, 3 y 6)',
@@ -3028,6 +2986,228 @@ function buildProImageTiempos(){
       nota: 'd.h. = días hábiles',
     },
   };
+}
+// ---------- Reporte de Compras por responsable (04.09.2026) ----------
+// Diseño nuevo, distinto del general de Tiempos del Proceso de arriba — Piero envió una referencia
+// visual propia ("Mira este es el diseño que debes usar tal cual cuando se trate de comprador
+// filtrado") y confirmó (AskUserQuestion) que REEMPLAZA por completo la imagen general cuando se filtra
+// un solo comprador (antes, 04.09.2026 más temprano, esto era un panel adicional dentro de la imagen
+// general — ver commit 94431ed — ahora se independiza en su propio builder + su propio renderer, ver
+// proComprasResponsableImageHtml más abajo). Usa el logo limpio del proyecto (LOGO_GRUPOFRIOPACKING_B64,
+// sin el lema) en vez del `.logo-lockup` de la plataforma, y compara siempre contra datos reales del
+// período filtrado (nunca cifras de la referencia visual).
+function buildProImageComprasResponsable(){
+  const comprador = document.getElementById('filterProcesoResponsable').value;
+  const rowsOrden = filteredProcesoRowsByOrden().filter(r=>r.camino==='compra' && r.usuarioCompras===comprador);
+  const ocSet = new Set(rowsOrden.map(r=>r.codOrden).filter(Boolean));
+  const totalOC = ocSet.size;
+
+  // Nacional/Importado — por OC distinta (no por línea), mismo criterio que el resto de la plataforma.
+  const ocOrigen = new Map();
+  for(const r of rowsOrden){ if(r.codOrden && !ocOrigen.has(r.codOrden)) ocOrigen.set(r.codOrden, r.origen); }
+  let nacionalN=0, importadoN=0;
+  for(const o of ocOrigen.values()){ if(o==='importado') importadoN++; else nacionalN++; }
+
+  // Monto en su moneda nativa, SIN convertir (mismo principio ya validado en Concentración de Gasto:
+  // "no debes convertir, debes darme el monto tanto en dólares como en soles"). El equivalente en soles
+  // (vía TIPO_CAMBIO) se calcula aparte y SOLO se usa para las barras de % — nunca se muestra como cifra.
+  const montoNat = montoPorMonedaOrigen(rowsOrden);
+
+  const IND4 = INDICATORS.find(i=>i.key==='d4');
+  const stIND4 = aggStatsForIndicator(rowsOrden, IND4);
+  const comparativo = periodoAnteriorComparativo(comprador);
+
+  // Condición de pago — por OC distinta, mismos 5 buckets ya usados en Concentración de Gasto.
+  const ocCredito = new Map();
+  for(const r of rowsOrden){
+    if(!r.codOrden || ocCredito.has(r.codOrden)) continue;
+    ocCredito.set(r.codOrden, creditoBucketFor(r.condiciones));
+  }
+  const ordenBuckets = ['Contado','Crédito 0-30 días','Crédito 30-60 días','Crédito 60+ días','Otra forma de pago','Sin dato'];
+  const creditoCounts = {};
+  ordenBuckets.forEach(b=>creditoCounts[b]=0);
+  for(const b of ocCredito.values()) creditoCounts[b] = (creditoCounts[b]||0) + 1;
+  const creditoRows = ordenBuckets.filter(b=>creditoCounts[b]>0).map(b=>({ label:b, n:creditoCounts[b], pct: totalOC ? creditoCounts[b]/totalOC*100 : 0 }));
+
+  // Categoría de compra (familia) top-5 por monto ejecutado — el % es sobre el equivalente en soles
+  // (referencia interna, ver arriba); el desglose por moneda que se muestra sigue siendo el nativo.
+  const catMap = {};
+  for(const r of rowsOrden){
+    const fam = r.familia || 'Sin familia';
+    const c = catMap[fam] = catMap[fam] || { ocSet: new Set(), soles:0, dolares:0 };
+    if(r.codOrden) c.ocSet.add(r.codOrden);
+    if(r.montoNativo!=null && !isNaN(r.montoNativo)){
+      if(monedaLabel(r.moneda)==='S/') c.soles += r.montoNativo; else c.dolares += r.montoNativo;
+    }
+  }
+  const totalMontoEq = (montoNat.soles + montoNat.dolares*TIPO_CAMBIO['US$']) || 1;
+  const catRows = Object.entries(catMap).map(([familia,c])=>{
+    const montoEq = c.soles + c.dolares*TIPO_CAMBIO['US$'];
+    return { familia, ocCount: c.ocSet.size, soles: c.soles, dolares: c.dolares, montoEq, pct: montoEq/totalMontoEq*100 };
+  }).sort((a,b)=>b.montoEq-a.montoEq).slice(0,5);
+
+  // Alertas de severidad del Indicador 4 (Entrega de OC) — mismo criterio que el panel COMPRAS general.
+  const sev4 = severityBucketsFor(rowsOrden, IND4);
+  const s4 = sev4[comprador] || { leve:0, media:0, critica:0, n:0, cumpleN:0 };
+  const totalAlertas = s4.leve + s4.media + s4.critica;
+
+  return {
+    comprador, totalOC, nacionalN, importadoN, comparativo,
+    montoNat, cumplePct: stIND4.cumplePct, creditoRows, catRows,
+    alerta: s4, totalAlertas,
+    dateLabel: procesoFilterDateLabel(),
+  };
+}
+function proComprasResponsableHeaderHtml(comprador, dateLabel){
+  return `
+  <div style="background:linear-gradient(120deg,#0a1e64 55%,#123080 100%);border-radius:18px 18px 0 0;padding:34px 40px 28px;position:relative;overflow:hidden;">
+    <div style="position:absolute;right:-40px;top:-40px;width:260px;height:260px;border-radius:50%;background:rgba(62,198,172,.14);"></div>
+    <div style="position:absolute;right:70px;bottom:-70px;width:190px;height:190px;border-radius:50%;background:rgba(62,198,172,.10);"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative;gap:20px;">
+      <div style="display:flex;align-items:flex-start;gap:16px;max-width:1000px;">
+        <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;margin-top:2px;">🛒</div>
+        <div>
+          <div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:.3px;line-height:1.2;font-family:Arial,sans-serif;">REPORTE DE COMPRAS</div>
+          <div style="font-size:17px;font-weight:700;color:#7fe3cf;margin-top:6px;letter-spacing:.4px;font-family:Arial,sans-serif;">DESEMPEÑO POR RESPONSABLE</div>
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+            <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);color:#fff;font-size:13px;font-weight:700;padding:6px 14px;border-radius:20px;font-family:Arial,sans-serif;">👤 ${escapeHtml(comprador)}</div>
+            <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;font-family:Arial,sans-serif;">📅 ${escapeHtml(dateLabel)}</div>
+          </div>
+        </div>
+      </div>
+      <img src="${LOGO_GRUPOFRIOPACKING_B64}" style="height:50px;flex-shrink:0;" alt="Grupo Friopacking">
+    </div>
+  </div>`;
+}
+function proComprasOcCardHtml(spec){
+  const comp = spec.comparativo;
+  let deltaHtml = '';
+  if(comp){
+    const delta = spec.totalOC - comp.n;
+    const color = delta>0 ? '#0ca30c' : (delta<0 ? '#d03b3b' : '#8b98a4');
+    const arrow = delta>0 ? '▲' : (delta<0 ? '▼' : '—');
+    deltaHtml = `<div style="margin-top:10px;font-size:13px;font-weight:700;color:${color};font-family:Arial,sans-serif;">${arrow} ${delta>0?'+':''}${delta} ${escapeHtml(comp.label)} (${comp.n})</div>`;
+  }
+  return `
+  <div style="flex:1;min-width:320px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;">📋 OC GENERADAS</div>
+    <div style="font-size:44px;font-weight:800;color:#0a1e64;margin-top:8px;font-family:Arial,sans-serif;">${spec.totalOC.toLocaleString('es-PE')}</div>
+    ${deltaHtml}
+  </div>`;
+}
+function proComprasCumplimientoCardHtml(pct){
+  return `
+  <div style="flex:1;min-width:320px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);display:flex;align-items:center;justify-content:space-between;gap:16px;">
+    <div>
+      <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;">✅ % CUMPLIMIENTO ENTREGA DE OC</div>
+      <div style="font-size:12px;color:#8b98a4;margin-top:6px;font-family:Arial,sans-serif;">Meta: ≥ 80%</div>
+    </div>
+    ${proRingSvg(pct, 92)}
+  </div>`;
+}
+function proComprasOrigenMonedaCardHtml(spec){
+  const total = spec.nacionalN + spec.importadoN;
+  const pctNac = total ? spec.nacionalN/total*100 : 0;
+  const pctImp = total ? spec.importadoN/total*100 : 0;
+  return `
+  <div style="flex:1;min-width:360px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;margin-bottom:14px;">🌎 ORIGEN Y MONEDA</div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#0a1e64;font-family:Arial,sans-serif;margin-bottom:4px;"><span>🇵🇪 Nacional</span><span>${spec.nacionalN} OC (${pctNac.toFixed(0)}%)</span></div>
+    <div style="height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;margin-bottom:12px;"><div style="width:${pctNac}%;height:100%;background:#1f9aa8;"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#0a1e64;font-family:Arial,sans-serif;margin-bottom:4px;"><span>🌎 Importado</span><span>${spec.importadoN} OC (${pctImp.toFixed(0)}%)</span></div>
+    <div style="height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;margin-bottom:16px;"><div style="width:${pctImp}%;height:100%;background:#e2960a;"></div></div>
+    <div style="display:flex;gap:16px;border-top:1px solid #eef2f6;padding-top:14px;">
+      <div style="flex:1;"><div style="font-size:11px;color:#8b98a4;font-weight:700;font-family:Arial,sans-serif;">MONTO EN SOLES</div><div style="font-size:19px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${fmtPEN(spec.montoNat.soles)}</div></div>
+      <div style="flex:1;"><div style="font-size:11px;color:#8b98a4;font-weight:700;font-family:Arial,sans-serif;">MONTO EN DÓLARES</div><div style="font-size:19px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${fmtUSD(spec.montoNat.dolares)}</div></div>
+    </div>
+  </div>`;
+}
+function proComprasCondicionPagoCardHtml(creditoRows){
+  const colorFor = { 'Contado':'#0ca30c','Crédito 0-30 días':'#1f9aa8','Crédito 30-60 días':'#e2960a','Crédito 60+ días':'#d03b3b','Otra forma de pago':'#7c3fd4','Sin dato':'#8b98a4' };
+  const rowsHtml = creditoRows.map(r=>`
+    <div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#0a1e64;font-family:Arial,sans-serif;margin-bottom:3px;"><span>${escapeHtml(r.label)}</span><span>${r.n} OC (${r.pct.toFixed(0)}%)</span></div>
+      <div style="height:8px;border-radius:5px;background:#e2e8ee;overflow:hidden;"><div style="width:${r.pct}%;height:100%;background:${colorFor[r.label]||'#8b98a4'};"></div></div>
+    </div>`).join('');
+  return `
+  <div style="flex:1;min-width:360px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;margin-bottom:14px;">💳 CONDICIÓN DE PAGO</div>
+    ${rowsHtml || '<div style="font-size:12.5px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</div>'}
+  </div>`;
+}
+function proComprasCategoriaTableHtml(catRows){
+  const iconFor = (i)=> ['🥇','🥈','🥉','4️⃣','5️⃣'][i] || '▪️';
+  const rowsHtml = catRows.map((c,i)=>`
+    <tr>
+      <td style="padding:10px 8px;font-size:18px;text-align:center;">${iconFor(i)}</td>
+      <td style="padding:10px 8px;font-weight:700;color:#0a1e64;font-size:14px;font-family:Arial,sans-serif;">${escapeHtml(c.familia)}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:13.5px;color:#1c2733;font-family:Arial,sans-serif;">${c.ocCount}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:13.5px;color:#1c2733;font-family:Arial,sans-serif;">${fmtPEN(c.soles)}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:13.5px;color:#1c2733;font-family:Arial,sans-serif;">${fmtUSD(c.dolares)}</td>
+      <td style="padding:10px 8px;min-width:140px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${Math.max(0,Math.min(100,c.pct))}%;height:100%;background:#3ec6ac;"></div></div>
+          <span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;width:44px;text-align:right;">${c.pct.toFixed(0)}%</span>
+        </div>
+      </td>
+    </tr>`).join('');
+  return `
+  <div style="background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;margin-bottom:14px;">📦 CATEGORÍA DE COMPRA (TOP 5)</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th></th>
+        <th style="text-align:left;font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">FAMILIA</th>
+        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">OC</th>
+        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">SOLES</th>
+        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">DÓLARES</th>
+        <th style="text-align:left;font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">% DEL MONTO EJECUTADO</th>
+      </tr></thead>
+      <tbody>${rowsHtml || `<tr><td colspan="6" style="text-align:center;padding:18px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
+    </table>
+  </div>`;
+}
+function proComprasAlertaCardHtml(s4, totalAlertas){
+  return `
+  <div style="flex:1;min-width:360px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;margin-bottom:14px;">⚠️ ALERTAS DE ENTREGA (IND. 4)</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${proStatBoxHtml({icon:'🟡', value:s4.leve||0, label:'LEVE (1-2 d)', color:'#e2960a'})}
+      ${proStatBoxHtml({icon:'🟠', value:s4.media||0, label:'MEDIA (3-5 d)', color:'#e2960a'})}
+      ${proStatBoxHtml({icon:'🔴', value:s4.critica||0, label:'CRÍTICA (>5 d)', color:'#d03b3b'})}
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:#8b98a4;font-family:Arial,sans-serif;">${totalAlertas} caso(s) de alerta en el período filtrado.</div>
+  </div>`;
+}
+// Renderer dedicado — NO reutiliza proImageHtml/proHeaderHtml (diseño distinto pedido por Piero "tal
+// cual"). "Meta: ≥ 80%" en la tarjeta de cumplimiento es una cifra de la referencia visual de Piero, no
+// una meta institucional ya confirmada en la plataforma — señalado a Piero al entregar, mismo cuidado
+// que ya se tuvo con "CUMPLIMIENTO GLOBAL PROMEDIO" en buildProImageTiempos (no se inventa una meta que
+// no ha confirmado).
+function proComprasResponsableImageHtml(spec){
+  return `
+  <div id="proImgInner" style="width:1600px;font-family:Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
+    ${proComprasResponsableHeaderHtml(spec.comprador, spec.dateLabel)}
+    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:26px 40px 6px;">
+      ${proComprasOcCardHtml(spec)}
+      ${proComprasCumplimientoCardHtml(spec.cumplePct)}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 40px;">
+      ${proComprasOrigenMonedaCardHtml(spec)}
+      ${proComprasCondicionPagoCardHtml(spec.creditoRows)}
+    </div>
+    <div style="padding:0 40px 16px;">
+      ${proComprasCategoriaTableHtml(spec.catRows)}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:0 40px 16px;">
+      ${proComprasAlertaCardHtml(spec.alerta, spec.totalAlertas)}
+      ${proComprasCumplimientoCardHtml(spec.cumplePct)}
+    </div>
+    <div style="margin:6px 40px 30px;background:#fff;border-radius:12px;padding:16px 22px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(20,30,45,.08);">
+      <span style="font-size:24px;">🏆</span>
+      <div><span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">OBJETIVO: </span><span style="font-size:12.5px;color:#5b6b7a;font-family:Arial,sans-serif;">Realizar compras oportunas, eficientes y estratégicas que aseguren la continuidad de los proyectos y la satisfacción del cliente.</span></div>
+    </div>
+  </div>`;
 }
 function buildProImageGasto(){
   const rows = filteredGastoRows();
