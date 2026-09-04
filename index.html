@@ -3258,11 +3258,15 @@ function openDrilldown(ind, rows, groupLabel){
   // marcadas, para que Gerencia pueda auditar cuáles se excluyeron y por qué en vez de que desaparezcan
   // mezcladas con las genuinamente "sin información".
   const regRows = ind.key==='d4' ? rows.filter(r=>r.esRegularizacion && r.d4raw!=null) : [];
-  const withoutVal = rows.length - withVal.length - regRows.length;
+  // OC ya aprobadas pero aún sin recibir ("pendientes de llegar") — pedido de Piero, 04.09.2026: que se
+  // vean en el detalle del Indicador 4 en vez de quedar mezcladas en "sin información" hasta que
+  // lleguen. Solo aplica al Indicador 4 (Entrega de OC) — el resto de indicadores no tiene este concepto.
+  const pendingRows = ind.key==='d4' ? rows.filter(r=>!r.esRegularizacion && r.d4==null && r.fAprob && !r.fRecep) : [];
+  const withoutVal = rows.length - withVal.length - regRows.length - pendingRows.length;
   const sorted = withVal.slice().sort((a,b)=>(b[ind.key]||0)-(a[ind.key]||0));
   const capped = sorted.slice(0,500);
   document.getElementById('procDetailTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.stage + (groupLabel ? ' · ' + groupLabel : '');
-  document.getElementById('procDetailNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + (regRows.length>0 ? ' · ' + regRows.length.toLocaleString('es-PE') + ' excluidas del cálculo por regularización (se listan al final)' : '') + '.';
+  document.getElementById('procDetailNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + (pendingRows.length>0 ? ' · ' + pendingRows.length.toLocaleString('es-PE') + ' pendientes de llegar (se listan al final)' : '') + (regRows.length>0 ? ' · ' + regRows.length.toLocaleString('es-PE') + ' excluidas del cálculo por regularización (se listan al final)' : '') + '.';
   const table = document.getElementById('tableDrilldown');
   table.querySelector('thead').innerHTML = '<tr><th>Requerimiento</th><th>Proyecto</th><th>Cód. producto</th><th>Descripción</th><th>Pedido</th><th>OC</th><th>Proveedor</th><th>Responsable</th><th>Fecha inicial</th><th>Fecha final</th><th>Días hábiles</th><th>Meta</th><th>Estado</th></tr>';
   function rowHtml(r, forced){
@@ -3287,7 +3291,14 @@ function openDrilldown(ind, rows, groupLabel){
       <td>${estado}</td>
     </tr>`;
   }
+  const hoy4 = new Date();
   const bodyHtml = capped.map(r=>rowHtml(r)).join('')
+    + pendingRows.map(r=>{
+        const lim4 = limite4For(r);
+        const vencido = lim4 && hoy4 > lim4;
+        const diasTranscurridos = busdayCount(r.fAprob, hoy4);
+        return rowHtml(r, { dias: diasTranscurridos, estado: vencido ? '<span class="pill warn">⏳ Pendiente (venció el plazo)</span>' : '<span class="pill">⏳ Pendiente</span>' });
+      }).join('')
     + regRows.map(r=>rowHtml(r, { dias:r.d4raw, estado:'<span class="pill muted">⚠ Regularización (excluida)</span>' })).join('');
   table.querySelector('tbody').innerHTML = bodyHtml || '<tr><td colspan="13" style="text-align:center;padding:24px;color:var(--muted);">Sin resultados</td></tr>';
   // Detalle inline debajo del contenido, no modal (pedido de Piero, 01.09.2026): se muestra el panel
