@@ -2612,14 +2612,19 @@ function proBannerHtml(b){
   </div>`;
 }
 function proImageHtml(opts){
-  // opts: {title, subtitle, kpis, tables, banner, footnote, large?, headerIcon?, areaPanels?, footerBar?}
-  const fecha = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
+  // opts: {title, subtitle, kpis, tables, banner, footnote, large?, headerIcon?, areaPanels?, footerBar?, width?, dateLabel?}
+  // `width`/`dateLabel` (04.09.2026, pedido de Piero sobre Tiempos del Proceso: "hacer el reporte más
+  // grande" para que no se corten los paneles de área, y mostrar el filtro activo en "Actualizado" en
+  // vez de siempre la fecha de hoy) — opcionales; Gasto y Alertas no los pasan y siguen igual que antes
+  // (1500px, fecha de hoy).
+  const fecha = opts.dateLabel || new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
+  const containerWidth = opts.width || 1500;
   // Cuando no hay banner, pie de letra chica, panel de áreas ni footer propio, se agrega un margen
   // inferior para que la imagen no termine pegada justo debajo de las tablas (Tiempos del Proceso,
   // 02.09.2026 — sigue aplicando cuando el rediseño de 03.09.2026 tampoco trae esos elementos).
   const bottomSpacer = (!opts.banner && !opts.footnote && !opts.areaPanels && !opts.footerBar) ? `<div style="padding-bottom:34px;"></div>` : '';
   return `
-  <div id="proImgInner" style="width:1500px;font-family:Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
+  <div id="proImgInner" style="width:${containerWidth}px;font-family:Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
     ${proHeaderHtml(opts.title, opts.subtitle, fecha, opts.headerIcon)}
     ${proKpiRowHtml(opts.kpis, opts.large)}
     ${proTablesRowHtml(opts.tables, opts.large)}
@@ -2705,6 +2710,18 @@ function severityBucketsFor(rows, ind){
 // no hace falta agregarlo aparte. Reintroduce el % de cumplimiento por responsable que se había
 // quitado el 02.09.2026 ("ya no es un ranking") porque la nueva referencia sí lo pide explícitamente,
 // ahora como parte de esta tabla de seguimiento (no como "ranking" con podio).
+// Etiqueta de "Actualizado" para la imagen de Tiempos del Proceso: muestra el filtro de fecha activo
+// (semana / mes+año / mes / año) en vez de siempre la fecha de hoy (pedido de Piero, 04.09.2026).
+function procesoFilterDateLabel(){
+  const anioSel = document.getElementById('filterProcesoAnio');
+  const mesSel = document.getElementById('filterProcesoMes');
+  const semanaSel = document.getElementById('filterProcesoSemana');
+  if(semanaSel.value !== 'all') return semanaSel.options[semanaSel.selectedIndex].text;
+  if(mesSel.value !== 'all' && anioSel.value !== 'all') return mesSel.options[mesSel.selectedIndex].text + ' ' + anioSel.value;
+  if(mesSel.value !== 'all') return mesSel.options[mesSel.selectedIndex].text + ' (todos los años)';
+  if(anioSel.value !== 'all') return anioSel.value;
+  return new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
+}
 function buildProImageTiempos(){
   const rows = filteredProcesoRows();
   const IND1 = INDICATORS.find(i=>i.key==='d1'), IND2 = INDICATORS.find(i=>i.key==='d2'), IND6 = INDICATORS.find(i=>i.key==='d6');
@@ -2800,6 +2817,8 @@ function buildProImageTiempos(){
     title: 'INDICADORES DE TIEMPOS DEL PROCESO',
     subtitle: 'COMPRAS Y ALMACÉN',
     headerIcon: '⏰',
+    width: 2000,
+    dateLabel: procesoFilterDateLabel(),
     kpis,
     large: true,
     areaPanels,
