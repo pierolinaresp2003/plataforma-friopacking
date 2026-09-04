@@ -2987,226 +2987,415 @@ function buildProImageTiempos(){
     },
   };
 }
-// ---------- Reporte de Compras por responsable (04.09.2026) ----------
-// Diseño nuevo, distinto del general de Tiempos del Proceso de arriba — Piero envió una referencia
-// visual propia ("Mira este es el diseño que debes usar tal cual cuando se trate de comprador
-// filtrado") y confirmó (AskUserQuestion) que REEMPLAZA por completo la imagen general cuando se filtra
-// un solo comprador (antes, 04.09.2026 más temprano, esto era un panel adicional dentro de la imagen
-// general — ver commit 94431ed — ahora se independiza en su propio builder + su propio renderer, ver
-// proComprasResponsableImageHtml más abajo). Usa el logo limpio del proyecto (LOGO_GRUPOFRIOPACKING_B64,
-// sin el lema) en vez del `.logo-lockup` de la plataforma, y compara siempre contra datos reales del
-// período filtrado (nunca cifras de la referencia visual).
+// ---------- Reporte de Compras por responsable (04.09.2026, rediseñado el mismo día) ----------
+// Piero mandó la FOTO real de la infografía que quiere ("el formato que me presentas no se parece en
+// nada a lo que te pedí... debe ser tal cual esooo, el de la foto") — el primer intento (basado solo en
+// la descripción) no calzaba con su referencia real. Esta versión sigue esa foto al detalle: encabezado
+// BLANCO (no el degradado navy del resto de la plataforma) con el logo del proyecto a la izquierda,
+// título + 2 pills (comprador y fecha), 3 tarjetas KPI con ícono en caja cuadrada, panel de
+// Origen/Moneda con Soles/Dólares/Euros por separado (a diferencia del resto de la plataforma, que junta
+// € dentro de Dólares — la referencia de Piero pide a Euros como columna propia), panel de Condición de
+// pago con los 4 buckets de crédito SIEMPRE visibles, tabla de categoría de compra con ícono + descripción
+// por familia, panel de Estado de entrega de OC (en plazo/vencidas/entregadas), panel Objetivo, y panel
+// Resumen General. Usa el logo limpio del proyecto (LOGO_GRUPOFRIOPACKING_B64, sin el lema "Soluciones
+// que mantienen tu mundo en frío" — Piero pidió quitarlo de cualquier parte de este reporte nuevo).
+function fmtMonedaCompras(n, symbol){
+  const v = (n==null || isNaN(n)) ? 0 : n;
+  return symbol + ' ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+// Ícono por familia — mapeo por palabra clave (los nombres de familia son datos reales de Piero, no una
+// lista fija), con las 5 familias de su ejemplo cubiertas exactamente y un ícono genérico de respaldo.
+function iconForFamilia(nombre){
+  const n = (nombre||'').toUpperCase();
+  if(n.includes('VALVULA')) return '🚰';
+  if(n.includes('TUBERIA') || n.includes('TUBO') || n.includes('ACCESORIO')) return '🔩';
+  if(n.includes('FILTRO') || n.includes('SECADOR')) return '🛢️';
+  if(n.includes('MISCEL')) return '⚙️';
+  if(n.includes('REFRIGERA') || n.includes('COMPRESOR') || n.includes('FRIO')) return '❄️';
+  if(n.includes('ELECTRIC') || n.includes('CABLE')) return '🔌';
+  if(n.includes('MOTOR') || n.includes('BOMBA')) return '⚡';
+  if(n.includes('PANEL') || n.includes('AISLAMIENTO') || n.includes('CONSTRUCCION') || n.includes('CEMENTO')) return '🧱';
+  if(n.includes('HERRAMIENTA')) return '🛠️';
+  if(n.includes('SEGURIDAD') || n.includes('EPP')) return '🦺';
+  if(n.includes('QUIMICO') || n.includes('GAS') || n.includes('LUBRICANTE') || n.includes('PINTURA')) return '🧪';
+  return '📦';
+}
+// "Descripción de la familia" de la tabla — no hay ese texto en la data (Reporte Maestro solo trae el
+// nombre de familia, no una descripción), así que se arma a partir de productos reales distintos de esa
+// familia en el período (hasta 4, acortados a las primeras palabras), en vez de inventar una descripción
+// genérica por nombre de familia.
+function descripcionFamiliaFor(productos){
+  if(!productos.length) return '';
+  const cortos = productos.slice(0,4).map(p=>p.toLowerCase().split(/\s+/).slice(0,3).join(' '));
+  return cortos.join(', ') + (productos.length>cortos.length ? ', etc.' : '.');
+}
+// Rango de fechas para la nota al pie del reporte — mismos filtros Año/Mes/Semana que
+// procesoFilterDateLabel() (que arma el texto de la pill de cabecera), pero acá se necesita un rango
+// dd/mm/yyyy concreto en vez de la etiqueta corta ("Semana 6 (31 Ago–6 Sep)").
+function procesoFilterDateRangeFooter(){
+  const anioSel = document.getElementById('filterProcesoAnio');
+  const mesSel = document.getElementById('filterProcesoMes');
+  const semanaSel = document.getElementById('filterProcesoSemana');
+  const fmt = (d)=> String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear();
+  if(semanaSel.value !== 'all'){
+    const start = fromIsoDay(semanaSel.value);
+    const end = new Date(start); end.setUTCDate(end.getUTCDate()+6);
+    return 'Período del ' + fmt(start) + ' al ' + fmt(end) + '.';
+  }
+  if(mesSel.value !== 'all' && anioSel.value !== 'all'){
+    const anio = Number(anioSel.value), mes = Number(mesSel.value);
+    const start = new Date(Date.UTC(anio, mes-1, 1));
+    const end = new Date(Date.UTC(anio, mes, 0));
+    return 'Período del ' + fmt(start) + ' al ' + fmt(end) + '.';
+  }
+  return 'Período: ' + procesoFilterDateLabel() + '.';
+}
 function buildProImageComprasResponsable(){
   const comprador = document.getElementById('filterProcesoResponsable').value;
   const rowsOrden = filteredProcesoRowsByOrden().filter(r=>r.camino==='compra' && r.usuarioCompras===comprador);
-  const ocSet = new Set(rowsOrden.map(r=>r.codOrden).filter(Boolean));
-  const totalOC = ocSet.size;
+  const ocRows = new Map(); // codOrden -> una fila representativa (fechas/estado son iguales entre líneas de la misma OC)
+  for(const r of rowsOrden){ if(r.codOrden && !ocRows.has(r.codOrden)) ocRows.set(r.codOrden, r); }
+  const totalOC = ocRows.size;
 
-  // Nacional/Importado — por OC distinta (no por línea), mismo criterio que el resto de la plataforma.
-  const ocOrigen = new Map();
-  for(const r of rowsOrden){ if(r.codOrden && !ocOrigen.has(r.codOrden)) ocOrigen.set(r.codOrden, r.origen); }
   let nacionalN=0, importadoN=0;
-  for(const o of ocOrigen.values()){ if(o==='importado') importadoN++; else nacionalN++; }
+  for(const r of ocRows.values()){ if(r.origen==='importado') importadoN++; else nacionalN++; }
 
-  // Monto en su moneda nativa, SIN convertir (mismo principio ya validado en Concentración de Gasto:
-  // "no debes convertir, debes darme el monto tanto en dólares como en soles"). El equivalente en soles
-  // (vía TIPO_CAMBIO) se calcula aparte y SOLO se usa para las barras de % — nunca se muestra como cifra.
-  const montoNat = montoPorMonedaOrigen(rowsOrden);
+  // Monto por moneda NATIVA, Soles/Dólares/Euros cada uno por separado (a pedido explícito del diseño
+  // de referencia — a diferencia del resto de la plataforma, que junta € dentro de "Dólares" a valor
+  // nominal). El equivalente en soles (vía TIPO_CAMBIO) se calcula aparte y SOLO se usa para las barras
+  // de % — nunca se muestra como cifra (mismo principio ya validado en Concentración de Gasto).
+  let soles=0, dolares=0, euros=0;
+  for(const r of rowsOrden){
+    if(r.montoNativo==null || isNaN(r.montoNativo)) continue;
+    const lbl = monedaLabel(r.moneda);
+    if(lbl==='S/') soles += r.montoNativo;
+    else if(lbl==='€') euros += r.montoNativo;
+    else dolares += r.montoNativo;
+  }
+  const montoEqTotal = (soles + dolares*TIPO_CAMBIO['US$'] + euros*TIPO_CAMBIO['€']) || 1;
 
-  const IND4 = INDICATORS.find(i=>i.key==='d4');
+  const IND2 = INDICATORS.find(i=>i.key==='d2'), IND4 = INDICATORS.find(i=>i.key==='d4');
+  const stIND2 = aggStatsForIndicator(rowsOrden, IND2);
   const stIND4 = aggStatsForIndicator(rowsOrden, IND4);
   const comparativo = periodoAnteriorComparativo(comprador);
 
-  // Condición de pago — por OC distinta, mismos 5 buckets ya usados en Concentración de Gasto.
+  // Condición de pago — por OC distinta. Los 4 buckets de crédito del diseño de referencia van SIEMPRE
+  // (aunque estén en 0, igual que en la foto de Piero); "Otra forma de pago"/"Sin dato" (anticipos,
+  // OC sin condición registrada) se agregan aparte solo si hay casos reales, para no esconder datos.
   const ocCredito = new Map();
   for(const r of rowsOrden){
     if(!r.codOrden || ocCredito.has(r.codOrden)) continue;
     ocCredito.set(r.codOrden, creditoBucketFor(r.condiciones));
   }
-  const ordenBuckets = ['Contado','Crédito 0-30 días','Crédito 30-60 días','Crédito 60+ días','Otra forma de pago','Sin dato'];
-  const creditoCounts = {};
-  ordenBuckets.forEach(b=>creditoCounts[b]=0);
-  for(const b of ocCredito.values()) creditoCounts[b] = (creditoCounts[b]||0) + 1;
-  const creditoRows = ordenBuckets.filter(b=>creditoCounts[b]>0).map(b=>({ label:b, n:creditoCounts[b], pct: totalOC ? creditoCounts[b]/totalOC*100 : 0 }));
+  const counts = {};
+  for(const b of ocCredito.values()) counts[b] = (counts[b]||0) + 1;
+  const bucketsFijos = ['Contado','Crédito 0-30 días','Crédito 30-60 días','Crédito 60+ días'];
+  const creditoRows = bucketsFijos.map(b=>({ label:b, n:counts[b]||0, pct: totalOC ? (counts[b]||0)/totalOC*100 : 0 }));
+  const creditoExtra = ['Otra forma de pago','Sin dato']
+    .filter(b=>counts[b])
+    .map(b=>({ label:b, n:counts[b], pct: totalOC ? counts[b]/totalOC*100 : 0 }));
 
-  // Categoría de compra (familia) top-5 por monto ejecutado — el % es sobre el equivalente en soles
-  // (referencia interna, ver arriba); el desglose por moneda que se muestra sigue siendo el nativo.
+  // Categoría de compra — TODAS las familias del período (el diseño de referencia suma 100% con "TOTAL
+  // GENERAL", no es un top 5 recortado), por OC distinta y monto por moneda nativa.
   const catMap = {};
   for(const r of rowsOrden){
     const fam = r.familia || 'Sin familia';
-    const c = catMap[fam] = catMap[fam] || { ocSet: new Set(), soles:0, dolares:0 };
+    const c = catMap[fam] = catMap[fam] || { ocSet:new Set(), soles:0, dolares:0, euros:0, productos:new Set() };
     if(r.codOrden) c.ocSet.add(r.codOrden);
+    if(r.producto) c.productos.add(r.producto.toString().trim());
     if(r.montoNativo!=null && !isNaN(r.montoNativo)){
-      if(monedaLabel(r.moneda)==='S/') c.soles += r.montoNativo; else c.dolares += r.montoNativo;
+      const lbl = monedaLabel(r.moneda);
+      if(lbl==='S/') c.soles += r.montoNativo;
+      else if(lbl==='€') c.euros += r.montoNativo;
+      else c.dolares += r.montoNativo;
     }
   }
-  const totalMontoEq = (montoNat.soles + montoNat.dolares*TIPO_CAMBIO['US$']) || 1;
   const catRows = Object.entries(catMap).map(([familia,c])=>{
-    const montoEq = c.soles + c.dolares*TIPO_CAMBIO['US$'];
-    return { familia, ocCount: c.ocSet.size, soles: c.soles, dolares: c.dolares, montoEq, pct: montoEq/totalMontoEq*100 };
-  }).sort((a,b)=>b.montoEq-a.montoEq).slice(0,5);
+    const montoEq = c.soles + c.dolares*TIPO_CAMBIO['US$'] + c.euros*TIPO_CAMBIO['€'];
+    return {
+      familia, icon: iconForFamilia(familia), descripcion: descripcionFamiliaFor(Array.from(c.productos)),
+      ocCount: c.ocSet.size, soles: c.soles, dolares: c.dolares, euros: c.euros, montoEq,
+      pct: montoEq/montoEqTotal*100,
+    };
+  }).sort((a,b)=>b.montoEq-a.montoEq);
+  const catTotales = catRows.reduce((acc,c)=>({ ocCount:acc.ocCount+c.ocCount, soles:acc.soles+c.soles, dolares:acc.dolares+c.dolares, euros:acc.euros+c.euros }), {ocCount:0,soles:0,dolares:0,euros:0});
 
-  // Alertas de severidad del Indicador 4 (Entrega de OC) — mismo criterio que el panel COMPRAS general.
-  const sev4 = severityBucketsFor(rowsOrden, IND4);
-  const s4 = sev4[comprador] || { leve:0, media:0, critica:0, n:0, cumpleN:0 };
-  const totalAlertas = s4.leve + s4.media + s4.critica;
+  // Estado de entrega de OC (por OC distinta): entregada (ya tiene FechaRecepcion), vencida (aprobada,
+  // sin recibir, y ya pasó el plazo pactado — limite4For, mismo criterio ya usado en el detalle "⏳
+  // Pendiente (venció el plazo)" del Indicador 4), en plazo (el resto, dentro de su plazo o sin plazo
+  // calculable todavía).
+  const hoy = new Date();
+  let entregadasN=0, vencidasN=0, enPlazoN=0;
+  for(const r of ocRows.values()){
+    if(r.fRecep){ entregadasN++; continue; }
+    const lim4 = limite4For(r);
+    if(lim4 && hoy > lim4) vencidasN++; else enPlazoN++;
+  }
 
   return {
     comprador, totalOC, nacionalN, importadoN, comparativo,
-    montoNat, cumplePct: stIND4.cumplePct, creditoRows, catRows,
-    alerta: s4, totalAlertas,
+    montoNat: { soles, dolares, euros },
+    tiempoEmisionProm: stIND2.promedio,
+    tiempoEntregaProm: stIND4.promedio, tiempoEntregaN: stIND4.n,
+    creditoRows, creditoExtra,
+    catRows, catTotales,
+    entregadasN, vencidasN, enPlazoN,
     dateLabel: procesoFilterDateLabel(),
+    dateRangeFooter: procesoFilterDateRangeFooter(),
   };
 }
 function proComprasResponsableHeaderHtml(comprador, dateLabel){
   return `
-  <div style="background:linear-gradient(120deg,#0a1e64 55%,#123080 100%);border-radius:18px 18px 0 0;padding:34px 40px 28px;position:relative;overflow:hidden;">
-    <div style="position:absolute;right:-40px;top:-40px;width:260px;height:260px;border-radius:50%;background:rgba(62,198,172,.14);"></div>
-    <div style="position:absolute;right:70px;bottom:-70px;width:190px;height:190px;border-radius:50%;background:rgba(62,198,172,.10);"></div>
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;position:relative;gap:20px;">
-      <div style="display:flex;align-items:flex-start;gap:16px;max-width:1000px;">
-        <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;margin-top:2px;">🛒</div>
-        <div>
-          <div style="font-size:32px;font-weight:800;color:#fff;letter-spacing:.3px;line-height:1.2;font-family:Arial,sans-serif;">REPORTE DE COMPRAS</div>
-          <div style="font-size:17px;font-weight:700;color:#7fe3cf;margin-top:6px;letter-spacing:.4px;font-family:Arial,sans-serif;">DESEMPEÑO POR RESPONSABLE</div>
-          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-            <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.16);color:#fff;font-size:13px;font-weight:700;padding:6px 14px;border-radius:20px;font-family:Arial,sans-serif;">👤 ${escapeHtml(comprador)}</div>
-            <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;font-family:Arial,sans-serif;">📅 ${escapeHtml(dateLabel)}</div>
-          </div>
+  <div style="background:#fff;border-radius:18px 18px 0 0;padding:26px 36px;display:flex;align-items:center;justify-content:space-between;gap:24px;border-bottom:1px solid #eef2f6;">
+    <div style="display:flex;align-items:center;gap:22px;">
+      <img src="${LOGO_GRUPOFRIOPACKING_B64}" style="height:56px;flex-shrink:0;" alt="Grupo Friopacking">
+      <div style="width:1px;align-self:stretch;background:#e2e8ee;"></div>
+      <div>
+        <div style="font-size:26px;font-weight:800;color:#0a1e64;letter-spacing:.3px;line-height:1.15;font-family:Arial,sans-serif;">REPORTE DE COMPRAS</div>
+        <div style="font-size:13.5px;font-weight:800;color:#1f8f96;margin-top:3px;letter-spacing:.3px;font-family:Arial,sans-serif;">USUARIO DE COMPRAS: ${escapeHtml(comprador.toUpperCase())}</div>
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
+          <div style="display:inline-flex;align-items:center;gap:7px;background:#1f9aa8;color:#fff;font-size:12.5px;font-weight:700;padding:6px 14px;border-radius:20px;font-family:Arial,sans-serif;">👤 ${escapeHtml(comprador)}</div>
+          <div style="display:inline-flex;align-items:center;gap:7px;background:#0a1e64;color:#fff;font-size:12.5px;font-weight:700;padding:6px 14px;border-radius:20px;font-family:Arial,sans-serif;">📅 ${escapeHtml(dateLabel)}</div>
         </div>
       </div>
-      <img src="${LOGO_GRUPOFRIOPACKING_B64}" style="height:50px;flex-shrink:0;" alt="Grupo Friopacking">
+    </div>
+    <div style="width:150px;height:86px;border-radius:12px;background:linear-gradient(135deg,#1f9aa8,#0a1e64);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <span style="font-size:34px;">❄️</span>
     </div>
   </div>`;
 }
-function proComprasOcCardHtml(spec){
+function proComprasIconBox(icon){
+  return `<div style="width:44px;height:44px;border-radius:10px;background:#1f9aa8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0;">${icon}</div>`;
+}
+function proComprasKpiCardHtml(opts){
+  // opts: {icon, label, valueHtml, metaText}
+  return `
+  <div style="flex:1;min-width:280px;background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;min-height:44px;">
+      ${proComprasIconBox(opts.icon)}
+      <div style="font-size:12.5px;font-weight:800;color:#0a1e64;line-height:1.25;letter-spacing:.2px;font-family:Arial,sans-serif;">${opts.label}</div>
+    </div>
+    ${opts.valueHtml}
+    ${opts.metaText ? `<div style="margin-top:14px;background:#eef2f6;border-radius:8px;padding:8px 12px;font-size:12px;color:#5b6b7a;font-weight:700;font-family:Arial,sans-serif;">${escapeHtml(opts.metaText)}</div>` : ''}
+  </div>`;
+}
+function proComprasNumUnitHtml(num, unit){
+  return `<div style="display:flex;align-items:baseline;gap:8px;"><div style="font-size:40px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${num}</div><div style="font-size:15px;font-weight:700;color:#8b98a4;font-family:Arial,sans-serif;">${escapeHtml(unit)}</div></div>`;
+}
+function proComprasKpiRowHtml(spec){
   const comp = spec.comparativo;
-  let deltaHtml = '';
+  let compHtml = '';
   if(comp){
     const delta = spec.totalOC - comp.n;
     const color = delta>0 ? '#0ca30c' : (delta<0 ? '#d03b3b' : '#8b98a4');
     const arrow = delta>0 ? '▲' : (delta<0 ? '▼' : '—');
-    deltaHtml = `<div style="margin-top:10px;font-size:13px;font-weight:700;color:${color};font-family:Arial,sans-serif;">${arrow} ${delta>0?'+':''}${delta} ${escapeHtml(comp.label)} (${comp.n})</div>`;
+    compHtml = `<div style="margin-top:8px;font-size:12px;font-weight:700;color:${color};font-family:Arial,sans-serif;">${arrow} ${delta>0?'+':''}${delta} ${escapeHtml(comp.label)} (${comp.n})</div>`;
   }
-  return `
-  <div style="flex:1;min-width:320px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;">📋 OC GENERADAS</div>
-    <div style="font-size:44px;font-weight:800;color:#0a1e64;margin-top:8px;font-family:Arial,sans-serif;">${spec.totalOC.toLocaleString('es-PE')}</div>
-    ${deltaHtml}
-  </div>`;
-}
-function proComprasCumplimientoCardHtml(pct){
-  return `
-  <div style="flex:1;min-width:320px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);display:flex;align-items:center;justify-content:space-between;gap:16px;">
-    <div>
-      <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;">✅ % CUMPLIMIENTO ENTREGA DE OC</div>
-      <div style="font-size:12px;color:#8b98a4;margin-top:6px;font-family:Arial,sans-serif;">Meta: ≥ 80%</div>
-    </div>
-    ${proRingSvg(pct, 92)}
-  </div>`;
+  const card1 = proComprasKpiCardHtml({
+    icon:'📄', label:'ÓRDENES DE COMPRA<br>GENERADAS',
+    valueHtml: proComprasNumUnitHtml(spec.totalOC.toLocaleString('es-PE'), 'OC') + compHtml,
+  });
+  const card2 = proComprasKpiCardHtml({
+    icon:'🕐', label:'TIEMPO DE EMISIÓN<br>DE OC',
+    valueHtml: spec.tiempoEmisionProm==null ? `<div style="font-size:22px;font-weight:800;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos</div>` : proComprasNumUnitHtml(spec.tiempoEmisionProm.toFixed(1), 'días'),
+    metaText: 'Meta: ≤ 2 d.h.',
+  });
+  const card3valueHtml = (spec.tiempoEntregaN>0)
+    ? proComprasNumUnitHtml(spec.tiempoEntregaProm.toFixed(1), 'días')
+    : `<div style="background:#1f9aa8;border-radius:10px;padding:13px;text-align:center;"><span style="font-size:18px;font-weight:800;color:#fff;letter-spacing:.4px;font-family:Arial,sans-serif;">EN PROGRESO</span></div>`;
+  const card3 = proComprasKpiCardHtml({
+    icon:'🚚', label:'TIEMPO DE ENTREGA<br>DE OC EN LURÍN',
+    valueHtml: card3valueHtml,
+    metaText: 'Meta: ≤ plazo pactado',
+  });
+  return `<div style="display:flex;flex-wrap:wrap;gap:16px;padding:24px 36px 6px;">${card1}${card2}${card3}</div>`;
 }
 function proComprasOrigenMonedaCardHtml(spec){
   const total = spec.nacionalN + spec.importadoN;
   const pctNac = total ? spec.nacionalN/total*100 : 0;
   const pctImp = total ? spec.importadoN/total*100 : 0;
+  const m = spec.montoNat;
+  const totalNativoSuma = (m.soles + m.dolares + m.euros) || 1; // solo para repartir el % visual entre las 3 columnas de moneda, no para convertir
   return `
-  <div style="flex:1;min-width:360px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;margin-bottom:14px;">🌎 ORIGEN Y MONEDA</div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#0a1e64;font-family:Arial,sans-serif;margin-bottom:4px;"><span>🇵🇪 Nacional</span><span>${spec.nacionalN} OC (${pctNac.toFixed(0)}%)</span></div>
-    <div style="height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;margin-bottom:12px;"><div style="width:${pctNac}%;height:100%;background:#1f9aa8;"></div></div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#0a1e64;font-family:Arial,sans-serif;margin-bottom:4px;"><span>🌎 Importado</span><span>${spec.importadoN} OC (${pctImp.toFixed(0)}%)</span></div>
-    <div style="height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;margin-bottom:16px;"><div style="width:${pctImp}%;height:100%;background:#e2960a;"></div></div>
-    <div style="display:flex;gap:16px;border-top:1px solid #eef2f6;padding-top:14px;">
-      <div style="flex:1;"><div style="font-size:11px;color:#8b98a4;font-weight:700;font-family:Arial,sans-serif;">MONTO EN SOLES</div><div style="font-size:19px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${fmtPEN(spec.montoNat.soles)}</div></div>
-      <div style="flex:1;"><div style="font-size:11px;color:#8b98a4;font-weight:700;font-family:Arial,sans-serif;">MONTO EN DÓLARES</div><div style="font-size:19px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${fmtUSD(spec.montoNat.dolares)}</div></div>
+  <div style="flex:1;min-width:400px;background:#fff;border-radius:14px;padding:24px 26px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Arial,sans-serif;margin-bottom:16px;">🌐 ORIGEN DE COMPRAS Y MONTO EJECUTADO</div>
+    <div style="display:flex;align-items:center;">
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:22px;">🇵🇪</div>
+        <div style="font-size:12.5px;font-weight:700;color:#5b6b7a;margin-top:2px;font-family:Arial,sans-serif;">Nacional</div>
+        <div style="font-size:26px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${pctNac.toFixed(1)}%</div>
+        <div style="font-size:12px;color:#8b98a4;font-family:Arial,sans-serif;">${spec.nacionalN} OC</div>
+      </div>
+      <div style="width:1px;height:64px;background:#eef2f6;"></div>
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:22px;">🌐</div>
+        <div style="font-size:12.5px;font-weight:700;color:#5b6b7a;margin-top:2px;font-family:Arial,sans-serif;">Importado</div>
+        <div style="font-size:26px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${pctImp.toFixed(1)}%</div>
+        <div style="font-size:12px;color:#8b98a4;font-family:Arial,sans-serif;">${spec.importadoN} OC</div>
+      </div>
+    </div>
+    <div style="background:#f7f9fb;border-radius:10px;padding:14px 10px;margin-top:16px;">
+      <div style="font-size:10.5px;font-weight:800;color:#8b98a4;text-align:center;letter-spacing:.3px;font-family:Arial,sans-serif;margin-bottom:10px;">MONTO COMPRADO POR MONEDA (DEL TOTAL EJECUTADO)</div>
+      <div style="display:flex;">
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:11px;color:#8b98a4;font-weight:700;font-family:Arial,sans-serif;">Soles (S/)</div>
+          <div style="font-size:16px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${fmtMonedaCompras(m.soles,'S/')}</div>
+          <div style="font-size:11px;color:#8b98a4;font-family:Arial,sans-serif;">${(m.soles/totalNativoSuma*100).toFixed(1)}%</div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:11px;color:#8b98a4;font-weight:700;font-family:Arial,sans-serif;">Dólares (US$)</div>
+          <div style="font-size:16px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${fmtMonedaCompras(m.dolares,'US$')}</div>
+          <div style="font-size:11px;color:#8b98a4;font-family:Arial,sans-serif;">${(m.dolares/totalNativoSuma*100).toFixed(1)}%</div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:11px;color:#8b98a4;font-weight:700;font-family:Arial,sans-serif;">Euros (€)</div>
+          <div style="font-size:16px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${fmtMonedaCompras(m.euros,'€')}</div>
+          <div style="font-size:11px;color:#8b98a4;font-family:Arial,sans-serif;">${(m.euros/totalNativoSuma*100).toFixed(1)}%</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#e6f5f2;border-radius:10px;padding:12px 16px;margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:12px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">💰 MONTO TOTAL EJECUTADO</span>
+      <span style="font-size:13px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${fmtMonedaCompras(m.soles,'S/')} &nbsp;|&nbsp; ${fmtMonedaCompras(m.dolares,'US$')} &nbsp;|&nbsp; ${fmtMonedaCompras(m.euros,'€')}</span>
     </div>
   </div>`;
 }
-function proComprasCondicionPagoCardHtml(creditoRows){
+function proComprasCondicionRowHtml(r){
   const colorFor = { 'Contado':'#0ca30c','Crédito 0-30 días':'#1f9aa8','Crédito 30-60 días':'#e2960a','Crédito 60+ días':'#d03b3b','Otra forma de pago':'#7c3fd4','Sin dato':'#8b98a4' };
-  const rowsHtml = creditoRows.map(r=>`
-    <div style="margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#0a1e64;font-family:Arial,sans-serif;margin-bottom:3px;"><span>${escapeHtml(r.label)}</span><span>${r.n} OC (${r.pct.toFixed(0)}%)</span></div>
-      <div style="height:8px;border-radius:5px;background:#e2e8ee;overflow:hidden;"><div style="width:${r.pct}%;height:100%;background:${colorFor[r.label]||'#8b98a4'};"></div></div>
-    </div>`).join('');
   return `
-  <div style="flex:1;min-width:360px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;margin-bottom:14px;">💳 CONDICIÓN DE PAGO</div>
-    ${rowsHtml || '<div style="font-size:12.5px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</div>'}
+  <div style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#0a1e64;font-family:Arial,sans-serif;margin-bottom:5px;"><span>${escapeHtml(r.label)}</span><span>${r.pct.toFixed(1)}% <span style="color:#8b98a4;font-weight:600;">(${r.n} OC)</span></span></div>
+    <div style="height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${r.pct}%;height:100%;background:${colorFor[r.label]||'#8b98a4'};"></div></div>
   </div>`;
 }
-function proComprasCategoriaTableHtml(catRows){
-  const iconFor = (i)=> ['🥇','🥈','🥉','4️⃣','5️⃣'][i] || '▪️';
-  const rowsHtml = catRows.map((c,i)=>`
+function proComprasCondicionPagoCardHtml(creditoRows, creditoExtra){
+  return `
+  <div style="flex:1;min-width:400px;background:#fff;border-radius:14px;padding:24px 26px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Arial,sans-serif;margin-bottom:18px;">💳 CONDICIÓN DE PAGO <span style="color:#8b98a4;font-weight:600;">(N° de OC)</span></div>
+    ${creditoRows.map(proComprasCondicionRowHtml).join('')}
+    ${creditoExtra.length ? `<div style="border-top:1px solid #eef2f6;margin-top:4px;padding-top:12px;">${creditoExtra.map(proComprasCondicionRowHtml).join('')}</div>` : ''}
+  </div>`;
+}
+function proComprasCategoriaTableHtml(catRows, totales){
+  const rowsHtml = catRows.map(c=>`
     <tr>
-      <td style="padding:10px 8px;font-size:18px;text-align:center;">${iconFor(i)}</td>
-      <td style="padding:10px 8px;font-weight:700;color:#0a1e64;font-size:14px;font-family:Arial,sans-serif;">${escapeHtml(c.familia)}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:13.5px;color:#1c2733;font-family:Arial,sans-serif;">${c.ocCount}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:13.5px;color:#1c2733;font-family:Arial,sans-serif;">${fmtPEN(c.soles)}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:13.5px;color:#1c2733;font-family:Arial,sans-serif;">${fmtUSD(c.dolares)}</td>
-      <td style="padding:10px 8px;min-width:140px;">
+      <td style="padding:12px 10px;font-size:19px;text-align:center;">${c.icon}</td>
+      <td style="padding:12px 10px;">
+        <div style="font-weight:800;color:#0a1e64;font-size:13.5px;font-family:Arial,sans-serif;">${escapeHtml(c.familia.toUpperCase())}</div>
+        ${c.descripcion ? `<div style="font-size:11px;color:#8b98a4;font-family:Arial,sans-serif;margin-top:2px;">${escapeHtml(c.descripcion)}</div>` : ''}
+      </td>
+      <td style="padding:12px 10px;text-align:center;font-size:13.5px;font-weight:700;color:#1c2733;font-family:Arial,sans-serif;">${c.ocCount}</td>
+      <td style="padding:12px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.soles,'S/')}</td>
+      <td style="padding:12px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.dolares,'US$')}</td>
+      <td style="padding:12px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.euros,'€')}</td>
+      <td style="padding:12px 10px;min-width:150px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="flex:1;height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${Math.max(0,Math.min(100,c.pct))}%;height:100%;background:#3ec6ac;"></div></div>
-          <span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;width:44px;text-align:right;">${c.pct.toFixed(0)}%</span>
+          <span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;width:48px;text-align:right;">${c.pct.toFixed(1)}%</span>
         </div>
       </td>
     </tr>`).join('');
   return `
-  <div style="background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;margin-bottom:14px;">📦 CATEGORÍA DE COMPRA (TOP 5)</div>
+  <div style="background:#fff;border-radius:14px;padding:24px 26px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
     <table style="width:100%;border-collapse:collapse;">
-      <thead><tr>
+      <thead><tr style="border-bottom:2px solid #eef2f6;">
         <th></th>
-        <th style="text-align:left;font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">FAMILIA</th>
-        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">OC</th>
-        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">SOLES</th>
-        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">DÓLARES</th>
-        <th style="text-align:left;font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:6px;font-family:Arial,sans-serif;">% DEL MONTO EJECUTADO</th>
+        <th style="text-align:left;font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:8px;font-family:Arial,sans-serif;">FAMILIA / CATEGORÍA</th>
+        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:8px;font-family:Arial,sans-serif;">N° DE OC</th>
+        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:8px;font-family:Arial,sans-serif;">SOLES (S/)</th>
+        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:8px;font-family:Arial,sans-serif;">DÓLARES (US$)</th>
+        <th style="font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:8px;font-family:Arial,sans-serif;">EUROS (€)</th>
+        <th style="text-align:left;font-size:10.5px;color:#8b98a4;font-weight:800;padding-bottom:8px;font-family:Arial,sans-serif;">% DEL TOTAL<br>(POR MONTO)</th>
       </tr></thead>
-      <tbody>${rowsHtml || `<tr><td colspan="6" style="text-align:center;padding:18px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
+      <tbody>${rowsHtml || `<tr><td colspan="7" style="text-align:center;padding:18px;color:#8b98a4;font-family:Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
+      ${catRows.length ? `<tfoot><tr style="background:#0a1e64;">
+        <td></td>
+        <td style="padding:10px;font-size:12.5px;font-weight:800;color:#fff;font-family:Arial,sans-serif;">TOTAL GENERAL</td>
+        <td style="padding:10px;text-align:center;font-size:12.5px;font-weight:800;color:#fff;font-family:Arial,sans-serif;">${totales.ocCount}</td>
+        <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.soles,'S/')}</td>
+        <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.dolares,'US$')}</td>
+        <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.euros,'€')}</td>
+        <td style="padding:10px;font-size:12.5px;font-weight:800;color:#fff;font-family:Arial,sans-serif;">100%</td>
+      </tr></tfoot>` : ''}
     </table>
+    <div style="font-size:10.5px;color:#8b98a4;margin-top:10px;font-family:Arial,sans-serif;">Nota: cada OC se asigna a su familia principal según el producto predominante.</div>
   </div>`;
 }
-function proComprasAlertaCardHtml(s4, totalAlertas){
+function proComprasEstadoEntregaCardHtml(spec){
+  const sinDemoras = spec.vencidasN === 0;
   return `
-  <div style="flex:1;min-width:360px;background:#fff;border-radius:14px;padding:26px 28px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="font-size:13px;font-weight:800;color:#8b98a4;letter-spacing:.4px;font-family:Arial,sans-serif;margin-bottom:14px;">⚠️ ALERTAS DE ENTREGA (IND. 4)</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      ${proStatBoxHtml({icon:'🟡', value:s4.leve||0, label:'LEVE (1-2 d)', color:'#e2960a'})}
-      ${proStatBoxHtml({icon:'🟠', value:s4.media||0, label:'MEDIA (3-5 d)', color:'#e2960a'})}
-      ${proStatBoxHtml({icon:'🔴', value:s4.critica||0, label:'CRÍTICA (>5 d)', color:'#d03b3b'})}
+  <div style="flex:1;min-width:340px;background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Arial,sans-serif;margin-bottom:16px;">🚚 ESTADO DE ENTREGA DE OC</div>
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;background:#f7f9fb;border-radius:10px;padding:12px 8px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#0ca30c;font-family:Arial,sans-serif;">${spec.enPlazoN}</div>
+        <div style="font-size:10px;font-weight:700;color:#5b6b7a;margin-top:4px;font-family:Arial,sans-serif;">EN PLAZO<br>(pendiente de entrega)</div>
+      </div>
+      <div style="flex:1;background:#f7f9fb;border-radius:10px;padding:12px 8px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#d03b3b;font-family:Arial,sans-serif;">${spec.vencidasN}</div>
+        <div style="font-size:10px;font-weight:700;color:#5b6b7a;margin-top:4px;font-family:Arial,sans-serif;">VENCIDAS<br>(sin entrega, plazo vencido)</div>
+      </div>
+      <div style="flex:1;background:#f7f9fb;border-radius:10px;padding:12px 8px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">${spec.entregadasN}</div>
+        <div style="font-size:10px;font-weight:700;color:#5b6b7a;margin-top:4px;font-family:Arial,sans-serif;">ENTREGADAS<br>EN LURÍN</div>
+      </div>
     </div>
-    <div style="margin-top:14px;font-size:12px;color:#8b98a4;font-family:Arial,sans-serif;">${totalAlertas} caso(s) de alerta en el período filtrado.</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 12px;border-radius:8px;background:${sinDemoras?'#e7f7e7':'#fbe8e8'};">
+      <span style="font-size:16px;">${sinDemoras?'✅':'⚠️'}</span>
+      <span style="font-size:11.5px;color:${sinDemoras?'#0a5c0a':'#8a2020'};font-family:Arial,sans-serif;">${sinDemoras ? 'Sin demoras registradas. Todas las OC se encuentran en plazo de entrega.' : spec.vencidasN + ' OC vencida(s) sin entrega — revisar seguimiento con el proveedor.'}</span>
+    </div>
   </div>`;
 }
-// Renderer dedicado — NO reutiliza proImageHtml/proHeaderHtml (diseño distinto pedido por Piero "tal
-// cual"). "Meta: ≥ 80%" en la tarjeta de cumplimiento es una cifra de la referencia visual de Piero, no
-// una meta institucional ya confirmada en la plataforma — señalado a Piero al entregar, mismo cuidado
-// que ya se tuvo con "CUMPLIMIENTO GLOBAL PROMEDIO" en buildProImageTiempos (no se inventa una meta que
-// no ha confirmado).
+function proComprasObjetivoCardHtml(){
+  return `
+  <div style="flex:1;min-width:280px;background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 1px 3px rgba(20,30,45,.10);display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:space-between;">
+    <div>
+      <div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Arial,sans-serif;margin-bottom:10px;">🎯 OBJETIVO</div>
+      <div style="font-size:12.5px;color:#5b6b7a;font-family:Arial,sans-serif;line-height:1.5;">Realizar compras oportunas, eficientes y estratégicas que aseguren la continuidad de los proyectos y la satisfacción del cliente.</div>
+    </div>
+    <div style="border-top:1px solid #eef2f6;margin-top:16px;padding-top:14px;width:100%;">
+      <img src="${LOGO_GRUPOFRIOPACKING_B64}" style="height:34px;" alt="Grupo Friopacking">
+    </div>
+  </div>`;
+}
+function proComprasResumenGeneralCardHtml(spec){
+  const items = [
+    { icon:'📄', label:'Órdenes de compra generadas', value: spec.totalOC.toLocaleString('es-PE')+' OC' },
+    { icon:'💰', label:'Monto total ejecutado', value: `${fmtMonedaCompras(spec.montoNat.soles,'S/')} / ${fmtMonedaCompras(spec.montoNat.dolares,'US$')} / ${fmtMonedaCompras(spec.montoNat.euros,'€')}` },
+    { icon:'🕐', label:'Tiempo promedio de emisión', value: spec.tiempoEmisionProm==null ? '—' : spec.tiempoEmisionProm.toFixed(1)+' días' },
+    { icon:'✅', label:'OC en plazo (pendientes de entrega)', value: spec.enPlazoN+' OC' },
+    { icon:'❗', label:'OC vencidas (sin entrega)', value: spec.vencidasN+' OC' },
+    { icon:'📦', label:'OC entregadas en Lurín', value: spec.entregadasN+' OC' },
+  ];
+  return `
+  <div style="flex:1;min-width:320px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="background:#0a1e64;padding:12px 20px;"><span style="font-size:13px;font-weight:800;color:#fff;letter-spacing:.3px;font-family:Arial,sans-serif;">RESUMEN GENERAL</span></div>
+    <div style="padding:14px 20px;">
+      ${items.map(it=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #f4f6f8;"><span style="font-size:12.5px;color:#5b6b7a;font-family:Arial,sans-serif;">${it.icon} ${escapeHtml(it.label)}</span><span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;white-space:nowrap;">${it.value}</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+// Renderer dedicado — NO reutiliza proImageHtml/proHeaderHtml (diseño propio de Piero, seguido "tal
+// cual" según la foto que envió). El monto se muestra siempre en la moneda original de la OC (nunca
+// convertido) — el equivalente en soles solo se usa por dentro para calcular los % de las barras.
 function proComprasResponsableImageHtml(spec){
   return `
   <div id="proImgInner" style="width:1600px;font-family:Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
     ${proComprasResponsableHeaderHtml(spec.comprador, spec.dateLabel)}
-    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:26px 40px 6px;">
-      ${proComprasOcCardHtml(spec)}
-      ${proComprasCumplimientoCardHtml(spec.cumplePct)}
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 40px;">
+    ${proComprasKpiRowHtml(spec)}
+    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:16px 36px;">
       ${proComprasOrigenMonedaCardHtml(spec)}
-      ${proComprasCondicionPagoCardHtml(spec.creditoRows)}
+      ${proComprasCondicionPagoCardHtml(spec.creditoRows, spec.creditoExtra)}
     </div>
-    <div style="padding:0 40px 16px;">
-      ${proComprasCategoriaTableHtml(spec.catRows)}
+    <div style="padding:0 36px 16px;">
+      ${proComprasCategoriaTableHtml(spec.catRows, spec.catTotales)}
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:0 40px 16px;">
-      ${proComprasAlertaCardHtml(spec.alerta, spec.totalAlertas)}
-      ${proComprasCumplimientoCardHtml(spec.cumplePct)}
+    <div style="display:flex;flex-wrap:wrap;gap:16px;padding:0 36px 30px;">
+      ${proComprasEstadoEntregaCardHtml(spec)}
+      ${proComprasObjetivoCardHtml()}
+      ${proComprasResumenGeneralCardHtml(spec)}
     </div>
-    <div style="margin:6px 40px 30px;background:#fff;border-radius:12px;padding:16px 22px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 3px rgba(20,30,45,.08);">
-      <span style="font-size:24px;">🏆</span>
-      <div><span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;">OBJETIVO: </span><span style="font-size:12.5px;color:#5b6b7a;font-family:Arial,sans-serif;">Realizar compras oportunas, eficientes y estratégicas que aseguren la continuidad de los proyectos y la satisfacción del cliente.</span></div>
-    </div>
+    <div style="margin:-14px 36px 26px;font-size:11px;color:#8b98a4;font-family:Arial,sans-serif;">Nota: ${escapeHtml(spec.dateRangeFooter)} El monto ejecutado se muestra en la moneda original de la OC. El tiempo se calcula en días hábiles.</div>
   </div>`;
 }
 function buildProImageGasto(){
