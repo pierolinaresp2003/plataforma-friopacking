@@ -1617,7 +1617,9 @@ function processConsulta(wb, filename){
 
     gastoRows.push({
       proveedor: col.provNombre!==-1 ? ((r[col.provNombre]||"").toString().trim() || "(sin proveedor)") : "(sin proveedor)",
-      familia: col.grupo!==-1 ? ((r[col.grupo]||"").toString().trim() || "Sin familia") : "Sin familia",
+      // categoriaGenericaFor (04.09.2026 ronda 38, pedido de Piero: "que ambos compartan esa lógica de
+      // productos") — mismas categorías consolidadas que el Reporte de Compras por responsable.
+      familia: categoriaGenericaFor(col.grupo!==-1 ? (r[col.grupo]||"").toString().trim() : ""),
       subfamilia: col.subgrupo!==-1 ? ((r[col.subgrupo]||"").toString().trim() || "Sin subfamilia") : "Sin subfamilia",
       producto: limpiaProducto(descripcionRaw, codigoRaw),
       origen: origenForDocumento(documento),
@@ -3127,6 +3129,28 @@ function fmtMonedaCompras(n, symbol){
   const v = (n==null || isNaN(n)) ? 0 : n;
   return symbol + ' ' + v.toLocaleString('es-PE', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
+// Consolida las familias reales de Reporte Maestro.xlsx (65 valores distintos verificados, muchos casi
+// duplicados) en categorías más genéricas — pedido de Piero (04.09.2026, ronda 38): "podrías agruparla
+// de forma más genérica... a tu interpretación... que ambos compartan esa lógica de productos" (se usa
+// acá y también en Concentración de Gasto — ver `familia:` en processConsulta). Reglas, verificadas
+// contra la lista real completa:
+// 1) "PART. DE X" se junta con "X" — un repuesto es del mismo tipo de equipo que la pieza completa
+//    (ej. "PART. DE VÁLVULA" y "VÁLVULA" quedan como una sola categoría "VÁLVULA").
+// 2) Variantes de escritura del mismo concepto se unifican (ej. "EQUIPOS DE PROTECCION PERSONAL - SIN
+//    COSTO" es la misma categoría que "EQUIPO DE PROTECCIÓN PERSONAL", solo con otro texto).
+// 3) "#N/A" (316 líneas reales con ese texto crudo, dato faltante en el Excel de Piero) se muestra como
+//    "Sin familia" en vez del texto crudo "#N/A".
+function categoriaGenericaFor(nombreFamilia){
+  let f = (nombreFamilia||'').toString().trim().toUpperCase();
+  if(!f || f==='#N/A' || f==='SIN FAMILIA') return 'Sin familia';
+  f = f.replace(/^PART\.?\s+DE\s+/, '').replace(/^PARTE\s+DE\s+/, '').trim();
+  const NORMALIZA = {
+    'EQUIPOS DE PROTECCION PERSONAL - SIN COSTO': 'EQUIPO DE PROTECCIÓN PERSONAL',
+    'EQUIPOS DE PROTECCIÓN PERSONAL - SIN COSTO': 'EQUIPO DE PROTECCIÓN PERSONAL',
+    'EQUIPOS DE PROTECCION PERSONAL': 'EQUIPO DE PROTECCIÓN PERSONAL',
+  };
+  return NORMALIZA[f] || f;
+}
 // Ícono por familia — mapeo por palabra clave (los nombres de familia son datos reales de Piero, no una
 // lista fija), con las 5 familias de su ejemplo cubiertas exactamente y un ícono genérico de respaldo.
 function iconForFamilia(nombre){
@@ -3236,18 +3260,46 @@ function buildProImageComprasResponsable(){
     .map(b=>({ label:b, n:counts[b], pct: totalOC ? counts[b]/totalOC*100 : 0 }));
 
   // Categoría de compra — TODAS las familias del período (el diseño de referencia suma 100% con "TOTAL
-  // GENERAL", no es un top 5 recortado), por OC distinta y monto por moneda nativa.
-  const catMap = {};
+  // GENERAL", no es un top 5 recortado). Categorías consolidadas vía categoriaGenericaFor (ronda 38,
+  // pedido de Piero: "agruparla de forma más genérica").
+  //
+  // Se agrupa PRIMERO por OC (no por línea) — pedido de Piero: "en N de OC debes colocar literal el
+  // número de oc correspondiente, no la cantidad de líneas". Antes, una OC con líneas en 2 familias
+  // distintas se sumaba una vez POR familia (inflando el total de la tabla por encima de totalOC), lo
+  // cual ya contradecía la nota del pie ("cada OC se asigna a su familia principal"). Ahora cada OC se
+  // asigna UNA sola vez a su familia predominante (la de mayor monto equivalente entre sus líneas), y
+  // ahí se le atribuye el monto completo de la OC — así "N° de OC" por familia y el TOTAL GENERAL suman
+  // exactamente lo mismo que totalOC.
+  const lineasPorOC = new Map();
   for(const r of rowsOrden){
-    const fam = r.familia || 'Sin familia';
-    const c = catMap[fam] = catMap[fam] || { ocSet:new Set(), soles:0, dolares:0, euros:0, productos:new Set() };
-    if(r.codOrden) c.ocSet.add(r.codOrden);
-    if(r.producto) c.productos.add(r.producto.toString().trim());
-    if(r.montoNativo!=null && !isNaN(r.montoNativo)){
+    if(!r.codOrden) continue;
+    if(!lineasPorOC.has(r.codOrden)) lineasPorOC.set(r.codOrden, []);
+    lineasPorOC.get(r.codOrden).push(r);
+  }
+  const catMap = {};
+  for(const lines of lineasPorOC.values()){
+    const montoPorFamilia = {};
+    for(const r of lines){
+      if(r.montoNativo==null || isNaN(r.montoNativo)) continue;
+      const fam = categoriaGenericaFor(r.familia);
       const lbl = monedaLabel(r.moneda);
-      if(lbl==='S/') c.soles += r.montoNativo;
-      else if(lbl==='€') c.euros += r.montoNativo;
-      else c.dolares += r.montoNativo;
+      const eq = lbl==='S/' ? r.montoNativo : (lbl==='€' ? r.montoNativo*TIPO_CAMBIO['€'] : r.montoNativo*TIPO_CAMBIO['US$']);
+      montoPorFamilia[fam] = (montoPorFamilia[fam]||0) + eq;
+    }
+    let familiaPredominante = categoriaGenericaFor(lines[0].familia);
+    let maxEq = -1;
+    for(const [fam,eq] of Object.entries(montoPorFamilia)){ if(eq>maxEq){ maxEq=eq; familiaPredominante=fam; } }
+
+    const c = catMap[familiaPredominante] = catMap[familiaPredominante] || { ocSet:new Set(), soles:0, dolares:0, euros:0, productos:new Set() };
+    c.ocSet.add(lines[0].codOrden);
+    for(const r of lines){
+      if(r.producto) c.productos.add(r.producto.toString().trim());
+      if(r.montoNativo!=null && !isNaN(r.montoNativo)){
+        const lbl = monedaLabel(r.moneda);
+        if(lbl==='S/') c.soles += r.montoNativo;
+        else if(lbl==='€') c.euros += r.montoNativo;
+        else c.dolares += r.montoNativo;
+      }
     }
   }
   const catRows = Object.entries(catMap).map(([familia,c])=>{
@@ -3272,14 +3324,35 @@ function buildProImageComprasResponsable(){
     if(lim4 && hoy > lim4) vencidasN++; else enPlazoN++;
   }
 
+  // Nivel de aviso de las OC ya entregadas (ronda 38, pedido de Piero: recuperar el concepto de "nivel
+  // de aviso" del primer intento — leve/media/crítica — pero sobre el Indicador 4 (Entrega), no el
+  // Indicador 2 (Emisión) como en aquel primer intento, porque acá se pidió específicamente "de las
+  // órdenes que se entregan"). El Indicador 4 no tiene una meta fija en días (depende del plazo pactado
+  // de cada OC — limite4For), así que el "exceso" se mide contra ESE plazo individual, no una meta
+  // global; mismos 3 umbrales que ya se habían usado para el Indicador 2 en el primer intento (Leve
+  // 1-2 d.h. de exceso, Media 3-5, Crítica > 5 d.h.).
+  let leveN=0, mediaN=0, criticaN=0;
+  for(const r of ocRows.values()){
+    if(!r.fRecep) continue;
+    const lim4 = limite4For(r);
+    if(!lim4) continue;
+    const fRecepDia = new Date(Date.UTC(r.fRecep.getUTCFullYear(), r.fRecep.getUTCMonth(), r.fRecep.getUTCDate()));
+    const exceso = busdayCount(lim4, fRecepDia); // positivo = llegó tarde, según su propio plazo pactado
+    if(exceso==null || exceso<=0) continue;
+    if(exceso<=2) leveN++;
+    else if(exceso<=5) mediaN++;
+    else criticaN++;
+  }
+
   return {
     comprador, totalOC, nacionalN, importadoN, comparativo,
     montoNat: { soles, dolares, euros },
     tiempoEmisionProm: stIND2.promedio,
-    tiempoEntregaProm: stIND4.promedio, tiempoEntregaN: stIND4.n,
+    tiempoEntregaProm: stIND4.promedio, tiempoEntregaN: stIND4.n, cumplimientoEntregaPct: stIND4.cumplePct,
     creditoRows, creditoExtra,
     catRows, catTotales,
     entregadasN, vencidasN, enPlazoN,
+    leveN, mediaN, criticaN,
     dateLabel: procesoFilterDateLabel(),
     dateRangeFooter: procesoFilterDateRangeFooter(),
   };
@@ -3492,32 +3565,32 @@ function proComprasEstadoEntregaCardHtml(spec){
     </div>
   </div>`;
 }
-function proComprasObjetivoCardHtml(){
+// Nivel de aviso de entrega (ronda 38, pedido de Piero: quitar Objetivo/Resumen General y volver al
+// concepto de "nivel de aviso" del primer intento — "de las órdenes que se entregan cuántas fueron con
+// leve media o crítica y el % de cumplimiento de entrega a la derecha, serían como 4 bloques con los
+// números en grande"). Mismo estilo de bloque grande que ya usa Estado de entrega de OC, a la derecha
+// de esa misma tarjeta.
+function proComprasNivelAvisoCardHtml(spec){
   return `
-  <div style="flex:1;min-width:280px;background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 1px 3px rgba(20,30,45,.10);display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:space-between;">
-    <div>
-      <div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Arial,sans-serif;margin-bottom:10px;">🎯 OBJETIVO</div>
-      <div style="font-size:12.5px;color:#5b6b7a;font-family:Arial,sans-serif;line-height:1.5;">Realizar compras oportunas, eficientes y estratégicas que aseguren la continuidad de los proyectos y la satisfacción del cliente.</div>
-    </div>
-    <div style="border-top:1px solid #eef2f6;margin-top:16px;padding-top:14px;width:100%;">
-      <img src="${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}" style="height:30px;" alt="Grupo Friopacking">
-    </div>
-  </div>`;
-}
-function proComprasResumenGeneralCardHtml(spec){
-  const items = [
-    { icon:'📄', label:'Órdenes de compra generadas', value: spec.totalOC.toLocaleString('es-PE')+' OC' },
-    { icon:'💰', label:'Monto total ejecutado', value: `${fmtMonedaCompras(spec.montoNat.soles,'S/')} / ${fmtMonedaCompras(spec.montoNat.dolares,'US$')} / ${fmtMonedaCompras(spec.montoNat.euros,'€')}` },
-    { icon:'🕐', label:'Tiempo promedio de emisión', value: spec.tiempoEmisionProm==null ? '—' : spec.tiempoEmisionProm.toFixed(1)+' días' },
-    { icon:'✅', label:'OC en plazo (pendientes de entrega)', value: spec.enPlazoN+' OC' },
-    { icon:'❗', label:'OC vencidas (sin entrega)', value: spec.vencidasN+' OC' },
-    { icon:'📦', label:'OC entregadas en Lurín', value: spec.entregadasN+' OC' },
-  ];
-  return `
-  <div style="flex:1;min-width:320px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="background:#0a1e64;padding:12px 20px;"><span style="font-size:13px;font-weight:800;color:#fff;letter-spacing:.3px;font-family:Arial,sans-serif;">RESUMEN GENERAL</span></div>
-    <div style="padding:14px 20px;">
-      ${items.map(it=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #f4f6f8;"><span style="font-size:12.5px;color:#5b6b7a;font-family:Arial,sans-serif;">${it.icon} ${escapeHtml(it.label)}</span><span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Arial,sans-serif;white-space:nowrap;">${it.value}</span></div>`).join('')}
+  <div style="flex:1;min-width:420px;background:#fff;border-radius:14px;padding:22px 24px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">${proComprasIconBox('🚦')}<div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Arial,sans-serif;">NIVEL DE AVISO DE ENTREGA <span style="color:#8b98a4;font-weight:600;">(OC ya entregadas)</span></div></div>
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;background:#f7f9fb;border-radius:10px;padding:12px 8px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#e2960a;font-family:Arial,sans-serif;">${spec.leveN}</div>
+        <div style="font-size:10px;font-weight:700;color:#5b6b7a;margin-top:4px;font-family:Arial,sans-serif;">LEVE<br>(1-2 d.h. tarde)</div>
+      </div>
+      <div style="flex:1;background:#f7f9fb;border-radius:10px;padding:12px 8px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#d97706;font-family:Arial,sans-serif;">${spec.mediaN}</div>
+        <div style="font-size:10px;font-weight:700;color:#5b6b7a;margin-top:4px;font-family:Arial,sans-serif;">MEDIA<br>(3-5 d.h. tarde)</div>
+      </div>
+      <div style="flex:1;background:#f7f9fb;border-radius:10px;padding:12px 8px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:#d03b3b;font-family:Arial,sans-serif;">${spec.criticaN}</div>
+        <div style="font-size:10px;font-weight:700;color:#5b6b7a;margin-top:4px;font-family:Arial,sans-serif;">CRÍTICA<br>(&gt; 5 d.h. tarde)</div>
+      </div>
+      <div style="flex:1;background:#f7f9fb;border-radius:10px;padding:12px 8px;text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:${proSemColor(spec.cumplimientoEntregaPct)};font-family:Arial,sans-serif;">${spec.cumplimientoEntregaPct==null ? '—' : spec.cumplimientoEntregaPct.toFixed(0)+'%'}</div>
+        <div style="font-size:10px;font-weight:700;color:#5b6b7a;margin-top:4px;font-family:Arial,sans-serif;">% CUMPLIMIENTO<br>DE ENTREGA</div>
+      </div>
     </div>
   </div>`;
 }
@@ -3538,8 +3611,7 @@ function proComprasResponsableImageHtml(spec){
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:16px;padding:0 36px 30px;">
       ${proComprasEstadoEntregaCardHtml(spec)}
-      ${proComprasObjetivoCardHtml()}
-      ${proComprasResumenGeneralCardHtml(spec)}
+      ${proComprasNivelAvisoCardHtml(spec)}
     </div>
     <div style="margin:-14px 36px 26px;font-size:11px;color:#8b98a4;font-family:Arial,sans-serif;">Nota: ${escapeHtml(spec.dateRangeFooter)} El monto ejecutado se muestra en la moneda original de la OC. El tiempo se calcula en días hábiles.</div>
   </div>`;
