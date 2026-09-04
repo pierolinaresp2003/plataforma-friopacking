@@ -1628,11 +1628,17 @@ function filteredGastoRows(){
   const anio = document.getElementById('filterGastoAnio').value;
   const mes = document.getElementById('filterGastoMes').value;
   const semana = document.getElementById('filterGastoSemana').value;
-  if(anio !== 'all') rows = rows.filter(r=>String(r.anio)===anio);
-  if(mes !== 'all') rows = rows.filter(r=>String(r.mes)===mes);
-  // Semana reemplazó a Día (pedido de Piero, 02.09.2026) — las filas de Gasto solo guardan
+  // Si hay una Semana elegida, manda ella sola sobre Año/Mes (misma corrección 04.09.2026 que
+  // filteredProcesoRows/filteredProcesoRowsByOrden/filteredAlertRows): una semana que cruza fin de mes
+  // no debe además filtrarse por Mes por separado, o se descartan en silencio sus propios días del mes
+  // siguiente. Semana reemplazó a Día (pedido de Piero, 02.09.2026) — las filas de Gasto solo guardan
   // {anio,mes,dia} sueltos (no un objeto Date), así que se arma la fecha al vuelo para compararla.
-  if(semana !== 'all') rows = rows.filter(r=>weekKeyFor(dateFromYMD(r.anio, r.mes, r.dia))===semana);
+  if(semana !== 'all'){
+    rows = rows.filter(r=>weekKeyFor(dateFromYMD(r.anio, r.mes, r.dia))===semana);
+  } else {
+    if(anio !== 'all') rows = rows.filter(r=>String(r.anio)===anio);
+    if(mes !== 'all') rows = rows.filter(r=>String(r.mes)===mes);
+  }
   return rows;
 }
 // Agregador genérico: agrupa `rows` por lo que devuelva `labelFn`, calcula Pareto 80/20 sobre el
@@ -2012,9 +2018,17 @@ function filteredAlertRows(rows){
     if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
     if(fResp!=='all' && r.responsable !== fResp) return false;
     if(fOrigen!=='all' && r.origen !== fOrigen) return false;
-    if(fAnio!=='all' && r.fDesde && r.fDesde.getUTCFullYear()!==Number(fAnio)) return false;
-    if(fMes!=='all' && r.fDesde && (r.fDesde.getUTCMonth()+1)!==Number(fMes)) return false;
-    if(fSemana!=='all' && r.fDesde && weekKeyFor(r.fDesde)!==fSemana) return false;
+    // Si hay una Semana elegida, manda ella sola sobre Año/Mes (bug detectado 04.09.2026: una semana
+    // que cruza fin de mes, ej. "Semana 6 (31 Ago–6 Sep)", quedaba filtrando también por Mes=Agosto por
+    // separado, y eso descartaba en silencio los días de esa misma semana que caen en septiembre —
+    // Piero mostró un caso real con OC del 1-3 sep. que desaparecían). Ver misma corrección en
+    // filteredGastoRows/filteredProcesoRows/filteredProcesoRowsByOrden.
+    if(fSemana!=='all'){
+      if(r.fDesde && weekKeyFor(r.fDesde)!==fSemana) return false;
+    } else {
+      if(fAnio!=='all' && r.fDesde && r.fDesde.getUTCFullYear()!==Number(fAnio)) return false;
+      if(fMes!=='all' && r.fDesde && (r.fDesde.getUTCMonth()+1)!==Number(fMes)) return false;
+    }
     return true;
   });
 }
@@ -2210,12 +2224,18 @@ function filteredProcesoRows(){
     if(fFamilia!=='all' && r.familia !== fFamilia) return false;
     if(fResp!=='all' && r.usuarioCompras !== fResp) return false;
     if(fOrigen!=='all' && r.origen !== fOrigen) return false;
-    // Año/Mes/Semana son selectores independientes sobre FechaRequerimiento — se pueden combinar entre
-    // sí (ej. "todos los agostos de cualquier año" con Mes=8 y Año=todos). Semana reemplazó a Día a
-    // pedido de Piero (02.09.2026: "filtrar por semanas en lugar de 'Todos los días'").
-    if(fAnio!=='all' && r.fReq && r.fReq.getUTCFullYear()!==Number(fAnio)) return false;
-    if(fMes!=='all' && r.fReq && (r.fReq.getUTCMonth()+1)!==Number(fMes)) return false;
-    if(fSemana!=='all' && r.fReq && weekKeyFor(r.fReq)!==fSemana) return false;
+    // Si hay una Semana elegida, manda ella sola sobre Año/Mes (bug detectado 04.09.2026: una semana
+    // que cruza fin de mes, ej. "Semana 6 (31 Ago–6 Sep)", quedaba filtrando también por Mes=Agosto por
+    // separado, y eso descartaba en silencio los días de esa misma semana que caen en septiembre —
+    // Piero mostró un caso real con OC del 1-3 sep. que desaparecían del detalle del Indicador 2). Sin
+    // Semana elegida, Año/Mes se siguen combinando entre sí como antes (ej. "todos los agostos de
+    // cualquier año"). Ver misma corrección en filteredGastoRows/filteredAlertRows/filteredProcesoRowsByOrden.
+    if(fSemana!=='all'){
+      if(r.fReq && weekKeyFor(r.fReq)!==fSemana) return false;
+    } else {
+      if(fAnio!=='all' && r.fReq && r.fReq.getUTCFullYear()!==Number(fAnio)) return false;
+      if(fMes!=='all' && r.fReq && (r.fReq.getUTCMonth()+1)!==Number(fMes)) return false;
+    }
     return true;
   });
 }
@@ -2240,9 +2260,14 @@ function filteredProcesoRowsByOrden(){
     if(fFamilia!=='all' && r.familia !== fFamilia) return false;
     if(fResp!=='all' && r.usuarioCompras !== fResp) return false;
     if(fOrigen!=='all' && r.origen !== fOrigen) return false;
-    if(fAnio!=='all' && r.fOrden && r.fOrden.getUTCFullYear()!==Number(fAnio)) return false;
-    if(fMes!=='all' && r.fOrden && (r.fOrden.getUTCMonth()+1)!==Number(fMes)) return false;
-    if(fSemana!=='all' && r.fOrden && weekKeyFor(r.fOrden)!==fSemana) return false;
+    // Si hay una Semana elegida, manda ella sola sobre Año/Mes — misma corrección que filteredProcesoRows
+    // (ver su comentario: una semana que cruza fin de mes no debe además filtrarse por Mes por separado).
+    if(fSemana!=='all'){
+      if(r.fOrden && weekKeyFor(r.fOrden)!==fSemana) return false;
+    } else {
+      if(fAnio!=='all' && r.fOrden && r.fOrden.getUTCFullYear()!==Number(fAnio)) return false;
+      if(fMes!=='all' && r.fOrden && (r.fOrden.getUTCMonth()+1)!==Number(fMes)) return false;
+    }
     return true;
   });
 }
