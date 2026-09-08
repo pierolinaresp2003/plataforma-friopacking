@@ -3713,14 +3713,9 @@ function renderProceso(){
     document.getElementById('procDetailClose').addEventListener('click', closeDrilldown);
     // Comprador filtrado (≠ "Todos") -> Reporte de Compras por responsable, diseño dedicado (04.09.2026,
     // confirmado con Piero: "Reemplaza todo") en vez del reporte general de Tiempos del Proceso.
-    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=>{
-      const comprador = document.getElementById('filterProcesoResponsable').value;
-      if(comprador !== 'all'){
-        downloadProComprasPartes(e.currentTarget);
-      } else {
-        downloadProImage(buildProImageTiempos, 'resumen-whatsapp-tiempos-proceso', e.currentTarget);
-      }
-    });
+    // Mismo formato para un comprador y para toda el área (08.09.2026). buildProImageTiempos y
+    // proImageHtml quedan sin usar desde acá (los siguen usando Gasto y Alertas para sus resúmenes).
+    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=> downloadProComprasPartes(e.currentTarget));
     procesoListenersBoundInner = true;
   }
   drawProceso();
@@ -4172,7 +4167,7 @@ function ocCountForPeriodOverride(comprador, matchFn){
   // Set de codOrden de más abajo ya evita contar dos veces una OC que aparezca en ambas fuentes.
   const rows = getProcesoRows().concat(PEDIDO_SIN_REQ_ROWS).filter(r=>{
     if(r.camino!=='compra') return false;
-    if(r.usuarioCompras !== comprador) return false;
+    if(comprador !== 'all' && r.usuarioCompras !== comprador) return false; // 'all' = toda el área de compras
     if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
     if(fFamilia!=='all' && categoriaGenericaFor(r.familia, r.idProducto, r.producto) !== fFamilia) return false;
     if(fOrigen!=='all' && r.origen !== fOrigen) return false;
@@ -4510,9 +4505,13 @@ function procesoFilterDateRangeFooter(){
   }
   return 'Período: ' + procesoFilterDateLabel() + '.';
 }
+// Sirve tanto para un comprador como para TODA el área (comprador === 'all', pedido de Piero
+// 08.09.2026: el reporte del área usa el mismo formato que el del comprador). Con 'all' no se filtra
+// por usuarioCompras y el encabezado dice "ÁREA DE COMPRAS" en vez del nombre.
 function buildProImageComprasResponsable(){
   const comprador = document.getElementById('filterProcesoResponsable').value;
-  const rowsOrdenMaestro = filteredProcesoRowsByOrden().filter(r=>r.camino==='compra' && r.usuarioCompras===comprador);
+  const esArea = (comprador === 'all');
+  const rowsOrdenMaestro = filteredProcesoRowsByOrden().filter(r=>r.camino==='compra' && (esArea || r.usuarioCompras===comprador));
   // Pedidos directos de PedidoSinReq.xlsx (OC que Reporte Maestro.xlsx nunca trae — ver comentario junto
   // a PEDIDO_SIN_REQ_ROWS) — se agregan SOLO a este reporte, filtrados con el mismo criterio de
   // proveedor/familia/origen/año/mes/semana que el resto, y sin duplicar una OC que por algún motivo ya
@@ -4522,7 +4521,7 @@ function buildProImageComprasResponsable(){
   // se cargó ANTES que Reporte Maestro.xlsx — FAMILIA_BY_PRODUCTO recién se termina de armar con ese
   // segundo archivo, y para entonces este reporte ya se puede estar viendo.
   const rowsOrdenDirectas = PEDIDO_SIN_REQ_ROWS
-    .filter(r=>r.usuarioCompras===comprador && !codOrdenYaIncluidos.has(r.codOrden))
+    .filter(r=>(esArea || r.usuarioCompras===comprador) && !codOrdenYaIncluidos.has(r.codOrden))
     .map(r=> (r.idProducto && FAMILIA_BY_PRODUCTO[r.idProducto] && FAMILIA_BY_PRODUCTO[r.idProducto]!==r.familia)
       ? Object.assign({}, r, { familia: FAMILIA_BY_PRODUCTO[r.idProducto] }) : r)
     .filter(matchesProcesoFiltrosOC);
@@ -4530,6 +4529,7 @@ function buildProImageComprasResponsable(){
   const ocRows = new Map(); // codOrden -> una fila representativa (fechas/estado son iguales entre líneas de la misma OC)
   for(const r of rowsOrden){ if(r.codOrden && !ocRows.has(r.codOrden)) ocRows.set(r.codOrden, r); }
   const totalOC = ocRows.size;
+  const compradoresN = new Set(rowsOrden.map(r=>r.usuarioCompras).filter(Boolean)).size;
 
   // Nacional/Importado por prefijo de CodOrden (0001-/0002-), a pedido explícito de Piero (04.09.2026)
   // — reemplaza el origen por RUC de proveedor que usa el resto de la plataforma, solo para este reporte.
@@ -4698,7 +4698,7 @@ function buildProImageComprasResponsable(){
   }
 
   return {
-    comprador, totalOC, nacionalN, importadoN, comparativo,
+    comprador, esArea, compradoresN, totalOC, nacionalN, importadoN, comparativo,
     montoNat: { soles, dolares, euros },
     tiempoEmisionProm: stIND2.promedio,
     tiempoEntregaProm: stIND4.promedio, tiempoEntregaN: stIND4.n, cumplimientoEntregaPct: stIND4.cumplePct,
@@ -4711,7 +4711,7 @@ function buildProImageComprasResponsable(){
     dateRangeFooter: procesoFilterDateRangeFooter(),
   };
 }
-function proComprasResponsableHeaderHtml(comprador, dateLabel){
+function proComprasResponsableHeaderHtml(comprador, dateLabel, esArea, compradoresN){
   // Rediseño 04.09.2026 ronda 37 (feedback de Piero: "muy seco y aburrido", debe verse "tal cual" la
   // foto de referencia) — logo sin el cuadrado azul de fondo, píldora de fecha con borde (no rellena) y
   // panel superior derecho con una foto real de planta (extraída del Manual de Identidad de Grupo
@@ -4723,9 +4723,9 @@ function proComprasResponsableHeaderHtml(comprador, dateLabel){
       <div style="width:1px;align-self:stretch;background:#e2e8ee;"></div>
       <div>
         <div style="font-size:26px;font-weight:800;color:#0a1e64;letter-spacing:.3px;line-height:1.15;font-family:Inter,Arial,sans-serif;">REPORTE DE COMPRAS</div>
-        <div style="font-size:13.5px;font-weight:800;color:#0a1e64;margin-top:3px;letter-spacing:.3px;font-family:Inter,Arial,sans-serif;">USUARIO DE COMPRAS: ${escapeHtml(comprador.toUpperCase())}</div>
+        <div style="font-size:13.5px;font-weight:800;color:#0a1e64;margin-top:3px;letter-spacing:.3px;font-family:Inter,Arial,sans-serif;">${esArea ? 'ÁREA DE COMPRAS' : 'USUARIO DE COMPRAS: ' + escapeHtml(comprador.toUpperCase())}</div>
         <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
-          <div style="display:inline-flex;align-items:center;gap:7px;background:#1f9aa8;color:#fff;font-size:12.5px;font-weight:700;padding:6px 14px;border-radius:20px;font-family:Inter,Arial,sans-serif;">👤 ${escapeHtml(comprador)}</div>
+          <div style="display:inline-flex;align-items:center;gap:7px;background:#1f9aa8;color:#fff;font-size:12.5px;font-weight:700;padding:6px 14px;border-radius:20px;font-family:Inter,Arial,sans-serif;">${esArea ? '👥 ' + compradoresN + ' compradores' : '👤 ' + escapeHtml(comprador)}</div>
           <div style="display:inline-flex;align-items:center;gap:7px;background:#fff;color:#0a1e64;border:1.5px solid #d7dfe8;font-size:12.5px;font-weight:700;padding:5px 14px;border-radius:20px;font-family:Inter,Arial,sans-serif;">📅 ${escapeHtml(dateLabel)}</div>
         </div>
       </div>
@@ -4980,7 +4980,7 @@ function proComprasResponsablePartesHtml(spec){
   <div id="proImgInner" style="width:1080px;font-family:Inter,Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">${contenido}</div>`;
   return [
     parte(`
-      ${proComprasResponsableHeaderHtml(spec.comprador, spec.dateLabel)}
+      ${proComprasResponsableHeaderHtml(spec.comprador, spec.dateLabel, spec.esArea, spec.compradoresN)}
       ${proComprasKpiRowHtml(spec)}
       <div style="display:flex;flex-wrap:wrap;gap:14px;padding:14px 20px 20px;">
         ${proComprasOrigenMonedaCardHtml(spec)}
@@ -5025,7 +5025,7 @@ async function downloadProComprasPartes(btn){
   try{
     const partes = proComprasResponsablePartesHtml(buildProImageComprasResponsable());
     const fecha = new Date().toISOString().slice(0,10);
-    const base = 'reporte-compras-' + comprador.toLowerCase() + '-' + fecha;
+    const base = 'reporte-compras-' + (comprador === 'all' ? 'area' : comprador.toLowerCase()) + '-' + fecha;
     const imagenes = [];
     for(let i=0;i<partes.length;i++){
       btn.textContent = '⏳ Imagen ' + (i+1) + ' de ' + partes.length + '...';
