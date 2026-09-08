@@ -4595,9 +4595,12 @@ function buildProImageComprasResponsable(){
     let proyPredominante = (lines[0].proyecto||'').toString().trim() || 'SIN PROYECTO (compra de almacén)';
     let maxPy = -1;
     for(const [py,eq] of Object.entries(montoPorProy)){ if(eq>maxPy){ maxPy=eq; proyPredominante=py; } }
-    const g = proyMap[proyPredominante] = proyMap[proyPredominante] || { ocSet:new Set(), soles:0, dolares:0, euros:0 };
+    const g = proyMap[proyPredominante] = proyMap[proyPredominante] || { ocSet:new Set(), pedSet:new Set(), soles:0, dolares:0, euros:0 };
     g.ocSet.add(lines[0].codOrden);
     for(const r of lines){
+      // % del proyecto = sobre PEDIDOS atendidos, no requerimientos ni monto (pedido de Piero,
+      // 08.09.2026). Se cuentan CodPedido distintos, que es lo que el comprador efectivamente atendió.
+      if(r.codPedido) g.pedSet.add(r.codPedido.toString().trim());
       if(r.montoNativo==null || isNaN(r.montoNativo)) continue;
       const lbl = monedaLabel(r.moneda);
       if(lbl==='S/') g.soles += r.montoNativo;
@@ -4605,12 +4608,14 @@ function buildProImageComprasResponsable(){
       else g.dolares += r.montoNativo;
     }
   }
+  const proyPedTotal = Object.values(proyMap).reduce((a,g)=>a+g.pedSet.size, 0);
   const proyRows = Object.entries(proyMap).map(([proyecto,g])=>{
     const montoEq = g.soles + g.dolares*TIPO_CAMBIO['US$'] + g.euros*TIPO_CAMBIO['€'];
-    return { proyecto, ocCount: g.ocSet.size, soles:g.soles, dolares:g.dolares, euros:g.euros, montoEq,
-             pct: montoEqTotal ? montoEq/montoEqTotal*100 : 0 };
-  }).sort((a,b)=>b.montoEq-a.montoEq);
-  const proyTotales = proyRows.reduce((acc,c)=>({ ocCount:acc.ocCount+c.ocCount, soles:acc.soles+c.soles, dolares:acc.dolares+c.dolares, euros:acc.euros+c.euros }), {ocCount:0,soles:0,dolares:0,euros:0});
+    return { proyecto, ocCount: g.ocSet.size, pedCount: g.pedSet.size,
+             soles:g.soles, dolares:g.dolares, euros:g.euros, montoEq,
+             pct: proyPedTotal ? g.pedSet.size/proyPedTotal*100 : 0 };
+  }).sort((a,b)=> b.pedCount-a.pedCount || b.montoEq-a.montoEq);
+  const proyTotales = proyRows.reduce((acc,c)=>({ ocCount:acc.ocCount+c.ocCount, pedCount:acc.pedCount+c.pedCount }), {ocCount:0,pedCount:0});
 
   // Estado de entrega de OC (por OC distinta): entregada (ya tiene FechaRecepcion), vencida (aprobada,
   // sin recibir, y ya pasó el plazo pactado — limite4For, mismo criterio ya usado en el detalle "⏳
@@ -4651,7 +4656,7 @@ function buildProImageComprasResponsable(){
     tiempoEntregaProm: stIND4.promedio, tiempoEntregaN: stIND4.n, cumplimientoEntregaPct: stIND4.cumplePct,
     creditoRows, creditoExtra,
     catRows, catTotales,
-    proyRows, proyTotales,
+    proyRows, proyTotales, proyPedTotal,
     entregadasN, vencidasN, enPlazoN,
     leveN, mediaN, criticaN,
     dateLabel: procesoFilterDateLabel(),
@@ -4798,116 +4803,76 @@ function proComprasCondicionPagoCardHtml(creditoRows, creditoExtra){
 //      — el TOTAL GENERAL del pie sigue calculándose sobre TODAS (llega ya sumado en `totales`);
 //   2. la línea de productos de ejemplo pasa a una sola línea con "…" en vez de envolverse en 2-3;
 //   3. filas más compactas (padding 12px -> 7px, ícono 19px -> 16px).
+// Tabla de familias y de proyectos, lado a lado y con SOLO 3 columnas cada una (pedido de Piero,
+// 08.09.2026: "solo debe estar columna de familia / categoria, la de n de oc y la del % del total del
+// monto. A la derecha de igual forma lo mismo para proyectos atendidos, las mismas columnas, solo que
+// aqui el % sera de que tantos PEDIDOS (NO REQUERIMIENTOS) se han atendido para esos proyectos").
+// Las 2 usan el mismo renderer para no duplicar código: cambia el título, la etiqueta de la 1ra columna,
+// la del %, y qué mide ese % (monto en familias, pedidos atendidos en proyectos).
 const PRO_CAT_TOP = 8;
-function proComprasCategoriaTableHtml(catRows, totales, proyRows){
-  let filas = catRows;
-  if(catRows.length > PRO_CAT_TOP + 1){
-    const resto = catRows.slice(PRO_CAT_TOP);
-    const suma = resto.reduce((a,c)=>({
-      ocCount:a.ocCount+c.ocCount, soles:a.soles+c.soles, dolares:a.dolares+c.dolares,
-      euros:a.euros+c.euros, pct:a.pct+c.pct,
-    }), {ocCount:0,soles:0,dolares:0,euros:0,pct:0});
-    filas = catRows.slice(0, PRO_CAT_TOP).concat([{
-      familia: 'Otras categorías (' + resto.length + ')', icon: '📦',
-      descripcion: resto.map(c=>c.familia.toLowerCase()).join(', '),
-      ocCount: suma.ocCount, soles: suma.soles, dolares: suma.dolares, euros: suma.euros, pct: suma.pct,
-    }]);
-  }
-  const rowsHtml = filas.map((c,i)=>`
-    <tr style="background:${i%2 ? '#f9fbfc' : '#fff'};">
-      <td style="padding:8px 10px;font-size:16px;text-align:center;">${c.icon}</td>
-      <td style="padding:8px 10px;font-weight:800;color:#0a1e64;font-size:12.5px;font-family:Inter,Arial,sans-serif;">${escapeHtml(c.familia.toUpperCase())}</td>
-      <td style="padding:8px 12px 8px 10px;font-size:10.5px;color:#8b98a4;font-family:Inter,Arial,sans-serif;line-height:1.35;max-width:250px;">${c.descripcion ? escapeHtml(c.descripcion) : '&mdash;'}</td>
-      <td style="padding:7px 10px;text-align:center;font-size:13.5px;font-weight:700;color:#1c2733;font-family:Inter,Arial,sans-serif;">${c.ocCount}</td>
-      <td style="padding:7px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.soles,'S/')}</td>
-      <td style="padding:7px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.dolares,'US$')}</td>
-      <td style="padding:7px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.euros,'€')}</td>
-      <td style="padding:7px 10px;min-width:150px;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="flex:1;height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${Math.max(0,Math.min(100,c.pct))}%;height:100%;background:#3ec6ac;"></div></div>
-          <span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Inter,Arial,sans-serif;width:48px;text-align:right;">${c.pct.toFixed(1)}%</span>
-        </div>
-      </td>
-    </tr>`).join('');
-  return `
-  <div style="background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
-    <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px;">${proComprasIconBox('📦')}<div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Inter,Arial,sans-serif;">FAMILIA / CATEGORÍA DE PRODUCTOS COMPRADOS</div></div>
-    <table style="width:100%;border-collapse:collapse;">
-      <thead><tr style="background:#0a1e64;">
-        <th style="border-radius:8px 0 0 8px;"></th>
-        <th style="text-align:left;font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">FAMILIA / CATEGORÍA</th>
-        <th style="text-align:left;font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">DESCRIPCIÓN (REFERENCIAL)</th>
-        <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">N° DE OC</th>
-        <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">SOLES (S/)</th>
-        <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">DÓLARES (US$)</th>
-        <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">EUROS (€)</th>
-        <th style="text-align:left;font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;border-radius:0 8px 8px 0;">% DEL TOTAL<br>(POR MONTO)</th>
-      </tr></thead>
-      <tbody>${rowsHtml || `<tr><td colspan="8" style="text-align:center;padding:18px;color:#8b98a4;font-family:Inter,Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
-      ${filas.length ? `<tfoot><tr style="background:#0a1e64;">
-        <td style="border-radius:8px 0 0 8px;"></td>
-        <td colspan="2" style="padding:10px;font-size:12.5px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;">TOTAL GENERAL</td>
-        <td style="padding:10px;text-align:center;font-size:12.5px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;">${totales.ocCount}</td>
-        <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.soles,'S/')}</td>
-        <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.dolares,'US$')}</td>
-        <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.euros,'€')}</td>
-        <td style="padding:10px;font-size:12.5px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;border-radius:0 8px 8px 0;">100%</td>
-      </tr></tfoot>` : ''}
-    </table>
-    <div style="font-size:10.5px;color:#8b98a4;margin-top:8px;font-family:Inter,Arial,sans-serif;">Nota: cada OC se asigna a su familia principal según el producto predominante.${catRows.length > filas.length ? ' Se listan las ' + PRO_CAT_TOP + ' familias de mayor monto; el resto se agrupa en "Otras categorías". El total incluye todas.' : ''}</div>
-    ${proComprasProyectosBlockHtml(proyRows)}
-  </div>`;
-}
-// Proyectos atendidos — vive en la misma tarjeta que las familias (pedido de Piero: "ese cuadro debe
-// aprovecharse para colocar esas 2 datas"), separado por una línea y con su propio encabezado.
 const PRO_PROY_TOP = 8;
-function proComprasProyectosBlockHtml(proyRows){
-  proyRows = proyRows || [];
-  if(!proyRows.length) return '';
-  let filas = proyRows;
-  if(proyRows.length > PRO_PROY_TOP + 1){
-    const resto = proyRows.slice(PRO_PROY_TOP);
-    const suma = resto.reduce((a,c)=>({ ocCount:a.ocCount+c.ocCount, soles:a.soles+c.soles, dolares:a.dolares+c.dolares, euros:a.euros+c.euros, pct:a.pct+c.pct }), {ocCount:0,soles:0,dolares:0,euros:0,pct:0});
-    filas = proyRows.slice(0, PRO_PROY_TOP).concat([{ proyecto:'Otros proyectos (' + resto.length + ')', ocCount:suma.ocCount, soles:suma.soles, dolares:suma.dolares, euros:suma.euros, pct:suma.pct }]);
-  }
-  const totales = proyRows.reduce((a,c)=>({ ocCount:a.ocCount+c.ocCount, soles:a.soles+c.soles, dolares:a.dolares+c.dolares, euros:a.euros+c.euros }), {ocCount:0,soles:0,dolares:0,euros:0});
+function proComprasMiniTablaHtml(o){
+  // o: {icon, title, extra, nameLabel, pctLabel, rows:[{icon,label,ocCount,pct}], totalOC, note}
   return `
-    <div style="margin-top:18px;padding-top:16px;border-top:1px solid #eef2f6;">
-      <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px;">${proComprasIconBox('🏗️')}<div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Inter,Arial,sans-serif;">PROYECTOS ATENDIDOS <span style="color:#8b98a4;font-weight:600;">(${proyRows.length})</span></div></div>
+    <div style="flex:1;min-width:470px;">
+      <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px;">${proComprasIconBox(o.icon)}<div style="font-size:13px;font-weight:800;color:#0a1e64;letter-spacing:.3px;font-family:Inter,Arial,sans-serif;">${o.title}${o.extra ? ` <span style="color:#8b98a4;font-weight:600;">${o.extra}</span>` : ''}</div></div>
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr style="background:#0a1e64;">
-          <th style="text-align:left;font-size:10px;color:#fff;font-weight:800;padding:9px 12px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;border-radius:8px 0 0 8px;">PROYECTO / CLIENTE</th>
-          <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">N° DE OC</th>
-          <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">SOLES (S/)</th>
-          <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">DÓLARES (US$)</th>
-          <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;">EUROS (€)</th>
-          <th style="text-align:left;font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;border-radius:0 8px 8px 0;">% DEL TOTAL<br>(POR MONTO)</th>
+          <th style="text-align:left;font-size:10px;color:#fff;font-weight:800;padding:9px 12px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;border-radius:8px 0 0 8px;">${o.nameLabel}</th>
+          <th style="font-size:10px;color:#fff;font-weight:800;padding:9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;white-space:nowrap;">N° DE OC</th>
+          <th style="text-align:left;font-size:10px;color:#fff;font-weight:800;padding:9px 12px 9px 10px;font-family:Inter,Arial,sans-serif;letter-spacing:.4px;border-radius:0 8px 8px 0;">${o.pctLabel}</th>
         </tr></thead>
-        <tbody>${filas.map((c,i)=>`
+        <tbody>${o.rows.map((r,i)=>`
           <tr style="background:${i%2 ? '#f9fbfc' : '#fff'};">
-            <td style="padding:8px 12px;font-weight:800;color:#0a1e64;font-size:12.5px;font-family:Inter,Arial,sans-serif;">${escapeHtml(c.proyecto.toUpperCase())}</td>
-            <td style="padding:8px 10px;text-align:center;font-size:13.5px;font-weight:700;color:#1c2733;font-family:Inter,Arial,sans-serif;">${c.ocCount}</td>
-            <td style="padding:8px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.soles,'S/')}</td>
-            <td style="padding:8px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.dolares,'US$')}</td>
-            <td style="padding:8px 10px;text-align:center;font-size:13px;color:#1c2733;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(c.euros,'€')}</td>
-            <td style="padding:8px 10px;min-width:150px;">
+            <td style="padding:9px 12px;font-family:Inter,Arial,sans-serif;">
+              <span style="font-size:15px;margin-right:7px;">${r.icon||''}</span><span style="font-weight:800;color:#0a1e64;font-size:12.5px;">${escapeHtml(r.label.toUpperCase())}</span>
+            </td>
+            <td style="padding:9px 10px;text-align:center;font-size:15px;font-weight:800;color:#1c2733;font-family:Inter,Arial,sans-serif;">${r.ocCount}</td>
+            <td style="padding:9px 12px 9px 10px;min-width:140px;">
               <div style="display:flex;align-items:center;gap:8px;">
-                <div style="flex:1;height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${Math.max(0,Math.min(100,c.pct))}%;height:100%;background:#3ec6ac;"></div></div>
-                <span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Inter,Arial,sans-serif;width:48px;text-align:right;">${c.pct.toFixed(1)}%</span>
+                <div style="flex:1;height:9px;border-radius:6px;background:#e2e8ee;overflow:hidden;"><div style="width:${Math.max(0,Math.min(100,r.pct))}%;height:100%;background:#3ec6ac;"></div></div>
+                <span style="font-size:12.5px;font-weight:800;color:#0a1e64;font-family:Inter,Arial,sans-serif;width:46px;text-align:right;">${r.pct.toFixed(1)}%</span>
               </div>
             </td>
-          </tr>`).join('')}</tbody>
-        <tfoot><tr style="background:#0a1e64;">
+          </tr>`).join('') || `<tr><td colspan="3" style="text-align:center;padding:18px;color:#8b98a4;font-family:Inter,Arial,sans-serif;">Sin datos con el filtro actual</td></tr>`}</tbody>
+        ${o.rows.length ? `<tfoot><tr style="background:#0a1e64;">
           <td style="padding:10px 12px;font-size:12.5px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;border-radius:8px 0 0 8px;">TOTAL GENERAL</td>
-          <td style="padding:10px;text-align:center;font-size:12.5px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;">${totales.ocCount}</td>
-          <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.soles,'S/')}</td>
-          <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.dolares,'US$')}</td>
-          <td style="padding:10px;text-align:center;font-size:12px;font-weight:700;color:#fff;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${fmtMonedaCompras(totales.euros,'€')}</td>
-          <td style="padding:10px;font-size:12.5px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;border-radius:0 8px 8px 0;">100%</td>
-        </tr></tfoot>
+          <td style="padding:10px;text-align:center;font-size:13px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;">${o.totalOC}</td>
+          <td style="padding:10px 12px 10px 10px;font-size:12.5px;font-weight:800;color:#fff;font-family:Inter,Arial,sans-serif;border-radius:0 8px 8px 0;">100%</td>
+        </tr></tfoot>` : ''}
       </table>
-      <div style="font-size:10.5px;color:#8b98a4;margin-top:8px;font-family:Inter,Arial,sans-serif;">Nota: cada OC se asigna a un solo proyecto, el de mayor monto entre sus líneas.${proyRows.length > filas.length ? ' Se listan los ' + PRO_PROY_TOP + ' proyectos de mayor monto; el resto se agrupa en "Otros proyectos". El total incluye todos.' : ''} Las OC de pedidos directos (sin requerimiento) aparecen como "SIN PROYECTO".</div>
+      <div style="font-size:10.5px;color:#8b98a4;margin-top:8px;line-height:1.5;font-family:Inter,Arial,sans-serif;">${o.note}</div>
     </div>`;
+}
+// Consolida la cola de una lista ordenada en una sola fila ("Otras categorías (n)" / "Otros proyectos
+// (n)"), para que la tabla no crezca sin control pero el TOTAL GENERAL siga siendo sobre todo.
+function proComprasConsolidar(rows, top, label, icon){
+  if(rows.length <= top + 1) return rows;
+  const resto = rows.slice(top);
+  const suma = resto.reduce((a,c)=>({ ocCount:a.ocCount+c.ocCount, pct:a.pct+c.pct }), {ocCount:0,pct:0});
+  return rows.slice(0, top).concat([{ icon, label: label + ' (' + resto.length + ')', ocCount:suma.ocCount, pct:suma.pct }]);
+}
+function proComprasCategoriaTableHtml(catRows, totales, proyRows, proyTotales){
+  proyRows = proyRows || [];
+  const fam = proComprasConsolidar(catRows.map(c=>({ icon:c.icon, label:c.familia, ocCount:c.ocCount, pct:c.pct })), PRO_CAT_TOP, 'Otras categorías', '📦');
+  const proy = proComprasConsolidar(proyRows.map(c=>({ icon:'🏗️', label:c.proyecto, ocCount:c.ocCount, pct:c.pct })), PRO_PROY_TOP, 'Otros proyectos', '🏗️');
+  return `
+  <div style="background:#fff;border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(20,30,45,.10);">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;">
+      ${proComprasMiniTablaHtml({
+        icon:'📦', title:'FAMILIA / CATEGORÍA DE PRODUCTOS COMPRADOS',
+        nameLabel:'FAMILIA / CATEGORÍA', pctLabel:'% DEL TOTAL (POR MONTO)',
+        rows: fam, totalOC: totales.ocCount,
+        note: 'Cada OC se asigna a una sola familia, la del producto predominante.' + (catRows.length > fam.length ? ' Se listan las ' + PRO_CAT_TOP + ' de mayor monto; el resto va en "Otras categorías". El total incluye todas.' : ''),
+      })}
+      ${proComprasMiniTablaHtml({
+        icon:'🏗️', title:'PROYECTOS ATENDIDOS', extra:'(' + proyRows.length + ')',
+        nameLabel:'PROYECTO / CLIENTE', pctLabel:'% DE PEDIDOS ATENDIDOS',
+        rows: proy, totalOC: (proyTotales||{ocCount:0}).ocCount,
+        note: 'El % es la participación de cada proyecto en los pedidos atendidos (CodPedido distintos, no requerimientos).' + (proyRows.length > proy.length ? ' Se listan los ' + PRO_PROY_TOP + ' con más pedidos; el resto va en "Otros proyectos".' : '') + ' Las OC de pedidos directos no traen proyecto y salen como "SIN PROYECTO".',
+      })}
+    </div>
+  </div>`;
 }
 function proComprasEstadoEntregaCardHtml(spec){
   // La barra de aviso se quitó y se volvió a poner el mismo día (08.09.2026): primero Piero pidió
@@ -4985,7 +4950,7 @@ function proComprasResponsableImageHtml(spec){
       ${proComprasCondicionPagoCardHtml(spec.creditoRows, spec.creditoExtra)}
     </div>
     <div style="padding:0 20px 14px;">
-      ${proComprasCategoriaTableHtml(spec.catRows, spec.catTotales, spec.proyRows)}
+      ${proComprasCategoriaTableHtml(spec.catRows, spec.catTotales, spec.proyRows, spec.proyTotales)}
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:14px;padding:0 20px 24px;">
       ${proComprasEstadoEntregaCardHtml(spec)}
