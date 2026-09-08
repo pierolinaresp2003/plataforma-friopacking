@@ -273,7 +273,7 @@
   <nav class="sidebar-nav">
     <div class="navitem active" data-section="proceso">🕐 Tiempos del Proceso de Atención</div>
     <div class="navitem" data-section="gasto">💰 Concentración de Gasto</div>
-    <div class="navitem" data-section="alertas">📦 Alertas de Reposición</div>
+    <div class="navitem" data-section="alertas">📦 Inventario · Almacén General</div>
   </nav>
   <div class="sidebar-foot">Grupo Friopacking<br>Logística</div>
 </aside>
@@ -458,15 +458,13 @@
         <button class="btn secondary" id="btnImgAlertas" type="button">🖼️ Generar imagen del módulo</button>
       </div>
       <div class="note" id="alertasDefNote" style="margin-bottom:14px;">
-        <b>Qué muestra esta alerta:</b> productos con <b>consumo mensual mayor a 0</b> cuyo <b>Stock Actual</b> está por debajo de su <b>Punto de Reorden</b>, según la hoja "Análisis Inventario" de tu Reporte Almacen.xlsx — es una foto del momento (no depende de fechas). "Quiebre" = stock en 0, "Crítico" = bajo la mitad del punto de reorden, "Bajo el ROP" = bajo el punto de reorden pero sobre la mitad. El catálogo sin consumo queda fuera a propósito.
+        <b>Qué muestra este módulo:</b> el inventario de los productos con <b>punto de reorden (ROP) definido</b>, según la hoja "Análisis Inventario" de tu Reporte Almacen.xlsx — es una foto del momento (no depende de fechas). <b>Estado</b> = "REPOSICIÓN" cuando <b>LIMA + EN TRÁNSITO</b> es menor o igual al ROP, "OK" si lo supera. <b>Stock disponible</b> = LIMA + EN TRÁNSITO − RESERVA − PICKING. Reserva y picking vienen de la Plataforma Almacén: mientras no estén en el Excel se leen como 0.
       </div>
       <div class="toolbar">
-        <select id="filterReposicionAlmacen"><option value="all">Todos los almacenes</option></select>
         <select id="filterReposicionEstado">
           <option value="all">Todos los estados</option>
-          <option value="quiebre">Solo Quiebre</option>
-          <option value="critico">Solo Crítico</option>
-          <option value="bajo">Solo Bajo el ROP</option>
+          <option value="reposicion">Solo REPOSICIÓN</option>
+          <option value="ok">Solo OK</option>
         </select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
@@ -2139,27 +2137,34 @@ function normalizeMoneda(raw){
 }
 let GASTO_DATA = null; // { rows: [{proveedor, familia, subfamilia, origen, moneda, creditoBucket, fecha, anio, mes, dia, montoPEN}], excluded, totalRows, filename, fromSnapshot }
 // Reporte Almacen.xlsx (08.09.2026, ver processAlmacen) — { rows: [{codigo, descripcion, unidad,
-// estadoArchivo, stocks:{ICA,LIMA,TRUJILLO}, stockActual, rop, stockMinimo, consumoMensual, transito,
-// cobertura, deficit, estado}], sedes, totalRows, excluidas, filename, sheetName }. Independiente de
-// DATA/GASTO_DATA: es una foto de stock, no tiene fecha ni se cruza con Reporte Maestro.
+// ica, lima, trujillo, transito, reserva, picking, rop, eoq, consumoMensual, cobertura, disponible,
+// faltante, estado}], sedes, totalRows, sinRop, excluidas, filename, sheetName, tieneReserva,
+// tienePicking }. Independiente de DATA/GASTO_DATA: es una foto de stock, no tiene fecha ni se cruza
+// con Reporte Maestro.
 let ALMACEN_DATA = null;
 // Sedes con stock en columna propia dentro de la hoja "Análisis Inventario" (verificado contra el
 // archivo real de Piero, 08.09.2026 — no existe una columna única "Almacén").
 const ALMACEN_SEDES = ['ICA','LIMA','TRUJILLO'];
 
-// ---------- Reporte Almacen.xlsx: Alertas de Reposición (08.09.2026) ----------
-// Verificado contra el archivo real de Piero (08.09.2026): la hoja que interesa es "Análisis
-// Inventario", con el encabezado en la FILA 3 y 15,317 productos con código. Columnas reales usadas:
-// Código, Descripción, Medida, ICA / LIMA / TRUJILLO (stock por sede, en columnas separadas), Stock
-// Actual (total), Stock en tránsito, Consumo Mensual, Punto de Reorden, Stock mínimo, Estado,
-// Cobertura (meses), Deficit contra ROP.
-// Dos cosas a tener presentes de ese archivo: (1) "Punto de Reorden" y "Stock mínimo" solo están
-// llenos en 4,444 de los 15,317 productos (los que tienen historial de consumo); (2) "Cant. Faltante a
-// comprar" viene sin valores calculados, así que no se usa.
-// CRITERIO confirmado con Piero (08.09.2026): alerta = Consumo Mensual > 0 Y Stock Actual por debajo
-// del Punto de Reorden → 3,320 productos. Se deja fuera a propósito el resto del catálogo sin consumo,
-// que en la columna "Estado" del archivo figura como CRITICO solo por tener stock 0 (12,916 filas) y
-// ahogaría la alerta. La columna "Estado" del archivo NO se recalcula: se muestra tal cual, al lado.
+// ---------- Reporte Almacen.xlsx: Inventario / Almacén General (08.09.2026) ----------
+// Columnas y reglas definidas por Piero en su archivo "Columnas modulo Inventario.Almacen General.xlsx"
+// (hoja "Hoja1"), verificadas contra el Reporte Almacen.xlsx real:
+//   CODIGO, DESCRIPCIÓN, UM(=Medida), ICA, LIMA, TRUJILLO, EN TRÁNSITO(=Stock en tránsito), RESERVA,
+//   PICKING, ROP(=Punto de Reorden), EOQ, CONSUMO MENSUAL, COBERTURA (MESES),
+//   STOCK DISPONIBLE = LIMA + EN TRÁNSITO - RESERVA - PICKING,
+//   ESTADO = "REPOSICIÓN" si LIMA + EN TRÁNSITO <= ROP, si no "OK".
+// Ojo: el estado y el stock disponible se miden SOLO contra LIMA (almacén central) + tránsito, no
+// contra el stock total de las 3 sedes — así lo definió Piero. ICA y TRUJILLO se muestran de referencia.
+// RESERVA y PICKING vienen de la "Plataforma Almacén", no del Excel: la columna "Reservas" del Reporte
+// Almacen existe pero llega vacía (0 de 15,317 filas) y no hay ninguna de picking. Decisión de Piero
+// (08.09.2026): él va a agregar esas 2 columnas a la hoja "Análisis Inventario"; mientras no estén, se
+// leen como 0 y Stock Disponible queda en LIMA + EN TRÁNSITO. Si las agrega con otro nombre, basta
+// sumarlo a los candidatos de findCol más abajo.
+// UNIVERSO confirmado con Piero: solo productos con ROP > 0 (4,440 de 15,317). El resto del catálogo no
+// tiene punto de reorden y con la fórmula de estado caería entero en "REPOSICIÓN" (0 <= 0), inflando la
+// alerta a 13,325 filas sin que ninguna sea accionable. Fill-rate real del archivo, para tenerlo
+// presente: ROP 4,444 · Consumo Mensual y Cobertura 4,722 · EOQ solo 2,112 · ICA/LIMA/TRUJILLO/tránsito
+// las 15,317.
 function processAlmacen(wb, filename){
   let sheetName = wb.SheetNames.find(n => /an[áa]lisis.*inventario/i.test(n.trim()));
   if(!sheetName) sheetName = wb.SheetNames.find(n => /inventario|stock/i.test(n.trim()));
@@ -2182,76 +2187,80 @@ function processAlmacen(wb, filename){
   const col = {
     codigo: findCol(headerRow, ["Código","Codigo"]),
     descripcion: findCol(headerRow, ["Descripción","Descripcion"]),
-    unidad: findCol(headerRow, ["Medida","Unidad","U.M.","UM"]),
-    stockActual: findCol(headerRow, ["Stock Actual"]),
-    transito: findCol(headerRow, ["Stock en tránsito","Stock en transito"]),
+    unidad: findCol(headerRow, ["Medida","UM","Unidad","U.M."]),
+    transito: findCol(headerRow, ["Stock en tránsito","Stock en transito","En tránsito","En transito"]),
+    reserva: findCol(headerRow, ["Reserva","Reservas"]),
+    picking: findCol(headerRow, ["Picking"]),
+    rop: findCol(headerRow, ["Punto de Reorden","ROP","Punto de Pedido"]),
+    eoq: findCol(headerRow, ["EOQ"]),
     consumoMensual: findCol(headerRow, ["Consumo Mensual"]),
-    rop: findCol(headerRow, ["Punto de Reorden","Punto de Pedido"]),
-    stockMinimo: findCol(headerRow, ["Stock mínimo","Stock Minimo"]),
-    estadoArchivo: findCol(headerRow, ["Estado"]),
     cobertura: findCol(headerRow, ["Cobertura (meses)","Cobertura"]),
-    deficitRop: findCol(headerRow, ["Deficit contra ROP","Déficit contra ROP"]),
   };
   const faltantes = [];
   if(col.codigo===-1) faltantes.push("Código");
-  if(col.stockActual===-1) faltantes.push("Stock Actual");
-  if(col.rop===-1) faltantes.push("Punto de Reorden");
-  if(col.consumoMensual===-1) faltantes.push("Consumo Mensual");
+  if(col.rop===-1) faltantes.push("Punto de Reorden / ROP");
+  if(col.transito===-1) faltantes.push("Stock en tránsito");
   if(faltantes.length){
     return { ok:false, message: 'encontré la hoja "' + sheetName + '" pero no pude ubicar la columna de ' + faltantes.join(", ") + ' — dime en qué columna está y lo ajusto.' };
   }
   // Stock por sede: solo por coincidencia EXACTA del encabezado, para no capturar por error otra
   // columna del archivo (findCol cae a coincidencia parcial si no encuentra exacta).
-  const sedes = [];
+  const sedeIdx = {};
   headerRow.forEach((h, i) => {
-    const t = (h==null?"":h.toString()).trim();
-    if(ALMACEN_SEDES.indexOf(t.toUpperCase()) !== -1) sedes.push({ name: t.toUpperCase(), idx: i });
+    const t = (h==null?"":h.toString()).trim().toUpperCase();
+    if(ALMACEN_SEDES.indexOf(t) !== -1) sedeIdx[t] = i;
   });
+  if(sedeIdx['LIMA'] === undefined){
+    return { ok:false, message: 'encontré la hoja "' + sheetName + '" pero no ubiqué la columna de stock de LIMA, que es la que define el estado de reposición.' };
+  }
 
   const num = v => (typeof v === 'number' && isFinite(v)) ? v
     : ((v!=null && v!=="" && isFinite(Number(v))) ? Number(v) : null);
   const txt = v => (v==null ? "" : v.toString()).trim();
+  const val = (r, i) => (i===undefined || i===-1) ? 0 : (num(r[i]) || 0);
   const dataRows = rows.slice(headerRowIdx+1);
   const almacenRows = [];
-  let excluidas = 0;
+  let excluidas = 0, sinRop = 0;
   for(const r of dataRows){
     if(!r) continue;
     const codigo = txt(r[col.codigo]);
     if(!codigo){ excluidas++; continue; }
-    const stockActual = num(r[col.stockActual]);
-    if(stockActual === null){ excluidas++; continue; }
     const rop = num(r[col.rop]);
-    const consumoMensual = num(r[col.consumoMensual]);
-    // Criterio confirmado: solo cuenta como alerta si el producto tiene consumo y está bajo su ROP.
-    const enAlerta = (consumoMensual !== null && consumoMensual > 0 && rop !== null && stockActual < rop);
-    const estado = !enAlerta ? 'ok'
-      : (stockActual <= 0 ? 'quiebre' : (stockActual < rop*0.5 ? 'critico' : 'bajo'));
-    const deficitArchivo = col.deficitRop!==-1 ? num(r[col.deficitRop]) : null;
-    const stocks = {};
-    for(const sd of sedes) stocks[sd.name] = num(r[sd.idx]) || 0;
+    // Universo confirmado con Piero: solo productos con punto de reorden definido.
+    if(rop === null || rop <= 0){ sinRop++; continue; }
+    const lima = val(r, sedeIdx['LIMA']);
+    const transito = val(r, col.transito);
+    const reserva = val(r, col.reserva);
+    const picking = val(r, col.picking);
     almacenRows.push({
       codigo,
       descripcion: col.descripcion!==-1 ? txt(r[col.descripcion]) : "",
       unidad: col.unidad!==-1 ? txt(r[col.unidad]) : "",
-      estadoArchivo: col.estadoArchivo!==-1 ? txt(r[col.estadoArchivo]) : "",
-      stocks, stockActual, rop,
-      stockMinimo: col.stockMinimo!==-1 ? num(r[col.stockMinimo]) : null,
-      consumoMensual,
-      transito: col.transito!==-1 ? num(r[col.transito]) : null,
+      ica: val(r, sedeIdx['ICA']),
+      lima,
+      trujillo: val(r, sedeIdx['TRUJILLO']),
+      transito, reserva, picking, rop,
+      eoq: col.eoq!==-1 ? num(r[col.eoq]) : null,
+      consumoMensual: col.consumoMensual!==-1 ? num(r[col.consumoMensual]) : null,
       cobertura: col.cobertura!==-1 ? num(r[col.cobertura]) : null,
-      deficit: deficitArchivo !== null ? deficitArchivo : (rop !== null ? rop - stockActual : 0),
-      estado,
+      disponible: lima + transito - reserva - picking,
+      faltante: rop - (lima + transito),
+      estado: (lima + transito) <= rop ? 'reposicion' : 'ok',
     });
   }
-  ALMACEN_DATA = { rows: almacenRows, sedes: sedes.map(sd=>sd.name), totalRows: dataRows.length, excluidas, filename, sheetName };
-  const nAlerta = almacenRows.filter(r=>r.estado!=='ok').length;
+  ALMACEN_DATA = {
+    rows: almacenRows, sedes: ALMACEN_SEDES.filter(sd=>sedeIdx[sd]!==undefined),
+    totalRows: dataRows.length, sinRop, excluidas, filename, sheetName,
+    tieneReserva: col.reserva!==-1, tienePicking: col.picking!==-1,
+  };
+  const nRepo = almacenRows.filter(r=>r.estado==='reposicion').length;
   // No se llama a render() directo: si Reporte Maestro.xlsx todavía no se cargó, DATA sigue null y
   // render() rompe (getProcesoRows/renderProceso asumen DATA no-nulo) — el panel entero sigue oculto
   // hasta que se cargue Maestro de todas formas (ver emptyState/dashboard en render()), así que basta
   // con refrescar Alertas por su cuenta; cuando Maestro se cargue después, render() ya volverá a llamar
   // renderAlertas() y mostrará esto correctamente.
   if(DATA){ render(); } else { renderAlertas(); }
-  return { ok:true, message: "procesado: " + almacenRows.length.toLocaleString('es-PE') + " productos, " + nAlerta.toLocaleString('es-PE') + " necesitan reposición." };
+  return { ok:true, message: "procesado: " + almacenRows.length.toLocaleString('es-PE') + " productos con punto de reorden, " + nRepo.toLocaleString('es-PE') + " en reposición." };
 }
 
 function processConsulta(wb, filename){
@@ -3092,27 +3101,21 @@ let alertasListenersBound = false;
 // definidas más arriba, sin usar, por si se quiere recuperar Requerimientos sin Pedido/Pedidos sin OC
 // como vista aparte más adelante).
 function populateReposicionFilters(){
-  // El selector de almacén NO filtra filas: la alerta se calcula contra el Stock Actual total, porque
-  // el Punto de Reorden del archivo también es total (no hay uno por sede). Elegir una sede cambia qué
-  // stock se muestra en la tabla, con el total siempre al lado. Decisión confirmada con Piero (08.09.2026).
-  const sedes = (ALMACEN_DATA && ALMACEN_DATA.sedes) || [];
-  const sel = document.getElementById('filterReposicionAlmacen');
-  const prev = sel.value;
-  sel.innerHTML = '<option value="all">Stock total (todos los almacenes)</option>'
-    + sedes.map(sd=>'<option value="'+escapeHtml(sd)+'">Stock en '+escapeHtml(sd)+'</option>').join('');
-  if(prev && Array.from(sel.options).some(o=>o.value===prev)) sel.value = prev;
+  // Ya no hay selector de almacén: ICA / LIMA / TRUJILLO ahora son columnas fijas de la tabla (diseño
+  // de columnas definido por Piero, 08.09.2026), así que el selector que cambiaba cuál se mostraba
+  // quedó sin sentido y se quitó del HTML. La función se mantiene por si vuelve a hacer falta poblar
+  // un filtro de este módulo.
 }
 function filteredReposicionRows(){
   const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
   const fEstado = document.getElementById('filterReposicionEstado').value;
   return rows.filter(r=>{
-    if(r.estado==='ok') return false; // esta vista es solo alertas: productos que SÍ necesitan reposición
     if(fEstado!=='all' && r.estado !== fEstado) return false;
     return true;
   });
 }
-const ESTADO_REPOSICION_LABEL = { quiebre:'Quiebre', critico:'Crítico', bajo:'Bajo el ROP' };
-const ESTADO_REPOSICION_PILL = { quiebre:'warn', critico:'warn', bajo:'late' };
+const ESTADO_REPOSICION_LABEL = { reposicion:'REPOSICIÓN', ok:'OK' };
+const ESTADO_REPOSICION_PILL = { reposicion:'warn', ok:'ok' };
 function renderAlertas(){
   const hasData = ALMACEN_DATA && ALMACEN_DATA.rows;
   if(!hasData){
@@ -3144,52 +3147,53 @@ function renderAlertas(){
   }
   populateReposicionFilters();
   if(!alertasListenersBound){
-    ['searchReposicion','filterReposicionAlmacen','filterReposicionEstado'].forEach(id=>{
+    ['searchReposicion','filterReposicionEstado'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawAlertas);
     });
-    document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'alertas-reposicion', e.currentTarget));
-    document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-alertas-reposicion', e.currentTarget));
+    document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'inventario-almacen-general', e.currentTarget));
+    document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-inventario-almacen-general', e.currentTarget));
     alertasListenersBound = true;
   }
   drawAlertas();
 }
 function drawAlertas(){
   const q = (document.getElementById('searchReposicion').value||"").toLowerCase();
-  const sede = document.getElementById('filterReposicionAlmacen').value;
   let view = filteredReposicionRows().filter(r=>!q || (r.codigo+' '+r.descripcion).toLowerCase().includes(q));
-  const ORDEN_ESTADO = { quiebre:0, critico:1, bajo:2 };
-  view = view.slice().sort((a,b)=> ORDEN_ESTADO[a.estado]-ORDEN_ESTADO[b.estado] || (b.deficit-a.deficit));
+  // REPOSICIÓN primero, y dentro de cada grupo el que le falta más para llegar al ROP.
+  view = view.slice().sort((a,b)=> (a.estado==='reposicion'?0:1)-(b.estado==='reposicion'?0:1) || (b.faltante-a.faltante));
   const fmt = v => v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2});
 
   const table = document.getElementById('tableReposicion');
-  const conSede = sede !== 'all';
-  table.querySelector('thead').innerHTML = '<tr><th>Código</th><th>Producto</th>'
-    + (conSede ? '<th>Stock '+escapeHtml(sede)+'</th>' : '')
-    + '<th>Stock total</th><th>Punto de reorden</th><th>Déficit</th><th>Consumo mensual</th><th>Cobertura (meses)</th><th>Estado (archivo)</th><th>Alerta</th></tr>';
-  const nCols = conSede ? 10 : 9;
+  table.querySelector('thead').innerHTML = '<tr><th>Código</th><th>Descripción</th><th>UM</th>'
+    + '<th>ICA</th><th>LIMA</th><th>Trujillo</th><th>En tránsito</th><th>Reserva</th><th>Picking</th>'
+    + '<th>ROP</th><th>EOQ</th><th>Consumo mensual</th><th>Cobertura (meses)</th><th>Stock disponible</th><th>Estado</th></tr>';
   table.querySelector('tbody').innerHTML = view.map(r=>`
     <tr>
       <td>${escapeHtml(r.codigo)}</td>
-      <td style="white-space:normal;min-width:220px;">${escapeHtml(r.descripcion)||'—'}</td>
-      ${conSede ? '<td>'+fmt(r.stocks[sede]!=null?r.stocks[sede]:0)+'</td>' : ''}
-      <td>${fmt(r.stockActual)}${r.unidad?' '+escapeHtml(r.unidad):''}</td>
+      <td style="white-space:normal;min-width:230px;">${escapeHtml(r.descripcion)||'—'}</td>
+      <td>${escapeHtml(r.unidad)||'—'}</td>
+      <td>${fmt(r.ica)}</td>
+      <td><b>${fmt(r.lima)}</b></td>
+      <td>${fmt(r.trujillo)}</td>
+      <td>${fmt(r.transito)}</td>
+      <td>${fmt(r.reserva)}</td>
+      <td>${fmt(r.picking)}</td>
       <td>${fmt(r.rop)}</td>
-      <td>${fmt(r.deficit)}</td>
+      <td>${fmt(r.eoq)}</td>
       <td>${fmt(r.consumoMensual)}</td>
       <td>${fmt(r.cobertura)}</td>
-      <td>${escapeHtml(r.estadoArchivo)||'—'}</td>
+      <td>${fmt(r.disponible)}</td>
       <td><span class="pill ${ESTADO_REPOSICION_PILL[r.estado]}">${ESTADO_REPOSICION_LABEL[r.estado]}</span></td>
-    </tr>`).join('') || `<tr><td colspan="${nCols}" style="text-align:center;padding:24px;color:var(--muted);">Sin productos con alerta de reposición con el filtro actual 🎉</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="15" style="text-align:center;padding:24px;color:var(--muted);">Sin productos con el filtro actual.</td></tr>`;
 
   const all = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
-  const nQuiebre = all.filter(r=>r.estado==='quiebre').length;
-  const nCritico = all.filter(r=>r.estado==='critico').length;
-  const nBajo = all.filter(r=>r.estado==='bajo').length;
+  const nRepo = all.filter(r=>r.estado==='reposicion').length;
+  const nSinLima = all.filter(r=>r.lima<=0).length;
   document.getElementById('kpiGridAlertas').innerHTML = `
-    <div class="card kpi${nQuiebre>0?' alert-card':''}"><div class="label">En quiebre (stock en 0)</div><div class="value${nQuiebre>0?' alert-n':''}">${nQuiebre.toLocaleString('es-PE')}</div></div>
-    <div class="card kpi${nCritico>0?' alert-card':''}"><div class="label">Críticos (bajo el 50% del ROP)</div><div class="value${nCritico>0?' alert-n':''}">${nCritico.toLocaleString('es-PE')}</div></div>
-    <div class="card kpi"><div class="label">Bajo el punto de reorden</div><div class="value">${nBajo.toLocaleString('es-PE')}</div></div>
+    <div class="card kpi"><div class="label">Productos en seguimiento</div><div class="value">${all.length.toLocaleString('es-PE')}</div><div class="sub">con punto de reorden definido</div></div>
+    <div class="card kpi${nRepo>0?' alert-card':''}"><div class="label">En reposición</div><div class="value${nRepo>0?' alert-n':''}">${nRepo.toLocaleString('es-PE')}</div><div class="sub">Lima + tránsito por debajo del ROP</div></div>
+    <div class="card kpi"><div class="label">Sin stock en Lima</div><div class="value">${nSinLima.toLocaleString('es-PE')}</div><div class="sub">stock en 0 en el almacén central</div></div>
   `;
 }
 
@@ -4777,38 +4781,32 @@ function buildProImageGasto(){
 // quedan sin usar más abajo, no se borraron (ver nota junto a section-alertas).
 function buildProImageAlertas(){
   const all = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
-  const nQuiebre = all.filter(r=>r.estado==='quiebre').length;
-  const nCritico = all.filter(r=>r.estado==='critico').length;
-  const nBajo = all.filter(r=>r.estado==='bajo').length;
-  const kpis = [
-    { num:'📦', label:'PRODUCTOS EN QUIEBRE', value: nQuiebre.toLocaleString('es-PE'), valueLabel:'STOCK EN 0', metaLabel:'ESTADO', metaValue:'Crítico', color: nQuiebre>0?'#d03b3b':'#0ca30c' },
-    { num:'⚠️', label:'PRODUCTOS CRÍTICOS', value: nCritico.toLocaleString('es-PE'), valueLabel:'BAJO 50% DEL ROP', metaLabel:'ESTADO', metaValue:'Atención', color: nCritico>0?'#e2960a':'#0ca30c' },
-  ];
-  const ORDEN_ESTADO = { quiebre:0, critico:1, bajo:2 };
-  const ESTADO_COLOR = { quiebre:'#d03b3b', critico:'#d03b3b', bajo:'#e2960a' };
+  const repo = all.filter(r=>r.estado==='reposicion');
+  const nSinLima = all.filter(r=>r.lima<=0).length;
   const fmt = v => v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2});
-  const view = all.filter(r=>r.estado!=='ok')
-    .sort((a,b)=> ORDEN_ESTADO[a.estado]-ORDEN_ESTADO[b.estado] || (b.deficit-a.deficit))
-    .slice(0,8);
+  const kpis = [
+    { num:'📦', label:'PRODUCTOS EN REPOSICIÓN', value: repo.length.toLocaleString('es-PE'), valueLabel:'LIMA + TRÁNSITO BAJO EL ROP', metaLabel:'EN SEGUIMIENTO', metaValue: all.length.toLocaleString('es-PE'), color: repo.length>0?'#d03b3b':'#0ca30c' },
+    { num:'⚠️', label:'SIN STOCK EN LIMA', value: nSinLima.toLocaleString('es-PE'), valueLabel:'STOCK EN 0 EN EL CENTRAL', metaLabel:'ESTADO', metaValue: nSinLima>0?'Atención':'OK', color: nSinLima>0?'#e2960a':'#0ca30c' },
+  ];
+  const view = repo.slice().sort((a,b)=> b.faltante-a.faltante).slice(0,8);
   const rows = view.map((r,i)=>({
     rank: i+1, name: (r.descripcion||r.codigo||'—').length>26 ? (r.descripcion||r.codigo).slice(0,24)+'…' : (r.descripcion||r.codigo||'—'),
-    cells: [ fmt(r.stockActual), fmt(r.rop) ],
-    pct: (r.rop>0) ? Math.min(100, r.deficit/r.rop*100) : 100,
-    pctLabel: fmt(r.deficit)+' de déficit',
-    barColor: ESTADO_COLOR[r.estado],
+    cells: [ fmt(r.disponible), fmt(r.rop) ],
+    pct: (r.rop>0) ? Math.min(100, r.faltante/r.rop*100) : 100,
+    pctLabel: fmt(r.faltante)+' para el ROP',
+    barColor: '#d03b3b',
   }));
-  const table = { icon:'📦', title:'Productos con alerta de reposición', subtitle:'Ordenados por severidad (quiebre primero), déficit más grande primero', nameLabel:'PRODUCTO', columns:['STOCK ACTUAL','PUNTO DE REORDEN'], barLabel:'DÉFICIT', rows, legendItems:[{color:'#d03b3b',label:'Quiebre / Crítico'},{color:'#e2960a',label:'Bajo el ROP'}] };
-  const totalAlerta = nQuiebre + nCritico + nBajo;
-  const banner = totalAlerta>0
-    ? { tone:'alert', items:[ {value:nQuiebre.toLocaleString('es-PE'), label:'En quiebre'}, {value:nCritico.toLocaleString('es-PE'), label:'Críticos'}, {value:nBajo.toLocaleString('es-PE'), label:'Bajo el ROP'} ], action:'ACCIÓN: coordinar reposición con el proveedor de cada producto listado.' }
-    : { tone:'info', items:[ {value:'0', label:'Productos bajo su punto de reorden'} ], action:'Todo el stock al día 🎉' };
+  const table = { icon:'📦', title:'Productos en reposición', subtitle:'Ordenados por lo que falta para llegar al punto de reorden', nameLabel:'PRODUCTO', columns:['STOCK DISPONIBLE','ROP'], barLabel:'FALTANTE', rows, legendItems:[{color:'#d03b3b',label:'En reposición'}] };
+  const banner = repo.length>0
+    ? { tone:'alert', items:[ {value:repo.length.toLocaleString('es-PE'), label:'En reposición'}, {value:nSinLima.toLocaleString('es-PE'), label:'Sin stock en Lima'}, {value:all.length.toLocaleString('es-PE'), label:'En seguimiento'} ], action:'ACCIÓN: coordinar reposición del almacén central (Lima) para los productos listados.' }
+    : { tone:'info', items:[ {value:'0', label:'Productos por debajo de su ROP'} ], action:'Todo el stock al día 🎉' };
   return {
-    title: 'ALERTAS DE REPOSICIÓN',
-    subtitle: 'CON CONSUMO Y STOCK BAJO SU PUNTO DE REORDEN',
+    title: 'INVENTARIO · ALMACÉN GENERAL',
+    subtitle: 'ESTADO DE REPOSICIÓN CONTRA EL PUNTO DE REORDEN',
     kpis,
     tables: [ table ],
     banner,
-    footnote: 'Hoja "Análisis Inventario" de la última carga de Reporte Almacen.xlsx — es una foto del stock al momento de cargar el archivo, no se actualiza sola. Solo productos con Consumo Mensual mayor a 0.',
+    footnote: 'Hoja "Análisis Inventario" de la última carga de Reporte Almacen.xlsx — foto del stock al momento de cargar el archivo, no se actualiza sola. Solo productos con ROP definido. Estado = LIMA + EN TRÁNSITO contra el ROP; Stock disponible = LIMA + EN TRÁNSITO − RESERVA − PICKING.',
   };
 }
 // Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = promedio simple
