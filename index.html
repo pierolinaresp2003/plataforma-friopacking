@@ -242,11 +242,11 @@
   .gasto-crumb .crumb-sep{color:var(--muted);}
   .gasto-crumb .crumb-current{color:var(--ink);font-weight:700;}
   .bar-row.clickable{cursor:pointer;}
-  /* Resumen "Cuánto pedir por categoría" (08.09.2026): la fila reusa .bar-row de Concentración de Gasto
-     y le agrega una columna con el total por unidad de medida a la derecha. */
-  .bar-row .pedir-um{width:220px;text-align:right;flex-shrink:0;font-size:11.5px;color:var(--ink-soft);}
-  .bar-row.selected .bar-label{color:var(--brand-ink);font-weight:700;}
-  @media (max-width:860px){ .bar-row .pedir-um{width:130px;font-size:10.5px;} }
+  /* Resumen "Cuánto pedir por categoría" (08.09.2026): tabla simple de categorías, sin barras (Piero
+     pidió quitar el gráfico de barras el mismo día). Cada fila abre el detalle producto por producto. */
+  .pedir-cat-row{cursor:pointer;}
+  .pedir-cat-row:hover td{background:var(--row-hover);}
+  .pedir-cat-row.selected td{background:var(--surface-2);font-weight:700;color:var(--brand-ink);}
   .bar-row.clickable:hover .bar-label{color:var(--brand-ink);}
   .moneda-tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--ink-soft);margin-right:3px;}
   .pill.muted{background:var(--surface-2);color:var(--ink-soft);}
@@ -462,10 +462,17 @@
         <button class="btn secondary" id="btnProImgAlertas" type="button">🖼️ Resumen para compartir</button>
         <button class="btn secondary" id="btnImgAlertas" type="button">🖼️ Generar imagen del módulo</button>
       </div>
-      <div class="note" id="alertasDefNote" style="margin-bottom:14px;">
+      <!-- Nota de metodología oculta a pedido de Piero (08.09.2026, "quita esto") — mismo criterio que
+           #gastoDefNote y #procesoDefNote: se deja el elemento en el HTML (con el texto de referencia de
+           las reglas del módulo) en display:none, no se borra de raíz. -->
+      <div class="note" id="alertasDefNote" style="display:none;">
         <b>Qué muestra este módulo:</b> el inventario de los productos con <b>punto de reorden (ROP) definido</b>, según la hoja "Análisis Inventario" de tu Reporte Almacen.xlsx — es una foto del momento (no depende de fechas). <b>Estado</b> = "REPOSICIÓN" cuando <b>LIMA + EN TRÁNSITO</b> es menor o igual al ROP, "OK" si lo supera. <b>Stock disponible</b> = LIMA + EN TRÁNSITO − RESERVA − PICKING. Reserva y picking vienen de la Plataforma Almacén: mientras no estén en el Excel se leen como 0.
       </div>
+      <!-- Búsqueda general del módulo, al inicio (pedido de Piero, 08.09.2026: "esto debe estar al
+           inicio como búsqueda general"): filtra TODO el módulo — tarjetas KPI, el resumen de "Cuánto
+           pedir por categoría" con su detalle, y la tabla de inventario. Ver reposicionScopeRows(). -->
       <div class="toolbar">
+        <input type="search" id="searchReposicion" placeholder="Buscar código o producto en todo el módulo...">
         <select id="filterReposicionEstado">
           <option value="all">Todos los estados</option>
           <option value="reposicion">Solo REPOSICIÓN</option>
@@ -490,9 +497,6 @@
         <div id="pedirDetalle" style="margin-top:14px;"></div>
       </div>
 
-      <div class="toolbar">
-        <input type="search" id="searchReposicion" placeholder="Buscar código o producto...">
-      </div>
       <div class="table-card card">
         <table id="tableReposicion" class="summary-table"><thead></thead><tbody></tbody></table>
       </div>
@@ -3127,13 +3131,18 @@ function populateReposicionFilters(){
   // quedó sin sentido y se quitó del HTML. La función se mantiene por si vuelve a hacer falta poblar
   // un filtro de este módulo.
 }
-function filteredReposicionRows(){
+// Búsqueda general del módulo (08.09.2026): un solo buscador arriba que recorta el universo con el que
+// trabajan las tarjetas KPI, el bloque de "Cuánto pedir por categoría" y la tabla de inventario. El
+// filtro de estado se aplica encima, y solo a la tabla.
+function reposicionScopeRows(){
+  const q = (document.getElementById('searchReposicion').value||"").toLowerCase().trim();
   const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  if(!q) return rows;
+  return rows.filter(r => (r.codigo + ' ' + r.descripcion).toLowerCase().includes(q));
+}
+function filteredReposicionRows(){
   const fEstado = document.getElementById('filterReposicionEstado').value;
-  return rows.filter(r=>{
-    if(fEstado!=='all' && r.estado !== fEstado) return false;
-    return true;
-  });
+  return reposicionScopeRows().filter(r => fEstado==='all' || r.estado === fEstado);
 }
 const ESTADO_REPOSICION_LABEL = { reposicion:'REPOSICIÓN', ok:'OK' };
 const ESTADO_REPOSICION_PILL = { reposicion:'warn', ok:'ok' };
@@ -3179,8 +3188,7 @@ function renderAlertas(){
   drawAlertas();
 }
 function drawAlertas(){
-  const q = (document.getElementById('searchReposicion').value||"").toLowerCase();
-  let view = filteredReposicionRows().filter(r=>!q || (r.codigo+' '+r.descripcion).toLowerCase().includes(q));
+  let view = filteredReposicionRows();
   // REPOSICIÓN primero, y dentro de cada grupo el que le falta más para llegar al ROP.
   view = view.slice().sort((a,b)=> (a.estado==='reposicion'?0:1)-(b.estado==='reposicion'?0:1) || (b.faltante-a.faltante));
   const fmt = v => v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2});
@@ -3208,7 +3216,7 @@ function drawAlertas(){
       <td><span class="pill ${ESTADO_REPOSICION_PILL[r.estado]}">${ESTADO_REPOSICION_LABEL[r.estado]}</span></td>
     </tr>`).join('') || `<tr><td colspan="15" style="text-align:center;padding:24px;color:var(--muted);">Sin productos con el filtro actual.</td></tr>`;
 
-  const all = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  const all = reposicionScopeRows();
   const nRepo = all.filter(r=>r.estado==='reposicion').length;
   const nSinLima = all.filter(r=>r.lima<=0).length;
   document.getElementById('kpiGridAlertas').innerHTML = `
@@ -3234,7 +3242,7 @@ function drawAlertas(){
 // (MTS, UND, MT2...), porque sumar metros con unidades daría un número sin sentido.
 let pedirCatSel = null;
 function pedirRowsFor(meses){
-  const all = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  const all = reposicionScopeRows();
   const rows = [];
   let sinConsumo = 0;
   for(const r of all){
@@ -3265,27 +3273,25 @@ function drawPedirPorCategoria(){
     g.porUm[um] = (g.porUm[um] || 0) + r.aPedir;
   }
   const grupos = Object.keys(byCat).map(k=>byCat[k]).sort((a,b)=> b.n-a.n || a.label.localeCompare(b.label));
-  const umText = g => {
-    const ums = Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a]);
-    return ums.slice(0,3).map(u=> fmt(arriba(g.porUm[u])) + (u==='—' ? '' : ' '+u)).join(' · ')
-      + (ums.length>3 ? ' · …' : '');
-  };
+  const umText = g => Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a])
+    .map(u=> fmt(arriba(g.porUm[u])) + (u==='—' ? '' : ' '+u)).join(' · ');
 
   document.getElementById('pedirResumen').innerHTML = meses > 0
     ? '<b>' + rows.length.toLocaleString('es-PE') + '</b> productos a pedir en <b>' + grupos.length + '</b> categorías para cubrir <b>' + fmt(meses) + '</b> mes(es)'
       + (sinConsumo ? ' · ' + sinConsumo.toLocaleString('es-PE') + ' en reposición sin consumo mensual registrado (no calculable)' : '')
     : 'Escribe cuántos meses quieres cubrir.';
 
-  const max = grupos.length ? grupos[0].n : 0;
-  document.getElementById('chartPedir').innerHTML = grupos.map(g=>
-    '<div class="bar-row clickable' + (pedirCatSel===g.label ? ' selected' : '') + '" data-cat="' + escapeHtml(g.label) + '" title="' + escapeHtml(g.label) + '">'
-    + '<div class="bar-label">' + escapeHtml(g.label) + '</div>'
-    + '<div class="bar-track"><div class="bar-fill" style="width:' + (max ? (g.n/max*100) : 0) + '%;background:var(--brand-2);"></div></div>'
-    + '<div class="bar-pct">' + g.n + '</div>'
-    + '<div class="pedir-um">' + escapeHtml(umText(g)) + '</div>'
-    + '</div>').join('')
-    || '<div style="font-size:12.5px;color:var(--ink-soft);padding:6px 0;">Nada que pedir con esos meses de cobertura 🎉</div>';
-  Array.prototype.forEach.call(document.querySelectorAll('#chartPedir .bar-row'), el=>{
+  document.getElementById('chartPedir').innerHTML = grupos.length
+    ? '<div class="table-card card"><table><thead><tr><th>Categoría</th><th>Productos a pedir</th><th>Cantidad a pedir (por unidad de medida)</th></tr></thead><tbody>'
+      + grupos.map(g=>
+        '<tr class="pedir-cat-row' + (pedirCatSel===g.label ? ' selected' : '') + '" data-cat="' + escapeHtml(g.label) + '">'
+        + '<td style="white-space:normal;min-width:230px;">' + escapeHtml(g.label) + '</td>'
+        + '<td>' + g.n + '</td>'
+        + '<td style="white-space:normal;">' + escapeHtml(umText(g)) + '</td>'
+        + '</tr>').join('')
+      + '</tbody></table></div>'
+    : '<div style="font-size:12.5px;color:var(--ink-soft);padding:6px 0;">Nada que pedir con esos meses de cobertura 🎉</div>';
+  Array.prototype.forEach.call(document.querySelectorAll('#chartPedir .pedir-cat-row'), el=>{
     el.addEventListener('click', ()=>{
       const cat = el.getAttribute('data-cat');
       pedirCatSel = (pedirCatSel === cat) ? null : cat;
