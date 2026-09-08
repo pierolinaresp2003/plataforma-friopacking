@@ -1295,7 +1295,8 @@ function origenFor(ruc){
 const GH_OWNER = "pierolinaresp2003";
 const GH_REPO = "plataforma-friopacking";
 const GH_BRANCH = "main";
-const SNAPSHOT_PATH = "data.json";
+const SNAPSHOT_PATH = "data.json";        // formato viejo, sin comprimir (se sigue leyendo)
+const SNAPSHOT_GZ_PATH = "data.json.gz";  // formato nuevo, comprimido (08.09.2026, ver publishSnapshot)
 const TOKEN_KEY = "fp_platform_gh_token";
 
 function getGhToken(){
@@ -1308,6 +1309,37 @@ function askGhToken(){
     return t.trim();
   }
   return "";
+}
+// El snapshot llegó a pesar ~15 MB de JSON (gasto.rows 8.4 MB + proceso.rows 5.5 MB), y el endpoint
+// "contents" de la API de GitHub que se usaba antes solo acepta ~1 MB: por eso "Guardar y compartir"
+// dejó de funcionar sin que se notara. Ahora el snapshot se comprime con gzip en el navegador
+// (~15 MB -> ~1.5 MB) y se sube con la API de Git (blobs/trees/commits/refs), que sí acepta archivos
+// grandes. De paso el link carga mucho más rápido en celular.
+function bytesToBase64(bytes){
+  let binary = "";
+  const chunkSize = 0x8000; // en bloques, para no exceder el límite de argumentos de String.fromCharCode
+  for(let i=0;i<bytes.length;i+=chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize));
+  }
+  return btoa(binary);
+}
+async function gzipBytes(str){
+  if(typeof CompressionStream === 'undefined') return null; // navegador viejo: se sube sin comprimir
+  const cs = new CompressionStream('gzip');
+  const stream = new Blob([str]).stream().pipeThrough(cs);
+  const buf = await new Response(stream).arrayBuffer();
+  return new Uint8Array(buf);
+}
+async function gunzipToText(arrayBuffer){
+  if(typeof DecompressionStream !== 'undefined'){
+    try{
+      const ds = new DecompressionStream('gzip');
+      const stream = new Blob([arrayBuffer]).stream().pipeThrough(ds);
+      return await new Response(stream).text();
+    }catch(e){ /* puede que el servidor ya lo haya descomprimido — se intenta como texto plano */ }
+  }
+  const txt = new TextDecoder().decode(arrayBuffer);
+  return txt.trim().startsWith('{') ? txt : null;
 }
 function utf8ToBase64(str){
   const bytes = new TextEncoder().encode(str);
@@ -1439,46 +1471,50 @@ async function publishSnapshot(){
   try{
     const snapshot = buildSnapshot();
     const jsonStr = JSON.stringify(snapshot);
-    const apiUrl = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${SNAPSHOT_PATH}`;
-
-    // 1) obtener el sha actual del archivo (si existe)
-    let sha = undefined;
-    const getRes = await fetch(apiUrl + `?ref=${GH_BRANCH}`, {
-      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }
-    });
-    if(getRes.ok){
-      const getJson = await getRes.json();
-      sha = getJson.sha;
-    } else if(getRes.status !== 404){
-      throw new Error("No pude leer el archivo actual (HTTP " + getRes.status + "). Revisa que el token siga siendo válido.");
-    }
-
-    // 2) crear/actualizar el archivo
-    const putRes = await fetch(apiUrl, {
-      method: "PUT",
-      headers: {
-        "Authorization": "Bearer " + token,
-        "Accept": "application/vnd.github+json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: "Publicar datos: " + (DATA.filename || "reporte") + " (" + new Date().toLocaleString('es-PE') + ")",
-        content: utf8ToBase64(jsonStr),
-        branch: GH_BRANCH,
-        sha: sha
-      })
-    });
-
-    if(!putRes.ok){
-      const errBody = await putRes.text();
-      if(putRes.status === 401 || putRes.status === 403){
-        localStorage.removeItem(TOKEN_KEY);
-        throw new Error("El token no tiene permiso o venció. Se borró de este navegador — vuelve a hacer clic en \"Guardar y compartir\" para ingresar uno nuevo.");
+    const gh = async (path, opts)=>{
+      const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/${path}`, Object.assign({
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Accept": "application/vnd.github+json",
+          "Content-Type": "application/json",
+        },
+      }, opts||{}));
+      if(!res.ok){
+        const body = await res.text();
+        if(res.status === 401 || res.status === 403){
+          localStorage.removeItem(TOKEN_KEY);
+          throw new Error("El token no tiene permiso o venció. Se borró de este navegador — vuelve a hacer clic en \"Guardar y compartir\" para ingresar uno nuevo.");
+        }
+        throw new Error("GitHub respondió " + res.status + " en " + path.split('?')[0] + ": " + body.slice(0,180));
       }
-      throw new Error("GitHub respondió " + putRes.status + ": " + errBody.slice(0,200));
-    }
+      return res.json();
+    };
 
-    showPublishBanner("✅ Publicado el " + new Date().toLocaleString('es-PE') + " — cualquiera que abra el link ahora va a ver estos datos.", false);
+    // 1) comprimir (si el navegador puede) y armar el contenido en base64
+    btn.textContent = "Comprimiendo...";
+    const gz = await gzipBytes(jsonStr);
+    const rutaDestino = gz ? SNAPSHOT_GZ_PATH : SNAPSHOT_PATH;
+    const contentB64 = gz ? bytesToBase64(gz) : utf8ToBase64(jsonStr);
+    const mb = (n)=> (n/1024/1024).toFixed(2) + " MB";
+
+    // 2) blob -> tree -> commit -> ref (la API de Git acepta archivos grandes; "contents" no)
+    btn.textContent = "Publicando...";
+    const blob = await gh('git/blobs', { method:'POST', body: JSON.stringify({ content: contentB64, encoding: 'base64' }) });
+    const ref = await gh(`git/ref/heads/${GH_BRANCH}`);
+    const commitActual = await gh(`git/commits/${ref.object.sha}`);
+    const tree = await gh('git/trees', { method:'POST', body: JSON.stringify({
+      base_tree: commitActual.tree.sha,
+      tree: [{ path: rutaDestino, mode: '100644', type: 'blob', sha: blob.sha }],
+    })});
+    const commit = await gh('git/commits', { method:'POST', body: JSON.stringify({
+      message: "Publicar datos: " + (DATA.filename || "reporte") + " (" + new Date().toLocaleString('es-PE') + ")",
+      tree: tree.sha,
+      parents: [ref.object.sha],
+    })});
+    await gh(`git/refs/heads/${GH_BRANCH}`, { method:'PATCH', body: JSON.stringify({ sha: commit.sha }) });
+
+    showPublishBanner("✅ Publicado el " + new Date().toLocaleString('es-PE') + " — cualquiera que abra el link ahora va a ver estos datos."
+      + " <span style=\"opacity:.7\">(" + rutaDestino + ", " + mb(jsonStr.length) + " comprimidos a " + mb(gz ? gz.length : jsonStr.length) + ")</span>", false);
   }catch(err){
     console.error(err);
     showPublishBanner("❌ No se pudo publicar: " + err.message, true);
@@ -1497,12 +1533,23 @@ function showPublishBanner(msg, isError){
 
 async function loadPublishedSnapshot(manual){
   try{
-    const res = await fetch('./' + SNAPSHOT_PATH + '?_=' + Date.now());
-    if(!res.ok){
-      if(manual) showPublishBanner('Todavía no hay ninguna versión publicada en este link. Carga tu archivo arriba y usa "Guardar y compartir" para ser el primero.', true);
-      return;
+    // Primero el snapshot comprimido (formato nuevo); si no está, el data.json plano de antes.
+    let snap = null;
+    try{
+      const resGz = await fetch('./' + SNAPSHOT_GZ_PATH + '?_=' + Date.now());
+      if(resGz.ok){
+        const txt = await gunzipToText(await resGz.arrayBuffer());
+        if(txt) snap = JSON.parse(txt);
+      }
+    }catch(e){ /* sigue con el formato viejo */ }
+    if(!snap){
+      const res = await fetch('./' + SNAPSHOT_PATH + '?_=' + Date.now());
+      if(!res.ok){
+        if(manual) showPublishBanner('Todavía no hay ninguna versión publicada en este link. Carga tu archivo arriba y usa "Guardar y compartir" para ser el primero.', true);
+        return;
+      }
+      snap = await res.json();
     }
-    const snap = await res.json();
     loadFromSnapshot(snap);
   }catch(e){
     // sin snapshot publicado (o abierto como archivo local file://) — se queda en el estado vacío normal
@@ -3668,7 +3715,7 @@ function renderProceso(){
     document.getElementById('btnEli5Proceso').addEventListener('click', (e)=>{
       const comprador = document.getElementById('filterProcesoResponsable').value;
       if(comprador !== 'all'){
-        downloadProImage(buildProImageComprasResponsable, 'reporte-compras-' + comprador.toLowerCase(), e.currentTarget, proComprasResponsableImageHtml);
+        downloadProComprasPartes(e.currentTarget);
       } else {
         downloadProImage(buildProImageTiempos, 'resumen-whatsapp-tiempos-proceso', e.currentTarget);
       }
@@ -4923,23 +4970,68 @@ function proComprasNivelAvisoCardHtml(spec){
 // Renderer dedicado — NO reutiliza proImageHtml/proHeaderHtml (diseño propio de Piero, seguido "tal
 // cual" según la foto que envió). El monto se muestra siempre en la moneda original de la OC (nunca
 // convertido) — el equivalente en soles solo se usa por dentro para calcular los % de las barras.
-function proComprasResponsableImageHtml(spec){
-  return `
-  <div id="proImgInner" style="width:1080px;font-family:Inter,Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
-    ${proComprasResponsableHeaderHtml(spec.comprador, spec.dateLabel)}
-    ${proComprasKpiRowHtml(spec)}
-    <div style="display:flex;flex-wrap:wrap;gap:14px;padding:14px 20px;">
-      ${proComprasOrigenMonedaCardHtml(spec)}
-      ${proComprasCondicionPagoCardHtml(spec.creditoRows, spec.creditoExtra)}
-    </div>
-    <div style="padding:0 20px 14px;">
-      ${proComprasCategoriaTableHtml(spec.catRows, spec.catTotales, spec.proyRows, spec.proyTotales)}
-    </div>
-    <div style="display:flex;flex-wrap:wrap;gap:14px;padding:0 20px 24px;">
-      ${proComprasEstadoEntregaCardHtml(spec)}
-      ${proComprasNivelAvisoCardHtml(spec)}
-    </div>
-  </div>`;
+// El reporte se genera partido en 3 imágenes (pedido de Piero, 08.09.2026, marcando los cortes con
+// líneas rojas sobre la imagen): 1) encabezado + KPIs + origen/condición de pago, 2) familias y
+// proyectos, 3) estado de entrega + nivel de aviso. Son 3 PNG independientes, pensados para mandarlos
+// por WhatsApp uno tras otro sin que ninguno quede ilegible por tener que reducirlo.
+function proComprasResponsablePartesHtml(spec){
+  const parte = (contenido)=> `
+  <div id="proImgInner" style="width:1080px;font-family:Inter,Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">${contenido}</div>`;
+  return [
+    parte(`
+      ${proComprasResponsableHeaderHtml(spec.comprador, spec.dateLabel)}
+      ${proComprasKpiRowHtml(spec)}
+      <div style="display:flex;flex-wrap:wrap;gap:14px;padding:14px 20px 20px;">
+        ${proComprasOrigenMonedaCardHtml(spec)}
+        ${proComprasCondicionPagoCardHtml(spec.creditoRows, spec.creditoExtra)}
+      </div>`),
+    parte(`
+      <div style="padding:20px;">
+        ${proComprasCategoriaTableHtml(spec.catRows, spec.catTotales, spec.proyRows, spec.proyTotales)}
+      </div>`),
+    parte(`
+      <div style="display:flex;flex-wrap:wrap;gap:14px;padding:20px;">
+        ${proComprasEstadoEntregaCardHtml(spec)}
+        ${proComprasNivelAvisoCardHtml(spec)}
+      </div>`),
+  ];
+}
+// Genera y descarga las 3 partes, una tras otra. Chrome puede pedir permiso para "descargar varios
+// archivos" la primera vez — es normal, hay que aceptarlo.
+async function downloadProComprasPartes(btn){
+  if(typeof html2canvas === 'undefined'){
+    alert('No se pudo generar la imagen: la librería no cargó (revisa tu conexión a internet e intenta de nuevo).');
+    return;
+  }
+  const comprador = document.getElementById('filterProcesoResponsable').value;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  const host = document.createElement('div');
+  host.style.position = 'fixed'; host.style.left = '-99999px'; host.style.top = '0';
+  document.body.appendChild(host);
+  try{
+    const partes = proComprasResponsablePartesHtml(buildProImageComprasResponsable());
+    const fecha = new Date().toISOString().slice(0,10);
+    for(let i=0;i<partes.length;i++){
+      btn.textContent = '⏳ Imagen ' + (i+1) + ' de ' + partes.length + '...';
+      host.innerHTML = partes[i];
+      await new Promise(r=>setTimeout(r, 80));
+      const canvas = await html2canvas(host.querySelector('#proImgInner'), { backgroundColor: '#eef1f5', scale: 2 });
+      const link = document.createElement('a');
+      link.download = 'reporte-compras-' + comprador.toLowerCase() + '-' + (i+1) + '-de-' + partes.length + '-' + fecha + '.png';
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      await new Promise(r=>setTimeout(r, 400)); // aire entre descargas para que el navegador no las bloquee
+    }
+  }catch(err){
+    alert('No se pudo generar la imagen: ' + (err && err.message ? err.message : err));
+  }finally{
+    host.remove();
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 function buildProImageGasto(){
   const rows = filteredGastoRows();
