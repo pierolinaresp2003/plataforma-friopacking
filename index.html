@@ -458,7 +458,7 @@
         <button class="btn secondary" id="btnImgAlertas" type="button">🖼️ Generar imagen del módulo</button>
       </div>
       <div class="note" id="alertasDefNote" style="margin-bottom:14px;">
-        <b>Qué muestra esta alerta:</b> productos cuyo <b>Stock Actual</b> está por debajo de su <b>Stock Mínimo</b> según tu Reporte Almacen.xlsx — es una foto del momento (no depende de fechas). "Quiebre" = stock en 0, "Crítico" = por debajo de la mitad del mínimo, "Bajo mínimo" = por debajo del mínimo pero sobre la mitad.
+        <b>Qué muestra esta alerta:</b> productos con <b>consumo mensual mayor a 0</b> cuyo <b>Stock Actual</b> está por debajo de su <b>Punto de Reorden</b>, según la hoja "Análisis Inventario" de tu Reporte Almacen.xlsx — es una foto del momento (no depende de fechas). "Quiebre" = stock en 0, "Crítico" = bajo la mitad del punto de reorden, "Bajo el ROP" = bajo el punto de reorden pero sobre la mitad. El catálogo sin consumo queda fuera a propósito.
       </div>
       <div class="toolbar">
         <select id="filterReposicionAlmacen"><option value="all">Todos los almacenes</option></select>
@@ -466,7 +466,7 @@
           <option value="all">Todos los estados</option>
           <option value="quiebre">Solo Quiebre</option>
           <option value="critico">Solo Crítico</option>
-          <option value="bajo">Solo Bajo mínimo</option>
+          <option value="bajo">Solo Bajo el ROP</option>
         </select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
@@ -1596,13 +1596,23 @@ loadPublishedSnapshot(false);
 // del archivo Y el nombre de sus hojas con varias variantes, para no depender de que el archivo
 // se llame exactamente igual al nombre "oficial" (corregido 01.09.2026 — Reporte Almacen.xlsx no
 // se estaba reconociendo con el patrón anterior, más estricto).
+// 08.09.2026: Reporte Almacen.xlsx entraba como Reporte Maestro.xlsx y el módulo de Reposición quedaba
+// vacío. Causa: ese libro trae 3 hojas ("Análisis Inventario", "Reporte Maestro", "PedSinReq") y la
+// regla de Maestro, que se evalúa primero, matcheaba por el nombre de esa segunda hoja. Fix: el atajo
+// por nombre de hoja de Maestro se desactiva cuando el NOMBRE DEL ARCHIVO ya dice que es otro de los 4
+// (el Reporte Maestro real sigue entrando por su propio nombre, que es su vía principal).
+const NOMBRE_DE_OTRO_ARCHIVO = /almac[ée]n|inventario|consulta|pedido.?sin.?req|sinreq/i;
 const FILE_SIGNATURES = [
-  { key: 'maestro', label: 'Reporte Maestro.xlsx', match: (name, sheets) => /reporte.?maestro/i.test(name) || sheets.some(s=>s.trim().toLowerCase()==='reporte maestro') },
+  { key: 'maestro', label: 'Reporte Maestro.xlsx', match: (name, sheets) => /reporte.?maestro/i.test(name) || (!NOMBRE_DE_OTRO_ARCHIVO.test(name) && sheets.some(s=>s.trim().toLowerCase()==='reporte maestro')) },
   { key: 'consulta', label: 'Consulta.xlsx', match: (name, sheets) => /consulta/i.test(name) || sheets.some(s=>s.trim().toLowerCase()==='consulta') },
   { key: 'almacen', label: 'Reporte Almacen.xlsx', match: (name, sheets) => /almac[ée]n/i.test(name) || /inventario/i.test(name) || sheets.some(s=>/inventario/i.test(s)) || sheets.some(s=>/almac[ée]n/i.test(s)) || sheets.some(s=>/stock/i.test(s)) },
   { key: 'pedidosinreq', label: 'PedidoSinReq.xlsx', match: (name, sheets) => /pedido.?sin.?req/i.test(name) || /sinreq/i.test(name) || sheets.some(s=>/pedido.?sin.?req/i.test(s)) },
 ];
 const fileState = {}; // key -> { icon, text, cls }
+// Último lote de archivos que pasó por el input (08.09.2026) — [{name, key, error}]. Sirve para que un
+// módulo pueda explicar por qué se quedó sin datos cuando su archivo no llegó, no se reconoció o no se
+// pudo leer: la lista de archivos del encabezado (#fileList) está oculta y no muestra nada de eso.
+let lastLoadFiles = [];
 
 function setFileState(key, icon, text, cls){
   fileState[key] = { icon, text, cls: cls || '' };
@@ -1642,8 +1652,10 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     }catch(err){
       console.error(err);
       readError = err;
+      parsed.push({ file, wb: null, sig: null, error: err && err.message ? err.message : String(err) });
     }
   }
+  lastLoadFiles = parsed.map(p => ({ name: p.file.name, key: p.sig ? p.sig.key : null, error: p.error || null }));
   const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3 };
   parsed.sort((a,b) => (PROC_ORDER[a.sig && a.sig.key] ?? 9) - (PROC_ORDER[b.sig && b.sig.key] ?? 9));
   for(const { file, wb, sig } of parsed){
@@ -2126,77 +2138,112 @@ function normalizeMoneda(raw){
   return (raw==null ? "" : raw.toString()).replace(/\s+/g, "");
 }
 let GASTO_DATA = null; // { rows: [{proveedor, familia, subfamilia, origen, moneda, creditoBucket, fecha, anio, mes, dia, montoPEN}], excluded, totalRows, filename, fromSnapshot }
-// Reporte Almacen.xlsx (08.09.2026, ver processAlmacen) — { rows: [{codigo, descripcion, almacen,
-// stockActual, stockMinimo, unidad, deficit, estado}], totalRows, excluidas, filename }. Independiente
-// de DATA/GASTO_DATA: es una foto de stock, no tiene fecha ni se cruza con Reporte Maestro.
+// Reporte Almacen.xlsx (08.09.2026, ver processAlmacen) — { rows: [{codigo, descripcion, unidad,
+// estadoArchivo, stocks:{ICA,LIMA,TRUJILLO}, stockActual, rop, stockMinimo, consumoMensual, transito,
+// cobertura, deficit, estado}], sedes, totalRows, excluidas, filename, sheetName }. Independiente de
+// DATA/GASTO_DATA: es una foto de stock, no tiene fecha ni se cruza con Reporte Maestro.
 let ALMACEN_DATA = null;
+// Sedes con stock en columna propia dentro de la hoja "Análisis Inventario" (verificado contra el
+// archivo real de Piero, 08.09.2026 — no existe una columna única "Almacén").
+const ALMACEN_SEDES = ['ICA','LIMA','TRUJILLO'];
 
 // ---------- Reporte Almacen.xlsx: Alertas de Reposición (08.09.2026) ----------
-// Piero pidió reconvertir el módulo "Alertas de Atención" en una alerta de qué productos necesitan
-// reposición: "trabájalo y te digo cómo va" — primera versión. Reporte Almacen.xlsx ya se reconocía
-// (FILE_SIGNATURES) pero no se procesaba. Como no hay todavía un archivo real de Piero para verificar
-// nombres exactos de columna (a diferencia de Consulta.xlsx/Reporte Maestro.xlsx, ya verificados
-// contra sus archivos reales), la detección de encabezado es deliberadamente amplia — variantes
-// comunes de Código/Descripción/Stock Actual/Stock Mínimo — y si no encuentra al menos Código +
-// Stock Actual + Stock Mínimo, falla con un mensaje explícito en vez de adivinar mal (mismo criterio
-// que el resto de la plataforma: mejor un error claro que un número incorrecto silencioso).
+// Verificado contra el archivo real de Piero (08.09.2026): la hoja que interesa es "Análisis
+// Inventario", con el encabezado en la FILA 3 y 15,317 productos con código. Columnas reales usadas:
+// Código, Descripción, Medida, ICA / LIMA / TRUJILLO (stock por sede, en columnas separadas), Stock
+// Actual (total), Stock en tránsito, Consumo Mensual, Punto de Reorden, Stock mínimo, Estado,
+// Cobertura (meses), Deficit contra ROP.
+// Dos cosas a tener presentes de ese archivo: (1) "Punto de Reorden" y "Stock mínimo" solo están
+// llenos en 4,444 de los 15,317 productos (los que tienen historial de consumo); (2) "Cant. Faltante a
+// comprar" viene sin valores calculados, así que no se usa.
+// CRITERIO confirmado con Piero (08.09.2026): alerta = Consumo Mensual > 0 Y Stock Actual por debajo
+// del Punto de Reorden → 3,320 productos. Se deja fuera a propósito el resto del catálogo sin consumo,
+// que en la columna "Estado" del archivo figura como CRITICO solo por tener stock 0 (12,916 filas) y
+// ahogaría la alerta. La columna "Estado" del archivo NO se recalcula: se muestra tal cual, al lado.
 function processAlmacen(wb, filename){
-  let sheetName = wb.SheetNames.find(n => /almac[ée]n|inventario|stock/i.test(n.trim()));
+  let sheetName = wb.SheetNames.find(n => /an[áa]lisis.*inventario/i.test(n.trim()));
+  if(!sheetName) sheetName = wb.SheetNames.find(n => /inventario|stock/i.test(n.trim()));
   if(!sheetName) sheetName = wb.SheetNames[0];
   const sheet = wb.Sheets[sheetName];
   const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
 
-  const NEEDED = ["Codigo","Código","Descripcion","Descripción","Stock Actual","Stock","Stock Minimo","Stock Mínimo","Punto de Reorden","Punto de Pedido"];
+  // En el archivo real el encabezado está en la fila 3, pero se busca en las primeras 15 por si cambia.
   let headerRowIdx = -1, headerRow = null;
   for(let i=0;i<Math.min(15, rows.length); i++){
-    const row = rows[i] || [];
-    const strs = row.map(c => (c||"").toString().trim().toLowerCase());
-    const hits = NEEDED.filter(n => strs.includes(n.toLowerCase())).length;
-    if(hits >= 2){ headerRowIdx = i; headerRow = row; break; }
+    const strs = (rows[i]||[]).map(c => (c==null?"":c.toString()).trim().toLowerCase());
+    if((strs.includes('código') || strs.includes('codigo')) && strs.some(s=>s.startsWith('stock'))){
+      headerRowIdx = i; headerRow = rows[i]; break;
+    }
   }
   if(headerRowIdx === -1){
-    return { ok:false, message: "no encontré columnas reconocibles (Código/Descripción/Stock) en las primeras 15 filas de la hoja \"" + sheetName + "\" — cuéntame los nombres reales de columna para ajustar la lectura." };
+    return { ok:false, message: 'no encontré la fila de encabezado (Código + Stock...) en las primeras 15 filas de la hoja "' + sheetName + '".' };
   }
 
   const col = {
-    codigo: findCol(headerRow, ["Codigo","Código","Cod. Articulo","Cod Producto","Cod. Producto","SKU","Item","IdProducto"]),
-    descripcion: findCol(headerRow, ["Descripcion","Descripción","Producto","Nombre","Nombre Producto","Articulo","Artículo"]),
-    almacen: findCol(headerRow, ["Almacen","Almacén","Ubicacion","Ubicación","Bodega","Sede"]),
-    unidad: findCol(headerRow, ["Unidad","U.M.","UM","Unidad de Medida"]),
-    stockActual: findCol(headerRow, ["Stock Actual","Stock Disponible","Existencia","Saldo","Cantidad Disponible","Stock"]),
-    stockMinimo: findCol(headerRow, ["Stock Minimo","Stock Mínimo","Minimo","Mínimo","Punto de Reorden","Punto de Pedido","Stock de Seguridad","Reorden"]),
-    proveedor: findCol(headerRow, ["Proveedor","Proveedor Principal"]),
+    codigo: findCol(headerRow, ["Código","Codigo"]),
+    descripcion: findCol(headerRow, ["Descripción","Descripcion"]),
+    unidad: findCol(headerRow, ["Medida","Unidad","U.M.","UM"]),
+    stockActual: findCol(headerRow, ["Stock Actual"]),
+    transito: findCol(headerRow, ["Stock en tránsito","Stock en transito"]),
+    consumoMensual: findCol(headerRow, ["Consumo Mensual"]),
+    rop: findCol(headerRow, ["Punto de Reorden","Punto de Pedido"]),
+    stockMinimo: findCol(headerRow, ["Stock mínimo","Stock Minimo"]),
+    estadoArchivo: findCol(headerRow, ["Estado"]),
+    cobertura: findCol(headerRow, ["Cobertura (meses)","Cobertura"]),
+    deficitRop: findCol(headerRow, ["Deficit contra ROP","Déficit contra ROP"]),
   };
   const faltantes = [];
   if(col.codigo===-1) faltantes.push("Código");
   if(col.stockActual===-1) faltantes.push("Stock Actual");
-  if(col.stockMinimo===-1) faltantes.push("Stock Mínimo");
+  if(col.rop===-1) faltantes.push("Punto de Reorden");
+  if(col.consumoMensual===-1) faltantes.push("Consumo Mensual");
   if(faltantes.length){
-    return { ok:false, message: "encontré la hoja \"" + sheetName + "\" pero no pude ubicar la columna de " + faltantes.join(", ") + " — dime en qué columna está y lo ajusto." };
+    return { ok:false, message: 'encontré la hoja "' + sheetName + '" pero no pude ubicar la columna de ' + faltantes.join(", ") + ' — dime en qué columna está y lo ajusto.' };
   }
+  // Stock por sede: solo por coincidencia EXACTA del encabezado, para no capturar por error otra
+  // columna del archivo (findCol cae a coincidencia parcial si no encuentra exacta).
+  const sedes = [];
+  headerRow.forEach((h, i) => {
+    const t = (h==null?"":h.toString()).trim();
+    if(ALMACEN_SEDES.indexOf(t.toUpperCase()) !== -1) sedes.push({ name: t.toUpperCase(), idx: i });
+  });
 
+  const num = v => (typeof v === 'number' && isFinite(v)) ? v
+    : ((v!=null && v!=="" && isFinite(Number(v))) ? Number(v) : null);
+  const txt = v => (v==null ? "" : v.toString()).trim();
   const dataRows = rows.slice(headerRowIdx+1);
   const almacenRows = [];
   let excluidas = 0;
   for(const r of dataRows){
     if(!r) continue;
-    const codigo = col.codigo!==-1 ? (r[col.codigo]||"").toString().trim() : "";
+    const codigo = txt(r[col.codigo]);
     if(!codigo){ excluidas++; continue; }
-    const stockActual = Number(r[col.stockActual]);
-    const stockMinimo = Number(r[col.stockMinimo]);
-    if(!isFinite(stockActual) || !isFinite(stockMinimo)){ excluidas++; continue; }
-    const deficit = stockMinimo - stockActual;
-    const estado = stockActual<=0 ? 'quiebre' : (stockActual < stockMinimo*0.5 ? 'critico' : (stockActual < stockMinimo ? 'bajo' : 'ok'));
+    const stockActual = num(r[col.stockActual]);
+    if(stockActual === null){ excluidas++; continue; }
+    const rop = num(r[col.rop]);
+    const consumoMensual = num(r[col.consumoMensual]);
+    // Criterio confirmado: solo cuenta como alerta si el producto tiene consumo y está bajo su ROP.
+    const enAlerta = (consumoMensual !== null && consumoMensual > 0 && rop !== null && stockActual < rop);
+    const estado = !enAlerta ? 'ok'
+      : (stockActual <= 0 ? 'quiebre' : (stockActual < rop*0.5 ? 'critico' : 'bajo'));
+    const deficitArchivo = col.deficitRop!==-1 ? num(r[col.deficitRop]) : null;
+    const stocks = {};
+    for(const sd of sedes) stocks[sd.name] = num(r[sd.idx]) || 0;
     almacenRows.push({
       codigo,
-      descripcion: col.descripcion!==-1 ? (r[col.descripcion]||"").toString().trim() : "",
-      almacen: col.almacen!==-1 ? (r[col.almacen]||"").toString().trim() : "",
-      unidad: col.unidad!==-1 ? (r[col.unidad]||"").toString().trim() : "",
-      proveedor: col.proveedor!==-1 ? (r[col.proveedor]||"").toString().trim() : "",
-      stockActual, stockMinimo, deficit, estado,
+      descripcion: col.descripcion!==-1 ? txt(r[col.descripcion]) : "",
+      unidad: col.unidad!==-1 ? txt(r[col.unidad]) : "",
+      estadoArchivo: col.estadoArchivo!==-1 ? txt(r[col.estadoArchivo]) : "",
+      stocks, stockActual, rop,
+      stockMinimo: col.stockMinimo!==-1 ? num(r[col.stockMinimo]) : null,
+      consumoMensual,
+      transito: col.transito!==-1 ? num(r[col.transito]) : null,
+      cobertura: col.cobertura!==-1 ? num(r[col.cobertura]) : null,
+      deficit: deficitArchivo !== null ? deficitArchivo : (rop !== null ? rop - stockActual : 0),
+      estado,
     });
   }
-  ALMACEN_DATA = { rows: almacenRows, totalRows: dataRows.length, excluidas, filename };
+  ALMACEN_DATA = { rows: almacenRows, sedes: sedes.map(sd=>sd.name), totalRows: dataRows.length, excluidas, filename, sheetName };
   const nAlerta = almacenRows.filter(r=>r.estado!=='ok').length;
   // No se llama a render() directo: si Reporte Maestro.xlsx todavía no se cargó, DATA sigue null y
   // render() rompe (getProcesoRows/renderProceso asumen DATA no-nulo) — el panel entero sigue oculto
@@ -2204,7 +2251,7 @@ function processAlmacen(wb, filename){
   // con refrescar Alertas por su cuenta; cuando Maestro se cargue después, render() ya volverá a llamar
   // renderAlertas() y mostrará esto correctamente.
   if(DATA){ render(); } else { renderAlertas(); }
-  return { ok:true, message: "procesado: " + almacenRows.length.toLocaleString('es-PE') + " productos (" + nAlerta.toLocaleString('es-PE') + " necesitan reposición)." };
+  return { ok:true, message: "procesado: " + almacenRows.length.toLocaleString('es-PE') + " productos, " + nAlerta.toLocaleString('es-PE') + " necesitan reposición." };
 }
 
 function processConsulta(wb, filename){
@@ -3045,28 +3092,54 @@ let alertasListenersBound = false;
 // definidas más arriba, sin usar, por si se quiere recuperar Requerimientos sin Pedido/Pedidos sin OC
 // como vista aparte más adelante).
 function populateReposicionFilters(){
-  const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
-  populateSelectDistinct(document.getElementById('filterReposicionAlmacen'), rows.map(r=>r.almacen), 'Todos los almacenes');
+  // El selector de almacén NO filtra filas: la alerta se calcula contra el Stock Actual total, porque
+  // el Punto de Reorden del archivo también es total (no hay uno por sede). Elegir una sede cambia qué
+  // stock se muestra en la tabla, con el total siempre al lado. Decisión confirmada con Piero (08.09.2026).
+  const sedes = (ALMACEN_DATA && ALMACEN_DATA.sedes) || [];
+  const sel = document.getElementById('filterReposicionAlmacen');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="all">Stock total (todos los almacenes)</option>'
+    + sedes.map(sd=>'<option value="'+escapeHtml(sd)+'">Stock en '+escapeHtml(sd)+'</option>').join('');
+  if(prev && Array.from(sel.options).some(o=>o.value===prev)) sel.value = prev;
 }
 function filteredReposicionRows(){
   const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
-  const fAlmacen = document.getElementById('filterReposicionAlmacen').value;
   const fEstado = document.getElementById('filterReposicionEstado').value;
   return rows.filter(r=>{
     if(r.estado==='ok') return false; // esta vista es solo alertas: productos que SÍ necesitan reposición
-    if(fAlmacen!=='all' && r.almacen !== fAlmacen) return false;
     if(fEstado!=='all' && r.estado !== fEstado) return false;
     return true;
   });
 }
-const ESTADO_REPOSICION_LABEL = { quiebre:'Quiebre', critico:'Crítico', bajo:'Bajo mínimo' };
+const ESTADO_REPOSICION_LABEL = { quiebre:'Quiebre', critico:'Crítico', bajo:'Bajo el ROP' };
 const ESTADO_REPOSICION_PILL = { quiebre:'warn', critico:'warn', bajo:'late' };
 function renderAlertas(){
   const hasData = ALMACEN_DATA && ALMACEN_DATA.rows;
   if(!hasData){
     document.getElementById('kpiGridAlertas').innerHTML = '';
     document.querySelector('#tableReposicion thead').innerHTML = '';
-    document.querySelector('#tableReposicion tbody').innerHTML = `<tr><td style="text-align:center;padding:24px;color:var(--muted);">Carga tu Reporte Almacen.xlsx arriba para ver qué productos necesitan reposición.</td></tr>`;
+    // 08.09.2026: el detalle de qué archivo se reconoció y qué pasó con él vive en #fileList, que está
+    // oculto desde la limpieza del encabezado (12a ronda) — así que al cargar los 4 archivos de una este
+    // módulo quedaba en blanco sin decir por qué. Acá se muestra el estado real de Reporte Almacen.xlsx
+    // (o, si no se reconoció ninguno, qué archivos sí entraron).
+    const stAlm = fileState['almacen'];
+    let msgAlm;
+    if(stAlm){
+      msgAlm = '<b>Reporte Almacen.xlsx</b>: ' + stAlm.icon + ' ' + escapeHtml(stAlm.text);
+    } else {
+      const detalle = lastLoadFiles.map(f => {
+        const lbl = f.key ? (FILE_SIGNATURES.find(s=>s.key===f.key)||{}).label || f.key : null;
+        const res = f.error ? '❌ no se pudo leer (' + escapeHtml(f.error) + ')'
+                  : lbl ? '✅ entró como ' + escapeHtml(lbl)
+                  : '⚠ no lo reconocí';
+        return '• ' + escapeHtml(f.name) + ' → ' + res;
+      });
+      msgAlm = (detalle.length
+          ? 'Ninguno de los archivos que cargaste entró como <b>Reporte Almacen.xlsx</b>:<br>' + detalle.join('<br>') + '<br><br>'
+          : 'Todavía no has cargado ningún archivo. ')
+        + 'El nombre del archivo o de una de sus hojas tiene que contener "Almacen", "Inventario" o "Stock".';
+    }
+    document.querySelector('#tableReposicion tbody').innerHTML = '<tr><td style="text-align:center;padding:24px;color:var(--muted);line-height:1.5;">' + msgAlm + '</td></tr>';
     return;
   }
   populateReposicionFilters();
@@ -3083,22 +3156,31 @@ function renderAlertas(){
 }
 function drawAlertas(){
   const q = (document.getElementById('searchReposicion').value||"").toLowerCase();
+  const sede = document.getElementById('filterReposicionAlmacen').value;
   let view = filteredReposicionRows().filter(r=>!q || (r.codigo+' '+r.descripcion).toLowerCase().includes(q));
   const ORDEN_ESTADO = { quiebre:0, critico:1, bajo:2 };
   view = view.slice().sort((a,b)=> ORDEN_ESTADO[a.estado]-ORDEN_ESTADO[b.estado] || (b.deficit-a.deficit));
+  const fmt = v => v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2});
 
   const table = document.getElementById('tableReposicion');
-  table.querySelector('thead').innerHTML = `<tr><th>Código</th><th>Producto</th><th>Almacén</th><th>Stock actual</th><th>Stock mínimo</th><th>Déficit</th><th>Estado</th></tr>`;
+  const conSede = sede !== 'all';
+  table.querySelector('thead').innerHTML = '<tr><th>Código</th><th>Producto</th>'
+    + (conSede ? '<th>Stock '+escapeHtml(sede)+'</th>' : '')
+    + '<th>Stock total</th><th>Punto de reorden</th><th>Déficit</th><th>Consumo mensual</th><th>Cobertura (meses)</th><th>Estado (archivo)</th><th>Alerta</th></tr>';
+  const nCols = conSede ? 10 : 9;
   table.querySelector('tbody').innerHTML = view.map(r=>`
     <tr>
       <td>${escapeHtml(r.codigo)}</td>
       <td style="white-space:normal;min-width:220px;">${escapeHtml(r.descripcion)||'—'}</td>
-      <td>${escapeHtml(r.almacen)||'—'}</td>
-      <td>${r.stockActual.toLocaleString('es-PE')}${r.unidad?' '+escapeHtml(r.unidad):''}</td>
-      <td>${r.stockMinimo.toLocaleString('es-PE')}</td>
-      <td>${r.deficit.toLocaleString('es-PE')}</td>
+      ${conSede ? '<td>'+fmt(r.stocks[sede]!=null?r.stocks[sede]:0)+'</td>' : ''}
+      <td>${fmt(r.stockActual)}${r.unidad?' '+escapeHtml(r.unidad):''}</td>
+      <td>${fmt(r.rop)}</td>
+      <td>${fmt(r.deficit)}</td>
+      <td>${fmt(r.consumoMensual)}</td>
+      <td>${fmt(r.cobertura)}</td>
+      <td>${escapeHtml(r.estadoArchivo)||'—'}</td>
       <td><span class="pill ${ESTADO_REPOSICION_PILL[r.estado]}">${ESTADO_REPOSICION_LABEL[r.estado]}</span></td>
-    </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin productos con alerta de reposición con el filtro actual 🎉</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="${nCols}" style="text-align:center;padding:24px;color:var(--muted);">Sin productos con alerta de reposición con el filtro actual 🎉</td></tr>`;
 
   const all = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
   const nQuiebre = all.filter(r=>r.estado==='quiebre').length;
@@ -3106,8 +3188,8 @@ function drawAlertas(){
   const nBajo = all.filter(r=>r.estado==='bajo').length;
   document.getElementById('kpiGridAlertas').innerHTML = `
     <div class="card kpi${nQuiebre>0?' alert-card':''}"><div class="label">En quiebre (stock en 0)</div><div class="value${nQuiebre>0?' alert-n':''}">${nQuiebre.toLocaleString('es-PE')}</div></div>
-    <div class="card kpi${nCritico>0?' alert-card':''}"><div class="label">Críticos (bajo el 50% del mínimo)</div><div class="value${nCritico>0?' alert-n':''}">${nCritico.toLocaleString('es-PE')}</div></div>
-    <div class="card kpi"><div class="label">Bajo mínimo</div><div class="value">${nBajo.toLocaleString('es-PE')}</div></div>
+    <div class="card kpi${nCritico>0?' alert-card':''}"><div class="label">Críticos (bajo el 50% del ROP)</div><div class="value${nCritico>0?' alert-n':''}">${nCritico.toLocaleString('es-PE')}</div></div>
+    <div class="card kpi"><div class="label">Bajo el punto de reorden</div><div class="value">${nBajo.toLocaleString('es-PE')}</div></div>
   `;
 }
 
@@ -4700,32 +4782,33 @@ function buildProImageAlertas(){
   const nBajo = all.filter(r=>r.estado==='bajo').length;
   const kpis = [
     { num:'📦', label:'PRODUCTOS EN QUIEBRE', value: nQuiebre.toLocaleString('es-PE'), valueLabel:'STOCK EN 0', metaLabel:'ESTADO', metaValue:'Crítico', color: nQuiebre>0?'#d03b3b':'#0ca30c' },
-    { num:'⚠️', label:'PRODUCTOS CRÍTICOS', value: nCritico.toLocaleString('es-PE'), valueLabel:'BAJO 50% DEL MÍNIMO', metaLabel:'ESTADO', metaValue:'Atención', color: nCritico>0?'#e2960a':'#0ca30c' },
+    { num:'⚠️', label:'PRODUCTOS CRÍTICOS', value: nCritico.toLocaleString('es-PE'), valueLabel:'BAJO 50% DEL ROP', metaLabel:'ESTADO', metaValue:'Atención', color: nCritico>0?'#e2960a':'#0ca30c' },
   ];
   const ORDEN_ESTADO = { quiebre:0, critico:1, bajo:2 };
   const ESTADO_COLOR = { quiebre:'#d03b3b', critico:'#d03b3b', bajo:'#e2960a' };
+  const fmt = v => v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2});
   const view = all.filter(r=>r.estado!=='ok')
     .sort((a,b)=> ORDEN_ESTADO[a.estado]-ORDEN_ESTADO[b.estado] || (b.deficit-a.deficit))
     .slice(0,8);
   const rows = view.map((r,i)=>({
     rank: i+1, name: (r.descripcion||r.codigo||'—').length>26 ? (r.descripcion||r.codigo).slice(0,24)+'…' : (r.descripcion||r.codigo||'—'),
-    cells: [ r.stockActual.toLocaleString('es-PE'), r.stockMinimo.toLocaleString('es-PE') ],
-    pct: r.stockMinimo>0 ? Math.min(100, r.deficit/r.stockMinimo*100) : 100,
-    pctLabel: r.deficit.toLocaleString('es-PE')+' de déficit',
+    cells: [ fmt(r.stockActual), fmt(r.rop) ],
+    pct: (r.rop>0) ? Math.min(100, r.deficit/r.rop*100) : 100,
+    pctLabel: fmt(r.deficit)+' de déficit',
     barColor: ESTADO_COLOR[r.estado],
   }));
-  const table = { icon:'📦', title:'Productos con alerta de reposición', subtitle:'Ordenados por severidad (quiebre primero), déficit más grande primero', nameLabel:'PRODUCTO', columns:['STOCK ACTUAL','STOCK MÍNIMO'], barLabel:'DÉFICIT', rows, legendItems:[{color:'#d03b3b',label:'Quiebre / Crítico'},{color:'#e2960a',label:'Bajo mínimo'}] };
+  const table = { icon:'📦', title:'Productos con alerta de reposición', subtitle:'Ordenados por severidad (quiebre primero), déficit más grande primero', nameLabel:'PRODUCTO', columns:['STOCK ACTUAL','PUNTO DE REORDEN'], barLabel:'DÉFICIT', rows, legendItems:[{color:'#d03b3b',label:'Quiebre / Crítico'},{color:'#e2960a',label:'Bajo el ROP'}] };
   const totalAlerta = nQuiebre + nCritico + nBajo;
   const banner = totalAlerta>0
-    ? { tone:'alert', items:[ {value:nQuiebre.toLocaleString('es-PE'), label:'En quiebre'}, {value:nCritico.toLocaleString('es-PE'), label:'Críticos'}, {value:nBajo.toLocaleString('es-PE'), label:'Bajo mínimo'} ], action:'ACCIÓN: coordinar reposición con el proveedor de cada producto listado.' }
-    : { tone:'info', items:[ {value:'0', label:'Productos bajo su stock mínimo'} ], action:'Todo el stock al día 🎉' };
+    ? { tone:'alert', items:[ {value:nQuiebre.toLocaleString('es-PE'), label:'En quiebre'}, {value:nCritico.toLocaleString('es-PE'), label:'Críticos'}, {value:nBajo.toLocaleString('es-PE'), label:'Bajo el ROP'} ], action:'ACCIÓN: coordinar reposición con el proveedor de cada producto listado.' }
+    : { tone:'info', items:[ {value:'0', label:'Productos bajo su punto de reorden'} ], action:'Todo el stock al día 🎉' };
   return {
     title: 'ALERTAS DE REPOSICIÓN',
-    subtitle: 'PRODUCTOS POR DEBAJO DE SU STOCK MÍNIMO',
+    subtitle: 'CON CONSUMO Y STOCK BAJO SU PUNTO DE REORDEN',
     kpis,
     tables: [ table ],
     banner,
-    footnote: 'Basado en la última carga de Reporte Almacen.xlsx — es una foto del stock al momento de cargar el archivo, no se actualiza sola.',
+    footnote: 'Hoja "Análisis Inventario" de la última carga de Reporte Almacen.xlsx — es una foto del stock al momento de cargar el archivo, no se actualiza sola. Solo productos con Consumo Mensual mayor a 0.',
   };
 }
 // Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = promedio simple
