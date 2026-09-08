@@ -242,11 +242,23 @@
   .gasto-crumb .crumb-sep{color:var(--muted);}
   .gasto-crumb .crumb-current{color:var(--ink);font-weight:700;}
   .bar-row.clickable{cursor:pointer;}
-  /* Resumen "Cuánto pedir por categoría" (08.09.2026): tabla simple de categorías, sin barras (Piero
-     pidió quitar el gráfico de barras el mismo día). Cada fila abre el detalle producto por producto. */
-  .pedir-cat-row{cursor:pointer;}
-  .pedir-cat-row:hover td{background:var(--row-hover);}
-  .pedir-cat-row.selected td{background:var(--surface-2);font-weight:700;color:var(--brand-ink);}
+  /* Resumen "Cuánto pedir por categoría" (08.09.2026): una tarjeta por familia — la tabla de
+     categorías se veía confusa ("puedes darle al módulo por tarjetas... que se abran una vez se
+     selecciona la categoría y que ahí de el detalle"). Al seleccionar una tarjeta se abre el detalle
+     producto por producto justo debajo de la grilla. Ícono por familia reutilizando iconForFamilia. */
+  .pedir-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;}
+  .pedir-card{background:var(--surface-3);border:2px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s,background .15s;}
+  .pedir-card:hover{background:var(--surface-2);}
+  .pedir-card.selected{border-color:var(--brand-2);background:var(--card);box-shadow:0 0 0 1px var(--brand-2);}
+  .pedir-card .pc-top{display:flex;align-items:flex-start;gap:8px;min-height:32px;}
+  .pedir-card .pc-ic{font-size:17px;line-height:1.2;flex-shrink:0;}
+  .pedir-card .pc-name{font-size:12.5px;font-weight:800;color:var(--ink);line-height:1.25;}
+  .pedir-card .pc-n{font-size:26px;font-weight:800;color:var(--brand-ink);margin-top:8px;line-height:1;}
+  .pedir-card .pc-n span{font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-left:5px;}
+  .pedir-card .pc-um{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:11.5px;color:var(--ink-soft);line-height:1.6;}
+  .pedir-card .pc-um b{color:var(--ink);font-weight:700;}
+  .pedir-card .pc-hint{margin-top:8px;font-size:10.5px;color:var(--muted);}
+  .pedir-detalle-head{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:9px;}
   .bar-row.clickable:hover .bar-label{color:var(--brand-ink);}
   .moneda-tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--ink-soft);margin-right:3px;}
   .pill.muted{background:var(--surface-2);color:var(--ink-soft);}
@@ -3241,6 +3253,11 @@ function drawAlertas(){
 // Las cantidades NO se suman entre unidades de medida distintas: cada categoría muestra su total por UM
 // (MTS, UND, MT2...), porque sumar metros con unidades daría un número sin sentido.
 let pedirCatSel = null;
+// iconForFamilia compara contra texto SIN acentos ("ELECTRIC", "VALVULA"), pero las familias reales
+// llegan acentuadas ("MATERIAL PARA INSTALACIÓN ELÉCTRICA", "VÁLVULA") y caían todas en el ícono
+// genérico. Se le pasa el nombre sin acentos solo desde acá, sin tocar la función compartida (la usan
+// también las imágenes de resumen, y ahí no se pidió ningún cambio).
+function sinAcentos(t){ return (t||'').normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 function pedirRowsFor(meses){
   const all = reposicionScopeRows();
   const rows = [];
@@ -3273,8 +3290,6 @@ function drawPedirPorCategoria(){
     g.porUm[um] = (g.porUm[um] || 0) + r.aPedir;
   }
   const grupos = Object.keys(byCat).map(k=>byCat[k]).sort((a,b)=> b.n-a.n || a.label.localeCompare(b.label));
-  const umText = g => Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a])
-    .map(u=> fmt(arriba(g.porUm[u])) + (u==='—' ? '' : ' '+u)).join(' · ');
 
   document.getElementById('pedirResumen').innerHTML = meses > 0
     ? '<b>' + rows.length.toLocaleString('es-PE') + '</b> productos a pedir en <b>' + grupos.length + '</b> categorías para cubrir <b>' + fmt(meses) + '</b> mes(es)'
@@ -3282,20 +3297,31 @@ function drawPedirPorCategoria(){
     : 'Escribe cuántos meses quieres cubrir.';
 
   document.getElementById('chartPedir').innerHTML = grupos.length
-    ? '<div class="table-card card"><table><thead><tr><th>Categoría</th><th>Productos a pedir</th><th>Cantidad a pedir (por unidad de medida)</th></tr></thead><tbody>'
-      + grupos.map(g=>
-        '<tr class="pedir-cat-row' + (pedirCatSel===g.label ? ' selected' : '') + '" data-cat="' + escapeHtml(g.label) + '">'
-        + '<td style="white-space:normal;min-width:230px;">' + escapeHtml(g.label) + '</td>'
-        + '<td>' + g.n + '</td>'
-        + '<td style="white-space:normal;">' + escapeHtml(umText(g)) + '</td>'
-        + '</tr>').join('')
-      + '</tbody></table></div>'
+    ? '<div class="pedir-cards">' + grupos.map(g=>{
+        const ums = Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a]);
+        const lineas = ums.slice(0,3).map(u=>
+          '<div><b>' + fmt(arriba(g.porUm[u])) + '</b>' + (u==='—' ? '' : ' ' + escapeHtml(u)) + '</div>').join('');
+        const sel = (pedirCatSel === g.label);
+        return '<div class="pedir-card' + (sel ? ' selected' : '') + '" data-cat="' + escapeHtml(g.label) + '">'
+          + '<div class="pc-top"><span class="pc-ic">' + iconForFamilia(sinAcentos(g.label)) + '</span>'
+          + '<div class="pc-name">' + escapeHtml(g.label) + '</div></div>'
+          + '<div class="pc-n">' + g.n.toLocaleString('es-PE') + '<span>producto' + (g.n===1?'':'s') + ' a pedir</span></div>'
+          + '<div class="pc-um">' + lineas
+          + (ums.length>3 ? '<div class="pc-hint">+ ' + (ums.length-3) + ' unidad(es) de medida más</div>' : '') + '</div>'
+          + '<div class="pc-hint">' + (sel ? 'Detalle abajo ↓' : 'Clic para ver el detalle') + '</div>'
+          + '</div>';
+      }).join('') + '</div>'
     : '<div style="font-size:12.5px;color:var(--ink-soft);padding:6px 0;">Nada que pedir con esos meses de cobertura 🎉</div>';
-  Array.prototype.forEach.call(document.querySelectorAll('#chartPedir .pedir-cat-row'), el=>{
+  Array.prototype.forEach.call(document.querySelectorAll('#chartPedir .pedir-card'), el=>{
     el.addEventListener('click', ()=>{
       const cat = el.getAttribute('data-cat');
-      pedirCatSel = (pedirCatSel === cat) ? null : cat;
+      const abrir = (pedirCatSel !== cat);
+      pedirCatSel = abrir ? cat : null;
       drawPedirPorCategoria();
+      if(abrir){
+        const box = document.getElementById('pedirDetalle');
+        if(box) box.scrollIntoView({ behavior:'smooth', block:'nearest' });
+      }
     });
   });
   drawPedirDetalle(grupos);
@@ -3310,8 +3336,8 @@ function drawPedirDetalle(grupos){
   const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
   const arriba = v => Math.ceil(v*100)/100;
   const rows = g.rows.slice().sort((a,b)=> b.aPedir-a.aPedir);
-  box.innerHTML = '<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;">'
-      + escapeHtml(g.label) + ' — ' + g.n + ' producto(s) a pedir</div>'
+  box.innerHTML = '<div class="pedir-detalle-head"><span>' + iconForFamilia(sinAcentos(g.label)) + '</span>'
+      + escapeHtml(g.label) + ' — ' + g.n.toLocaleString('es-PE') + ' producto(s) a pedir</div>'
     + '<div class="table-card card" style="max-height:420px;overflow:auto;"><table><thead><tr>'
     + '<th>Código</th><th>Descripción</th><th>UM</th><th>LIMA</th><th>En tránsito</th><th>ROP</th>'
     + '<th>Consumo mensual</th><th>Cobertura (meses)</th><th>Cantidad a pedir</th></tr></thead><tbody>'
