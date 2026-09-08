@@ -5019,27 +5019,140 @@ function downloadProComprasPartes(btn){
 // —lienzo de 1080px partido en imágenes— para que se lea en el celular (pedido de Piero, 08.09.2026:
 // "este reporte debe mostrar el resumen así, esa debe ser la info solo que con el formato que ya sabes
 // cortando en imágenes"). Antes salía en una sola imagen de 2000px de ancho.
+// Renderizado propio para celular (08.09.2026, pedido de Piero: "necesito que le des el tamaño de
+// letra como para que se vea desde un celular, cada imagen debe abarcar el máximo espacio posible").
+// No reusa proHeaderHtml/proKpiCardHtml/proAreaPanelHtml del reporte ancho: esas funciones están
+// dimensionadas para 1500-2000px y, al verse en un celular, un texto de 11px sobre un lienzo de 1080px
+// queda en ~4px reales. Acá el lienzo también es de 1080px pero la tipografía es ~3x más grande
+// (cuerpo 30px, etiquetas 22px, números 70px), que es lo que se lee cómodo a ancho completo de pantalla.
+// Los datos son los mismos de buildProImageTiempos (kpis, areaPanels, footerBar) — solo cambia el dibujo.
 function proTiemposPartesHtml(opts){
   const fecha = opts.dateLabel || new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
+  const F = 'Inter,Arial,sans-serif';
   const parte = (contenido)=> `
-  <div id="proImgInner" style="width:1080px;font-family:Inter,Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">${contenido}</div>`;
-  const panels = opts.areaPanels || [];
-  // Las 5 tarjetas van en una grilla de 3 columnas (2 filas: 3 + 2) en vez del flex de 5 por fila que
-  // usa proKpiRowHtml: a 1080px ese flex las partía 4 + 1 y la última quedaba estirada a todo el ancho.
-  // Cada tarjeta se envuelve en una celda con min-width:0 porque proKpiCardHtml trae min-width:230px.
-  const kpiGridHtml = (kpis)=> (!kpis || !kpis.length) ? '' : `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:22px 20px 20px;">
-      ${kpis.map(k=>`<div style="min-width:0;display:flex;">${proKpiCardHtml(k, opts.large)}</div>`).join('')}
+  <div id="proImgInner" style="width:1080px;font-family:${F};background:#eef1f5;box-sizing:border-box;">${contenido}</div>`;
+
+  // --- encabezado ---
+  const header = `
+    <div style="background:#0a1e64;padding:34px 34px 30px;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;">
+      <div style="min-width:0;">
+        <div style="font-size:44px;font-weight:800;color:#fff;line-height:1.1;letter-spacing:.4px;">${escapeHtml(opts.title)}</div>
+        <div style="font-size:26px;font-weight:700;color:#3ec6ac;margin-top:8px;letter-spacing:.6px;">${escapeHtml(opts.subtitle||'')}</div>
+        <div style="display:inline-flex;align-items:center;gap:10px;margin-top:20px;background:rgba(255,255,255,.14);border-radius:30px;padding:10px 22px;">
+          <span style="font-size:24px;">📅</span>
+          <span style="font-size:24px;font-weight:700;color:#fff;">${escapeHtml(fecha)}</span>
+        </div>
+      </div>
+      <img src="${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}" style="height:58px;flex-shrink:0;background:#fff;border-radius:12px;padding:12px 18px;box-sizing:content-box;" alt="Grupo Friopacking">
     </div>`;
-  const partes = [
-    parte(proHeaderHtml(opts.title, opts.subtitle, fecha, opts.headerIcon) + kpiGridHtml(opts.kpis)),
-  ];
-  // Un panel de área por imagen (a 1080px no caben los 2 al lado del otro); el pie va con el último.
+
+  // --- tarjeta de indicador, 2 por fila ---
+  const kpiCard = (k)=> {
+    const color = k.color || proSemColor(k.pct);
+    return `
+    <div style="background:#fff;border-radius:18px;border-top:10px solid ${color};padding:26px 28px 28px;box-sizing:border-box;">
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:64px;height:64px;border-radius:16px;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:32px;flex-shrink:0;">${k.icon||''}</div>
+        <div style="font-size:26px;font-weight:800;color:#0a1e64;line-height:1.2;">${k.label}</div>
+      </div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:22px;">
+        <div>
+          <div style="font-size:20px;font-weight:700;color:#8b98a4;letter-spacing:.6px;">${escapeHtml(k.valueLabel||'PROMEDIO')}</div>
+          <div style="font-size:64px;font-weight:800;color:#0a1e64;line-height:1;margin-top:4px;">${escapeHtml(String(k.value).replace(' días',''))}</div>
+          <div style="font-size:22px;color:#5b6b7a;margin-top:6px;">días</div>
+          <div style="font-size:20px;color:#8b98a4;margin-top:10px;">${escapeHtml(k.metaLabel||'META')}: ${escapeHtml(k.metaValue||'')}</div>
+        </div>
+        ${k.pct==null ? '' : `<div style="flex-shrink:0;">${proRingSvg(k.pct, 132)}</div>`}
+      </div>
+    </div>`;
+  };
+  const kpis = opts.kpis || [];
+  const kpiGrid = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:24px;">
+      ${kpis.map((k,i)=> `<div style="min-width:0;${(i===kpis.length-1 && kpis.length%2===1) ? 'grid-column:1 / -1;' : ''}">${kpiCard(k)}</div>`).join('')}
+    </div>`;
+
+  // --- panel de área (COMPRAS / ALMACÉN) ---
+  const statTile = (b)=> `
+    <div style="flex:1;min-width:0;background:#f7f9fb;border-radius:14px;padding:20px 18px;text-align:center;box-sizing:border-box;">
+      <div style="font-size:34px;">${b.icon||''}</div>
+      <div style="font-size:40px;font-weight:800;color:${b.color||'#0a1e64'};line-height:1.1;margin-top:6px;">${escapeHtml(String(b.value))}</div>
+      <div style="font-size:19px;font-weight:700;color:#5b6b7a;line-height:1.3;margin-top:8px;">${escapeHtml(b.label)}</div>
+    </div>`;
+  // html2canvas no reparte el texto de los <th> en varias líneas: lo cortamos nosotros
+  const dosLineas = (txt)=>{
+    const w = String(txt||'').trim().split(/\s+/);
+    if(w.length < 2) return escapeHtml(txt||'');
+    let mejor = 1, dif = Infinity;
+    for(let i=1;i<w.length;i++){
+      const a = w.slice(0,i).join(' ').length, b = w.slice(i).join(' ').length;
+      if(Math.abs(a-b) < dif){ dif = Math.abs(a-b); mejor = i; }
+    }
+    return escapeHtml(w.slice(0,mejor).join(' ')) + '<br>' + escapeHtml(w.slice(mejor).join(' '));
+  };
+  const panelHtml = (p)=> {
+    const t = p.table || { rows: [] };
+    const conExtra = !!t.extraCol;
+    const wMain = conExtra ? 175 : 190, wLeve = conExtra ? 90 : 96, wMedia = conExtra ? 95 : 100,
+          wCrit = conExtra ? 105 : 110, wPct = conExtra ? 155 : 165, fName = conExtra ? 24 : 27;
+    return `
+    <div style="background:#fff;border-radius:18px;overflow:hidden;">
+      <div style="background:${p.headerColor};padding:22px 28px;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:34px;">${p.icon||''}</span>
+        <span style="font-size:34px;font-weight:800;color:#fff;letter-spacing:.6px;">${escapeHtml(p.title)}</span>
+      </div>
+      <div style="padding:24px 24px 28px;">
+        <div style="display:flex;gap:14px;">${(p.statBoxes||[]).map(statTile).join('')}</div>
+        <table style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:22px;">
+          <thead><tr>
+            <th style="background:#0a1e64;text-align:left;font-size:19px;color:#fff;font-weight:800;padding:14px 16px;border-radius:10px 0 0 10px;overflow:hidden;">${escapeHtml(t.nameLabel||'RESPONSABLE')}</th>
+            <th style="background:#0a1e64;width:${wMain}px;font-size:19px;color:#fff;font-weight:800;padding:14px 8px;line-height:1.2;overflow:hidden;">${dosLineas((t.mainCol&&t.mainCol.label)||'')}</th>
+            ${conExtra ? `<th style="background:#0a1e64;width:${wMain}px;font-size:19px;color:#fff;font-weight:800;padding:14px 8px;line-height:1.2;overflow:hidden;">${dosLineas(t.extraCol.label)}</th>` : ''}
+            <th style="background:#0a1e64;width:${wLeve}px;font-size:19px;color:#e2960a;font-weight:800;padding:14px 4px;overflow:hidden;">LEVE</th>
+            <th style="background:#0a1e64;width:${wMedia}px;font-size:19px;color:#f0ad3e;font-weight:800;padding:14px 4px;overflow:hidden;">MEDIA</th>
+            <th style="background:#0a1e64;width:${wCrit}px;font-size:19px;color:#f0665f;font-weight:800;padding:14px 4px;overflow:hidden;">CRÍTICA</th>
+            <th style="background:#0a1e64;width:${wPct}px;font-size:19px;color:#fff;font-weight:800;padding:14px 16px 14px 8px;border-radius:0 10px 10px 0;line-height:1.2;overflow:hidden;">% CUMPLI-<br>MIENTO</th>
+          </tr></thead>
+          <tbody>${(t.rows||[]).map((r,i)=>`
+            <tr>
+              <td style="background:${i%2?'#f9fbfc':'#fff'};padding:16px;font-size:${fName}px;font-weight:800;color:#0a1e64;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${escapeHtml(r.name)}</td>
+              <td style="background:${i%2?'#f9fbfc':'#fff'};padding:16px 8px;text-align:center;font-size:28px;font-weight:700;color:#1c2733;">${escapeHtml(String(r.main))}</td>
+              ${conExtra ? `<td style="background:${i%2?'#f9fbfc':'#fff'};padding:16px 8px;text-align:center;font-size:28px;font-weight:700;color:#1c2733;">${escapeHtml(String(r.extra||'0'))}</td>` : ''}
+              <td style="background:${i%2?'#f9fbfc':'#fff'};padding:16px 4px;text-align:center;font-size:26px;font-weight:800;color:${r.leve?'#e2960a':'#c7d0d9'};">${r.leve}</td>
+              <td style="background:${i%2?'#f9fbfc':'#fff'};padding:16px 4px;text-align:center;font-size:26px;font-weight:800;color:${r.media?'#d97706':'#c7d0d9'};">${r.media}</td>
+              <td style="background:${i%2?'#f9fbfc':'#fff'};padding:16px 4px;text-align:center;font-size:26px;font-weight:800;color:${r.critica?'#d03b3b':'#c7d0d9'};">${r.critica}</td>
+              <td style="background:${i%2?'#f9fbfc':'#fff'};padding:16px 16px 16px 8px;text-align:right;font-size:28px;font-weight:800;color:${proSemColor(r.pct)};">${r.pct==null?'—':r.pct.toFixed(1)+'%'}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  };
+
+  // --- pie: objetivo + cumplimiento global ---
+  const f = opts.footerBar;
+  const pie = !f ? '' : `
+    <div style="background:#fff;border-radius:18px;padding:26px 28px;margin-top:20px;">
+      <div style="display:flex;align-items:flex-start;gap:16px;">
+        <span style="font-size:38px;line-height:1;">🏆</span>
+        <div><span style="font-size:24px;font-weight:800;color:#0a1e64;">OBJETIVO: </span><span style="font-size:24px;color:#5b6b7a;line-height:1.45;">${escapeHtml(f.objetivo)}</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;background:#eef2f6;border-radius:14px;padding:20px 24px;margin-top:22px;">
+        <span style="font-size:34px;">🎯</span>
+        <div>
+          <div style="font-size:19px;font-weight:700;color:#8b98a4;">${escapeHtml(f.metaGlobalLabel)}</div>
+          <div style="font-size:38px;font-weight:800;color:#0a1e64;line-height:1.1;">${escapeHtml(f.metaGlobalValue)}</div>
+        </div>
+      </div>
+      <div style="font-size:19px;color:#8b98a4;margin-top:16px;">ℹ️ ${escapeHtml(f.nota)}</div>
+    </div>`;
+
+  const panels = opts.areaPanels || [];
+  const partes = [ parte(header + kpiGrid) ];
   panels.forEach((panel, idx)=>{
-    partes.push(parte(`<div style="padding:20px;">${proAreaPanelHtml(panel)}</div>`
-      + ((idx === panels.length - 1) ? proFooterBarHtml(opts.footerBar) : '')));
+    const esUltimo = (idx === panels.length - 1);
+    partes.push(parte(`<div style="padding:24px;">${panelHtml(panel)}${esUltimo ? pie : ''}</div>`));
   });
-  if(!panels.length && opts.footerBar) partes.push(parte(proFooterBarHtml(opts.footerBar)));
+  if(!panels.length && pie) partes.push(parte(`<div style="padding:24px;">${pie}</div>`));
   return partes;
 }
 function downloadProTiemposPartes(btn){
