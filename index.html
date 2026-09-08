@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
   // Aplica el tema guardado ANTES de pintar la página, para que no haya parpadeo.
   (function(){
@@ -4996,8 +4997,20 @@ function proComprasResponsablePartesHtml(spec){
       </div>`),
   ];
 }
-// Genera y descarga las 3 partes, una tras otra. Chrome puede pedir permiso para "descargar varios
-// archivos" la primera vez — es normal, hay que aceptarlo.
+// Genera las 3 partes y las entrega en UN solo .zip (pedido de Piero, 08.09.2026) — así el navegador
+// hace una sola descarga y no pide permiso para "descargar varios archivos". El zip va sin comprimir
+// (STORE): los PNG ya están comprimidos y volver a comprimirlos no gana nada y sí tarda. Si JSZip no
+// cargó, se cae al comportamiento anterior: las 3 imágenes por separado.
+function descargarBlob(blob, nombre){
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = nombre;
+  link.href = url;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 10000);
+}
 async function downloadProComprasPartes(btn){
   if(typeof html2canvas === 'undefined'){
     alert('No se pudo generar la imagen: la librería no cargó (revisa tu conexión a internet e intenta de nuevo).');
@@ -5012,18 +5025,27 @@ async function downloadProComprasPartes(btn){
   try{
     const partes = proComprasResponsablePartesHtml(buildProImageComprasResponsable());
     const fecha = new Date().toISOString().slice(0,10);
+    const base = 'reporte-compras-' + comprador.toLowerCase() + '-' + fecha;
+    const imagenes = [];
     for(let i=0;i<partes.length;i++){
       btn.textContent = '⏳ Imagen ' + (i+1) + ' de ' + partes.length + '...';
       host.innerHTML = partes[i];
       await new Promise(r=>setTimeout(r, 80));
       const canvas = await html2canvas(host.querySelector('#proImgInner'), { backgroundColor: '#eef1f5', scale: 2 });
-      const link = document.createElement('a');
-      link.download = 'reporte-compras-' + comprador.toLowerCase() + '-' + (i+1) + '-de-' + partes.length + '-' + fecha + '.png';
-      link.href = canvas.toDataURL('image/png');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      await new Promise(r=>setTimeout(r, 400)); // aire entre descargas para que el navegador no las bloquee
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      imagenes.push({ nombre: base + '-' + (i+1) + '-de-' + partes.length + '.png', blob });
+    }
+    if(typeof JSZip !== 'undefined'){
+      btn.textContent = '⏳ Armando el zip...';
+      const zip = new JSZip();
+      for(const img of imagenes) zip.file(img.nombre, img.blob);
+      const zipBlob = await zip.generateAsync({ type:'blob', compression:'STORE' });
+      descargarBlob(zipBlob, base + '.zip');
+    } else {
+      for(const img of imagenes){
+        descargarBlob(img.blob, img.nombre);
+        await new Promise(r=>setTimeout(r, 400)); // aire para que el navegador no bloquee las descargas
+      }
     }
   }catch(err){
     alert('No se pudo generar la imagen: ' + (err && err.message ? err.message : err));
