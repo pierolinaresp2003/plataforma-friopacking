@@ -242,6 +242,11 @@
   .gasto-crumb .crumb-sep{color:var(--muted);}
   .gasto-crumb .crumb-current{color:var(--ink);font-weight:700;}
   .bar-row.clickable{cursor:pointer;}
+  /* Resumen "Cuánto pedir por categoría" (08.09.2026): la fila reusa .bar-row de Concentración de Gasto
+     y le agrega una columna con el total por unidad de medida a la derecha. */
+  .bar-row .pedir-um{width:220px;text-align:right;flex-shrink:0;font-size:11.5px;color:var(--ink-soft);}
+  .bar-row.selected .bar-label{color:var(--brand-ink);font-weight:700;}
+  @media (max-width:860px){ .bar-row .pedir-um{width:130px;font-size:10.5px;} }
   .bar-row.clickable:hover .bar-label{color:var(--brand-ink);}
   .moneda-tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--ink-soft);margin-right:3px;}
   .pill.muted{background:var(--surface-2);color:var(--ink-soft);}
@@ -468,6 +473,22 @@
         </select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
+
+      <!-- "Cuánto pedir por categoría" (08.09.2026, pedido de Piero: "cuánto es lo que se debería pedir
+           para los productos que son críticos... por categorías (las mismas que se usan en módulo 2)...
+           en base a los meses que yo quiera para abastecerme"). Ver drawPedirPorCategoria(). -->
+      <div class="card" id="pedirCard" style="padding:18px 20px 14px;margin-bottom:18px;display:none;">
+        <h3 style="margin:0 0 4px;font-size:14px;color:var(--ink);">Cuánto pedir, por categoría</h3>
+        <p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-soft);line-height:1.5;">Solo los productos en <b>REPOSICIÓN</b>. Cantidad a pedir = <b>consumo mensual × meses − (LIMA + EN TRÁNSITO)</b>. La categoría se resuelve por código de producto con la misma homologación de Concentración de Gasto.</p>
+        <div class="toolbar">
+          <label style="font-size:13px;color:var(--ink);display:inline-flex;align-items:center;gap:8px;font-weight:600;">Meses a abastecer
+            <input type="number" id="mesesAbastecer" value="3" min="0.5" max="36" step="0.5" style="width:92px;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--ink);font-weight:700;">
+          </label>
+          <span id="pedirResumen" style="font-size:12.5px;color:var(--ink-soft);"></span>
+        </div>
+        <div id="chartPedir"></div>
+        <div id="pedirDetalle" style="margin-top:14px;"></div>
+      </div>
 
       <div class="toolbar">
         <input type="search" id="searchReposicion" placeholder="Buscar código o producto...">
@@ -3147,7 +3168,7 @@ function renderAlertas(){
   }
   populateReposicionFilters();
   if(!alertasListenersBound){
-    ['searchReposicion','filterReposicionEstado'].forEach(id=>{
+    ['searchReposicion','filterReposicionEstado','mesesAbastecer'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawAlertas);
     });
@@ -3195,6 +3216,106 @@ function drawAlertas(){
     <div class="card kpi${nRepo>0?' alert-card':''}"><div class="label">En reposición</div><div class="value${nRepo>0?' alert-n':''}">${nRepo.toLocaleString('es-PE')}</div><div class="sub">Lima + tránsito por debajo del ROP</div></div>
     <div class="card kpi"><div class="label">Sin stock en Lima</div><div class="value">${nSinLima.toLocaleString('es-PE')}</div><div class="sub">stock en 0 en el almacén central</div></div>
   `;
+  drawPedirPorCategoria();
+}
+
+// ---------- Cuánto pedir por categoría (08.09.2026) ----------
+// Pedido de Piero: saber cuánto habría que pedir de los productos críticos para cubrir los meses que él
+// escriba, agrupado por las mismas categorías del módulo 2 (Concentración de Gasto) y resuelto por
+// código de producto homologado. Decisiones confirmadas con él antes de programar:
+//   - "críticos" = los que el módulo ya marca en REPOSICIÓN (LIMA + EN TRÁNSITO <= ROP).
+//   - el stock que se descuenta es LIMA + EN TRÁNSITO (mismo criterio del estado; Ica y Trujillo no
+//     entran, y reserva/picking tampoco por ahora — ver processAlmacen).
+//   - salida: resumen por categoría, con el detalle producto por producto al hacer clic.
+// La categoría sale de categoriaGenericaFor('', codigo, descripcion) — el mapa por código (Reporte
+// Maestro + Consulta + homologación) resuelve el 100% de los 4,440 productos del universo, verificado
+// contra los archivos reales el 08.09.2026, así que no hace falta un caso "sin categoría".
+// Las cantidades NO se suman entre unidades de medida distintas: cada categoría muestra su total por UM
+// (MTS, UND, MT2...), porque sumar metros con unidades daría un número sin sentido.
+let pedirCatSel = null;
+function pedirRowsFor(meses){
+  const all = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  const rows = [];
+  let sinConsumo = 0;
+  for(const r of all){
+    if(r.estado !== 'reposicion') continue;
+    // Sin consumo mensual registrado no hay forma de traducir "meses" a cantidad: se cuentan aparte en
+    // vez de asumir 0 y hacerlos desaparecer del resumen.
+    if(r.consumoMensual === null || !(r.consumoMensual > 0)){ sinConsumo++; continue; }
+    const aPedir = (r.consumoMensual * meses) - (r.lima + r.transito);
+    if(!(aPedir > 0)) continue;
+    rows.push(Object.assign({}, r, { aPedir, categoria: categoriaGenericaFor('', r.codigo, r.descripcion) }));
+  }
+  return { rows, sinConsumo };
+}
+function drawPedirPorCategoria(){
+  const card = document.getElementById('pedirCard');
+  if(!(ALMACEN_DATA && ALMACEN_DATA.rows)){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  const meses = Math.max(0, Number(document.getElementById('mesesAbastecer').value) || 0);
+  const { rows, sinConsumo } = pedirRowsFor(meses);
+  const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
+  const arriba = v => Math.ceil(v*100)/100;
+
+  const byCat = {};
+  for(const r of rows){
+    const g = byCat[r.categoria] = byCat[r.categoria] || { label:r.categoria, n:0, porUm:{}, rows:[] };
+    g.n++; g.rows.push(r);
+    const um = r.unidad || '—';
+    g.porUm[um] = (g.porUm[um] || 0) + r.aPedir;
+  }
+  const grupos = Object.keys(byCat).map(k=>byCat[k]).sort((a,b)=> b.n-a.n || a.label.localeCompare(b.label));
+  const umText = g => {
+    const ums = Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a]);
+    return ums.slice(0,3).map(u=> fmt(arriba(g.porUm[u])) + (u==='—' ? '' : ' '+u)).join(' · ')
+      + (ums.length>3 ? ' · …' : '');
+  };
+
+  document.getElementById('pedirResumen').innerHTML = meses > 0
+    ? '<b>' + rows.length.toLocaleString('es-PE') + '</b> productos a pedir en <b>' + grupos.length + '</b> categorías para cubrir <b>' + fmt(meses) + '</b> mes(es)'
+      + (sinConsumo ? ' · ' + sinConsumo.toLocaleString('es-PE') + ' en reposición sin consumo mensual registrado (no calculable)' : '')
+    : 'Escribe cuántos meses quieres cubrir.';
+
+  const max = grupos.length ? grupos[0].n : 0;
+  document.getElementById('chartPedir').innerHTML = grupos.map(g=>
+    '<div class="bar-row clickable' + (pedirCatSel===g.label ? ' selected' : '') + '" data-cat="' + escapeHtml(g.label) + '" title="' + escapeHtml(g.label) + '">'
+    + '<div class="bar-label">' + escapeHtml(g.label) + '</div>'
+    + '<div class="bar-track"><div class="bar-fill" style="width:' + (max ? (g.n/max*100) : 0) + '%;background:var(--brand-2);"></div></div>'
+    + '<div class="bar-pct">' + g.n + '</div>'
+    + '<div class="pedir-um">' + escapeHtml(umText(g)) + '</div>'
+    + '</div>').join('')
+    || '<div style="font-size:12.5px;color:var(--ink-soft);padding:6px 0;">Nada que pedir con esos meses de cobertura 🎉</div>';
+  Array.prototype.forEach.call(document.querySelectorAll('#chartPedir .bar-row'), el=>{
+    el.addEventListener('click', ()=>{
+      const cat = el.getAttribute('data-cat');
+      pedirCatSel = (pedirCatSel === cat) ? null : cat;
+      drawPedirPorCategoria();
+    });
+  });
+  drawPedirDetalle(grupos);
+}
+function drawPedirDetalle(grupos){
+  const box = document.getElementById('pedirDetalle');
+  const g = grupos.filter(x=>x.label===pedirCatSel)[0];
+  if(!g){
+    box.innerHTML = grupos.length ? '<div style="font-size:12px;color:var(--muted);">Haz clic en una categoría para ver el detalle producto por producto.</div>' : '';
+    return;
+  }
+  const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
+  const arriba = v => Math.ceil(v*100)/100;
+  const rows = g.rows.slice().sort((a,b)=> b.aPedir-a.aPedir);
+  box.innerHTML = '<div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px;">'
+      + escapeHtml(g.label) + ' — ' + g.n + ' producto(s) a pedir</div>'
+    + '<div class="table-card card" style="max-height:420px;overflow:auto;"><table><thead><tr>'
+    + '<th>Código</th><th>Descripción</th><th>UM</th><th>LIMA</th><th>En tránsito</th><th>ROP</th>'
+    + '<th>Consumo mensual</th><th>Cobertura (meses)</th><th>Cantidad a pedir</th></tr></thead><tbody>'
+    + rows.map(r=> '<tr><td>' + escapeHtml(r.codigo) + '</td>'
+        + '<td style="white-space:normal;min-width:230px;">' + (escapeHtml(r.descripcion) || '—') + '</td>'
+        + '<td>' + (escapeHtml(r.unidad) || '—') + '</td>'
+        + '<td>' + fmt(r.lima) + '</td><td>' + fmt(r.transito) + '</td><td>' + fmt(r.rop) + '</td>'
+        + '<td>' + fmt(r.consumoMensual) + '</td><td>' + fmt(r.cobertura) + '</td>'
+        + '<td><b>' + fmt(arriba(r.aPedir)) + '</b></td></tr>').join('')
+    + '</tbody></table></div>';
 }
 
 // Colores nacional/importado (categóricos ya usados en la plataforma para distinguir grupos que no son
