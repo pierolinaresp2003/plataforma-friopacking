@@ -206,6 +206,20 @@
   .trend-svg text{font-size:11.5px;fill:var(--ink-soft);}
   .trend-svg .tr-meta-label{fill:var(--ink-soft);font-size:11px;font-weight:600;}
 
+  /* Evolución mensual por proveedor (08.09.2026) — pedido de Piero: mismo DISEÑO que el resto de
+     Concentración de Gasto (tipografía/colores de .bar-row, .bar-pct, etc.), no el de Tiempos del
+     Proceso (.trend-*, pensado para el indicador semanal de ese otro módulo). Clases propias en vez de
+     reusar .trend-*, para no acoplar dos módulos que no tienen nada que ver entre sí. */
+  .evo-empty{font-size:12.5px;color:var(--ink-soft);padding:4px 0 10px;}
+  .evo-legend{display:flex;flex-wrap:wrap;gap:12px 16px;font-size:11.5px;color:var(--ink-soft);margin:0 0 8px;user-select:none;-webkit-user-select:none;}
+  .evo-legend .lg-item{display:inline-flex;align-items:center;gap:6px;}
+  .evo-legend .lg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .evo-hint{font-size:11px;color:var(--ink-soft);opacity:.75;margin:0 0 8px;user-select:none;-webkit-user-select:none;}
+  .evo-svg{display:block;overflow:visible;max-width:100%;user-select:none;-webkit-user-select:none;}
+  .evo-svg .evo-grid{stroke:var(--border);stroke-width:1;}
+  .evo-svg .evo-zoom-overlay{fill:transparent;cursor:zoom-in;}
+  .evo-svg text{font-size:11px;fill:var(--ink-soft);}
+
   .proc-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
   @media (max-width:960px){ .proc-kpi-grid{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:640px){ .proc-kpi-grid{grid-template-columns:1fr;} }
@@ -259,7 +273,7 @@
   <nav class="sidebar-nav">
     <div class="navitem active" data-section="proceso">🕐 Tiempos del Proceso de Atención</div>
     <div class="navitem" data-section="gasto">💰 Concentración de Gasto</div>
-    <div class="navitem" data-section="alertas">⚠️ Alertas de Atención</div>
+    <div class="navitem" data-section="alertas">📦 Alertas de Reposición</div>
   </nav>
   <div class="sidebar-foot">Grupo Friopacking<br>Logística</div>
 </aside>
@@ -291,6 +305,7 @@
       <li data-key="maestro"><span class="ic">⬜</span> Reporte Maestro.xlsx — no cargado</li>
       <li data-key="consulta"><span class="ic">⬜</span> Consulta.xlsx — no cargado</li>
       <li data-key="pedidosinreq"><span class="ic">⬜</span> PedidoSinReq.xlsx — no cargado</li>
+      <li data-key="almacen"><span class="ic">⬜</span> Reporte Almacen.xlsx — no cargado</li>
     </ul>
     <p id="status" style="margin-top:8px;">Ningún archivo cargado todavía.</p>
   </div>
@@ -417,52 +432,50 @@
       <div class="card" style="padding:18px 20px 8px;margin-bottom:18px;" id="chartGastoCard">
         <div id="chartGasto"></div>
       </div>
+      <!-- Evolución mensual por proveedor (08.09.2026, pedido de Piero via comentario del artefacto):
+           solo aparece en la vista "Por proveedor", muestra la evolución mes a mes A TRAVÉS DE TODOS
+           LOS AÑOS (no respeta el filtro Año/Mes/Semana, que es justo lo que se quiere dejar de lado
+           para ver la tendencia completa), una línea por cada proveedor que esté actualmente filtrado
+           (buscador / Pareto) en la tabla de arriba. Ver drawGastoEvolucionProveedor(). -->
+      <div class="card" id="gastoEvolucionCard" style="padding:18px 20px 8px;margin-bottom:18px;display:none;">
+        <h3 style="margin:0 0 10px;font-size:14px;color:var(--ink);">Evolución mensual por proveedor (todos los años)</h3>
+        <div id="gastoEvolucionChart"></div>
+      </div>
       <div class="table-card card" style="display:none;"><table id="tableGasto"><thead></thead><tbody></tbody></table></div>
     </div><!-- /section-gasto -->
 
     <div id="section-alertas" class="section">
+      <!-- Módulo reconvertido de "Alertas de Atención" (requerimientos/pedidos atrasados) a "Alertas
+           de Reposición" (08.09.2026, pedido de Piero: "quiero que sea para alertar los productos que
+           necesiten reposición... trabájalo y te digo cómo va" — primera versión, a ajustar con su
+           feedback). Usa Reporte Almacen.xlsx (ya se reconocía el archivo pero no se procesaba, ver
+           FILE_SIGNATURES/processAlmacen) — un producto necesita reposición cuando su Stock Actual cae
+           por debajo de su Stock Mínimo. Las funciones viejas de Requerimientos sin Pedido/Pedidos sin
+           OC (metaAlerta, diasHabilesAlerta, filteredAlertRows, drawAlertasTable, alertCountsSimple)
+           quedan sin usar pero NO se borraron, por si se quiere recuperar esa vista aparte más adelante. -->
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
         <button class="btn secondary" id="btnProImgAlertas" type="button">🖼️ Resumen para compartir</button>
         <button class="btn secondary" id="btnImgAlertas" type="button">🖼️ Generar imagen del módulo</button>
       </div>
       <div class="note" id="alertasDefNote" style="margin-bottom:14px;">
-        <b>Qué muestra esta alerta:</b> requerimientos y pedidos que todavía no pasan al siguiente paso del proceso y ya superan los <b>2 días hábiles</b> (la meta de Tiempo de Generación de Pedido y Tiempo de Emisión de OC) contados hasta <b>hoy</b> — no hasta que se resuelvan. Se excluyen los requerimientos/pedidos marcados como "Archivado". Como se calcula contra la fecha de hoy, la lista cambia cada día aunque no vuelvas a cargar el archivo.
+        <b>Qué muestra esta alerta:</b> productos cuyo <b>Stock Actual</b> está por debajo de su <b>Stock Mínimo</b> según tu Reporte Almacen.xlsx — es una foto del momento (no depende de fechas). "Quiebre" = stock en 0, "Crítico" = por debajo de la mitad del mínimo, "Bajo mínimo" = por debajo del mínimo pero sobre la mitad.
       </div>
       <div class="toolbar">
-        <select id="filterAlertaProyecto"><option value="all">Todos los proyectos</option></select>
-        <select id="filterAlertaProveedor"><option value="all">Todos los proveedores</option></select>
-        <select id="filterAlertaResponsable"><option value="all">Todos los responsables</option></select>
-        <select id="filterAlertaOrigen">
-          <option value="all">Origen: todos</option>
-          <option value="nacional">Origen: Nacional</option>
-          <option value="importado">Origen: Importado</option>
+        <select id="filterReposicionAlmacen"><option value="all">Todos los almacenes</option></select>
+        <select id="filterReposicionEstado">
+          <option value="all">Todos los estados</option>
+          <option value="quiebre">Solo Quiebre</option>
+          <option value="critico">Solo Crítico</option>
+          <option value="bajo">Solo Bajo mínimo</option>
         </select>
-        <select id="filterAlertaAnio"><option value="all">Todos los años</option></select>
-        <select id="filterAlertaMes">
-          <option value="all">Todos los meses</option>
-          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
-          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
-          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
-          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
-        </select>
-        <select id="filterAlertaSemana"><option value="all">Todas las semanas</option></select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
 
-      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Requerimientos sin Pedido (más de 2 d.h.)</h3>
       <div class="toolbar">
-        <input type="search" id="searchAlertaReq" placeholder="Buscar proyecto, producto o código...">
-      </div>
-      <div class="table-card card" style="margin-bottom:24px;">
-        <table id="tableAlertaReq" class="summary-table"><thead></thead><tbody></tbody></table>
-      </div>
-
-      <h3 style="margin:22px 0 6px;font-size:15px;color:var(--ink);">Pedidos sin OC (más de 2 d.h.)</h3>
-      <div class="toolbar">
-        <input type="search" id="searchAlertaPedido" placeholder="Buscar proyecto, producto o código...">
+        <input type="search" id="searchReposicion" placeholder="Buscar código o producto...">
       </div>
       <div class="table-card card">
-        <table id="tableAlertaPedido" class="summary-table"><thead></thead><tbody></tbody></table>
+        <table id="tableReposicion" class="summary-table"><thead></thead><tbody></tbody></table>
       </div>
     </div><!-- /section-alertas -->
 
@@ -1651,9 +1664,12 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     } else if(sig && sig.key === 'pedidosinreq'){
       const res = processPedidoSinReq(wb, file.name);
       setFileState('pedidosinreq', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+    } else if(sig && sig.key === 'almacen'){
+      // 08.09.2026: antes se reconocía el archivo pero no se procesaba ("queda en memoria... no tiene
+      // indicador armado") — ahora alimenta Alertas de Reposición (ver processAlmacen).
+      const res = processAlmacen(wb, file.name);
+      setFileState('almacen', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
     }
-    // Reporte Almacen.xlsx se reconoce y queda en memoria si se carga, pero todavía no tiene
-    // indicador armado en la plataforma — no se muestra nada en pantalla si no se reconoce.
   }
   if(document.getElementById('status').textContent.startsWith("Leyendo")){
     if(maestroSeen){
@@ -2110,6 +2126,86 @@ function normalizeMoneda(raw){
   return (raw==null ? "" : raw.toString()).replace(/\s+/g, "");
 }
 let GASTO_DATA = null; // { rows: [{proveedor, familia, subfamilia, origen, moneda, creditoBucket, fecha, anio, mes, dia, montoPEN}], excluded, totalRows, filename, fromSnapshot }
+// Reporte Almacen.xlsx (08.09.2026, ver processAlmacen) — { rows: [{codigo, descripcion, almacen,
+// stockActual, stockMinimo, unidad, deficit, estado}], totalRows, excluidas, filename }. Independiente
+// de DATA/GASTO_DATA: es una foto de stock, no tiene fecha ni se cruza con Reporte Maestro.
+let ALMACEN_DATA = null;
+
+// ---------- Reporte Almacen.xlsx: Alertas de Reposición (08.09.2026) ----------
+// Piero pidió reconvertir el módulo "Alertas de Atención" en una alerta de qué productos necesitan
+// reposición: "trabájalo y te digo cómo va" — primera versión. Reporte Almacen.xlsx ya se reconocía
+// (FILE_SIGNATURES) pero no se procesaba. Como no hay todavía un archivo real de Piero para verificar
+// nombres exactos de columna (a diferencia de Consulta.xlsx/Reporte Maestro.xlsx, ya verificados
+// contra sus archivos reales), la detección de encabezado es deliberadamente amplia — variantes
+// comunes de Código/Descripción/Stock Actual/Stock Mínimo — y si no encuentra al menos Código +
+// Stock Actual + Stock Mínimo, falla con un mensaje explícito en vez de adivinar mal (mismo criterio
+// que el resto de la plataforma: mejor un error claro que un número incorrecto silencioso).
+function processAlmacen(wb, filename){
+  let sheetName = wb.SheetNames.find(n => /almac[ée]n|inventario|stock/i.test(n.trim()));
+  if(!sheetName) sheetName = wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+
+  const NEEDED = ["Codigo","Código","Descripcion","Descripción","Stock Actual","Stock","Stock Minimo","Stock Mínimo","Punto de Reorden","Punto de Pedido"];
+  let headerRowIdx = -1, headerRow = null;
+  for(let i=0;i<Math.min(15, rows.length); i++){
+    const row = rows[i] || [];
+    const strs = row.map(c => (c||"").toString().trim().toLowerCase());
+    const hits = NEEDED.filter(n => strs.includes(n.toLowerCase())).length;
+    if(hits >= 2){ headerRowIdx = i; headerRow = row; break; }
+  }
+  if(headerRowIdx === -1){
+    return { ok:false, message: "no encontré columnas reconocibles (Código/Descripción/Stock) en las primeras 15 filas de la hoja \"" + sheetName + "\" — cuéntame los nombres reales de columna para ajustar la lectura." };
+  }
+
+  const col = {
+    codigo: findCol(headerRow, ["Codigo","Código","Cod. Articulo","Cod Producto","Cod. Producto","SKU","Item","IdProducto"]),
+    descripcion: findCol(headerRow, ["Descripcion","Descripción","Producto","Nombre","Nombre Producto","Articulo","Artículo"]),
+    almacen: findCol(headerRow, ["Almacen","Almacén","Ubicacion","Ubicación","Bodega","Sede"]),
+    unidad: findCol(headerRow, ["Unidad","U.M.","UM","Unidad de Medida"]),
+    stockActual: findCol(headerRow, ["Stock Actual","Stock Disponible","Existencia","Saldo","Cantidad Disponible","Stock"]),
+    stockMinimo: findCol(headerRow, ["Stock Minimo","Stock Mínimo","Minimo","Mínimo","Punto de Reorden","Punto de Pedido","Stock de Seguridad","Reorden"]),
+    proveedor: findCol(headerRow, ["Proveedor","Proveedor Principal"]),
+  };
+  const faltantes = [];
+  if(col.codigo===-1) faltantes.push("Código");
+  if(col.stockActual===-1) faltantes.push("Stock Actual");
+  if(col.stockMinimo===-1) faltantes.push("Stock Mínimo");
+  if(faltantes.length){
+    return { ok:false, message: "encontré la hoja \"" + sheetName + "\" pero no pude ubicar la columna de " + faltantes.join(", ") + " — dime en qué columna está y lo ajusto." };
+  }
+
+  const dataRows = rows.slice(headerRowIdx+1);
+  const almacenRows = [];
+  let excluidas = 0;
+  for(const r of dataRows){
+    if(!r) continue;
+    const codigo = col.codigo!==-1 ? (r[col.codigo]||"").toString().trim() : "";
+    if(!codigo){ excluidas++; continue; }
+    const stockActual = Number(r[col.stockActual]);
+    const stockMinimo = Number(r[col.stockMinimo]);
+    if(!isFinite(stockActual) || !isFinite(stockMinimo)){ excluidas++; continue; }
+    const deficit = stockMinimo - stockActual;
+    const estado = stockActual<=0 ? 'quiebre' : (stockActual < stockMinimo*0.5 ? 'critico' : (stockActual < stockMinimo ? 'bajo' : 'ok'));
+    almacenRows.push({
+      codigo,
+      descripcion: col.descripcion!==-1 ? (r[col.descripcion]||"").toString().trim() : "",
+      almacen: col.almacen!==-1 ? (r[col.almacen]||"").toString().trim() : "",
+      unidad: col.unidad!==-1 ? (r[col.unidad]||"").toString().trim() : "",
+      proveedor: col.proveedor!==-1 ? (r[col.proveedor]||"").toString().trim() : "",
+      stockActual, stockMinimo, deficit, estado,
+    });
+  }
+  ALMACEN_DATA = { rows: almacenRows, totalRows: dataRows.length, excluidas, filename };
+  const nAlerta = almacenRows.filter(r=>r.estado!=='ok').length;
+  // No se llama a render() directo: si Reporte Maestro.xlsx todavía no se cargó, DATA sigue null y
+  // render() rompe (getProcesoRows/renderProceso asumen DATA no-nulo) — el panel entero sigue oculto
+  // hasta que se cargue Maestro de todas formas (ver emptyState/dashboard en render()), así que basta
+  // con refrescar Alertas por su cuenta; cuando Maestro se cargue después, render() ya volverá a llamar
+  // renderAlertas() y mostrará esto correctamente.
+  if(DATA){ render(); } else { renderAlertas(); }
+  return { ok:true, message: "procesado: " + almacenRows.length.toLocaleString('es-PE') + " productos (" + nAlerta.toLocaleString('es-PE') + " necesitan reposición)." };
+}
 
 function processConsulta(wb, filename){
   let sheetName = wb.SheetNames.find(n => n.trim().toLowerCase() === "consulta");
@@ -2699,6 +2795,180 @@ function drawGasto(){
       tr.addEventListener('click', ()=> onRowClick(Number(tr.dataset.i)));
     });
   }
+
+  // Evolución mensual por proveedor — solo tiene sentido en la vista "Por proveedor" (pedido de
+  // Piero, 08.09.2026): "la evolución a lo largo de los meses de todos los años... para ver la
+  // evolución del gasto que se hizo en cada empresa para la parte de Por Proveedor". Recibe `rows`
+  // (ya filtrado por Año/Mes/Semana) para que el gráfico "también cambie según lo que se filtre
+  // arriba" (aclaración de Piero, 08.09.2026) — con "Todos los años"/"Todos los meses" elegido (el
+  // estado por defecto) eso es exactamente todo el histórico, que es el caso que pidió primero.
+  const evoCard = document.getElementById('gastoEvolucionCard');
+  if(vistaProveedor && view.length){
+    evoCard.style.display = '';
+    drawGastoEvolucionProveedor(rows, view);
+  } else {
+    evoCard.style.display = 'none';
+    document.getElementById('gastoEvolucionChart').innerHTML = '';
+  }
+}
+
+// Paleta fija para distinguir hasta 8 proveedores a la vez en el gráfico de evolución — no depende
+// del tema claro/oscuro (son colores de serie, no de superficie), igual que el resto de colores fijos
+// que ya usa el módulo (ej. colorFor de Forma de pago). El primero coincide a propósito con el azul
+// que ya usaban las barras de "80% principal" en Concentración de Gasto (var(--seg-a)).
+const GASTO_EVOLUCION_PALETTE = ['#2a78d6','#1baf7a','#e2960a','#d03b3b','#7c3fd4','#1f9aa8','#c2410c','#65a30d'];
+const MESES_ABR_EVOLUCION = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+// Estado de zoom (rueda del mouse) del gráfico de evolución — mismo patrón que trendZoom de
+// Tiempos del Proceso (drawIndicatorTrend), pedido de Piero 08.09.2026: "debe tener la opción para
+// acercar y alejar de forma cómoda". `monthsKey` identifica el rango de meses/proveedores actual
+// para poder resetear el zoom automáticamente si cambia el filtro de Año/Mes/Semana o la lista de
+// proveedores en pantalla (si no, el zoom quedaría apuntando a índices de un rango que ya no existe).
+let gastoEvoZoom = { startIdx: null, endIdx: null, monthsKey: null };
+function drawGastoEvolucionProveedor(rows, view){
+  const el = document.getElementById('gastoEvolucionChart');
+  const top = view.slice(0, 8);
+  const labels = top.map(g=>g.label);
+  const scopedRows = rows.filter(r=>labels.includes(r.proveedor));
+  const monthKey = r => r.anio + '-' + String(r.mes).padStart(2,'0');
+  const fullMonths = Array.from(new Set(scopedRows.map(monthKey))).sort();
+
+  if(fullMonths.length < 2){
+    el.innerHTML = '<div class="evo-empty">No hay suficientes meses con datos para mostrar una evolución con los filtros actuales.</div>';
+    return;
+  }
+
+  const monthsSignature = fullMonths[0] + '|' + fullMonths[fullMonths.length-1] + '|' + fullMonths.length + '|' + labels.join(',');
+  if(gastoEvoZoom.monthsKey !== monthsSignature) gastoEvoZoom = { startIdx: null, endIdx: null, monthsKey: monthsSignature };
+  const zoomed = gastoEvoZoom.startIdx!=null && gastoEvoZoom.endIdx!=null;
+  const months = zoomed ? fullMonths.slice(gastoEvoZoom.startIdx, gastoEvoZoom.endIdx+1) : fullMonths;
+
+  const monthLabel = k => { const [y,m] = k.split('-'); return MESES_ABR_EVOLUCION[Number(m)-1] + " '" + y.slice(2); };
+  // Montos en dólares (pedido de Piero, 08.09.2026: "la moneda debe estar de preferencia en
+  // dólares") — se parte del equivalente en soles (montoPEN, ya usado para el ranking/Pareto del
+  // resto del módulo) y se pasa a dólares con el mismo tipo de cambio fijo (TIPO_CAMBIO['US$']) que
+  // usa el resto de la plataforma para ese tipo de conversión — no es el monto real en dólares de
+  // cada compra puntual, es un equivalente para poder comparar proveedores que compran en distintas
+  // monedas en un solo eje.
+  const series = top.map((g,i)=>{
+    const byMonth = {};
+    for(const r of scopedRows){ if(r.proveedor===g.label) byMonth[monthKey(r)] = (byMonth[monthKey(r)]||0) + r.montoPEN; }
+    return { label: g.label, color: GASTO_EVOLUCION_PALETTE[i % GASTO_EVOLUCION_PALETTE.length], values: months.map(m=>(byMonth[m]||0)/TIPO_CAMBIO['US$']) };
+  });
+
+  const W = 900, H = 320, padL = 64, padR = 14, padT = 14, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const allVals = series.flatMap(s=>s.values);
+  const { step: gridStep, niceMin: minVal, niceMax: maxVal } = niceAxisRange(allVals.length ? allVals : [1], 4);
+  const xFor = i => padL + (months.length===1 ? plotW/2 : (i/(months.length-1))*plotW);
+  const yFor = v => padT + plotH - ((v-minVal)/((maxVal-minVal)||1))*plotH;
+
+  let gridSvg = '';
+  for(let v=minVal; v<=maxVal+1e-9; v+=gridStep){
+    const y = yFor(v);
+    gridSvg += `<line class="evo-grid" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line>`;
+    gridSvg += `<text x="${padL-8}" y="${y+3}" text-anchor="end">${fmtUSD(v)}</text>`;
+  }
+  const xLabelStep = Math.ceil(months.length/10) || 1;
+  const xLabelsSvg = months.map((m,i)=> (i % xLabelStep===0 || i===months.length-1)
+    ? `<text x="${xFor(i)}" y="${H-8}" text-anchor="middle">${escapeHtml(monthLabel(m))}</text>` : '').join('');
+
+  const linesSvg = series.map(s=>{
+    const pts = s.values.map((v,i)=>[xFor(i), yFor(v)]);
+    const path = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+    const dots = pts.map(([x,y],i)=>`<circle cx="${x}" cy="${y}" r="3" fill="${s.color}"><title>${escapeHtml(s.label)} — ${escapeHtml(monthLabel(months[i]))}: ${fmtUSD(s.values[i])}</title></circle>`).join('');
+    return `<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2"></path>${dots}`;
+  }).join('');
+
+  const legendSvg = `<div class="evo-legend">${series.map(s=>`<span class="lg-item"><span class="lg-dot" style="background:${s.color}"></span>${escapeHtml(s.label)}</span>`).join('')}</div>`;
+  const hintSvg = zoomed ? `<div class="evo-hint">Acercado — gira la rueda para seguir acercando/alejando, o mantén presionado el clic y arrastra para moverte.</div>` : `<div class="evo-hint">Gira la rueda del mouse sobre el gráfico para acercar/alejar.</div>`;
+
+  el.innerHTML = `${legendSvg}${hintSvg}<svg class="evo-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+    ${gridSvg}
+    <rect id="evoZoomOverlay" class="evo-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
+    ${linesSvg}
+    ${xLabelsSvg}
+  </svg>`;
+
+  // Zoom con la rueda del mouse, mismo mecanismo que drawIndicatorTrend: centrado en el cursor,
+  // recalcula el rango de meses visible y vuelve a dibujar. Como el eje X aquí son meses (no semanas)
+  // se necesitan al menos 2 para trazar una línea, igual que el mínimo ya validado arriba.
+  const overlay = document.getElementById('evoZoomOverlay');
+  const svgXFromClientX = (clientX)=>{
+    const rect = el.querySelector('.evo-svg').getBoundingClientRect();
+    return (clientX - rect.left) * (W / rect.width);
+  };
+  overlay.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const curStart = zoomed ? gastoEvoZoom.startIdx : 0;
+    const curEnd = zoomed ? gastoEvoZoom.endIdx : fullMonths.length-1;
+    const curLen = curEnd - curStart + 1;
+
+    const x = svgXFromClientX(e.clientX);
+    let localIdx = 0, bestD = Infinity;
+    months.forEach((m,i)=>{ const d = Math.abs(xFor(i)-x); if(d<bestD){ bestD=d; localIdx=i; } });
+    const pivotIdx = curStart + localIdx;
+    const fraction = curLen>1 ? localIdx/(curLen-1) : 0.5;
+
+    const ZOOM_FACTOR = 0.8;
+    const zoomingIn = e.deltaY < 0;
+    let newLen = zoomingIn ? Math.round(curLen*ZOOM_FACTOR) : Math.round(curLen/ZOOM_FACTOR);
+    newLen = Math.max(2, Math.min(fullMonths.length, newLen));
+
+    if(newLen >= fullMonths.length){
+      if(!zoomed) return;
+      gastoEvoZoom = { startIdx: null, endIdx: null, monthsKey: monthsSignature };
+      drawGastoEvolucionProveedor(rows, view);
+      return;
+    }
+
+    let newStart = Math.round(pivotIdx - fraction*(newLen-1));
+    newStart = Math.max(0, Math.min(fullMonths.length-newLen, newStart));
+    const newEnd = newStart + newLen - 1;
+    if(newStart===curStart && newEnd===curEnd) return;
+    gastoEvoZoom = { startIdx: newStart, endIdx: newEnd, monthsKey: monthsSignature };
+    drawGastoEvolucionProveedor(rows, view);
+  }, { passive:false });
+
+  // Mantener clic (o el dedo) y arrastrar para moverte dentro del rango con zoom aplicado — pedido de
+  // Piero, 08.09.2026 ("debe permitirme moverme a través manteniendo presionado el click"), mismo
+  // mecanismo que ya usa el gráfico de Tiempos del Proceso (drawIndicatorTrend). Sin zoom no hay nada
+  // más que mostrar a los costados, así que el arrastre solo se activa con `zoomed`.
+  if(zoomed){
+    const curStart = gastoEvoZoom.startIdx, curEnd = gastoEvoZoom.endIdx;
+    const curLen = curEnd - curStart + 1;
+    const monthSpacing = months.length>1 ? (xFor(1)-xFor(0)) : plotW;
+    let panStartClientX = 0;
+
+    const onPanMove = (clientX)=>{
+      const dxSvg = svgXFromClientX(clientX) - svgXFromClientX(panStartClientX);
+      const monthShift = Math.round(-dxSvg / monthSpacing);
+      const newStart = Math.max(0, Math.min(fullMonths.length - curLen, curStart + monthShift));
+      const newEnd = newStart + curLen - 1;
+      if(newStart!==gastoEvoZoom.startIdx || newEnd!==gastoEvoZoom.endIdx){
+        gastoEvoZoom = { startIdx: newStart, endIdx: newEnd, monthsKey: monthsSignature };
+        drawGastoEvolucionProveedor(rows, view);
+      }
+    };
+    const onMouseMove = (e)=> onPanMove(e.clientX);
+    const onMouseUp = ()=>{
+      overlay.style.cursor = 'grab';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    overlay.style.cursor = 'grab';
+    overlay.addEventListener('mousedown', (e)=>{
+      e.preventDefault();
+      panStartClientX = e.clientX;
+      overlay.style.cursor = 'grabbing';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+    let touchPanning = false;
+    overlay.addEventListener('touchstart', (e)=>{ touchPanning = true; panStartClientX = e.touches[0].clientX; }, { passive:true });
+    overlay.addEventListener('touchmove', (e)=>{ if(touchPanning) onPanMove(e.touches[0].clientX); }, { passive:true });
+    overlay.addEventListener('touchend', ()=>{ touchPanning = false; });
+  }
 }
 
 function render(){
@@ -2771,55 +3041,73 @@ function filteredAlertRows(rows){
   });
 }
 let alertasListenersBound = false;
+// Filtros de Alertas de Reposición — reemplazan a filteredAlertRows/populateAlertaFilters (siguen
+// definidas más arriba, sin usar, por si se quiere recuperar Requerimientos sin Pedido/Pedidos sin OC
+// como vista aparte más adelante).
+function populateReposicionFilters(){
+  const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  populateSelectDistinct(document.getElementById('filterReposicionAlmacen'), rows.map(r=>r.almacen), 'Todos los almacenes');
+}
+function filteredReposicionRows(){
+  const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  const fAlmacen = document.getElementById('filterReposicionAlmacen').value;
+  const fEstado = document.getElementById('filterReposicionEstado').value;
+  return rows.filter(r=>{
+    if(r.estado==='ok') return false; // esta vista es solo alertas: productos que SÍ necesitan reposición
+    if(fAlmacen!=='all' && r.almacen !== fAlmacen) return false;
+    if(fEstado!=='all' && r.estado !== fEstado) return false;
+    return true;
+  });
+}
+const ESTADO_REPOSICION_LABEL = { quiebre:'Quiebre', critico:'Crítico', bajo:'Bajo mínimo' };
+const ESTADO_REPOSICION_PILL = { quiebre:'warn', critico:'warn', bajo:'late' };
 function renderAlertas(){
-  const hasData = DATA && DATA.alertRows && DATA.alertRows.length >= 0 && DATA.hasFechaRequerimientoCol;
+  const hasData = ALMACEN_DATA && ALMACEN_DATA.rows;
   if(!hasData){
     document.getElementById('kpiGridAlertas').innerHTML = '';
-    document.querySelector('#tableAlertaReq thead').innerHTML = '';
-    document.querySelector('#tableAlertaReq tbody').innerHTML = '';
-    document.querySelector('#tableAlertaPedido thead').innerHTML = '';
-    document.querySelector('#tableAlertaPedido tbody').innerHTML = '';
+    document.querySelector('#tableReposicion thead').innerHTML = '';
+    document.querySelector('#tableReposicion tbody').innerHTML = `<tr><td style="text-align:center;padding:24px;color:var(--muted);">Carga tu Reporte Almacen.xlsx arriba para ver qué productos necesitan reposición.</td></tr>`;
     return;
   }
-  populateAlertaFilters();
+  populateReposicionFilters();
   if(!alertasListenersBound){
-    ['searchAlertaReq','searchAlertaPedido','filterAlertaProyecto','filterAlertaProveedor','filterAlertaResponsable','filterAlertaOrigen','filterAlertaAnio','filterAlertaMes','filterAlertaSemana'].forEach(id=>{
+    ['searchReposicion','filterReposicionAlmacen','filterReposicionEstado'].forEach(id=>{
       const el = document.getElementById(id);
       el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawAlertas);
     });
-    document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'alertas-atencion', e.currentTarget));
-    document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-alertas-atencion', e.currentTarget));
+    document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'alertas-reposicion', e.currentTarget));
+    document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-alertas-reposicion', e.currentTarget));
     alertasListenersBound = true;
   }
   drawAlertas();
 }
-function drawAlertasTable(tableEl, rows, codLabel, searchInputId){
-  const q = (document.getElementById(searchInputId).value||"").toLowerCase();
-  let view = filteredAlertRows(rows).filter(r=>!q || (r.proyecto+' '+r.producto+' '+r.codRequerimiento+' '+r.codPedido).toLowerCase().includes(q));
-  view = view.map(r=>Object.assign({}, r, { dias: diasHabilesAlerta(r) }))
-    .filter(r=>r.dias!=null && r.dias > metaAlerta(r.tipo))
-    .sort((a,b)=>b.dias-a.dias);
-  tableEl.querySelector('thead').innerHTML = `<tr><th>${codLabel}</th><th>Proyecto</th><th>Producto</th><th>Proveedor</th><th>Responsable</th><th>Desde</th><th>Días hábiles sin atención</th></tr>`;
-  tableEl.querySelector('tbody').innerHTML = view.map(r=>`
-    <tr>
-      <td>${escapeHtml(r.tipo==='req_sin_pedido'?r.codRequerimiento:r.codPedido)||'—'}</td>
-      <td style="white-space:normal;min-width:160px;">${escapeHtml(r.proyecto)}</td>
-      <td style="white-space:normal;min-width:180px;">${escapeHtml(r.producto)}</td>
-      <td style="white-space:normal;min-width:140px;">${escapeHtml(r.proveedor)||'—'}</td>
-      <td>${escapeHtml(r.responsable)}</td>
-      <td>${fmtDate(r.fDesde)}</td>
-      <td><span class="pill warn">${r.dias} d.h.</span></td>
-    </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin casos por encima de la meta con el filtro actual 🎉</td></tr>`;
-  return view.length;
-}
 function drawAlertas(){
-  populateSemanaSelect(document.getElementById('filterAlertaSemana'), document.getElementById('filterAlertaAnio').value, document.getElementById('filterAlertaMes').value);
-  const all = DATA.alertRows || [];
-  const nReq = drawAlertasTable(document.getElementById('tableAlertaReq'), all.filter(r=>r.tipo==='req_sin_pedido'), 'Requerimiento', 'searchAlertaReq');
-  const nPedido = drawAlertasTable(document.getElementById('tableAlertaPedido'), all.filter(r=>r.tipo==='pedido_sin_oc'), 'Pedido', 'searchAlertaPedido');
+  const q = (document.getElementById('searchReposicion').value||"").toLowerCase();
+  let view = filteredReposicionRows().filter(r=>!q || (r.codigo+' '+r.descripcion).toLowerCase().includes(q));
+  const ORDEN_ESTADO = { quiebre:0, critico:1, bajo:2 };
+  view = view.slice().sort((a,b)=> ORDEN_ESTADO[a.estado]-ORDEN_ESTADO[b.estado] || (b.deficit-a.deficit));
+
+  const table = document.getElementById('tableReposicion');
+  table.querySelector('thead').innerHTML = `<tr><th>Código</th><th>Producto</th><th>Almacén</th><th>Stock actual</th><th>Stock mínimo</th><th>Déficit</th><th>Estado</th></tr>`;
+  table.querySelector('tbody').innerHTML = view.map(r=>`
+    <tr>
+      <td>${escapeHtml(r.codigo)}</td>
+      <td style="white-space:normal;min-width:220px;">${escapeHtml(r.descripcion)||'—'}</td>
+      <td>${escapeHtml(r.almacen)||'—'}</td>
+      <td>${r.stockActual.toLocaleString('es-PE')}${r.unidad?' '+escapeHtml(r.unidad):''}</td>
+      <td>${r.stockMinimo.toLocaleString('es-PE')}</td>
+      <td>${r.deficit.toLocaleString('es-PE')}</td>
+      <td><span class="pill ${ESTADO_REPOSICION_PILL[r.estado]}">${ESTADO_REPOSICION_LABEL[r.estado]}</span></td>
+    </tr>`).join('') || `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin productos con alerta de reposición con el filtro actual 🎉</td></tr>`;
+
+  const all = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  const nQuiebre = all.filter(r=>r.estado==='quiebre').length;
+  const nCritico = all.filter(r=>r.estado==='critico').length;
+  const nBajo = all.filter(r=>r.estado==='bajo').length;
   document.getElementById('kpiGridAlertas').innerHTML = `
-    <div class="card kpi${nReq>0?' alert-card':''}"><div class="label">Requerimientos sin Pedido (&gt;2 d.h.)</div><div class="value${nReq>0?' alert-n':''}">${nReq.toLocaleString('es-PE')}</div><div class="sub">Responsable fijo: JCENTENO</div></div>
-    <div class="card kpi${nPedido>0?' alert-card':''}"><div class="label">Pedidos sin OC (&gt;2 d.h.)</div><div class="value${nPedido>0?' alert-n':''}">${nPedido.toLocaleString('es-PE')}</div><div class="sub">Responsable: comprador asignado (UsuarioCompras)</div></div>
+    <div class="card kpi${nQuiebre>0?' alert-card':''}"><div class="label">En quiebre (stock en 0)</div><div class="value${nQuiebre>0?' alert-n':''}">${nQuiebre.toLocaleString('es-PE')}</div></div>
+    <div class="card kpi${nCritico>0?' alert-card':''}"><div class="label">Críticos (bajo el 50% del mínimo)</div><div class="value${nCritico>0?' alert-n':''}">${nCritico.toLocaleString('es-PE')}</div></div>
+    <div class="card kpi"><div class="label">Bajo mínimo</div><div class="value">${nBajo.toLocaleString('es-PE')}</div></div>
   `;
 }
 
@@ -4403,37 +4691,41 @@ function buildProImageGasto(){
     footnote: 'Solo Órdenes de Compra (no de Servicio) con Estado Atendido Total/Parcial o Aprobado. Monto convertido a Soles con tipo de cambio de referencia fijo (US$ y €). Forma de pago desde la hoja "R.EOC" (solo cubre órdenes desde 01.01.2026).',
   };
 }
+// Reconvertido a Alertas de Reposición (08.09.2026) — alertCountsSimple/metaAlerta/diasHabilesAlerta
+// quedan sin usar más abajo, no se borraron (ver nota junto a section-alertas).
 function buildProImageAlertas(){
-  const ac = alertCountsSimple();
+  const all = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  const nQuiebre = all.filter(r=>r.estado==='quiebre').length;
+  const nCritico = all.filter(r=>r.estado==='critico').length;
+  const nBajo = all.filter(r=>r.estado==='bajo').length;
   const kpis = [
-    { num:'📋', label:'REQUERIMIENTOS SIN PEDIDO (>2 D.H.)', value: ac.nReq.toLocaleString('es-PE'), valueLabel:'CASOS ABIERTOS', metaLabel:'RESPONSABLE', metaValue:'JCENTENO', color: ac.nReq>0?'#d03b3b':'#0ca30c' },
-    { num:'🧾', label:'PEDIDOS SIN OC (>2 D.H.)', value: ac.nPedido.toLocaleString('es-PE'), valueLabel:'CASOS ABIERTOS', metaLabel:'RESPONSABLE', metaValue:'Comprador asignado', color: ac.nPedido>0?'#d03b3b':'#0ca30c' },
+    { num:'📦', label:'PRODUCTOS EN QUIEBRE', value: nQuiebre.toLocaleString('es-PE'), valueLabel:'STOCK EN 0', metaLabel:'ESTADO', metaValue:'Crítico', color: nQuiebre>0?'#d03b3b':'#0ca30c' },
+    { num:'⚠️', label:'PRODUCTOS CRÍTICOS', value: nCritico.toLocaleString('es-PE'), valueLabel:'BAJO 50% DEL MÍNIMO', metaLabel:'ESTADO', metaValue:'Atención', color: nCritico>0?'#e2960a':'#0ca30c' },
   ];
-  function rankingTable(tipo, title){
-    const meta = metaAlerta(tipo);
-    const view = (DATA.alertRows||[]).filter(r=>r.tipo===tipo)
-      .map(r=>Object.assign({}, r, { dias: diasHabilesAlerta(r) }))
-      .filter(r=>r.dias!=null && r.dias>meta)
-      .sort((a,b)=>b.dias-a.dias)
-      .slice(0,6);
-    const rows = view.map((r,i)=>({
-      rank: i+1, name: r.responsable || '(sin responsable)',
-      cells: [ (r.proyecto||'—').length>26 ? r.proyecto.slice(0,24)+'…' : (r.proyecto||'—') ],
-      pct: Math.min(100, r.dias/(meta*6)*100), pctLabel: r.dias+' d.h.',
-      barColor: proSeverityColor(r.dias, meta),
-    }));
-    return { icon:'⏱️', title, subtitle:'Casos por encima de la meta ('+meta+' d.h.), más atrasados primero', nameLabel:'RESPONSABLE', columns:['PROYECTO'], barLabel:'ATRASO', rows, legendItems:[{color:'#0ca30c',label:'Atraso moderado'},{color:'#e2960a',label:'Atraso alto'},{color:'#d03b3b',label:'Atraso crítico'}] };
-  }
-  const banner = (ac.nReq>0 || ac.nPedido>0)
-    ? { tone:'alert', items:[ {value:ac.nReq.toLocaleString('es-PE'), label:'Requerimientos sin Pedido'}, {value:ac.nPedido.toLocaleString('es-PE'), label:'Pedidos sin OC'} ], action:'ACCIÓN: revisar con Almacén y Compras los casos listados arriba.' }
-    : { tone:'info', items:[ {value:'0', label:'Casos abiertos fuera de meta'} ], action:'Todo al día 🎉' };
+  const ORDEN_ESTADO = { quiebre:0, critico:1, bajo:2 };
+  const ESTADO_COLOR = { quiebre:'#d03b3b', critico:'#d03b3b', bajo:'#e2960a' };
+  const view = all.filter(r=>r.estado!=='ok')
+    .sort((a,b)=> ORDEN_ESTADO[a.estado]-ORDEN_ESTADO[b.estado] || (b.deficit-a.deficit))
+    .slice(0,8);
+  const rows = view.map((r,i)=>({
+    rank: i+1, name: (r.descripcion||r.codigo||'—').length>26 ? (r.descripcion||r.codigo).slice(0,24)+'…' : (r.descripcion||r.codigo||'—'),
+    cells: [ r.stockActual.toLocaleString('es-PE'), r.stockMinimo.toLocaleString('es-PE') ],
+    pct: r.stockMinimo>0 ? Math.min(100, r.deficit/r.stockMinimo*100) : 100,
+    pctLabel: r.deficit.toLocaleString('es-PE')+' de déficit',
+    barColor: ESTADO_COLOR[r.estado],
+  }));
+  const table = { icon:'📦', title:'Productos con alerta de reposición', subtitle:'Ordenados por severidad (quiebre primero), déficit más grande primero', nameLabel:'PRODUCTO', columns:['STOCK ACTUAL','STOCK MÍNIMO'], barLabel:'DÉFICIT', rows, legendItems:[{color:'#d03b3b',label:'Quiebre / Crítico'},{color:'#e2960a',label:'Bajo mínimo'}] };
+  const totalAlerta = nQuiebre + nCritico + nBajo;
+  const banner = totalAlerta>0
+    ? { tone:'alert', items:[ {value:nQuiebre.toLocaleString('es-PE'), label:'En quiebre'}, {value:nCritico.toLocaleString('es-PE'), label:'Críticos'}, {value:nBajo.toLocaleString('es-PE'), label:'Bajo mínimo'} ], action:'ACCIÓN: coordinar reposición con el proveedor de cada producto listado.' }
+    : { tone:'info', items:[ {value:'0', label:'Productos bajo su stock mínimo'} ], action:'Todo el stock al día 🎉' };
   return {
-    title: 'ALERTAS DE ATENCIÓN',
-    subtitle: 'REQUERIMIENTOS Y PEDIDOS SIN ATENDER',
+    title: 'ALERTAS DE REPOSICIÓN',
+    subtitle: 'PRODUCTOS POR DEBAJO DE SU STOCK MÍNIMO',
     kpis,
-    tables: [ rankingTable('req_sin_pedido','Requerimientos sin Pedido'), rankingTable('pedido_sin_oc','Pedidos sin OC') ],
+    tables: [ table ],
     banner,
-    footnote: 'Días hábiles transcurridos calculados contra hoy (no contra una fecha guardada) — la lista cambia cada día aunque no se vuelva a cargar el archivo. Se excluyen los casos "Archivado".',
+    footnote: 'Basado en la última carga de Reporte Almacen.xlsx — es una foto del stock al momento de cargar el archivo, no se actualiza sola.',
   };
 }
 // Diagrama lineal por indicador: evolución semana a semana (eje X = semana, eje Y = promedio simple
