@@ -4242,9 +4242,13 @@ function buildProImageTiempos(){
   // entrega de oc en lurin, no el de tiempo de emision de oc". Las alertas Leve/Media/Crítica siguen
   // siendo del Indicador 2, que es el paso que Compras controla; solo cambió el %.
   const rowsPorFechaOc = filteredProcesoRowsByOrden();
+  // El N° de OC sale del MISMO universo que el reporte por comprador (Reporte Maestro + las OC directas
+  // de PedidoSinReq.xlsx) — antes solo miraba el Maestro y por eso el área mostraba menos OC que el
+  // reporte individual del mismo comprador (08.09.2026). Las alertas Leve/Media/Crítica y el % siguen
+  // saliendo del Maestro: son del Indicador 2, que necesita la fecha de requerimiento, y una OC directa
+  // no tiene requerimiento.
   const compradorOcSets = {};
-  for(const r of rowsPorFechaOc){
-    if(r.camino!=='compra') continue;
+  for(const r of rowsOrdenComprasFor('all')){
     const comprador = (r.usuarioCompras||'').trim();
     if(!comprador || comprador.toUpperCase()==='MLUJAN') continue;
     const oc = (r.codOrden||'').trim();
@@ -4520,14 +4524,16 @@ function procesoFilterDateRangeFooter(){
 // Sirve tanto para un comprador como para TODA el área (comprador === 'all', pedido de Piero
 // 08.09.2026: el reporte del área usa el mismo formato que el del comprador). Con 'all' no se filtra
 // por usuarioCompras y el encabezado dice "ÁREA DE COMPRAS" en vez del nombre.
-function buildProImageComprasResponsable(){
-  const comprador = document.getElementById('filterProcesoResponsable').value;
+// Universo de OC de Compras del período filtrado: Reporte Maestro.xlsx (camino 'compra') MÁS las OC
+// directas de PedidoSinReq.xlsx que el Maestro nunca trae. Está aparte para que el reporte por
+// comprador y el panel COMPRAS del reporte del área cuenten exactamente lo mismo (08.09.2026: el área
+// mostraba menos OC que el individual porque solo miraba el Maestro).
+function rowsOrdenComprasFor(comprador){
   const esArea = (comprador === 'all');
   const rowsOrdenMaestro = filteredProcesoRowsByOrden().filter(r=>r.camino==='compra' && (esArea || r.usuarioCompras===comprador));
-  // Pedidos directos de PedidoSinReq.xlsx (OC que Reporte Maestro.xlsx nunca trae — ver comentario junto
-  // a PEDIDO_SIN_REQ_ROWS) — se agregan SOLO a este reporte, filtrados con el mismo criterio de
-  // proveedor/familia/origen/año/mes/semana que el resto, y sin duplicar una OC que por algún motivo ya
-  // esté en Reporte Maestro (106 casos verificados de solape real).
+  // Pedidos directos de PedidoSinReq.xlsx (ver comentario junto a PEDIDO_SIN_REQ_ROWS) — filtrados con
+  // el mismo criterio de proveedor/familia/origen/año/mes/semana que el resto, y sin duplicar una OC
+  // que por algún motivo ya esté en Reporte Maestro (106 casos verificados de solape real).
   const codOrdenYaIncluidos = new Set(rowsOrdenMaestro.map(r=>r.codOrden).filter(Boolean));
   // La familia se refresca acá (no queda fija desde que se cargó PedidoSinReq.xlsx) por si ese archivo
   // se cargó ANTES que Reporte Maestro.xlsx — FAMILIA_BY_PRODUCTO recién se termina de armar con ese
@@ -4537,7 +4543,12 @@ function buildProImageComprasResponsable(){
     .map(r=> (r.idProducto && FAMILIA_BY_PRODUCTO[r.idProducto] && FAMILIA_BY_PRODUCTO[r.idProducto]!==r.familia)
       ? Object.assign({}, r, { familia: FAMILIA_BY_PRODUCTO[r.idProducto] }) : r)
     .filter(matchesProcesoFiltrosOC);
-  const rowsOrden = rowsOrdenMaestro.concat(rowsOrdenDirectas);
+  return rowsOrdenMaestro.concat(rowsOrdenDirectas);
+}
+function buildProImageComprasResponsable(){
+  const comprador = document.getElementById('filterProcesoResponsable').value;
+  const esArea = (comprador === 'all');
+  const rowsOrden = rowsOrdenComprasFor(comprador);
   const ocRows = new Map(); // codOrden -> una fila representativa (fechas/estado son iguales entre líneas de la misma OC)
   for(const r of rowsOrden){ if(r.codOrden && !ocRows.has(r.codOrden)) ocRows.set(r.codOrden, r); }
   const totalOC = ocRows.size;
