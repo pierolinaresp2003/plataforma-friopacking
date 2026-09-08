@@ -3713,9 +3713,14 @@ function renderProceso(){
     document.getElementById('procDetailClose').addEventListener('click', closeDrilldown);
     // Comprador filtrado (≠ "Todos") -> Reporte de Compras por responsable, diseño dedicado (04.09.2026,
     // confirmado con Piero: "Reemplaza todo") en vez del reporte general de Tiempos del Proceso.
-    // Mismo formato para un comprador y para toda el área (08.09.2026). buildProImageTiempos y
-    // proImageHtml quedan sin usar desde acá (los siguen usando Gasto y Alertas para sus resúmenes).
-    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=> downloadProComprasPartes(e.currentTarget));
+    // Los 2 reportes se entregan igual (lienzo de 1080px partido en imágenes, dentro de un zip), pero
+    // el contenido cambia: con un comprador filtrado va su Reporte de Compras; con "Todos" va el
+    // resumen de Indicadores de Tiempos del Proceso de toda el área.
+    document.getElementById('btnEli5Proceso').addEventListener('click', (e)=>{
+      const comprador = document.getElementById('filterProcesoResponsable').value;
+      if(comprador !== 'all') downloadProComprasPartes(e.currentTarget);
+      else downloadProTiemposPartes(e.currentTarget);
+    });
     procesoListenersBoundInner = true;
   }
   drawProceso();
@@ -4211,7 +4216,7 @@ function procesoFilterDateLabel(){
 }
 function buildProImageTiempos(){
   const rows = filteredProcesoRows();
-  const IND1 = INDICATORS.find(i=>i.key==='d1'), IND2 = INDICATORS.find(i=>i.key==='d2'), IND6 = INDICATORS.find(i=>i.key==='d6');
+  const IND1 = INDICATORS.find(i=>i.key==='d1'), IND2 = INDICATORS.find(i=>i.key==='d2'), IND4 = INDICATORS.find(i=>i.key==='d4'), IND6 = INDICATORS.find(i=>i.key==='d6');
   const iconByNum = { 1:'📋', 2:'🛒', 3:'🛡️', 4:'🚚', 5:'📄' };
   const colorByNum = { 1:'#1f9aa8', 2:'#e2960a', 3:'#0ca30c', 4:'#d03b3b', 5:'#7c3fd4' };
   const kpis = INDICATORS.map(ind=>{
@@ -4231,7 +4236,11 @@ function buildProImageTiempos(){
 
   // Panel COMPRAS: mismo conteo de "cuántas OC generó cada comprador" ya validado (codOrden distinto
   // por comprador, MLUJAN excluido por no ser un comprador real) más el desglose de alertas por
-  // severidad y el % de cumplimiento del Indicador 2 (Emisión de OC) — el paso que sí controla Compras.
+  // severidad.
+  // % DE CUMPLIMIENTO: Indicador 4 (Tiempo de Entrega de OC en Lurín), no el Indicador 2 (Emisión) —
+  // pedido explícito de Piero (08.09.2026): "en el % de cumplimiento de todos debe ir el % de tiempo de
+  // entrega de oc en lurin, no el de tiempo de emision de oc". Las alertas Leve/Media/Crítica siguen
+  // siendo del Indicador 2, que es el paso que Compras controla; solo cambió el %.
   const rowsPorFechaOc = filteredProcesoRowsByOrden();
   const compradorOcSets = {};
   for(const r of rowsPorFechaOc){
@@ -4243,14 +4252,17 @@ function buildProImageTiempos(){
     (compradorOcSets[comprador] = compradorOcSets[comprador] || new Set()).add(oc);
   }
   const sev2 = severityBucketsFor(rowsPorFechaOc, IND2);
+  const sev4 = severityBucketsFor(rowsPorFechaOc, IND4); // solo para el % de cumplimiento por comprador
   const comprasRowsRaw = Object.keys(compradorOcSets).map(name=>{
     const s = sev2[name] || { leve:0, media:0, critica:0, n:0, cumpleN:0 };
-    return { name, ocCount: compradorOcSets[name].size, leve:s.leve, media:s.media, critica:s.critica, pct: s.n ? (s.cumpleN/s.n*100) : null };
+    const e = sev4[name] || { n:0, cumpleN:0 };
+    return { name, ocCount: compradorOcSets[name].size, leve:s.leve, media:s.media, critica:s.critica, pct: e.n ? (e.cumpleN/e.n*100) : null };
   }).sort((a,b)=> b.ocCount - a.ocCount).slice(0,8);
   const comprasRows = comprasRowsRaw.map(r=>({ name:r.name, main:r.ocCount.toLocaleString('es-PE'), leve:r.leve, media:r.media, critica:r.critica, pct:r.pct }));
   const totalOC = Object.values(compradorOcSets).reduce((a,s)=>a+s.size,0);
   const totalAlertaCompras = Object.values(sev2).reduce((a,s)=>a+s.leve+s.media+s.critica,0);
   const stIND2 = aggStatsForIndicator(rowsPorFechaOc, IND2);
+  const stIND4compras = aggStatsForIndicator(rowsPorFechaOc, IND4);
 
   // Panel ALMACÉN: combina Indicador 1 (Generación de Pedido — normalmente JCENTENO, aunque puede
   // haber "pedidos directos" con otro responsable, ver responsableD1For) e Indicador 5/d6 (Despacho de
@@ -4279,7 +4291,7 @@ function buildProImageTiempos(){
       statBoxes: [
         { icon:'📋', value: totalOC.toLocaleString('es-PE'), label:'CANTIDAD DE OC GENERADAS', color:'#0a1e64' },
         { icon:'⚠️', value: totalAlertaCompras.toLocaleString('es-PE'), label:'ALERTA CASOS X RESPONSABLE (TOTAL)', color: totalAlertaCompras>0?'#d03b3b':'#0ca30c' },
-        { icon:'✅', value: stIND2.cumplePct==null?'—':stIND2.cumplePct.toFixed(1)+'%', label:'% CUMPLIMIENTO EMISIÓN DE OC', color: proSemColor(stIND2.cumplePct) },
+        { icon:'✅', value: stIND4compras.cumplePct==null?'—':stIND4compras.cumplePct.toFixed(1)+'%', label:'% CUMPLIMIENTO ENTREGA DE OC EN LURÍN', color: proSemColor(stIND4compras.cumplePct) },
       ],
       table: { nameLabel:'RESPONSABLE', mainCol:{label:'CANTIDAD DE OC GENERADAS'}, rows: comprasRows },
     },
@@ -4997,7 +5009,44 @@ function proComprasResponsablePartesHtml(spec){
       </div>`),
   ];
 }
-// Genera las 3 partes y las entrega en UN solo .zip (pedido de Piero, 08.09.2026) — así el navegador
+function downloadProComprasPartes(btn){
+  const comprador = document.getElementById('filterProcesoResponsable').value;
+  const base = 'reporte-compras-' + (comprador === 'all' ? 'area' : comprador.toLowerCase()) + '-' + new Date().toISOString().slice(0,10);
+  return generarPartesEnZip(btn, proComprasResponsablePartesHtml(buildProImageComprasResponsable()), base);
+}
+// Reporte de TODA el área: el contenido es el resumen de indicadores de siempre (5 tarjetas con aro,
+// panel COMPRAS, panel ALMACÉN, objetivo y cumplimiento global), pero servido en el formato nuevo
+// —lienzo de 1080px partido en imágenes— para que se lea en el celular (pedido de Piero, 08.09.2026:
+// "este reporte debe mostrar el resumen así, esa debe ser la info solo que con el formato que ya sabes
+// cortando en imágenes"). Antes salía en una sola imagen de 2000px de ancho.
+function proTiemposPartesHtml(opts){
+  const fecha = opts.dateLabel || new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
+  const parte = (contenido)=> `
+  <div id="proImgInner" style="width:1080px;font-family:Inter,Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">${contenido}</div>`;
+  const panels = opts.areaPanels || [];
+  // Las 5 tarjetas van en una grilla de 3 columnas (2 filas: 3 + 2) en vez del flex de 5 por fila que
+  // usa proKpiRowHtml: a 1080px ese flex las partía 4 + 1 y la última quedaba estirada a todo el ancho.
+  // Cada tarjeta se envuelve en una celda con min-width:0 porque proKpiCardHtml trae min-width:230px.
+  const kpiGridHtml = (kpis)=> (!kpis || !kpis.length) ? '' : `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:22px 20px 20px;">
+      ${kpis.map(k=>`<div style="min-width:0;display:flex;">${proKpiCardHtml(k, opts.large)}</div>`).join('')}
+    </div>`;
+  const partes = [
+    parte(proHeaderHtml(opts.title, opts.subtitle, fecha, opts.headerIcon) + kpiGridHtml(opts.kpis)),
+  ];
+  // Un panel de área por imagen (a 1080px no caben los 2 al lado del otro); el pie va con el último.
+  panels.forEach((panel, idx)=>{
+    partes.push(parte(`<div style="padding:20px;">${proAreaPanelHtml(panel)}</div>`
+      + ((idx === panels.length - 1) ? proFooterBarHtml(opts.footerBar) : '')));
+  });
+  if(!panels.length && opts.footerBar) partes.push(parte(proFooterBarHtml(opts.footerBar)));
+  return partes;
+}
+function downloadProTiemposPartes(btn){
+  const base = 'indicadores-tiempos-proceso-' + new Date().toISOString().slice(0,10);
+  return generarPartesEnZip(btn, proTiemposPartesHtml(buildProImageTiempos()), base);
+}
+// Genera las partes y las entrega en UN solo .zip (pedido de Piero, 08.09.2026) — así el navegador
 // hace una sola descarga y no pide permiso para "descargar varios archivos". El zip va sin comprimir
 // (STORE): los PNG ya están comprimidos y volver a comprimirlos no gana nada y sí tarda. Si JSZip no
 // cargó, se cae al comportamiento anterior: las 3 imágenes por separado.
@@ -5011,21 +5060,17 @@ function descargarBlob(blob, nombre){
   link.remove();
   setTimeout(()=>URL.revokeObjectURL(url), 10000);
 }
-async function downloadProComprasPartes(btn){
+async function generarPartesEnZip(btn, partes, base){
   if(typeof html2canvas === 'undefined'){
     alert('No se pudo generar la imagen: la librería no cargó (revisa tu conexión a internet e intenta de nuevo).');
     return;
   }
-  const comprador = document.getElementById('filterProcesoResponsable').value;
   const originalText = btn.textContent;
   btn.disabled = true;
   const host = document.createElement('div');
   host.style.position = 'fixed'; host.style.left = '-99999px'; host.style.top = '0';
   document.body.appendChild(host);
   try{
-    const partes = proComprasResponsablePartesHtml(buildProImageComprasResponsable());
-    const fecha = new Date().toISOString().slice(0,10);
-    const base = 'reporte-compras-' + (comprador === 'all' ? 'area' : comprador.toLowerCase()) + '-' + fecha;
     const imagenes = [];
     for(let i=0;i<partes.length;i++){
       btn.textContent = '⏳ Imagen ' + (i+1) + ' de ' + partes.length + '...';
