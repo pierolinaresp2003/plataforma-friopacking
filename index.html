@@ -3483,19 +3483,19 @@ function drawPedirPorCategoria(){
   const meses = Math.max(0, Number(document.getElementById('mesesAbastecer').value) || 0);
   const { rows, sinConsumo } = pedirRowsFor(meses);
   const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
-  // La cantidad a pedir se redondea HACIA ARRIBA a entero (pedido de Piero, 09.09.2026: "redondea los
-  // valores de columna a pedir"). Hacia arriba porque pedir de menos deja el producto bajo el ROP, y a
-  // entero porque no se compran 0.75 unidades ni fracciones de metro.
-  const arriba = v => Math.ceil(v);
+  // Redondeo NORMAL a entero: por debajo de .5 baja, de .5 en adelante sube (Piero, 09.09.2026: "si se
+  // aproxima en menos de .5 ahí no debes aproximarlo al entero más cercano ojo" — corrigiendo el
+  // redondeo hacia arriba que tenía antes). A entero porque no se compran fracciones de unidad.
+  const arriba = v => Math.round(v);
 
   const byCat = {};
   for(const r of rows){
     const g = byCat[r.categoria] = byCat[r.categoria] || { label:r.categoria, n:0, porUm:{}, rows:[] };
     g.n++; g.rows.push(r);
     const um = r.unidad || '—';
-    // Se acumula el valor YA redondeado, para que el total por unidad de medida cuadre exactamente
-    // con la suma de la columna "A pedir" que se ve en la tabla.
-    g.porUm[um] = (g.porUm[um] || 0) + Math.ceil(r.aPedir);
+    // Se acumula el valor YA redondeado (mismo criterio que la columna), para que el total por unidad
+    // de medida cuadre exactamente con la suma de la columna "A pedir" que se ve en la tabla.
+    g.porUm[um] = (g.porUm[um] || 0) + Math.round(r.aPedir);
   }
   const grupos = Object.keys(byCat).map(k=>byCat[k]).sort((a,b)=> b.n-a.n || a.label.localeCompare(b.label));
 
@@ -3539,10 +3539,10 @@ function drawPedirDetalle(grupos){
   const g = grupos.filter(x=>x.label===pedirCatSel)[0];
   if(!g){ box.innerHTML = ''; return; }
   const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
-  // La cantidad a pedir se redondea HACIA ARRIBA a entero (pedido de Piero, 09.09.2026: "redondea los
-  // valores de columna a pedir"). Hacia arriba porque pedir de menos deja el producto bajo el ROP, y a
-  // entero porque no se compran 0.75 unidades ni fracciones de metro.
-  const arriba = v => Math.ceil(v);
+  // Redondeo NORMAL a entero: por debajo de .5 baja, de .5 en adelante sube (Piero, 09.09.2026: "si se
+  // aproxima en menos de .5 ahí no debes aproximarlo al entero más cercano ojo" — corrigiendo el
+  // redondeo hacia arriba que tenía antes). A entero porque no se compran fracciones de unidad.
+  const arriba = v => Math.round(v);
   // Orden por ROTACIÓN, de mayor a menor (pedido de Piero, 09.09.2026: "también debes ordenar los
   // productos de mayor rotación a menor, y ahí ya podré ver qué cantidad pedir de esos que serían los
   // críticos"). La rotación es el consumo mensual del producto ya homologado.
