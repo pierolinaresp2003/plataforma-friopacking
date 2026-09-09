@@ -251,15 +251,23 @@
   .pedir-card{background:var(--surface-3);border:2px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s,background .15s;}
   .pedir-card:hover{background:var(--surface-2);}
   .pedir-card.selected{border-color:var(--brand-2);background:var(--card);box-shadow:0 0 0 1px var(--brand-2);}
-  .pedir-card .pc-top{display:flex;align-items:flex-start;gap:8px;min-height:32px;}
-  .pedir-card .pc-ic{font-size:17px;line-height:1.2;flex-shrink:0;}
-  .pedir-card .pc-name{font-size:12.5px;font-weight:800;color:var(--ink);line-height:1.25;}
+  /* Tarjeta de categoría: SOLO el título, en grande (pedido de Piero, 09.09.2026, comentario en el
+     artefacto: "pon en estas tarjetas el titulo en grande y quita todo lo demás que pones / solo
+     titulo"). Se quitaron el contador de productos (.pc-n) y el desglose por unidad de medida
+     (.pc-um) — esos datos siguen estando, pero dentro del detalle de la categoría. */
+  .pedir-card .pc-top{display:flex;align-items:center;gap:11px;min-height:46px;}
+  .pedir-card .pc-ic{font-size:26px;line-height:1;flex-shrink:0;}
+  .pedir-card .pc-name{font-size:17px;font-weight:800;color:var(--ink);line-height:1.25;}
   .pedir-card .pc-n{font-size:26px;font-weight:800;color:var(--brand-ink);margin-top:8px;line-height:1;}
   .pedir-card .pc-n span{font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-left:5px;}
   .pedir-card .pc-um{margin-top:10px;padding-top:9px;border-top:1px solid var(--border);font-size:11.5px;color:var(--ink-soft);line-height:1.6;}
   .pedir-card .pc-um b{color:var(--ink);font-weight:700;}
   .pedir-card .pc-hint{margin-top:8px;font-size:10.5px;color:var(--muted);}
-  .pedir-detalle-head{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:var(--ink);margin-bottom:9px;}
+  .pedir-detalle-head{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:800;color:var(--ink);margin-bottom:4px;}
+  .pedir-detalle-sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:11px;}
+  .pedir-volver{display:inline-block;font-size:12.5px;font-weight:700;color:var(--brand-ink);cursor:pointer;margin-bottom:12px;}
+  .pedir-volver:hover{text-decoration:underline;}
+  .cod-hom{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.35;}
   .bar-row.clickable:hover .bar-label{color:var(--brand-ink);}
   .moneda-tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--ink-soft);margin-right:3px;}
   .pill.muted{background:var(--surface-2);color:var(--ink-soft);}
@@ -493,6 +501,9 @@
         </select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
+      <!-- Resultado de la homologación de códigos por descripción y, si los hay, los códigos gemelos
+           con unidad de medida distinta (que no se pueden sumar). Ver firmaProducto()/processAlmacen. -->
+      <div id="alertasHomNote" style="display:none;"></div>
 
       <!-- "Cuánto pedir por categoría" (08.09.2026, pedido de Piero: "cuánto es lo que se debería pedir
            para los productos que son críticos... por categorías (las mismas que se usan en módulo 2)...
@@ -510,7 +521,11 @@
         <div id="pedirDetalle" style="margin-top:14px;"></div>
       </div>
 
-      <div class="table-card card">
+      <!-- Tabla de inventario producto por producto: oculta a pedido de Piero (09.09.2026, comentario
+           en el artefacto: "elimina toda esta tabla de codigo descripcion, etc / la tabla no debe estar
+           aqui"). Se deja en display:none en vez de borrarla porque drawReposicion() la sigue llenando
+           y el detalle por categoría reusa las mismas filas. -->
+      <div class="table-card card" style="display:none;">
         <table id="tableReposicion" class="summary-table"><thead></thead><tbody></tbody></table>
       </div>
     </div><!-- /section-alertas -->
@@ -2230,6 +2245,50 @@ let ALMACEN_DATA = null;
 // Sedes con stock en columna propia dentro de la hoja "Análisis Inventario" (verificado contra el
 // archivo real de Piero, 08.09.2026 — no existe una columna única "Almacén").
 const ALMACEN_SEDES = ['ICA','LIMA','TRUJILLO'];
+// ---------- Homologación de códigos por descripción (09.09.2026) ----------
+// Pedido de Piero: "004300300421 / 004300300313 estos 2 codigos son lo mismo, ambos son rz1 y de la
+// medida 3g1.5, a eso me refería con que debes homologar los códigos, no solo de cables sino de todos
+// los productos que en descripción signifiquen lo mismo. pero debes ser muy minucioso".
+// firmaProducto() reduce la descripción a lo que de verdad identifica al producto y descarta las formas
+// distintas de escribir lo mismo. Cada regla salió de comparar los códigos gemelos reales del archivo:
+//   MM² = MM2                        CABLE RZ1-K 3GX1,5MM²   vs  CABLE RZ1-K 3G1.5MM2
+//   coma decimal = punto             1,5                     vs  1.5
+//   la X y la G son el mismo         3X1.5MM2 / 3GX1.5MM2    vs  3G1.5MM2
+//     separador de conductores
+//   espacios dentro de la medida     3G1.5 MM2               vs  3G1.5MM2
+//   prefijo comercial irrelevante    C/ALIMENTADOR-FUERZA…   vs  CABLE…  vs  CONDUCTOR ELECTRICO…
+//   marca                            AFERINAS-X / AFIRENAS-X / TOXFREE ZH / EXZHELLENT
+//   especificación redundante        0,6/1KV, 06,/1KV, POLIETILENO RETICULADO, XLPE, LSZH, CLASE 5
+//   variante contable                "( SIN COSTO)", "- SIN COSTO" (es el mismo material físico)
+//   orden de las palabras            PLANCHA DE ESPUMA 4" X 2000 X 1000 MM en cualquier orden
+// Lo que NO se toca a propósito: medidas, colores (VERDE/AMARILLO), modelos y códigos de fabricante —
+// ahí sí cambia el producto. Y la unidad de medida entra en la clave del grupo (ver processAlmacen):
+// hay códigos gemelos donde uno está en UND y el otro en MTS, y sumar metros con unidades daría un
+// número falso; esos quedan separados y se reportan como conflicto.
+const FIRMA_RUIDO = [
+  /\(\s*SIN\s*COSTO\s*\)/g, /-\s*SIN\s*COSTO\b/g, /\bSIN\s*COSTO\b/g,
+  /\bLIBRE\s+DE\s+HALOGENOS?\b/g, /\bLIBRE\s+HALOGENOS?\b/g,
+  /\bPOLIETILENO\s+RETICULADO\b/g, /\bLSZH\b/g, /\bXLPE\b/g, /\bCLASE\s*5\b/g, /\bUNIPOLAR\b/g,
+  /\bAF[EI]R[EI]NAS(?:\s*-\s*X)?\b/g, /\bTOXFREE\s*ZH\b/g, /\bEXZHELLENT\b/g,
+];
+const FIRMA_PREFIJOS = [/^C\s*\/?\s*ALIMENTADOR\s*-?\s*FUERZA\b/, /^CABLE\b/, /^CONDUCTOR\s+ELECTRICO\b/];
+function firmaProducto(desc){
+  let s = sinAcentos(String(desc==null?'':desc)).toUpperCase();
+  s = s.replace(/²/g,'2').replace(/³/g,'3').replace(/[“”]/g,'"').replace(/[’′]/g,"'");
+  s = s.replace(/(\d),(\d)/g, '$1.$2');
+  s = s.replace(/\b0?\.?6\.?\s*[\/-]\s*1\s*KV\b/g, ' ');
+  s = s.replace(/\b1\s*KV\b/g, ' ');
+  FIRMA_RUIDO.forEach(rx=>{ s = s.replace(rx, ' '); });
+  FIRMA_PREFIJOS.forEach(rx=>{ s = s.replace(rx, ' '); });
+  s = s.replace(/\bRZ1\s*-?\s*K\b/g, 'RZ1K');
+  s = s.replace(/\b(\d+)\s*G\s*X?\s*([\d.]+)\s*MM\s*2/g, '$1G$2MM2');
+  s = s.replace(/\b(\d+)\s*X\s*([\d.]+)\s*MM\s*2/g,      '$1G$2MM2');
+  s = s.replace(/([\d.]+)\s*MM\s*2/g, '$1MM2');
+  s = s.replace(/[\/,;]+/g, ' ').replace(/\.(?=\s|$)/g, ' ');
+  s = s.replace(/\s*-\s*/g, ' ');
+  s = s.replace(/[^A-Z0-9."'#%+]+/g, ' ');
+  return s.trim().split(/\s+/).sort().join(' ');
+}
 
 // ---------- Reporte Almacen.xlsx: Inventario / Almacén General (08.09.2026) ----------
 // Columnas y reglas definidas por Piero en su archivo "Columnas modulo Inventario.Almacen General.xlsx"
@@ -2333,19 +2392,61 @@ function processAlmacen(wb, filename){
       estado: (lima + transito) <= rop ? 'reposicion' : 'ok',
     });
   }
+  // --- homologación: varios códigos que significan lo mismo pasan a ser UN producto ---
+  const grupos = {}, ordenGrupos = [], porFirma = {};
+  for(const r of almacenRows){
+    const firma = firmaProducto(r.descripcion);
+    (porFirma[firma] = porFirma[firma] || []).push(r);
+    const k = firma + '||' + (r.unidad||'').toUpperCase();
+    if(!grupos[k]){ grupos[k] = []; ordenGrupos.push(k); }
+    grupos[k].push(r);
+  }
+  const productos = ordenGrupos.map(k=>{
+    const g = grupos[k];
+    if(g.length === 1) return Object.assign({}, g[0], { codigos:[g[0].codigo], nCodigos:1 });
+    // Código "principal": el de mayor consumo mensual — el que está vivo en la operación.
+    const pri = g.slice().sort((a,b)=> (b.consumoMensual||0)-(a.consumoMensual||0) || b.rop-a.rop)[0];
+    const sum = f => g.reduce((a,x)=> a + (x[f]||0), 0);
+    const lima = sum('lima'), transito = sum('transito'), reserva = sum('reserva'),
+          picking = sum('picking'), rop = sum('rop');
+    return Object.assign({}, pri, {
+      codigos: g.map(x=>x.codigo).sort(), nCodigos: g.length,
+      ica: sum('ica'), lima, trujillo: sum('trujillo'), transito, reserva, picking, rop,
+      eoq: g.some(x=>x.eoq!=null) ? sum('eoq') : null,
+      consumoMensual: g.some(x=>x.consumoMensual!=null) ? sum('consumoMensual') : null,
+      disponible: lima + transito - reserva - picking,
+      faltante: rop - (lima + transito),
+      estado: (lima + transito) <= rop ? 'reposicion' : 'ok',
+    });
+  });
+  // Mismo producto con unidad de medida distinta: no se puede sumar metros con unidades, así que esos
+  // códigos quedan separados y se reportan para que Piero corrija el maestro.
+  const conflictosUm = Object.keys(porFirma).filter(f=>{
+    const ums = {};
+    porFirma[f].forEach(r=>{ ums[(r.unidad||'').toUpperCase().trim()] = 1; });
+    return Object.keys(ums).length > 1;
+  }).map(f => porFirma[f].map(r=>({ codigo:r.codigo, unidad:(r.unidad||'').trim(), descripcion:r.descripcion })));
+
   ALMACEN_DATA = {
-    rows: almacenRows, sedes: ALMACEN_SEDES.filter(sd=>sedeIdx[sd]!==undefined),
+    rows: productos, sedes: ALMACEN_SEDES.filter(sd=>sedeIdx[sd]!==undefined),
     totalRows: dataRows.length, sinRop, excluidas, filename, sheetName,
     tieneReserva: col.reserva!==-1, tienePicking: col.picking!==-1,
+    nCodigos: almacenRows.length,
+    nHomologados: productos.filter(p=>p.nCodigos>1).reduce((a,p)=>a+p.nCodigos, 0),
+    nGruposHomologados: productos.filter(p=>p.nCodigos>1).length,
+    conflictosUm,
   };
-  const nRepo = almacenRows.filter(r=>r.estado==='reposicion').length;
+  const nRepo = productos.filter(r=>r.estado==='reposicion').length;
+  const extraHom = ALMACEN_DATA.nGruposHomologados
+    ? ' Homologué ' + ALMACEN_DATA.nHomologados + ' códigos que significan lo mismo en ' + ALMACEN_DATA.nGruposHomologados + ' productos.'
+    : '';
   // No se llama a render() directo: si Reporte Maestro.xlsx todavía no se cargó, DATA sigue null y
   // render() rompe (getProcesoRows/renderProceso asumen DATA no-nulo) — el panel entero sigue oculto
   // hasta que se cargue Maestro de todas formas (ver emptyState/dashboard en render()), así que basta
   // con refrescar Alertas por su cuenta; cuando Maestro se cargue después, render() ya volverá a llamar
   // renderAlertas() y mostrará esto correctamente.
   if(DATA){ render(); } else { renderAlertas(); }
-  return { ok:true, message: "procesado: " + almacenRows.length.toLocaleString('es-PE') + " productos con punto de reorden, " + nRepo.toLocaleString('es-PE') + " en reposición." };
+  return { ok:true, message: "procesado: " + productos.length.toLocaleString('es-PE') + " productos con punto de reorden, " + nRepo.toLocaleString('es-PE') + " en reposición." + extraHom };
 }
 
 function processConsulta(wb, filename){
@@ -3198,7 +3299,8 @@ function reposicionScopeRows(){
   const q = (document.getElementById('searchReposicion').value||"").toLowerCase().trim();
   const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
   if(!q) return rows;
-  return rows.filter(r => (r.codigo + ' ' + r.descripcion).toLowerCase().includes(q));
+  // Busca en TODOS los códigos homologados del producto, no solo en el principal.
+  return rows.filter(r => ((r.codigos||[r.codigo]).join(' ') + ' ' + r.descripcion).toLowerCase().includes(q));
 }
 function filteredReposicionRows(){
   const fEstado = document.getElementById('filterReposicionEstado').value;
@@ -3280,11 +3382,37 @@ function drawAlertas(){
   const nRepo = all.filter(r=>r.estado==='reposicion').length;
   const nSinLima = all.filter(r=>r.lima<=0).length;
   document.getElementById('kpiGridAlertas').innerHTML = `
-    <div class="card kpi"><div class="label">Productos en seguimiento</div><div class="value">${all.length.toLocaleString('es-PE')}</div><div class="sub">con punto de reorden definido</div></div>
+    <div class="card kpi"><div class="label">Productos en seguimiento</div><div class="value">${all.length.toLocaleString('es-PE')}</div><div class="sub">con punto de reorden definido${ALMACEN_DATA.nGruposHomologados ? ', ya homologados' : ''}</div></div>
     <div class="card kpi${nRepo>0?' alert-card':''}"><div class="label">En reposición</div><div class="value${nRepo>0?' alert-n':''}">${nRepo.toLocaleString('es-PE')}</div><div class="sub">Lima + tránsito por debajo del ROP</div></div>
     <div class="card kpi"><div class="label">Sin stock en Lima</div><div class="value">${nSinLima.toLocaleString('es-PE')}</div><div class="sub">stock en 0 en el almacén central</div></div>
   `;
+  drawHomologacionNote();
   drawPedirPorCategoria();
+}
+// Deja a la vista qué juntó la homologación y qué no pudo juntar (misma descripción, distinta unidad de
+// medida). Piero pidió ser minucioso con esto, así que el módulo no lo hace en silencio.
+function drawHomologacionNote(){
+  const box = document.getElementById('alertasHomNote');
+  if(!box) return;
+  const d = ALMACEN_DATA;
+  if(!d || (!d.nGruposHomologados && !(d.conflictosUm||[]).length)){ box.style.display = 'none'; return; }
+  const partes = [];
+  if(d.nGruposHomologados){
+    partes.push('<b>Códigos homologados por descripción:</b> ' + d.nHomologados.toLocaleString('es-PE')
+      + ' códigos que significan lo mismo se cuentan como ' + d.nGruposHomologados.toLocaleString('es-PE')
+      + ' producto(s). Su stock, su consumo y su ROP se suman, así que el módulo ya no pide de nuevo algo que existe bajo otro código.');
+  }
+  const cf = (d.conflictosUm||[]).filter(g=>g.length>1);
+  if(cf.length){
+    partes.push('<b>⚠ ' + cf.length + ' producto(s) con la misma descripción pero distinta unidad de medida</b>'
+      + ' — no los junté, porque sumar metros con unidades daría un número falso. Habría que corregirlos en el maestro:<br>'
+      + cf.slice(0,6).map(g=> '&nbsp;&nbsp;• ' + g.map(x=> escapeHtml(x.codigo) + ' (' + escapeHtml(x.unidad||'sin UM') + ')').join(' vs ')
+          + ' — ' + escapeHtml((g[0].descripcion||'').slice(0,70))).join('<br>')
+      + (cf.length>6 ? '<br>&nbsp;&nbsp;• y ' + (cf.length-6) + ' más' : ''));
+  }
+  box.className = 'note' + (cf.length ? ' warn' : '');
+  box.style.display = '';
+  box.innerHTML = partes.join('<br><br>');
 }
 
 // ---------- Cuánto pedir por categoría (08.09.2026) ----------
@@ -3344,32 +3472,32 @@ function drawPedirPorCategoria(){
       + (sinConsumo ? ' · ' + sinConsumo.toLocaleString('es-PE') + ' en reposición sin consumo mensual registrado (no calculable)' : '')
     : 'Escribe cuántos meses quieres cubrir.';
 
-  document.getElementById('chartPedir').innerHTML = grupos.length
-    ? '<div class="pedir-cards">' + grupos.map(g=>{
-        const ums = Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a]);
-        const lineas = ums.slice(0,3).map(u=>
-          '<div><b>' + fmt(arriba(g.porUm[u])) + '</b>' + (u==='—' ? '' : ' ' + escapeHtml(u)) + '</div>').join('');
-        const sel = (pedirCatSel === g.label);
-        return '<div class="pedir-card' + (sel ? ' selected' : '') + '" data-cat="' + escapeHtml(g.label) + '">'
+  // Al elegir una categoría el módulo CAMBIA de vista: se ocultan las tarjetas y se muestra solo el
+  // detalle de esa categoría, con un enlace para volver (pedido de Piero, 09.09.2026, comentario en el
+  // artefacto: "al darle click a alguna de estas pestañas, debe dirigirse a otra pestaña con el detalle
+  // de productos, no debe aparecer abajo sin más la tabla").
+  const abierta = grupos.filter(g=>g.label===pedirCatSel)[0];
+  const chart = document.getElementById('chartPedir');
+  if(abierta){
+    chart.innerHTML = '';
+    chart.style.display = 'none';
+    drawPedirDetalle(grupos);
+    return;
+  }
+  chart.style.display = '';
+  chart.innerHTML = grupos.length
+    ? '<div class="pedir-cards">' + grupos.map(g=>
+        '<div class="pedir-card" data-cat="' + escapeHtml(g.label) + '">'
           + '<div class="pc-top"><span class="pc-ic">' + iconForFamilia(sinAcentos(g.label)) + '</span>'
           + '<div class="pc-name">' + escapeHtml(g.label) + '</div></div>'
-          + '<div class="pc-n">' + g.n.toLocaleString('es-PE') + '<span>producto' + (g.n===1?'':'s') + ' a pedir</span></div>'
-          + '<div class="pc-um">' + lineas
-          + (ums.length>3 ? '<div class="pc-hint">+ ' + (ums.length-3) + ' unidad(es) de medida más</div>' : '') + '</div>'
-          + '<div class="pc-hint">' + (sel ? 'Detalle abajo ↓' : 'Clic para ver el detalle') + '</div>'
-          + '</div>';
-      }).join('') + '</div>'
+          + '</div>').join('') + '</div>'
     : '<div style="font-size:12.5px;color:var(--ink-soft);padding:6px 0;">Nada que pedir con esos meses de cobertura 🎉</div>';
-  Array.prototype.forEach.call(document.querySelectorAll('#chartPedir .pedir-card'), el=>{
+  Array.prototype.forEach.call(chart.querySelectorAll('.pedir-card'), el=>{
     el.addEventListener('click', ()=>{
-      const cat = el.getAttribute('data-cat');
-      const abrir = (pedirCatSel !== cat);
-      pedirCatSel = abrir ? cat : null;
+      pedirCatSel = el.getAttribute('data-cat');
       drawPedirPorCategoria();
-      if(abrir){
-        const box = document.getElementById('pedirDetalle');
-        if(box) box.scrollIntoView({ behavior:'smooth', block:'nearest' });
-      }
+      const card = document.getElementById('pedirCard');
+      if(card) card.scrollIntoView({ behavior:'smooth', block:'start' });
     });
   });
   drawPedirDetalle(grupos);
@@ -3377,25 +3505,33 @@ function drawPedirPorCategoria(){
 function drawPedirDetalle(grupos){
   const box = document.getElementById('pedirDetalle');
   const g = grupos.filter(x=>x.label===pedirCatSel)[0];
-  if(!g){
-    box.innerHTML = grupos.length ? '<div style="font-size:12px;color:var(--muted);">Haz clic en una categoría para ver el detalle producto por producto.</div>' : '';
-    return;
-  }
+  if(!g){ box.innerHTML = ''; return; }
   const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
   const arriba = v => Math.ceil(v*100)/100;
-  const rows = g.rows.slice().sort((a,b)=> b.aPedir-a.aPedir);
-  box.innerHTML = '<div class="pedir-detalle-head"><span>' + iconForFamilia(sinAcentos(g.label)) + '</span>'
-      + escapeHtml(g.label) + ' — ' + g.n.toLocaleString('es-PE') + ' producto(s) a pedir</div>'
-    + '<div class="table-card card" style="max-height:420px;overflow:auto;"><table><thead><tr>'
-    + '<th>Código</th><th>Descripción</th><th>UM</th><th>LIMA</th><th>En tránsito</th><th>ROP</th>'
-    + '<th>Consumo mensual</th><th>Cobertura (meses)</th><th>Cantidad a pedir</th></tr></thead><tbody>'
-    + rows.map(r=> '<tr><td>' + escapeHtml(r.codigo) + '</td>'
+  // Orden por ROTACIÓN, de mayor a menor (pedido de Piero, 09.09.2026: "también debes ordenar los
+  // productos de mayor rotación a menor, y ahí ya podré ver qué cantidad pedir de esos que serían los
+  // críticos"). La rotación es el consumo mensual del producto ya homologado.
+  const rows = g.rows.slice().sort((a,b)=> (b.consumoMensual||0)-(a.consumoMensual||0) || b.aPedir-a.aPedir);
+  const ums = Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a]);
+  const totales = ums.map(u=> '<b>' + fmt(arriba(g.porUm[u])) + '</b>' + (u==='—' ? '' : ' ' + escapeHtml(u))).join(' · ');
+  box.innerHTML = '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'
+    + '<div class="pedir-detalle-head"><span>' + iconForFamilia(sinAcentos(g.label)) + '</span>'
+      + escapeHtml(g.label) + '</div>'
+    + '<div class="pedir-detalle-sub">' + g.n.toLocaleString('es-PE') + ' producto(s) a pedir · total: ' + totales
+      + ' · ordenados de mayor a menor rotación</div>'
+    + '<div class="table-card card" style="max-height:520px;overflow:auto;"><table><thead><tr>'
+    + '<th>Código</th><th>Descripción</th><th>UM</th><th>Rotación (consumo/mes)</th><th>LIMA</th><th>En tránsito</th><th>ROP</th>'
+    + '<th>Cantidad a pedir</th></tr></thead><tbody>'
+    + rows.map(r=> '<tr><td style="white-space:normal;">' + escapeHtml(r.codigo)
+          + (r.nCodigos > 1 ? '<div class="cod-hom" title="Códigos homologados: significan lo mismo, así que su stock y su consumo se suman">+ ' + (r.nCodigos-1) + ' código(s): ' + escapeHtml(r.codigos.filter(c=>c!==r.codigo).join(', ')) + '</div>' : '') + '</td>'
         + '<td style="white-space:normal;min-width:230px;">' + (escapeHtml(r.descripcion) || '—') + '</td>'
         + '<td>' + (escapeHtml(r.unidad) || '—') + '</td>'
+        + '<td><b>' + fmt(r.consumoMensual) + '</b></td>'
         + '<td>' + fmt(r.lima) + '</td><td>' + fmt(r.transito) + '</td><td>' + fmt(r.rop) + '</td>'
-        + '<td>' + fmt(r.consumoMensual) + '</td><td>' + fmt(r.cobertura) + '</td>'
         + '<td><b>' + fmt(arriba(r.aPedir)) + '</b></td></tr>').join('')
     + '</tbody></table></div>';
+  const volver = document.getElementById('pedirVolver');
+  if(volver) volver.addEventListener('click', ()=>{ pedirCatSel = null; drawPedirPorCategoria(); });
 }
 
 // Colores nacional/importado (categóricos ya usados en la plataforma para distinguir grupos que no son
