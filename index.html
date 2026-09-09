@@ -300,6 +300,12 @@
   .cmp-vals{width:150px;text-align:right;flex-shrink:0;font-size:11.5px;color:var(--ink-soft);}
   @media (max-width:640px){ .cmp-row .bar-label{width:110px;font-size:11px;} .cmp-vals{width:110px;font-size:10.5px;} }
 
+  #publishToast{position:fixed;top:64px;right:20px;z-index:9000;max-width:420px;display:none;
+    background:var(--card);color:var(--ink);border:1px solid var(--border);border-left:5px solid var(--green);
+    border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.5;box-shadow:0 8px 28px rgba(20,30,45,.20);}
+  #publishToast.err{border-left-color:var(--red);}
+  #publishToast .toast-x{float:right;margin:-4px -4px 0 10px;cursor:pointer;color:var(--muted);font-weight:700;}
+  #publishToast .toast-x:hover{color:var(--ink);}
   .modal-close{background:var(--surface-2);border:none;color:var(--ink);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;flex-shrink:0;}
   .modal-close:hover{background:var(--surface-2-hover);}
 </style>
@@ -352,6 +358,10 @@
   </div>
 
   <div id="publishBanner" class="note" style="display:none;"></div>
+  <!-- Aviso flotante del guardado (09.09.2026): el banner de arriba queda fuera de pantalla cuando
+       Piero está dentro de un módulo, así que decía "no se guarda" sin ver ni el ✅ ni el ❌. Este
+       aparece sobre el contenido, al lado del botón, y no se puede perder de vista. -->
+  <div id="publishToast" role="status"></div>
 
   <div id="emptyState" class="card empty">
     <div>Carga tu Reporte Maestro.xlsx arriba para ver los indicadores.</div>
@@ -513,10 +523,14 @@
            pedir por categoría" con su detalle, y la tabla de inventario. Ver reposicionScopeRows(). -->
       <div class="toolbar">
         <input type="search" id="searchReposicion" placeholder="Buscar código o producto en todo el módulo...">
+        <!-- El filtro decide qué productos entran a las tarjetas por categoría y a su detalle
+             (09.09.2026, pedido de Piero: "puedes permitir filtrar por los que tengan valores a pedir y
+             los que no? porque quiero ver la consulta de todos los productos que existen no solo de los
+             que son para pedir"). Ver pedirRowsFor(). -->
         <select id="filterReposicionEstado">
-          <option value="all">Todos los estados</option>
-          <option value="reposicion">Solo REPOSICIÓN</option>
-          <option value="ok">Solo OK</option>
+          <option value="pedir">Solo los que hay que pedir</option>
+          <option value="todos">Todos los productos</option>
+          <option value="nopedir">Solo los que NO hay que pedir</option>
         </select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
@@ -1524,7 +1538,9 @@ async function publishSnapshot(){
         const body = await res.text();
         if(res.status === 401 || res.status === 403){
           localStorage.removeItem(TOKEN_KEY);
-          throw new Error("El token no tiene permiso o venció. Se borró de este navegador — vuelve a hacer clic en \"Guardar y compartir\" para ingresar uno nuevo.");
+          throw new Error("<b>tu token de GitHub venció o le falta permiso</b> (GitHub respondió " + res.status + ")."
+            + " Ya lo borré de este navegador: vuelve a hacer clic en ☁ y pega un token nuevo con permiso <i>Contents: Read and write</i> sobre el repo "
+            + GH_OWNER + "/" + GH_REPO + ".<br><span style=\"opacity:.7;font-size:11.5px;\">Respuesta de GitHub: " + escapeHtml(body.slice(0,140)) + "</span>");
         }
         throw new Error("GitHub respondió " + res.status + " en " + path.split('?')[0] + ": " + body.slice(0,180));
       }
@@ -1570,6 +1586,16 @@ function showPublishBanner(msg, isError){
   el.style.display = 'block';
   el.className = 'note' + (isError ? ' warn' : '');
   el.innerHTML = msg;
+  // Mismo mensaje flotando sobre el contenido, para que se vea sin importar dónde esté el scroll.
+  const t = document.getElementById('publishToast');
+  if(!t) return;
+  t.className = isError ? 'err' : '';
+  t.style.display = 'block';
+  t.innerHTML = '<span class="toast-x" title="Cerrar">✕</span>' + msg;
+  t.querySelector('.toast-x').addEventListener('click', ()=>{ t.style.display = 'none'; });
+  clearTimeout(showPublishBanner._t);
+  // El ✅ se va solo; el ❌ se queda hasta que Piero lo cierre, para poder leer qué dijo GitHub.
+  if(!isError) showPublishBanner._t = setTimeout(()=>{ t.style.display = 'none'; }, 9000);
 }
 
 async function loadPublishedSnapshot(manual){
@@ -1584,12 +1610,18 @@ async function loadPublishedSnapshot(manual){
       }
     }catch(e){ /* sigue con el formato viejo */ }
     if(!snap){
+      // Formato viejo sin comprimir. Se avisa SIEMPRE (no solo en carga manual): si el data.json.gz
+      // recién publicado no se pudo leer, antes se cargaba este archivo viejo en silencio y parecía
+      // que "no se había guardado" (Piero, 09.09.2026). Mejor que diga de dónde salieron los datos.
       const res = await fetch('./' + SNAPSHOT_PATH + '?_=' + Date.now());
       if(!res.ok){
         if(manual) showPublishBanner('Todavía no hay ninguna versión publicada en este link. Carga tu archivo arriba y usa "Guardar y compartir" para ser el primero.', true);
         return;
       }
       snap = await res.json();
+      showPublishBanner('⚠ No pude leer <b>' + SNAPSHOT_GZ_PATH + '</b> (la versión nueva), así que cargué <b>'
+        + SNAPSHOT_PATH + '</b>, que es el formato viejo y puede estar desactualizado.'
+        + (snap.publishedAt ? ' Fecha de esos datos: <b>' + new Date(snap.publishedAt).toLocaleString('es-PE') + '</b>.' : ''), true);
     }
     loadFromSnapshot(snap);
   }catch(e){
@@ -3331,8 +3363,14 @@ function reposicionScopeRows(){
   return rows.filter(r => ((r.codigos||[r.codigo]).join(' ') + ' ' + r.descripcion).toLowerCase().includes(q));
 }
 function filteredReposicionRows(){
-  const fEstado = document.getElementById('filterReposicionEstado').value;
-  return reposicionScopeRows().filter(r => fEstado==='all' || r.estado === fEstado);
+  // El select pasó a ser "qué hay que pedir" (pedir / todos / nopedir) el 09.09.2026. Esta función
+  // alimenta la tabla de inventario, que está oculta, así que se traduce al estado equivalente para no
+  // dejarla en blanco si algún día se vuelve a mostrar.
+  const modo = document.getElementById('filterReposicionEstado').value;
+  const rows = reposicionScopeRows();
+  if(modo === 'pedir') return rows.filter(r => r.estado === 'reposicion');
+  if(modo === 'nopedir') return rows.filter(r => r.estado === 'ok');
+  return rows;
 }
 const ESTADO_REPOSICION_LABEL = { reposicion:'REPOSICIÓN', ok:'OK' };
 const ESTADO_REPOSICION_PILL = { reposicion:'warn', ok:'ok' };
@@ -3461,18 +3499,35 @@ let pedirCatSel = null;
 // genérico. Se le pasa el nombre sin acentos solo desde acá, sin tocar la función compartida (la usan
 // también las imágenes de resumen, y ahí no se pidió ningún cambio).
 function sinAcentos(t){ return (t||'').normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
-function pedirRowsFor(meses){
+// modo: 'pedir'   -> solo los que hay que pedir (REPOSICIÓN y con cantidad a pedir > 0) — el de siempre
+//       'todos'   -> todos los productos del universo, con o sin cantidad a pedir
+//       'nopedir' -> solo los que NO hay que pedir (están OK, o no les falta nada para los meses pedidos)
+// En 'todos' y 'nopedir' la cantidad a pedir se deja en 0 cuando no hay nada que pedir, y los productos
+// sin consumo mensual registrado SÍ se listan (con "—" en rotación), porque ahí Piero está consultando
+// el inventario, no armando una compra.
+function pedirRowsFor(meses, modo){
+  modo = modo || 'pedir';
   const all = reposicionScopeRows();
   const rows = [];
   let sinConsumo = 0;
   for(const r of all){
-    if(r.estado !== 'reposicion') continue;
-    // Sin consumo mensual registrado no hay forma de traducir "meses" a cantidad: se cuentan aparte en
-    // vez de asumir 0 y hacerlos desaparecer del resumen.
-    if(r.consumoMensual === null || !(r.consumoMensual > 0)){ sinConsumo++; continue; }
-    const aPedir = (r.consumoMensual * meses) - (r.lima + r.transito);
-    if(!(aPedir > 0)) continue;
-    rows.push(Object.assign({}, r, { aPedir, categoria: categoriaGenericaFor('', r.codigo, r.descripcion) }));
+    const conConsumo = (r.consumoMensual !== null && r.consumoMensual > 0);
+    const aPedirCrudo = conConsumo ? (r.consumoMensual * meses) - (r.lima + r.transito) : null;
+    const hayQuePedir = (r.estado === 'reposicion') && conConsumo && aPedirCrudo > 0;
+    if(modo === 'pedir'){
+      if(r.estado !== 'reposicion') continue;
+      // Sin consumo mensual registrado no hay forma de traducir "meses" a cantidad: se cuentan aparte
+      // en vez de asumir 0 y hacerlos desaparecer del resumen.
+      if(!conConsumo){ sinConsumo++; continue; }
+      if(!(aPedirCrudo > 0)) continue;
+    } else if(modo === 'nopedir'){
+      if(hayQuePedir) continue;
+    }
+    rows.push(Object.assign({}, r, {
+      aPedir: hayQuePedir ? aPedirCrudo : 0,
+      hayQuePedir,
+      categoria: categoriaGenericaFor('', r.codigo, r.descripcion),
+    }));
   }
   return { rows, sinConsumo };
 }
@@ -3481,7 +3536,8 @@ function drawPedirPorCategoria(){
   if(!(ALMACEN_DATA && ALMACEN_DATA.rows)){ card.style.display = 'none'; return; }
   card.style.display = '';
   const meses = Math.max(0, Number(document.getElementById('mesesAbastecer').value) || 0);
-  const { rows, sinConsumo } = pedirRowsFor(meses);
+  const modo = document.getElementById('filterReposicionEstado').value;
+  const { rows, sinConsumo } = pedirRowsFor(meses, modo);
   const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
   // Redondeo NORMAL a entero: por debajo de .5 baja, de .5 en adelante sube (Piero, 09.09.2026: "si se
   // aproxima en menos de .5 ahí no debes aproximarlo al entero más cercano ojo" — corrigiendo el
@@ -3495,7 +3551,7 @@ function drawPedirPorCategoria(){
     const um = r.unidad || '—';
     // Se acumula el valor YA redondeado (mismo criterio que la columna), para que el total por unidad
     // de medida cuadre exactamente con la suma de la columna "A pedir" que se ve en la tabla.
-    g.porUm[um] = (g.porUm[um] || 0) + Math.round(r.aPedir);
+    if(r.hayQuePedir !== false) g.porUm[um] = (g.porUm[um] || 0) + Math.round(r.aPedir);
   }
   const grupos = Object.keys(byCat).map(k=>byCat[k]).sort((a,b)=> b.n-a.n || a.label.localeCompare(b.label));
 
@@ -3547,12 +3603,17 @@ function drawPedirDetalle(grupos){
   // productos de mayor rotación a menor, y ahí ya podré ver qué cantidad pedir de esos que serían los
   // críticos"). La rotación es el consumo mensual del producto ya homologado.
   const rows = g.rows.slice().sort((a,b)=> (b.consumoMensual||0)-(a.consumoMensual||0) || b.aPedir-a.aPedir);
-  const ums = Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a]);
+  const nPedir = rows.filter(r=>r.hayQuePedir !== false).length;
+  // Solo unidades de medida con algo que pedir: con el redondeo, un total de 0.16 CTO quedaba en
+  // "0 CTO", que no dice nada.
+  const ums = Object.keys(g.porUm).filter(u=> g.porUm[u] > 0).sort((a,b)=> g.porUm[b]-g.porUm[a]);
   const totales = ums.map(u=> '<b>' + fmt(g.porUm[u]) + '</b>' + (u==='—' ? '' : ' ' + escapeHtml(u))).join(' · ');
   box.innerHTML = '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'
     + '<div class="pedir-detalle-head"><span>' + iconForFamilia(sinAcentos(g.label)) + '</span>'
       + escapeHtml(g.label) + '</div>'
-    + '<div class="pedir-detalle-sub">' + g.n.toLocaleString('es-PE') + ' producto(s) a pedir · total: ' + totales
+    + '<div class="pedir-detalle-sub">' + g.n.toLocaleString('es-PE') + ' producto(s)'
+      + (nPedir < g.n ? ', ' + nPedir.toLocaleString('es-PE') + ' con cantidad a pedir' : ' a pedir')
+      + (totales ? ' · total: ' + totales : '')
       + ' · ordenados de mayor a menor rotación</div>'
     // Orden de columnas y ancho fijo pedidos por Piero (09.09.2026, comentario en el artefacto:
     // "que no quede tanto espacio en blanco y que luego de UM vaya el stock en Lima Trujillo Ica /
@@ -3580,7 +3641,7 @@ function drawPedirDetalle(grupos){
         + '<td class="num">' + fmt(r.transito) + '</td>'
         + '<td class="num"><b>' + fmt(r.consumoMensual) + '</b></td>'
         + '<td class="num">' + fmt(r.rop) + '</td>'
-        + '<td class="num pedir-col">' + fmt(arriba(r.aPedir)) + '</td></tr>').join('')
+        + '<td class="num pedir-col">' + (r.hayQuePedir === false ? '<span style="opacity:.35;font-weight:600;">—</span>' : fmt(arriba(r.aPedir))) + '</td></tr>').join('')
     + '</tbody></table></div>';
   const volver = document.getElementById('pedirVolver');
   if(volver) volver.addEventListener('click', ()=>{ pedirCatSel = null; drawPedirPorCategoria(); });
