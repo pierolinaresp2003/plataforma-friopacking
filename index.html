@@ -271,7 +271,11 @@
   .pedir-tabla{table-layout:fixed;width:100%;}
   .pedir-tabla th,.pedir-tabla td{padding:8px 10px;}
   .pedir-tabla th{white-space:normal;line-height:1.25;vertical-align:bottom;}
-  .pedir-tabla th.num,.pedir-tabla td.num{text-align:right;}
+  /* Títulos centrados sobre su columna (pedido de Piero, 09.09.2026: "centra los titulos, ajustalo").
+     Los valores siguen alineados a la derecha, que es lo que permite comparar magnitudes en vertical. */
+  .pedir-tabla th.num{text-align:center;}
+  .pedir-tabla td.num{text-align:right;}
+  .pedir-tabla th.um,.pedir-tabla td.um{text-align:center;}
   .pedir-tabla td{font-variant-numeric:tabular-nums;}
   .pedir-tabla th.pedir-col{background:var(--brand);color:#fff;}
   .pedir-tabla td.pedir-col{background:var(--surface-2);color:var(--brand-ink);font-weight:800;font-size:14px;border-left:2px solid var(--brand-2);}
@@ -3479,14 +3483,19 @@ function drawPedirPorCategoria(){
   const meses = Math.max(0, Number(document.getElementById('mesesAbastecer').value) || 0);
   const { rows, sinConsumo } = pedirRowsFor(meses);
   const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
-  const arriba = v => Math.ceil(v*100)/100;
+  // La cantidad a pedir se redondea HACIA ARRIBA a entero (pedido de Piero, 09.09.2026: "redondea los
+  // valores de columna a pedir"). Hacia arriba porque pedir de menos deja el producto bajo el ROP, y a
+  // entero porque no se compran 0.75 unidades ni fracciones de metro.
+  const arriba = v => Math.ceil(v);
 
   const byCat = {};
   for(const r of rows){
     const g = byCat[r.categoria] = byCat[r.categoria] || { label:r.categoria, n:0, porUm:{}, rows:[] };
     g.n++; g.rows.push(r);
     const um = r.unidad || '—';
-    g.porUm[um] = (g.porUm[um] || 0) + r.aPedir;
+    // Se acumula el valor YA redondeado, para que el total por unidad de medida cuadre exactamente
+    // con la suma de la columna "A pedir" que se ve en la tabla.
+    g.porUm[um] = (g.porUm[um] || 0) + Math.ceil(r.aPedir);
   }
   const grupos = Object.keys(byCat).map(k=>byCat[k]).sort((a,b)=> b.n-a.n || a.label.localeCompare(b.label));
 
@@ -3530,13 +3539,16 @@ function drawPedirDetalle(grupos){
   const g = grupos.filter(x=>x.label===pedirCatSel)[0];
   if(!g){ box.innerHTML = ''; return; }
   const fmt = v => (v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2}));
-  const arriba = v => Math.ceil(v*100)/100;
+  // La cantidad a pedir se redondea HACIA ARRIBA a entero (pedido de Piero, 09.09.2026: "redondea los
+  // valores de columna a pedir"). Hacia arriba porque pedir de menos deja el producto bajo el ROP, y a
+  // entero porque no se compran 0.75 unidades ni fracciones de metro.
+  const arriba = v => Math.ceil(v);
   // Orden por ROTACIÓN, de mayor a menor (pedido de Piero, 09.09.2026: "también debes ordenar los
   // productos de mayor rotación a menor, y ahí ya podré ver qué cantidad pedir de esos que serían los
   // críticos"). La rotación es el consumo mensual del producto ya homologado.
   const rows = g.rows.slice().sort((a,b)=> (b.consumoMensual||0)-(a.consumoMensual||0) || b.aPedir-a.aPedir);
   const ums = Object.keys(g.porUm).sort((a,b)=> g.porUm[b]-g.porUm[a]);
-  const totales = ums.map(u=> '<b>' + fmt(arriba(g.porUm[u])) + '</b>' + (u==='—' ? '' : ' ' + escapeHtml(u))).join(' · ');
+  const totales = ums.map(u=> '<b>' + fmt(g.porUm[u]) + '</b>' + (u==='—' ? '' : ' ' + escapeHtml(u))).join(' · ');
   box.innerHTML = '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'
     + '<div class="pedir-detalle-head"><span>' + iconForFamilia(sinAcentos(g.label)) + '</span>'
       + escapeHtml(g.label) + '</div>'
@@ -3552,7 +3564,7 @@ function drawPedirDetalle(grupos){
     + '<col style="width:68px"><col style="width:76px"><col style="width:58px">'
     + '<col style="width:80px"><col style="width:92px"><col style="width:80px"><col style="width:116px"></colgroup>'
     + '<thead><tr>'
-    + '<th>Código</th><th>Descripción</th><th>UM</th>'
+    + '<th>Código</th><th>Descripción</th><th class="um">UM</th>'
     + '<th class="num">LIMA</th><th class="num">Trujillo</th><th class="num">ICA</th>'
     + '<th class="num">En tránsito</th><th class="num">Rotación</th><th class="num">ROP</th>'
     + '<th class="num pedir-col">A pedir</th></tr></thead><tbody>'
@@ -3561,7 +3573,7 @@ function drawPedirDetalle(grupos){
     // gemelos están en r.codigos y el buscador general los sigue encontrando.
     + rows.map(r=> '<tr><td>' + escapeHtml(r.codigo) + '</td>'
         + '<td style="white-space:normal;">' + (escapeHtml(r.descripcion) || '—') + '</td>'
-        + '<td>' + (escapeHtml(r.unidad) || '—') + '</td>'
+        + '<td class="um">' + (escapeHtml(r.unidad) || '—') + '</td>'
         + '<td class="num">' + fmt(r.lima) + '</td>'
         + '<td class="num">' + fmt(r.trujillo) + '</td>'
         + '<td class="num">' + fmt(r.ica) + '</td>'
