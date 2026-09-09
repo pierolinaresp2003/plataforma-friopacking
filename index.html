@@ -221,6 +221,24 @@
   .evo-svg .evo-zoom-overlay{fill:transparent;cursor:zoom-in;}
   .evo-svg text{font-size:11px;fill:var(--ink-soft);}
 
+  /* Kardex del producto (09.09.2026) — reusa el mismo lenguaje visual de .trend-* (mismo tooltip/leyenda),
+     con clases propias porque el trazo es un área de stock, no una línea de indicador semanal. */
+  .kdx-legend{display:flex;flex-wrap:wrap;gap:14px 16px;font-size:11.5px;color:var(--ink-soft);margin:0 0 6px;user-select:none;-webkit-user-select:none;}
+  .kdx-legend .lg-item{display:inline-flex;align-items:center;gap:6px;}
+  .kdx-legend .lg-swatch{width:16px;height:2px;border-radius:2px;background:var(--brand-2-dark);flex-shrink:0;}
+  .kdx-legend .lg-swatch.dashed{background:none;border-top:2px dashed currentColor;height:0;}
+  .kdx-svg{display:block;overflow:visible;max-width:100%;user-select:none;-webkit-user-select:none;}
+  .kdx-svg .kdx-grid{stroke:var(--border);stroke-width:1;}
+  .kdx-svg .kdx-zoom-overlay{fill:transparent;cursor:zoom-in;}
+  .kdx-svg .kdx-area{fill:var(--brand-2-dark);fill-opacity:.12;}
+  .kdx-svg .kdx-line{stroke:var(--brand-2-dark);stroke-width:2;fill:none;}
+  .kdx-svg .kdx-dot{fill:var(--brand-2-dark);cursor:pointer;}
+  .kdx-svg .kdx-rop{stroke:var(--red);stroke-width:1.5;stroke-dasharray:4 3;fill:none;pointer-events:none;}
+  .kdx-svg .kdx-seg{stroke:var(--seg-c);stroke-width:1.5;stroke-dasharray:4 3;fill:none;pointer-events:none;}
+  .kdx-svg .kdx-ref-label{font-size:11px;font-weight:600;pointer-events:none;}
+  .kdx-svg text{font-size:11.5px;fill:var(--ink-soft);}
+  .kdx-empty{font-size:12.5px;color:var(--ink-soft);padding:4px 0 10px;}
+
   .proc-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
   @media (max-width:960px){ .proc-kpi-grid{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:640px){ .proc-kpi-grid{grid-template-columns:1fr;} }
@@ -539,6 +557,17 @@
            anunciar en pantalla. drawHomologacionNote() ya no se llama, pero se mantiene por si hay que
            volver a mostrarlo; el detalle de cada producto sigue listando sus códigos homologados. -->
       <div id="alertasHomNote" style="display:none;"></div>
+
+      <!-- Kardex del producto (09.09.2026, pedido de Piero: "quiero que cuando se filtre así un solo
+           producto que abajo salga el detalle del kardex de este producto, cómo se fue moviendo con
+           ingresos y salidas"). Se arma con las hojas "Ingresos"/"Movimientos" de Reporte Almacen.xlsx
+           (ver parsePivotMensual/processAlmacen) y solo aparece cuando el buscador de arriba deja
+           exactamente 1 producto a la vista — ver kardexProductoActual/drawKardex. -->
+      <div class="card" id="kardexCard" style="padding:18px 20px 14px;margin-bottom:18px;display:none;">
+        <h3 style="margin:0 0 2px;font-size:14px;color:var(--ink);" id="kardexTitle">Kardex</h3>
+        <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;" id="kardexSub"></div>
+        <div id="kardexChart"></div>
+      </div>
 
       <!-- "Cuánto pedir por categoría" (08.09.2026, pedido de Piero: "cuánto es lo que se debería pedir
            para los productos que son críticos... por categorías (las mismas que se usan en módulo 2)...
@@ -1514,7 +1543,10 @@ function buildSnapshot(){
     // guardo la info"). Se publican los productos YA homologados y con su estado calculado — el mismo
     // arreglo que usa el módulo en memoria — con claves cortas. Son ~4,400 filas: pesa poco al lado de
     // proceso/gasto, que tienen decenas de miles.
-    almacenSchemaVersion: 1,
+    // Sube a 2 el 09.09.2026: se agrega "sg" (Stock Seguridad) y el kardex mensual (ki/km + kardexPeriods)
+    // para el detalle de un solo producto (ver drawKardex). Un snapshot viejo (<2) no trae ninguno de los
+    // 2 — loadFromSnapshot los deja en null y el kardex simplemente no se muestra hasta volver a publicar.
+    almacenSchemaVersion: 2,
     almacen: (ALMACEN_DATA && ALMACEN_DATA.rows) ? {
       filename: ALMACEN_DATA.filename,
       sheetName: ALMACEN_DATA.sheetName,
@@ -1528,14 +1560,19 @@ function buildSnapshot(){
       nHomologados: ALMACEN_DATA.nHomologados,
       nGruposHomologados: ALMACEN_DATA.nGruposHomologados,
       conflictosUm: ALMACEN_DATA.conflictosUm,
+      // Periodos del kardex (Ene 2025 en adelante), una sola vez para todo el módulo — no se repiten por
+      // producto. null si el Excel publicado no tenía las hojas "Ingresos"/"Movimientos".
+      kardexPeriods: ALMACEN_DATA.kardexPeriods || null,
       // Redondeo a 2 decimales: son cantidades de almacén, no hace falta más, y recorta el JSON.
       rows: ALMACEN_DATA.rows.map(r => {
         const n = v => (v==null ? null : Math.round(v*100)/100);
+        const na = arr => arr ? arr.map(n) : undefined;
         return {
           c: r.codigo, cs: (r.nCodigos>1 ? r.codigos : undefined), d: r.descripcion, u: r.unidad,
           i: n(r.ica), l: n(r.lima), t: n(r.trujillo), tr: n(r.transito),
           rv: n(r.reserva), pk: n(r.picking), rp: n(r.rop), eq: n(r.eoq),
-          cm: n(r.consumoMensual), cb: n(r.cobertura),
+          cm: n(r.consumoMensual), cb: n(r.cobertura), sg: n(r.stockSeguridad),
+          ki: na(r.kardexIngresos), km: na(r.kardexMovimientos),
         };
       }),
     } : null,
@@ -1743,12 +1780,17 @@ function loadFromSnapshot(snap){
     fromSnapshot: true,
     // El estado y el stock que cuenta para el ROP se RECALCULAN acá, no se publican: así el link
     // público usa siempre la regla vigente (ver stockParaReposicion) y no una congelada al publicar.
+    // kardexPeriods/ki/km (09.09.2026): un snapshot viejo (almacenSchemaVersion < 2) no los trae — quedan
+    // en null/undefined y el kardex simplemente no aparece hasta volver a publicar con el Excel actual.
+    kardexPeriods: snap.almacen.kardexPeriods || null,
     rows: snap.almacen.rows.map(r => conEstadoRepo({
       codigo: r.c, codigos: (r.cs || [r.c]), nCodigos: (r.cs ? r.cs.length : 1),
       descripcion: r.d || "", unidad: r.u || "",
       ica: r.i||0, lima: r.l||0, trujillo: r.t||0, transito: r.tr||0,
       reserva: r.rv||0, picking: r.pk||0, rop: r.rp||0,
       eoq: (r.eq!=null?r.eq:null), consumoMensual: (r.cm!=null?r.cm:null), cobertura: (r.cb!=null?r.cb:null),
+      stockSeguridad: (r.sg!=null?r.sg:null),
+      kardexIngresos: r.ki || undefined, kardexMovimientos: r.km || undefined,
       disponible: (r.l||0) + (r.tr||0) - (r.rv||0) - (r.pk||0),
     })),
   }) : null;
@@ -2434,6 +2476,52 @@ function firmaProducto(desc){
 // alerta a 13,325 filas sin que ninguna sea accionable. Fill-rate real del archivo, para tenerlo
 // presente: ROP 4,444 · Consumo Mensual y Cobertura 4,722 · EOQ solo 2,112 · ICA/LIMA/TRUJILLO/tránsito
 // las 15,317.
+// Lee una tabla dinámica de Excel "código × mes" (hojas "Ingresos"/"Movimientos" de Reporte Almacen.xlsx,
+// agregadas el 09.09.2026). Formato real verificado con el archivo de Piero: una fila con "20XX" en la
+// columna del primer mes de ese año (celda combinada, solo aparece en la primera columna del año), la
+// fila siguiente con las 21 etiquetas de mes (Ene 2025 → Set 2026), una fila "Etiquetas de fila" y de ahí
+// para abajo una fila por código con su valor mensual, terminando en una fila "Total general". No se
+// asume la posición exacta de columnas (aparte de que el código homologado "traduce" nombre de hoja, y a
+// futuro con más meses la tabla dinámica crece hacia la derecha), así que esta función encuentra las 2
+// filas de encabezado buscándolas, en vez de asumir número de fila u columna fijos.
+const MESES_KEY = {ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,set:9,sep:9,oct:10,nov:11,dic:12};
+function parsePivotMensual(wb, sheetName){
+  if(!sheetName || !wb.Sheets[sheetName]) return null;
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, raw:true, defval:null});
+  let yearRowIdx = -1, labelRowIdx = -1;
+  for(let i=0; i<Math.min(12, rows.length); i++){
+    const row = rows[i] || [];
+    if(yearRowIdx===-1 && row.some(c => /^20\d\d$/.test(String(c==null?'':c).trim()))) yearRowIdx = i;
+    if(String(row[0]==null?'':row[0]).trim().toLowerCase()==='etiquetas de fila'){ labelRowIdx = i; break; }
+  }
+  if(yearRowIdx===-1 || labelRowIdx===-1 || labelRowIdx <= yearRowIdx) return null;
+  const yearRow = rows[yearRowIdx], monthRow = rows[yearRowIdx+1] || [];
+  const periods = [];
+  let curYear = null;
+  for(let c=1; c<Math.max(yearRow.length, monthRow.length); c++){
+    const yv = yearRow[c];
+    if(yv!=null && /^20\d\d$/.test(String(yv).trim())) curYear = parseInt(yv, 10);
+    const mv = monthRow[c];
+    const mKey = mv==null ? null : MESES_KEY[String(mv).trim().toLowerCase().replace(/\.$/,'')];
+    if(!mKey || !curYear) break; // llegamos a la columna "Total general" (o similar): ahí termina la tabla
+    periods.push({ col:c, year:curYear, month:mKey, key: curYear + '-' + String(mKey).padStart(2,'0') });
+  }
+  if(!periods.length) return null;
+  const byCodigo = {};
+  for(let i=labelRowIdx+1; i<rows.length; i++){
+    const row = rows[i];
+    if(!row || row[0]==null) continue;
+    const codigo = String(row[0]).trim();
+    if(!codigo || /^total general$/i.test(codigo)) continue;
+    const porPeriodo = {};
+    periods.forEach(p=>{
+      const v = row[p.col];
+      porPeriodo[p.key] = (typeof v === 'number' && isFinite(v)) ? v : ((v!=null && v!=="" && isFinite(Number(v))) ? Number(v) : 0);
+    });
+    byCodigo[codigo] = porPeriodo;
+  }
+  return { periods, byCodigo };
+}
 function processAlmacen(wb, filename){
   let sheetName = wb.SheetNames.find(n => /an[áa]lisis.*inventario/i.test(n.trim()));
   if(!sheetName) sheetName = wb.SheetNames.find(n => /inventario|stock/i.test(n.trim()));
@@ -2464,6 +2552,9 @@ function processAlmacen(wb, filename){
     eoq: findCol(headerRow, ["EOQ"]),
     consumoMensual: findCol(headerRow, ["Consumo Mensual"]),
     cobertura: findCol(headerRow, ["Cobertura (meses)","Cobertura"]),
+    // Stock Seguridad (09.09.2026): no se usaba hasta ahora — hace falta como línea de referencia en el
+    // kardex (ver drawKardex). Es la columna M de "Análisis Inventario".
+    stockSeguridad: findCol(headerRow, ["Stock Seguridad","Stock de Seguridad"]),
   };
   const faltantes = [];
   if(col.codigo===-1) faltantes.push("Código");
@@ -2512,6 +2603,7 @@ function processAlmacen(wb, filename){
       eoq: col.eoq!==-1 ? num(r[col.eoq]) : null,
       consumoMensual: col.consumoMensual!==-1 ? num(r[col.consumoMensual]) : null,
       cobertura: col.cobertura!==-1 ? num(r[col.cobertura]) : null,
+      stockSeguridad: col.stockSeguridad!==-1 ? num(r[col.stockSeguridad]) : null,
       disponible: lima + transito - reserva - picking,
     }));
   }
@@ -2537,6 +2629,7 @@ function processAlmacen(wb, filename){
       ica: sum('ica'), lima, trujillo: sum('trujillo'), transito, reserva, picking, rop,
       eoq: g.some(x=>x.eoq!=null) ? sum('eoq') : null,
       consumoMensual: g.some(x=>x.consumoMensual!=null) ? sum('consumoMensual') : null,
+      stockSeguridad: g.some(x=>x.stockSeguridad!=null) ? sum('stockSeguridad') : null,
       disponible: lima + transito - reserva - picking,
     }));
   });
@@ -2548,6 +2641,32 @@ function processAlmacen(wb, filename){
     return Object.keys(ums).length > 1;
   }).map(f => porFirma[f].map(r=>({ codigo:r.codigo, unidad:(r.unidad||'').trim(), descripcion:r.descripcion })));
 
+  // --- Kardex: hojas "Ingresos" y "Movimientos" (09.09.2026) ---
+  // Pedido de Piero: al filtrar el buscador a un solo producto, mostrar abajo el kardex (cómo se fue
+  // moviendo el stock con ingresos y salidas), con un gráfico con zoom/arrastre y líneas de ROP y Stock
+  // de Seguridad. Las 2 hojas nuevas son tablas dinámicas de Excel por código × mes (Ene 2025 en
+  // adelante) — "Ingresos" = cuánto entró, "Movimientos" = cuánto salió (su "Consumo Mensual" por código
+  // coincide exacto con el de "Análisis Inventario", verificado contra el archivo real: código
+  // 004300500164 → 21.52 en ambas hojas). Se agregan por producto YA homologado (sumando los códigos
+  // gemelos, igual que el resto de esta función) para que el kardex hable del mismo producto que ve Piero.
+  const kardexIng = parsePivotMensual(wb, wb.SheetNames.find(n=>/ingres/i.test(n)));
+  const kardexMov = parsePivotMensual(wb, wb.SheetNames.find(n=>/movimient/i.test(n)));
+  let kardexPeriods = null;
+  if(kardexIng || kardexMov){
+    // Unión de los periodos de ambas hojas, por si alguna trae un mes que la otra todavía no (ej. recién
+    // se generó una y no la otra) — ordenados cronológicamente. En el archivo real ambas traen los mismos
+    // 21 meses (Ene 2025 a Set 2026).
+    const porKey = {};
+    (kardexIng ? kardexIng.periods : []).concat(kardexMov ? kardexMov.periods : []).forEach(p=>{ porKey[p.key] = p; });
+    kardexPeriods = Object.keys(porKey).map(k=>porKey[k]).sort((a,b)=> a.key.localeCompare(b.key));
+    productos.forEach(p=>{
+      const codigos = p.codigos || [p.codigo];
+      const sumaPeriodo = (fuente, key) => codigos.reduce((a,c)=> a + (((fuente && fuente[c]) || {})[key] || 0), 0);
+      p.kardexIngresos = kardexPeriods.map(per => sumaPeriodo(kardexIng && kardexIng.byCodigo, per.key));
+      p.kardexMovimientos = kardexPeriods.map(per => sumaPeriodo(kardexMov && kardexMov.byCodigo, per.key));
+    });
+  }
+
   ALMACEN_DATA = {
     rows: productos, sedes: ALMACEN_SEDES.filter(sd=>sedeIdx[sd]!==undefined),
     totalRows: dataRows.length, sinRop, excluidas, filename, sheetName,
@@ -2556,6 +2675,7 @@ function processAlmacen(wb, filename){
     nHomologados: productos.filter(p=>p.nCodigos>1).reduce((a,p)=>a+p.nCodigos, 0),
     nGruposHomologados: productos.filter(p=>p.nCodigos>1).length,
     conflictosUm,
+    kardexPeriods,
   };
   const nRepo = productos.filter(r=>r.estado==='reposicion').length;
   const extraHom = ALMACEN_DATA.nGruposHomologados
@@ -3426,6 +3546,15 @@ function reposicionScopeRows(){
   // Busca en TODOS los códigos homologados del producto, no solo en el principal.
   return rows.filter(r => ((r.codigos||[r.codigo]).join(' ') + ' ' + r.descripcion).toLowerCase().includes(q));
 }
+// Devuelve el producto a mostrar en el kardex: solo cuando el buscador de arriba (con algo escrito)
+// deja exactamente 1 producto a la vista (pedido de Piero, 09.09.2026: "cuando se filtre así un solo
+// producto"). Con el buscador vacío o con más de un resultado no hay kardex que mostrar.
+function kardexProductoActual(){
+  const q = (document.getElementById('searchReposicion').value||"").trim();
+  if(!q) return null;
+  const scope = reposicionScopeRows();
+  return scope.length === 1 ? scope[0] : null;
+}
 function filteredReposicionRows(){
   // El select pasó a ser "qué hay que pedir" (pedir / todos / nopedir) el 09.09.2026. Esta función
   // alimenta la tabla de inventario, que está oculta, así que se traduce al estado equivalente para no
@@ -3531,6 +3660,7 @@ function drawAlertas(){
     <div class="card kpi${nRepo>0?' alert-card':''}"><div class="label">En reposición</div><div class="value${nRepo>0?' alert-n':''}">${nRepo.toLocaleString('es-PE')}</div><div class="sub">stock por debajo del ROP</div></div>
     <div class="card kpi"><div class="label">Sin stock en Lima</div><div class="value">${nSinLima.toLocaleString('es-PE')}</div><div class="sub">stock en 0 en el almacén central</div></div>
   `;
+  drawKardex();
   drawPedirPorCategoria();
 }
 // Deja a la vista qué juntó la homologación y qué no pudo juntar (misma descripción, distinta unidad de
@@ -3557,6 +3687,205 @@ function drawHomologacionNote(){
   box.className = 'note' + (cf.length ? ' warn' : '');
   box.style.display = '';
   box.innerHTML = partes.join('<br><br>');
+}
+
+// ---------- Kardex del producto (09.09.2026) ----------
+// Pedido de Piero: "quiero que cuando se filtre así un solo producto que abajo salga el detalle del
+// kardex de este producto, cómo se fue moviendo con ingresos y salidas... quiero que en el diseño del
+// grafico se evidencie el stock actual al pasar el mouse por encima, asimismo que estén las lineas de rop
+// y de stock de seguridad, por favor hazlo bien y el gráfico con la funcion de acercar y mover que ya
+// habias trabajado antes". Datos: parsePivotMensual() sobre las hojas "Ingresos"/"Movimientos" (ver
+// processAlmacen), ya agregadas por producto homologado. El stock de cada mes se reconstruye HACIA ATRÁS
+// desde el stock actual (el mismo que usa el resto del módulo, stockParaReposicion): stock al final de un
+// mes = stock de hoy menos el efecto neto (ingresos − salidas) de los meses posteriores — así el último
+// punto del gráfico SIEMPRE coincide exacto con el stock que ya muestra el resto del módulo, y no es una
+// cifra recalculada aparte. Zoom (rueda, centrado en el cursor) y arrastre (clic sostenido) reusan tal
+// cual el patrón ya construido para drawIndicatorTrend()/.trend-svg.
+let kardexZoom = { startIdx: null, endIdx: null };
+let kardexLastKey = null;
+const MESES_LABEL = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
+function drawKardex(){
+  const card = document.getElementById('kardexCard');
+  const producto = kardexProductoActual();
+  if(!producto){ card.style.display = 'none'; kardexLastKey = null; return; }
+  card.style.display = '';
+  document.getElementById('kardexTitle').textContent = 'Kardex — ' + producto.codigo
+    + (producto.nCodigos>1 ? ' (' + producto.nCodigos + ' códigos homologados)' : '');
+  document.getElementById('kardexSub').textContent = (producto.descripcion||'').trim();
+
+  const periods = ALMACEN_DATA.kardexPeriods;
+  if(!periods || !periods.length || !producto.kardexIngresos){
+    document.getElementById('kardexChart').innerHTML = '<div class="kdx-empty">Para ver el kardex de este producto, tu Reporte Almacen.xlsx debe tener las hojas "Ingresos" y "Movimientos" (o hay que volver a "☁ Guardar y compartir" si el link publicado es de antes de que existieran).</div>';
+    kardexLastKey = null;
+    return;
+  }
+  const key = producto.codigo;
+  if(kardexLastKey !== key){ kardexZoom = { startIdx: null, endIdx: null }; kardexLastKey = key; }
+
+  const n = periods.length;
+  const stockFin = new Array(n);
+  let cur = producto.stockRepo;
+  for(let i=n-1; i>=0; i--){
+    stockFin[i] = cur;
+    cur = cur - (producto.kardexIngresos[i]||0) + (producto.kardexMovimientos[i]||0);
+  }
+
+  const zoomed = kardexZoom.startIdx!=null && kardexZoom.endIdx!=null;
+  const idxView = (zoomed ? periods.slice(kardexZoom.startIdx, kardexZoom.endIdx+1) : periods).map((p,li)=> (zoomed ? kardexZoom.startIdx : 0) + li);
+
+  const W = 900, H = 300, padL = 46, padR = 14, padT = 16, padB = 26;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+
+  const allVals = idxView.map(i=>stockFin[i]);
+  if(producto.rop!=null) allVals.push(producto.rop);
+  if(producto.stockSeguridad!=null) allVals.push(producto.stockSeguridad);
+  if(!allVals.length) allVals.push(1);
+  const { step: gridStep, niceMin: minVal, niceMax: maxVal } = niceAxisRange(allVals, 4);
+
+  const xFor = (localI)=> padL + (idxView.length===1 ? plotW/2 : (localI/(idxView.length-1))*plotW);
+  const yFor = (v)=> padT + plotH - ((v-minVal)/(maxVal-minVal))*plotH;
+
+  let gridSvg = '';
+  for(let v=0; v<=maxVal+1e-9; v+=gridStep){
+    const y = yFor(v);
+    gridSvg += `<line class="kdx-grid" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line><text x="${padL-8}" y="${y+3}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+  let refSvg = '';
+  const yRop = producto.rop!=null ? yFor(producto.rop) : null;
+  const ySeg = producto.stockSeguridad!=null ? yFor(producto.stockSeguridad) : null;
+  // Halo blanco detrás del texto (paint-order:stroke): la última línea de datos suele caer justo en esta
+  // zona (es la más reciente y la que motiva mirar el kardex), así que sin esto la etiqueta se mezclaba
+  // con el punto/línea de stock. Con el halo se lee igual encima de cualquier cosa.
+  const refLabelStyle = color => `fill:${color};paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;`;
+  if(yRop!=null){
+    refSvg += `<line class="kdx-rop" x1="${padL}" y1="${yRop}" x2="${W-padR}" y2="${yRop}"></line><text class="kdx-ref-label" style="${refLabelStyle('var(--red)')}" x="${W-padR}" y="${yRop-4}" text-anchor="end">ROP ${Math.round(producto.rop*10)/10}</text>`;
+  }
+  if(ySeg!=null){
+    // El ROP y el stock de seguridad suelen quedar muy cerca (el ROP es stock de seguridad + consumo del
+    // lead time) — si sus líneas están a menos de 14px, la etiqueta de "Stock seguridad" se aleja un poco
+    // más de la del ROP para que no se encimen una sobre la otra.
+    const yLabel = (yRop!=null && Math.abs(ySeg-yRop) < 14) ? yRop+14 : ySeg+12;
+    refSvg += `<line class="kdx-seg" x1="${padL}" y1="${ySeg}" x2="${W-padR}" y2="${ySeg}"></line><text class="kdx-ref-label" style="${refLabelStyle('var(--seg-c)')}" x="${W-padR}" y="${yLabel}" text-anchor="end">Stock seguridad ${Math.round(producto.stockSeguridad*10)/10}</text>`;
+  }
+
+  const pts = idxView.map((i,li)=>[xFor(li), yFor(stockFin[i])]);
+  const linePath = pts.map((p,li)=>(li===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const baseY = yFor(minVal).toFixed(1);
+  const areaPath = pts.length ? linePath + ` L${pts[pts.length-1][0].toFixed(1)},${baseY} L${pts[0][0].toFixed(1)},${baseY} Z` : '';
+
+  const monthLabel = p => MESES_LABEL[p.month-1] + ' ' + String(p.year).slice(2);
+  const labelStep = Math.max(1, Math.ceil(idxView.length/8));
+  const xLabelsSvg = idxView.map((i,li)=> (li%labelStep===0 || li===idxView.length-1)
+    ? `<text x="${xFor(li)}" y="${H-6}" text-anchor="middle">${monthLabel(periods[i])}</text>` : '').join('');
+
+  const dotsSvg = idxView.map((i,li)=>{
+    const [x,y] = [xFor(li), yFor(stockFin[i])];
+    const lbl = monthLabel(periods[i]) + (i===n-1 ? ' (actual)' : '');
+    return `<circle class="kdx-dot" cx="${x}" cy="${y}" r="4" data-label="${escapeHtml(lbl)}" data-stock="${stockFin[i].toFixed(2)}" data-ing="${(producto.kardexIngresos[i]||0).toFixed(2)}" data-mov="${(producto.kardexMovimientos[i]||0).toFixed(2)}"></circle>`;
+  }).join('');
+
+  const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado</span>`
+    + (producto.rop!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--red);"></span>ROP</span>` : '')
+    + (producto.stockSeguridad!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-c);"></span>Stock de seguridad</span>` : '')
+    + `</div>`;
+
+  const chart = document.getElementById('kardexChart');
+  chart.innerHTML = `${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+    ${gridSvg}
+    <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
+    <path class="kdx-area" d="${areaPath}"></path>
+    <path class="kdx-line" d="${linePath}"></path>
+    ${dotsSvg}
+    ${refSvg}
+    ${xLabelsSvg}
+  </svg><div class="trend-tooltip" id="kardexTooltip"></div>`;
+
+  // Zoom con la rueda del mouse, centrado en el cursor, y arrastre para desplazarse dentro del rango con
+  // zoom — mismo patrón exacto de drawIndicatorTrend() (ver ahí el porqué de cada detalle).
+  const overlay = document.getElementById('kardexZoomOverlay');
+  const svgXFromClientX = (clientX)=>{
+    const rect = chart.querySelector('.kdx-svg').getBoundingClientRect();
+    return (clientX - rect.left) * (W / rect.width);
+  };
+  overlay.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const curStart = zoomed ? kardexZoom.startIdx : 0;
+    const curEnd = zoomed ? kardexZoom.endIdx : n-1;
+    const curLen = curEnd - curStart + 1;
+
+    const x = svgXFromClientX(e.clientX);
+    let localIdx = 0, bestD = Infinity;
+    idxView.forEach((gi,li)=>{ const d = Math.abs(xFor(li)-x); if(d<bestD){ bestD=d; localIdx=li; } });
+    const pivotIdx = curStart + localIdx;
+    const fraction = curLen>1 ? localIdx/(curLen-1) : 0.5;
+
+    const ZOOM_FACTOR = 0.8;
+    const zoomingIn = e.deltaY < 0;
+    let newLen = zoomingIn ? Math.round(curLen*ZOOM_FACTOR) : Math.round(curLen/ZOOM_FACTOR);
+    newLen = Math.max(2, Math.min(n, newLen));
+
+    if(newLen >= n){
+      if(!zoomed) return;
+      kardexZoom = { startIdx: null, endIdx: null };
+      drawKardex();
+      return;
+    }
+    let newStart = Math.round(pivotIdx - fraction*(newLen-1));
+    newStart = Math.max(0, Math.min(n-newLen, newStart));
+    const newEnd = newStart + newLen - 1;
+    if(newStart===curStart && newEnd===curEnd) return;
+    kardexZoom = { startIdx: newStart, endIdx: newEnd };
+    drawKardex();
+  }, { passive:false });
+
+  const tooltip = document.getElementById('kardexTooltip');
+  chart.querySelectorAll('.kdx-dot').forEach(dot=>{
+    dot.addEventListener('mouseenter', ()=>{
+      tooltip.innerHTML = `<b>${dot.dataset.label}</b><br>Stock: ${Number(dot.dataset.stock).toLocaleString('es-PE',{maximumFractionDigits:2})}<br>Ingresos del mes: ${Number(dot.dataset.ing).toLocaleString('es-PE',{maximumFractionDigits:2})} · Salidas: ${Number(dot.dataset.mov).toLocaleString('es-PE',{maximumFractionDigits:2})}`;
+      tooltip.style.display = 'block';
+    });
+    dot.addEventListener('mousemove', (e)=>{
+      const rect = chart.getBoundingClientRect();
+      tooltip.style.left = (e.clientX - rect.left + 12) + 'px';
+      tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+    });
+    dot.addEventListener('mouseleave', ()=>{ tooltip.style.display = 'none'; });
+  });
+
+  if(zoomed){
+    const curStart = kardexZoom.startIdx, curEnd = kardexZoom.endIdx;
+    const curLen = curEnd - curStart + 1;
+    const spacing = idxView.length>1 ? (xFor(1)-xFor(0)) : plotW;
+    let panStartClientX = 0;
+    const onPanMove = (clientX)=>{
+      const dxSvg = svgXFromClientX(clientX) - svgXFromClientX(panStartClientX);
+      const shift = Math.round(-dxSvg / spacing);
+      const newStart = Math.max(0, Math.min(n-curLen, curStart+shift));
+      const newEnd = newStart+curLen-1;
+      if(newStart!==kardexZoom.startIdx || newEnd!==kardexZoom.endIdx){
+        kardexZoom = { startIdx: newStart, endIdx: newEnd };
+        drawKardex();
+      }
+    };
+    const onMouseMove = (e)=> onPanMove(e.clientX);
+    const onMouseUp = ()=>{
+      overlay.style.cursor = 'grab';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    overlay.style.cursor = 'grab';
+    overlay.addEventListener('mousedown', (e)=>{
+      e.preventDefault();
+      panStartClientX = e.clientX;
+      overlay.style.cursor = 'grabbing';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    });
+    let touchPanning = false;
+    overlay.addEventListener('touchstart', (e)=>{ touchPanning = true; panStartClientX = e.touches[0].clientX; }, { passive:true });
+    overlay.addEventListener('touchmove', (e)=>{ if(touchPanning) onPanMove(e.touches[0].clientX); }, { passive:true });
+    overlay.addEventListener('touchend', ()=>{ touchPanning = false; });
+  }
 }
 
 // ---------- Cuánto pedir por categoría (08.09.2026) ----------
