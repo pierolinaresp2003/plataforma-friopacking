@@ -516,7 +516,7 @@
            #gastoDefNote y #procesoDefNote: se deja el elemento en el HTML (con el texto de referencia de
            las reglas del módulo) en display:none, no se borra de raíz. -->
       <div class="note" id="alertasDefNote" style="display:none;">
-        <b>Qué muestra este módulo:</b> el inventario de los productos con <b>punto de reorden (ROP) definido</b>, según la hoja "Análisis Inventario" de tu Reporte Almacen.xlsx — es una foto del momento (no depende de fechas). <b>Estado</b> = "REPOSICIÓN" cuando <b>LIMA + EN TRÁNSITO</b> es menor o igual al ROP, "OK" si lo supera. <b>Stock disponible</b> = LIMA + EN TRÁNSITO − RESERVA − PICKING. Reserva y picking vienen de la Plataforma Almacén: mientras no estén en el Excel se leen como 0.
+        <b>Qué muestra este módulo:</b> el inventario de los productos con <b>punto de reorden (ROP) definido</b>, según la hoja "Análisis Inventario" de tu Reporte Almacen.xlsx — es una foto del momento (no depende de fechas). <b>Estado</b> = "REPOSICIÓN" cuando el stock es menor o igual al ROP, "OK" si lo supera. El stock que cuenta es <b>LIMA + EN TRÁNSITO + ICA + TRUJILLO</b>, salvo cuando la unidad de medida es <b>MTS</b>: ahí solo <b>LIMA + EN TRÁNSITO</b>, porque los metros ya cortados no se traen de otra sede. <b>Stock disponible</b> = LIMA + EN TRÁNSITO − RESERVA − PICKING. Reserva y picking vienen de la Plataforma Almacén: mientras no estén en el Excel se leen como 0.
       </div>
       <!-- Búsqueda general del módulo, al inicio (pedido de Piero, 08.09.2026: "esto debe estar al
            inicio como búsqueda general"): filtra TODO el módulo — tarjetas KPI, el resumen de "Cuánto
@@ -547,7 +547,7 @@
         <!-- Título y nota de metodología ocultos a pedido de Piero (09.09.2026, comentario en el
              artefacto: "quita esto") — mismo criterio que las otras notas del módulo. -->
         <h3 style="display:none;margin:0 0 4px;font-size:14px;color:var(--ink);">Cuánto pedir, por categoría</h3>
-        <p style="display:none;margin:0 0 12px;font-size:12.5px;color:var(--ink-soft);line-height:1.5;">Solo los productos en <b>REPOSICIÓN</b>. Cantidad a pedir = <b>consumo mensual × meses − (LIMA + EN TRÁNSITO)</b>. La categoría se resuelve por código de producto con la misma homologación de Concentración de Gasto.</p>
+        <p style="display:none;margin:0 0 12px;font-size:12.5px;color:var(--ink-soft);line-height:1.5;">Solo los productos en <b>REPOSICIÓN</b>. Cantidad a pedir = <b>consumo mensual × meses − stock</b>, con el mismo stock que define el estado. La categoría se resuelve por código de producto con la misma homologación de Concentración de Gasto.</p>
         <div class="toolbar">
           <label style="font-size:13px;color:var(--ink);display:inline-flex;align-items:center;gap:8px;font-weight:600;">Meses a abastecer
             <input type="number" id="mesesAbastecer" value="3" min="0.5" max="36" step="0.5" style="width:92px;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--ink);font-weight:700;">
@@ -2302,6 +2302,28 @@ let ALMACEN_DATA = null;
 // Sedes con stock en columna propia dentro de la hoja "Análisis Inventario" (verificado contra el
 // archivo real de Piero, 08.09.2026 — no existe una columna única "Almacén").
 const ALMACEN_SEDES = ['ICA','LIMA','TRUJILLO'];
+// ---------- Qué stock cuenta para el punto de reorden (09.09.2026) ----------
+// Piero: "considera los 3 almacenes como stock general para el cálculo, pero solo si tienen unidad de
+// medida distinta a MTS". Lo que se cuenta por unidades (candados, tuercas, válvulas) se puede traer de
+// otra sede, así que Ica y Trujillo entran al stock; los metros de cable ya están cortados y no se
+// traen de vuelta, así que ahí solo cuenta Lima.
+// Este MISMO stock es el que se compara contra el ROP para decidir si hay que pedir Y el que se
+// descuenta de la cantidad a pedir (ver pedirRowsFor) — si no, el módulo se contradice: marcaría un
+// producto como "hay que pedir" y después le descontaría un stock distinto.
+const ALMACEN_UM_SIN_TRASLADO = ['MTS'];
+function stockParaReposicion(r){
+  const um = (r.unidad || '').trim().toUpperCase();
+  const traslada = ALMACEN_UM_SIN_TRASLADO.indexOf(um) === -1;
+  return r.lima + r.transito + (traslada ? ((r.ica||0) + (r.trujillo||0)) : 0);
+}
+// Completa un producto con su stock para reposición, cuánto le falta para el ROP y su estado.
+function conEstadoRepo(o){
+  const stockRepo = stockParaReposicion(o);
+  o.stockRepo = stockRepo;
+  o.faltante = o.rop - stockRepo;
+  o.estado = stockRepo <= o.rop ? 'reposicion' : 'ok';
+  return o;
+}
 // ---------- Homologación de códigos por descripción (09.09.2026) ----------
 // Pedido de Piero: "004300300421 / 004300300313 estos 2 codigos son lo mismo, ambos son rz1 y de la
 // medida 3g1.5, a eso me refería con que debes homologar los códigos, no solo de cables sino de todos
@@ -2353,7 +2375,8 @@ function firmaProducto(desc){
 //   CODIGO, DESCRIPCIÓN, UM(=Medida), ICA, LIMA, TRUJILLO, EN TRÁNSITO(=Stock en tránsito), RESERVA,
 //   PICKING, ROP(=Punto de Reorden), EOQ, CONSUMO MENSUAL, COBERTURA (MESES),
 //   STOCK DISPONIBLE = LIMA + EN TRÁNSITO - RESERVA - PICKING,
-//   ESTADO = "REPOSICIÓN" si LIMA + EN TRÁNSITO <= ROP, si no "OK".
+//   ESTADO = "REPOSICIÓN" si el stock para reposición <= ROP, si no "OK" (ver stockParaReposicion:
+//     los 3 almacenes cuentan como stock general salvo cuando la unidad de medida es MTS).
 // Ojo: el estado y el stock disponible se miden SOLO contra LIMA (almacén central) + tránsito, no
 // contra el stock total de las 3 sedes — así lo definió Piero. ICA y TRUJILLO se muestran de referencia.
 // RESERVA y PICKING vienen de la "Plataforma Almacén", no del Excel: la columna "Reservas" del Reporte
@@ -2433,7 +2456,7 @@ function processAlmacen(wb, filename){
     const transito = val(r, col.transito);
     const reserva = val(r, col.reserva);
     const picking = val(r, col.picking);
-    almacenRows.push({
+    almacenRows.push(conEstadoRepo({
       codigo,
       descripcion: col.descripcion!==-1 ? txt(r[col.descripcion]) : "",
       unidad: col.unidad!==-1 ? txt(r[col.unidad]) : "",
@@ -2445,9 +2468,7 @@ function processAlmacen(wb, filename){
       consumoMensual: col.consumoMensual!==-1 ? num(r[col.consumoMensual]) : null,
       cobertura: col.cobertura!==-1 ? num(r[col.cobertura]) : null,
       disponible: lima + transito - reserva - picking,
-      faltante: rop - (lima + transito),
-      estado: (lima + transito) <= rop ? 'reposicion' : 'ok',
-    });
+    }));
   }
   // --- homologación: varios códigos que significan lo mismo pasan a ser UN producto ---
   const grupos = {}, ordenGrupos = [], porFirma = {};
@@ -2466,15 +2487,13 @@ function processAlmacen(wb, filename){
     const sum = f => g.reduce((a,x)=> a + (x[f]||0), 0);
     const lima = sum('lima'), transito = sum('transito'), reserva = sum('reserva'),
           picking = sum('picking'), rop = sum('rop');
-    return Object.assign({}, pri, {
+    return conEstadoRepo(Object.assign({}, pri, {
       codigos: g.map(x=>x.codigo).sort(), nCodigos: g.length,
       ica: sum('ica'), lima, trujillo: sum('trujillo'), transito, reserva, picking, rop,
       eoq: g.some(x=>x.eoq!=null) ? sum('eoq') : null,
       consumoMensual: g.some(x=>x.consumoMensual!=null) ? sum('consumoMensual') : null,
       disponible: lima + transito - reserva - picking,
-      faltante: rop - (lima + transito),
-      estado: (lima + transito) <= rop ? 'reposicion' : 'ok',
-    });
+    }));
   });
   // Mismo producto con unidad de medida distinta: no se puede sumar metros con unidades, así que esos
   // códigos quedan separados y se reportan para que Piero corrija el maestro.
@@ -3449,7 +3468,7 @@ function drawAlertas(){
   const nSinLima = all.filter(r=>r.lima<=0).length;
   document.getElementById('kpiGridAlertas').innerHTML = `
     <div class="card kpi"><div class="label">Productos en seguimiento</div><div class="value">${all.length.toLocaleString('es-PE')}</div><div class="sub">con punto de reorden definido${ALMACEN_DATA.nGruposHomologados ? ', ya homologados' : ''}</div></div>
-    <div class="card kpi${nRepo>0?' alert-card':''}"><div class="label">En reposición</div><div class="value${nRepo>0?' alert-n':''}">${nRepo.toLocaleString('es-PE')}</div><div class="sub">Lima + tránsito por debajo del ROP</div></div>
+    <div class="card kpi${nRepo>0?' alert-card':''}"><div class="label">En reposición</div><div class="value${nRepo>0?' alert-n':''}">${nRepo.toLocaleString('es-PE')}</div><div class="sub">stock por debajo del ROP</div></div>
     <div class="card kpi"><div class="label">Sin stock en Lima</div><div class="value">${nSinLima.toLocaleString('es-PE')}</div><div class="sub">stock en 0 en el almacén central</div></div>
   `;
   drawPedirPorCategoria();
@@ -3484,8 +3503,9 @@ function drawHomologacionNote(){
 // Pedido de Piero: saber cuánto habría que pedir de los productos críticos para cubrir los meses que él
 // escriba, agrupado por las mismas categorías del módulo 2 (Concentración de Gasto) y resuelto por
 // código de producto homologado. Decisiones confirmadas con él antes de programar:
-//   - "críticos" = los que el módulo ya marca en REPOSICIÓN (LIMA + EN TRÁNSITO <= ROP).
-//   - el stock que se descuenta es LIMA + EN TRÁNSITO (mismo criterio del estado; Ica y Trujillo no
+//   - "críticos" = los que el módulo ya marca en REPOSICIÓN (stock <= ROP).
+//   - el stock que se descuenta es el mismo que define el estado (09.09.2026: los 3 almacenes suman,
+//     salvo en MTS. Antes era solo LIMA + EN TRÁNSITO; Ica y Trujillo no
 //     entran, y reserva/picking tampoco por ahora — ver processAlmacen).
 //   - salida: resumen por categoría, con el detalle producto por producto al hacer clic.
 // La categoría sale de categoriaGenericaFor('', codigo, descripcion) — el mapa por código (Reporte
@@ -3512,7 +3532,10 @@ function pedirRowsFor(meses, modo){
   let sinConsumo = 0;
   for(const r of all){
     const conConsumo = (r.consumoMensual !== null && r.consumoMensual > 0);
-    const aPedirCrudo = conConsumo ? (r.consumoMensual * meses) - (r.lima + r.transito) : null;
+    // Se descuenta el MISMO stock que decidió el estado (ver stockParaReposicion): Lima + tránsito
+    // siempre, más Ica y Trujillo cuando la unidad de medida no es MTS.
+    const stock = (r.stockRepo != null) ? r.stockRepo : stockParaReposicion(r);
+    const aPedirCrudo = conConsumo ? (r.consumoMensual * meses) - stock : null;
     const hayQuePedir = (r.estado === 'reposicion') && conConsumo && aPedirCrudo > 0;
     if(modo === 'pedir'){
       if(r.estado !== 'reposicion') continue;
@@ -5535,7 +5558,7 @@ function buildProImageAlertas(){
   const nSinLima = all.filter(r=>r.lima<=0).length;
   const fmt = v => v==null ? '—' : v.toLocaleString('es-PE', {maximumFractionDigits:2});
   const kpis = [
-    { num:'📦', label:'PRODUCTOS EN REPOSICIÓN', value: repo.length.toLocaleString('es-PE'), valueLabel:'LIMA + TRÁNSITO BAJO EL ROP', metaLabel:'EN SEGUIMIENTO', metaValue: all.length.toLocaleString('es-PE'), color: repo.length>0?'#d03b3b':'#0ca30c' },
+    { num:'📦', label:'PRODUCTOS EN REPOSICIÓN', value: repo.length.toLocaleString('es-PE'), valueLabel:'STOCK BAJO EL ROP', metaLabel:'EN SEGUIMIENTO', metaValue: all.length.toLocaleString('es-PE'), color: repo.length>0?'#d03b3b':'#0ca30c' },
     { num:'⚠️', label:'SIN STOCK EN LIMA', value: nSinLima.toLocaleString('es-PE'), valueLabel:'STOCK EN 0 EN EL CENTRAL', metaLabel:'ESTADO', metaValue: nSinLima>0?'Atención':'OK', color: nSinLima>0?'#e2960a':'#0ca30c' },
   ];
   const view = repo.slice().sort((a,b)=> b.faltante-a.faltante).slice(0,8);
