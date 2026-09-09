@@ -1509,6 +1509,36 @@ function buildSnapshot(){
         a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100, no: Math.round(r.montoNativo*100)/100,
       })),
     } : null,
+    // Inventario · Almacén General (09.09.2026): faltaba publicarse, así que el link público mostraba
+    // el módulo 3 en blanco después de "Guardar y compartir" (Piero: "no se carga el modulo 3 cuando
+    // guardo la info"). Se publican los productos YA homologados y con su estado calculado — el mismo
+    // arreglo que usa el módulo en memoria — con claves cortas. Son ~4,400 filas: pesa poco al lado de
+    // proceso/gasto, que tienen decenas de miles.
+    almacenSchemaVersion: 1,
+    almacen: (ALMACEN_DATA && ALMACEN_DATA.rows) ? {
+      filename: ALMACEN_DATA.filename,
+      sheetName: ALMACEN_DATA.sheetName,
+      sedes: ALMACEN_DATA.sedes,
+      totalRows: ALMACEN_DATA.totalRows,
+      sinRop: ALMACEN_DATA.sinRop,
+      excluidas: ALMACEN_DATA.excluidas,
+      tieneReserva: ALMACEN_DATA.tieneReserva,
+      tienePicking: ALMACEN_DATA.tienePicking,
+      nCodigos: ALMACEN_DATA.nCodigos,
+      nHomologados: ALMACEN_DATA.nHomologados,
+      nGruposHomologados: ALMACEN_DATA.nGruposHomologados,
+      conflictosUm: ALMACEN_DATA.conflictosUm,
+      // Redondeo a 2 decimales: son cantidades de almacén, no hace falta más, y recorta el JSON.
+      rows: ALMACEN_DATA.rows.map(r => {
+        const n = v => (v==null ? null : Math.round(v*100)/100);
+        return {
+          c: r.codigo, cs: (r.nCodigos>1 ? r.codigos : undefined), d: r.descripcion, u: r.unidad,
+          i: n(r.ica), l: n(r.lima), t: n(r.trujillo), tr: n(r.transito),
+          rv: n(r.reserva), pk: n(r.picking), rp: n(r.rop), eq: n(r.eoq),
+          cm: n(r.consumoMensual), cb: n(r.cobertura),
+        };
+      }),
+    } : null,
   };
 }
 
@@ -1707,6 +1737,21 @@ function loadFromSnapshot(snap){
       anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo, montoNativo: (r.no!=null ? r.no : r.mo),
     })),
   } : null;
+  // Inventario · Almacén General (09.09.2026). Un snapshot publicado antes de esta ronda no trae
+  // "almacen": el módulo queda vacío y avisa que hay que volver a publicar, en vez de salir en blanco.
+  ALMACEN_DATA = (snap.almacen && snap.almacen.rows) ? Object.assign({}, snap.almacen, {
+    fromSnapshot: true,
+    // El estado y el stock que cuenta para el ROP se RECALCULAN acá, no se publican: así el link
+    // público usa siempre la regla vigente (ver stockParaReposicion) y no una congelada al publicar.
+    rows: snap.almacen.rows.map(r => conEstadoRepo({
+      codigo: r.c, codigos: (r.cs || [r.c]), nCodigos: (r.cs ? r.cs.length : 1),
+      descripcion: r.d || "", unidad: r.u || "",
+      ica: r.i||0, lima: r.l||0, trujillo: r.t||0, transito: r.tr||0,
+      reserva: r.rv||0, picking: r.pk||0, rop: r.rp||0,
+      eoq: (r.eq!=null?r.eq:null), consumoMensual: (r.cm!=null?r.cm:null), cobertura: (r.cb!=null?r.cb:null),
+      disponible: (r.l||0) + (r.tr||0) - (r.rv||0) - (r.pk||0),
+    })),
+  }) : null;
   populateGastoAnios();
   populateProcesoFilters();
   setStatus("Viendo datos publicados de " + (snap.filename || "un archivo") + ".", "ok");
@@ -3404,7 +3449,10 @@ function renderAlertas(){
     // (o, si no se reconoció ninguno, qué archivos sí entraron).
     const stAlm = fileState['almacen'];
     let msgAlm;
-    if(stAlm){
+    if(DATA && DATA.fromSnapshot){
+      msgAlm = 'Esta versión publicada del link <b>no trae los datos de inventario</b>. Se publicó antes de que este módulo viajara en el snapshot: '
+        + 'carga tu <b>Reporte Almacen.xlsx</b> con el ícono 📂 y usa <b>☁ Guardar y compartir</b> para actualizar el link.';
+    } else if(stAlm){
       msgAlm = '<b>Reporte Almacen.xlsx</b>: ' + stAlm.icon + ' ' + escapeHtml(stAlm.text);
     } else {
       const detalle = lastLoadFiles.map(f => {
@@ -3419,9 +3467,21 @@ function renderAlertas(){
           : 'Todavía no has cargado ningún archivo. ')
         + 'El nombre del archivo o de una de sus hojas tiene que contener "Almacen", "Inventario" o "Stock".';
     }
-    document.querySelector('#tableReposicion tbody').innerHTML = '<tr><td style="text-align:center;padding:24px;color:var(--muted);line-height:1.5;">' + msgAlm + '</td></tr>';
+    // El mensaje va en un aviso propio, NO dentro de la tabla: esa tabla está oculta desde el
+    // 09.09.2026, así que el módulo salía completamente en blanco y sin explicación cuando no había
+    // datos (Piero: "no se carga el modulo 3 cuando guardo la info").
+    document.querySelector('#tableReposicion tbody').innerHTML = '';
+    const cajaVacia = document.getElementById('alertasHomNote');
+    if(cajaVacia){
+      cajaVacia.className = 'note warn';
+      cajaVacia.style.display = '';
+      cajaVacia.innerHTML = msgAlm;
+    }
+    document.getElementById('pedirCard').style.display = 'none';
     return;
   }
+  const cajaVacia = document.getElementById('alertasHomNote');
+  if(cajaVacia) cajaVacia.style.display = 'none';
   populateReposicionFilters();
   if(!alertasListenersBound){
     ['searchReposicion','filterReposicionEstado','mesesAbastecer'].forEach(id=>{
