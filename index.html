@@ -265,6 +265,17 @@
   .pedir-card .pc-hint{margin-top:8px;font-size:10.5px;color:var(--muted);}
   .pedir-detalle-head{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:800;color:var(--ink);margin-bottom:4px;}
   .pedir-detalle-sub{font-size:12.5px;color:var(--ink-soft);margin-bottom:11px;}
+  /* Tabla del detalle por categoría: ancho fijo por columna (ver el colgroup en drawPedirDetalle) para
+     que los números no se lleven espacio de más y la descripción use el resto. La columna "A pedir" va
+     resaltada al final, que es el número por el que Piero entra a esta vista. */
+  .pedir-tabla{table-layout:fixed;width:100%;}
+  .pedir-tabla th,.pedir-tabla td{padding:8px 10px;}
+  .pedir-tabla th{white-space:normal;line-height:1.25;vertical-align:bottom;}
+  .pedir-tabla th.num,.pedir-tabla td.num{text-align:right;}
+  .pedir-tabla td{font-variant-numeric:tabular-nums;}
+  .pedir-tabla th.pedir-col{background:var(--brand);color:#fff;}
+  .pedir-tabla td.pedir-col{background:var(--surface-2);color:var(--brand-ink);font-weight:800;font-size:14px;border-left:2px solid var(--brand-2);}
+  .pedir-tabla tr:hover td.pedir-col{background:var(--surface-2-hover);}
   .pedir-volver{display:inline-block;font-size:12.5px;font-weight:700;color:var(--brand-ink);cursor:pointer;margin-bottom:12px;}
   .pedir-volver:hover{text-decoration:underline;}
   .cod-hom{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.35;}
@@ -479,7 +490,11 @@
            por debajo de su Stock Mínimo. Las funciones viejas de Requerimientos sin Pedido/Pedidos sin
            OC (metaAlerta, diasHabilesAlerta, filteredAlertRows, drawAlertasTable, alertCountsSimple)
            quedan sin usar pero NO se borraron, por si se quiere recuperar esa vista aparte más adelante. -->
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:10px;">
+      <!-- Los 2 botones de imagen quedan ocultos a pedido de Piero (09.09.2026, comentarios en el
+           artefacto: "QUITA ESTO" sobre cada uno). Se dejan en display:none, no borrados, porque
+           renderAlertas() les engancha su listener y downloadSectionImage/buildProImageAlertas siguen
+           existiendo para cuando quiera volver a generar la imagen de este módulo. -->
+      <div style="display:none;justify-content:flex-end;gap:10px;margin-bottom:10px;">
         <button class="btn secondary" id="btnProImgAlertas" type="button">🖼️ Resumen para compartir</button>
         <button class="btn secondary" id="btnImgAlertas" type="button">🖼️ Generar imagen del módulo</button>
       </div>
@@ -501,21 +516,27 @@
         </select>
       </div>
       <div class="kpi-grid" id="kpiGridAlertas"></div>
-      <!-- Resultado de la homologación de códigos por descripción y, si los hay, los códigos gemelos
-           con unidad de medida distinta (que no se pueden sumar). Ver firmaProducto()/processAlmacen. -->
+      <!-- Aviso del resultado de la homologación: oculto a pedido de Piero (09.09.2026, comentario en
+           el artefacto: "QUITA ESTO"). La homologación sigue aplicándose igual — solo se dejó de
+           anunciar en pantalla. drawHomologacionNote() ya no se llama, pero se mantiene por si hay que
+           volver a mostrarlo; el detalle de cada producto sigue listando sus códigos homologados. -->
       <div id="alertasHomNote" style="display:none;"></div>
 
       <!-- "Cuánto pedir por categoría" (08.09.2026, pedido de Piero: "cuánto es lo que se debería pedir
            para los productos que son críticos... por categorías (las mismas que se usan en módulo 2)...
            en base a los meses que yo quiera para abastecerme"). Ver drawPedirPorCategoria(). -->
       <div class="card" id="pedirCard" style="padding:18px 20px 14px;margin-bottom:18px;display:none;">
-        <h3 style="margin:0 0 4px;font-size:14px;color:var(--ink);">Cuánto pedir, por categoría</h3>
-        <p style="margin:0 0 12px;font-size:12.5px;color:var(--ink-soft);line-height:1.5;">Solo los productos en <b>REPOSICIÓN</b>. Cantidad a pedir = <b>consumo mensual × meses − (LIMA + EN TRÁNSITO)</b>. La categoría se resuelve por código de producto con la misma homologación de Concentración de Gasto.</p>
+        <!-- Título y nota de metodología ocultos a pedido de Piero (09.09.2026, comentario en el
+             artefacto: "quita esto") — mismo criterio que las otras notas del módulo. -->
+        <h3 style="display:none;margin:0 0 4px;font-size:14px;color:var(--ink);">Cuánto pedir, por categoría</h3>
+        <p style="display:none;margin:0 0 12px;font-size:12.5px;color:var(--ink-soft);line-height:1.5;">Solo los productos en <b>REPOSICIÓN</b>. Cantidad a pedir = <b>consumo mensual × meses − (LIMA + EN TRÁNSITO)</b>. La categoría se resuelve por código de producto con la misma homologación de Concentración de Gasto.</p>
         <div class="toolbar">
           <label style="font-size:13px;color:var(--ink);display:inline-flex;align-items:center;gap:8px;font-weight:600;">Meses a abastecer
             <input type="number" id="mesesAbastecer" value="3" min="0.5" max="36" step="0.5" style="width:92px;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--ink);font-weight:700;">
           </label>
-          <span id="pedirResumen" style="font-size:12.5px;color:var(--ink-soft);"></span>
+          <!-- Resumen "N productos a pedir en N categorías..." oculto a pedido de Piero (09.09.2026,
+               comentario en el artefacto: "quita esto"). drawPedirPorCategoria() lo sigue llenando. -->
+          <span id="pedirResumen" style="display:none;font-size:12.5px;color:var(--ink-soft);"></span>
         </div>
         <div id="chartPedir"></div>
         <div id="pedirDetalle" style="margin-top:14px;"></div>
@@ -3003,7 +3024,10 @@ function drawGasto(){
   }).join("");
   const headerHtml = view.length ? `<div class="bar-row" style="font-size:10.5px;font-weight:700;color:var(--muted);padding-bottom:2px;">
       <div class="bar-label"></div>
-      <div class="bar-track"></div>
+      <!-- Espaciador de la columna de la barra: sin fondo. Con la clase .bar-track completa se dibujaba
+           una barra gris vacía sobre el encabezado (Piero, 09.09.2026: "quita esto"). Sigue ocupando el
+           mismo ancho para que SOLES y DÓLARES queden alineados con las cifras de abajo. -->
+      <div style="flex:1;"></div>
       <div class="bar-pct" style="width:${COLW};">SOLES</div>
       <div class="bar-pct" style="width:${COLW};">DÓLARES</div>
     </div>` : '';
@@ -3386,7 +3410,6 @@ function drawAlertas(){
     <div class="card kpi${nRepo>0?' alert-card':''}"><div class="label">En reposición</div><div class="value${nRepo>0?' alert-n':''}">${nRepo.toLocaleString('es-PE')}</div><div class="sub">Lima + tránsito por debajo del ROP</div></div>
     <div class="card kpi"><div class="label">Sin stock en Lima</div><div class="value">${nSinLima.toLocaleString('es-PE')}</div><div class="sub">stock en 0 en el almacén central</div></div>
   `;
-  drawHomologacionNote();
   drawPedirPorCategoria();
 }
 // Deja a la vista qué juntó la homologación y qué no pudo juntar (misma descripción, distinta unidad de
@@ -3519,16 +3542,33 @@ function drawPedirDetalle(grupos){
       + escapeHtml(g.label) + '</div>'
     + '<div class="pedir-detalle-sub">' + g.n.toLocaleString('es-PE') + ' producto(s) a pedir · total: ' + totales
       + ' · ordenados de mayor a menor rotación</div>'
-    + '<div class="table-card card" style="max-height:520px;overflow:auto;"><table><thead><tr>'
-    + '<th>Código</th><th>Descripción</th><th>UM</th><th>Rotación (consumo/mes)</th><th>LIMA</th><th>En tránsito</th><th>ROP</th>'
-    + '<th>Cantidad a pedir</th></tr></thead><tbody>'
-    + rows.map(r=> '<tr><td style="white-space:normal;">' + escapeHtml(r.codigo)
-          + (r.nCodigos > 1 ? '<div class="cod-hom" title="Códigos homologados: significan lo mismo, así que su stock y su consumo se suman">+ ' + (r.nCodigos-1) + ' código(s): ' + escapeHtml(r.codigos.filter(c=>c!==r.codigo).join(', ')) + '</div>' : '') + '</td>'
-        + '<td style="white-space:normal;min-width:230px;">' + (escapeHtml(r.descripcion) || '—') + '</td>'
+    // Orden de columnas y ancho fijo pedidos por Piero (09.09.2026, comentario en el artefacto:
+    // "que no quede tanto espacio en blanco y que luego de UM vaya el stock en Lima Trujillo Ica /
+    // Luego el en tránsito / Luego la rotación / Luego el ROP y finalmente la cantidad a pedir al final
+    // resaltado"). table-layout:fixed + colgroup: los números se quedan en columnas angostas y la
+    // descripción se lleva todo el ancho sobrante, que es lo que dejaba el espacio en blanco.
+    + '<div class="table-card card" style="max-height:560px;overflow:auto;"><table class="pedir-tabla">'
+    + '<colgroup><col style="width:112px"><col><col style="width:52px">'
+    + '<col style="width:68px"><col style="width:76px"><col style="width:58px">'
+    + '<col style="width:80px"><col style="width:92px"><col style="width:80px"><col style="width:116px"></colgroup>'
+    + '<thead><tr>'
+    + '<th>Código</th><th>Descripción</th><th>UM</th>'
+    + '<th class="num">LIMA</th><th class="num">Trujillo</th><th class="num">ICA</th>'
+    + '<th class="num">En tránsito</th><th class="num">Rotación</th><th class="num">ROP</th>'
+    + '<th class="num pedir-col">A pedir</th></tr></thead><tbody>'
+    // Solo el código principal: Piero pidió no listar los códigos homologados debajo (09.09.2026,
+    // comentario en el artefacto: "no pongas esto"). La homologación sigue aplicándose — los códigos
+    // gemelos están en r.codigos y el buscador general los sigue encontrando.
+    + rows.map(r=> '<tr><td>' + escapeHtml(r.codigo) + '</td>'
+        + '<td style="white-space:normal;">' + (escapeHtml(r.descripcion) || '—') + '</td>'
         + '<td>' + (escapeHtml(r.unidad) || '—') + '</td>'
-        + '<td><b>' + fmt(r.consumoMensual) + '</b></td>'
-        + '<td>' + fmt(r.lima) + '</td><td>' + fmt(r.transito) + '</td><td>' + fmt(r.rop) + '</td>'
-        + '<td><b>' + fmt(arriba(r.aPedir)) + '</b></td></tr>').join('')
+        + '<td class="num">' + fmt(r.lima) + '</td>'
+        + '<td class="num">' + fmt(r.trujillo) + '</td>'
+        + '<td class="num">' + fmt(r.ica) + '</td>'
+        + '<td class="num">' + fmt(r.transito) + '</td>'
+        + '<td class="num"><b>' + fmt(r.consumoMensual) + '</b></td>'
+        + '<td class="num">' + fmt(r.rop) + '</td>'
+        + '<td class="num pedir-col">' + fmt(arriba(r.aPedir)) + '</td></tr>').join('')
     + '</tbody></table></div>';
   const volver = document.getElementById('pedirVolver');
   if(volver) volver.addEventListener('click', ()=>{ pedirCatSel = null; drawPedirPorCategoria(); });
