@@ -243,6 +243,13 @@
      gráfico es dato real y cuál es estimado. */
   .kdx-svg .kdx-line-proj{stroke:var(--seg-a);stroke-width:2;stroke-dasharray:6 4;fill:none;pointer-events:none;}
   .kdx-svg .kdx-band{fill:var(--seg-a);fill-opacity:.14;stroke:none;pointer-events:none;}
+  /* 15.09.2026, pregunta de Piero en el chat: "estas considerando en la simulacion el movimiento segun
+     desviacion estandar?" — sí se considera (ver sigma en drawKardex), pero cuando el Desvest del
+     producto es grande frente a su Consumo Diario, la banda ±1 desvest satura el eje casi de inmediato y
+     el relleno solo se ve como un fondo plano, indistinguible de "no hay banda". Se agrega el trazo de
+     los bordes superior/inferior de la banda (antes solo tenía relleno, sin stroke) para que el límite de
+     la incertidumbre se note aunque el relleno esté saturado. */
+  .kdx-svg .kdx-band-edge{stroke:var(--seg-a);stroke-width:1;stroke-dasharray:2 3;fill:none;opacity:.55;pointer-events:none;}
   .kdx-svg .kdx-dot-proj{fill:var(--card);stroke:var(--seg-a);stroke-width:2;cursor:pointer;}
   .kdx-legend .lg-swatch.proj{background:none;border-top:2px dashed var(--seg-a);height:0;}
   /* Rediseño 14.09.2026 (pedido de Piero, mostró un ejemplo de referencia: "en tu gráfico no se sabe casi
@@ -264,6 +271,18 @@
   .kdx-suc-btn{border:1px solid var(--border);background:var(--surface-2);color:var(--brand-ink);padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
   .kdx-suc-btn:hover{background:var(--surface-2-hover);}
   .kdx-suc-btn.active{background:var(--brand-2);color:#08281f;border-color:var(--brand-2);}
+
+  /* 15.09.2026, pedido de Piero en el chat: "debe salir en la parte de arriba como etiqueta grande qué
+     cantidad habría que pedir si es necesario o no" — etiqueta grande arriba del todo del Kardex. Reusa
+     TAL CUAL el mismo cálculo que ya arma la columna "A pedir" de "Cuánto pedir por categoría"
+     (pedirRowsFor, ver drawKardex), para que este número nunca se desalinee de esa tabla. */
+  .kdx-pedir-banner{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;border-radius:10px;padding:12px 16px;margin-bottom:14px;border:1.5px solid;}
+  .kdx-pedir-banner .kdx-pedir-tag{font-size:15px;font-weight:800;}
+  .kdx-pedir-banner .kdx-pedir-cant{font-size:26px;font-weight:800;line-height:1;}
+  .kdx-pedir-banner .kdx-pedir-sub{width:100%;font-size:11.5px;font-weight:600;opacity:.85;}
+  .kdx-pedir-si{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+  .kdx-pedir-no{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+  .kdx-pedir-neutral{background:var(--surface-2);border-color:var(--border);color:var(--ink-soft);font-size:12.5px;font-weight:600;}
 
   .proc-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
   @media (max-width:960px){ .proc-kpi-grid{grid-template-columns:repeat(2,1fr);} }
@@ -3883,6 +3902,21 @@ function drawKardex(){
   // cambiar la simulación también": ya pasa solo, mesesInput lee el input en vivo y hay un listener de
   // 'input' en #mesesAbastecer que vuelve a llamar drawKardex() en cada cambio (ver drawAlertas).
   const mesesInput = Math.max(0, Number(document.getElementById('mesesAbastecer').value) || 0);
+
+  // --- Etiqueta grande: "¿hay que pedir?" ---
+  // 15.09.2026, pedido de Piero en el chat: "debe salir en la parte de arriba como etiqueta grande qué
+  // cantidad habría que pedir si es necesario o no". Reusa TAL CUAL pedirRowsFor() — la misma función que
+  // ya arma la columna "A pedir" de "Cuánto pedir por categoría" más abajo — en vez de inventar una
+  // segunda fórmula: como el buscador de arriba ya está filtrado a este único producto (kardexProductoActual
+  // exige exactamente 1 resultado), pedirRowsFor(mesesInput,'todos') devuelve ese mismo producto, con la
+  // misma cantidad que Piero ya ve en esa tabla — nunca se pueden desalinear.
+  const pedirRow = pedirRowsFor(mesesInput, 'todos').rows[0];
+  const pedirBannerSvg = mesesInput <= 0
+    ? `<div class="kdx-pedir-banner kdx-pedir-neutral">Escribe cuántos meses quieres cubrir arriba, en "Meses a abastecer", para saber si hay que pedir.</div>`
+    : (pedirRow && pedirRow.hayQuePedir
+        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(Math.round(pedirRow.aPedir))} ${escapeHtml(producto.unidad||'')}</span><span class="kdx-pedir-sub">para cubrir ${mesesInput} ${mesesInput===1?'mes':'meses'} — stock por debajo del ROP</span></div>`
+        : `<div class="kdx-pedir-banner kdx-pedir-no"><span class="kdx-pedir-tag">No es necesario pedir</span><span class="kdx-pedir-sub">${producto.estado==='reposicion' ? ('En reposición, pero el stock ya cubre ' + mesesInput + ' ' + (mesesInput===1?'mes':'meses')) : 'Stock por encima del ROP'}</span></div>`);
+
   // Consumo Diario/Desvest son cifras del producto completo (los 3 almacenes juntos), no por sucursal —
   // el Excel no trae un consumo diario separado por Ica/Lima/Trujillo. Proyectar la caída de una sola
   // sucursal con el consumo del total inventaría un dato que no está: por eso la proyección solo se
@@ -4031,7 +4065,7 @@ function drawKardex(){
   // más arriba), acá se recorta con un clip-path al rectángulo del gráfico — así, si la banda es enorme
   // frente a los datos reales, se ve "llegando hasta el borde" en vez de salirse de la tarjeta o forzar
   // una escala inútil.
-  let projLineSvg = '', bandSvg = '', calloutSvg = '';
+  let projLineSvg = '', bandSvg = '', bandEdgeSvg = '', calloutSvg = '';
   if(tieneProyeccion && m>0){
     const projLineIdx = (idxView.indexOf(n-1)!==-1 ? [n-1] : []).concat(idxView.filter(i=>i>=n));
     if(projLineIdx.length>1){
@@ -4039,9 +4073,16 @@ function drawKardex(){
       const projPath = stepPath(projPts);
       projLineSvg = `<path class="kdx-line-proj" clip-path="url(#kdxPlotClip)" d="${projPath}"></path>`;
       const upperPts = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockFin[i] : projUpper[i-n])]);
-      const lowerPts = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockFin[i] : projLower[i-n])]).reverse();
-      const bandPath = stepPath(upperPts) + ' ' + stepPath(lowerPts).replace(/^M/,'L') + ' Z';
+      const lowerPtsAsc = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockFin[i] : projLower[i-n])]);
+      const bandPath = stepPath(upperPts) + ' ' + stepPath(lowerPtsAsc.slice().reverse()).replace(/^M/,'L') + ' Z';
       bandSvg = `<path class="kdx-band" clip-path="url(#kdxPlotClip)" d="${bandPath}"></path>`;
+      // 15.09.2026, pregunta de Piero: "estas considerando ... la desviacion estandar?" — sí, pero cuando
+      // el Desvest es grande frente al Consumo Diario la banda satura el eje casi de inmediato y el
+      // relleno se ve como un fondo plano. Se dibujan también los bordes (superior/inferior) como líneas
+      // punteadas, recortadas por el mismo clip-path, para que el límite de la incertidumbre se note
+      // incluso cuando el relleno está saturado contra el techo/piso del gráfico.
+      bandEdgeSvg = `<path class="kdx-band-edge" clip-path="url(#kdxPlotClip)" d="${stepPath(upperPts)}"></path>`
+        + `<path class="kdx-band-edge" clip-path="url(#kdxPlotClip)" d="${stepPath(lowerPtsAsc)}"></path>`;
     }
   }
 
@@ -4139,11 +4180,12 @@ function drawKardex(){
   const fuenteCaption = `<div class="kdx-caption kdx-fuente">Fuente: ${escapeHtml(ALMACEN_DATA.filename||'Reporte Almacen.xlsx')} — hojas Ingresos y Movimientos, agrupadas por semana ISO (lunes a domingo).</div>`;
 
   const chart = document.getElementById('kardexChart');
-  chart.innerHTML = `${sucFilterSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+  chart.innerHTML = `${pedirBannerSvg}${sucFilterSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
     <defs><clipPath id="kdxPlotClip"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect></clipPath></defs>
     ${gridSvg}
     <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
     ${bandSvg}
+    ${bandEdgeSvg}
     <path class="kdx-area" d="${areaPath}"></path>
     <path class="kdx-line" d="${linePath}"></path>
     ${projLineSvg}
