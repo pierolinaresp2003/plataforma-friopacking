@@ -244,14 +244,16 @@
      Piero ("que simules de color naranja esa proyección de cómo sería el movimiento"), ahora que la
      simulación considera el tiempo de entrega. */
   .kdx-svg .kdx-line-proj{stroke:var(--amber);stroke-width:2;stroke-dasharray:6 4;fill:none;pointer-events:none;}
-  .kdx-svg .kdx-band{fill:var(--amber);fill-opacity:.10;stroke:none;pointer-events:none;}
+  /* 15.09.2026: .kdx-band pasó de ser el relleno de la banda ±1 desvest (que tapaba todo el gráfico) a
+     ser el área BAJO la curva proyectada, el equivalente naranja de .kdx-area. */
+  .kdx-svg .kdx-band{fill:var(--amber);fill-opacity:.16;stroke:none;pointer-events:none;}
   /* 15.09.2026, pregunta de Piero en el chat: "estas considerando en la simulacion el movimiento segun
      desviacion estandar?" — sí se considera (ver sigma en drawKardex), pero cuando el Desvest del
      producto es grande frente a su Consumo Diario, la banda ±1 desvest satura el eje casi de inmediato y
      el relleno solo se ve como un fondo plano, indistinguible de "no hay banda". Se agrega el trazo de
      los bordes superior/inferior de la banda (antes solo tenía relleno, sin stroke) para que el límite de
      la incertidumbre se note aunque el relleno esté saturado. */
-  .kdx-svg .kdx-band-edge{stroke:var(--amber);stroke-width:1;stroke-dasharray:2 3;fill:none;opacity:.55;pointer-events:none;}
+  .kdx-svg .kdx-band-edge{stroke:var(--amber-ink);stroke-width:1.2;stroke-dasharray:2 3;fill:none;opacity:.75;pointer-events:none;}
   .kdx-svg .kdx-dot-proj{fill:var(--card);stroke:var(--amber);stroke-width:2;cursor:pointer;}
   .kdx-legend .lg-swatch.proj{background:none;border-top:2px dashed var(--amber);height:0;}
   /* Marcas de la simulación con tiempo de entrega (15.09.2026): la vertical donde se COLOCA el pedido y el
@@ -259,7 +261,12 @@
      dice cuándo hay que actuar, que es justo lo que Piero pidió ver. */
   .kdx-svg .kdx-pedido-line{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:5 4;pointer-events:none;}
   .kdx-svg .kdx-pedido-label{font-size:10.5px;font-weight:800;fill:var(--amber);pointer-events:none;}
-  .kdx-svg .kdx-llega-dot{fill:var(--amber);stroke:var(--card);stroke-width:1.5;pointer-events:none;}
+  .kdx-svg .kdx-llega-dot{fill:var(--amber);stroke:var(--card);stroke-width:1.5;cursor:pointer;}
+  /* Llegada del stock en tránsito: en el verde del histórico, porque es mercadería ya comprada, no un
+     pedido simulado (15.09.2026). */
+  .kdx-svg .kdx-transito-line{stroke:var(--brand-2-dark);stroke-width:1.5;stroke-dasharray:5 4;opacity:.7;pointer-events:none;}
+  .kdx-svg .kdx-transito-label{font-size:10.5px;font-weight:800;fill:var(--brand-2-dark);pointer-events:none;}
+  .kdx-svg .kdx-transito-dot{fill:var(--brand-2-dark);stroke:var(--card);stroke-width:1.5;cursor:pointer;}
   .kdx-svg .kdx-rop-sim{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:4 3;fill:none;opacity:.8;pointer-events:none;}
   /* Rediseño 14.09.2026 (pedido de Piero, mostró un ejemplo de referencia: "en tu gráfico no se sabe casi
      nada"): tarjetas KPI arriba del gráfico, línea vertical "Hoy" separando histórico/proyección, y
@@ -3903,6 +3910,16 @@ const KARDEX_SUCURSALES = [
   { key:'lima', label:'Lima San Pedro' },
   { key:'trujillo', label:'Trujillo' },
 ];
+// 15.09.2026, pedido de Piero: "cuando la unidad de medida no es mts o algo así, no puedes poner que el
+// consumo es de .5, porque no tiene sentido, serían enteros — ¿puedes hacer esa diferenciación?".
+// Unidades que SÍ se pueden partir (se miden, no se cuentan): metros, metros², metros lineales, kilos,
+// galones, toneladas. El resto de las que trae el Excel son piezas contables — UND (2,286 productos),
+// NIU, PAR, JGO, CIL, ROL, PZA, BAL, KIT, CAJ, PAQ — y ahí el stock simulado va en enteros.
+const UM_FRACCIONABLES = ['MTS','MT2','MT3','MTL','M','M2','M3','KGR','KG','GR','TON','GLN','LT','L','GAL'];
+function umEsFraccionable(um){
+  const t = (um||'').toString().trim().toUpperCase();
+  return UM_FRACCIONABLES.indexOf(t) !== -1;
+}
 function drawKardex(){
   const card = document.getElementById('kardexCard');
   const producto = kardexProductoActual();
@@ -3988,6 +4005,11 @@ function drawKardex(){
   // el de importación — y con él va SU par de ROP/Stock de Seguridad (columnas AF/AE), porque el punto de
   // reorden de una importación de 90 días no tiene nada que ver con el de una compra local. Valores <= 0 se
   // tratan como "sin dato" (el archivo real trae ceros y hasta negativos de restas de fechas mal cerradas).
+  // Unidades contables vs. medibles (ver umEsFraccionable): decide si el stock simulado y el eje van en
+  // enteros o admiten decimales.
+  const umFraccion = umEsFraccionable(producto.unidad);
+  const redondeaUm = v => umFraccion ? v : Math.round(v);
+  const nivelNumUm = v => umFraccion ? v : Math.round(v);
   const ltNacional = (producto.leadTime != null && producto.leadTime > 0) ? producto.leadTime : null;
   const ltImportado = (producto.leadTimeImp != null && producto.leadTimeImp > 0) ? producto.leadTimeImp : null;
   const esImportado = (ltNacional == null && ltImportado != null);
@@ -4002,6 +4024,18 @@ function drawKardex(){
   const projPeriods = [], projMean = [], projUpper = [], projLower = [];
   // pedidos: cada uno con el día en que se COLOCA (cruce del ROP) y el día en que LLEGA (LT días después).
   const pedidos = [];
+  // Stock en tránsito (15.09.2026, pedido de Piero: "quiero que consideres si hay stock en tránsito, veas
+  // si es nacional o importado, y en base al lead time también muestres en la gráfica que eso va a llegar,
+  // para que recién a partir de ahí coloques la proyección estimada a pedir"). Es mercadería YA comprada,
+  // así que entra en el gráfico como una llegada real, no como un pedido simulado. El Excel no trae la
+  // fecha de llegada del tránsito: se estima con el mismo tiempo de entrega del producto — el nacional o
+  // el de importación, según cuál de los dos tenga lleno (ver leadDias/esImportado arriba).
+  const transitoCant = (kardexSucursal==='lima' && producto.transito > 0) ? producto.transito : 0;
+  const tTransito = transitoCant > 0 ? leadDias : null;
+  // Todas las entradas de stock de la simulación, en orden: primero el tránsito ya comprado y después los
+  // pedidos que la simulación decide colocar. La proyección de "qué habría que pedir" arranca recién
+  // después de que entre el tránsito, que es justo lo que pidió Piero.
+  const llegadas = [];
   let cicloDias = 0, cantidadPedido = 0, horizonDias = 0;
   if(tieneProyeccion){
     // Cuánto se pide: los meses de rotación que Piero escriba arriba. Su Excel calcula el Consumo Diario
@@ -4020,12 +4054,24 @@ function drawKardex(){
     // a empezar. El horizonte termina justo donde se colocaría el 3er pedido: así se ven exactamente los 2
     // ciclos completos que pidió Piero, ni uno de más.
     let cursorT = 0, cursorNivel = stockSuc;
+    // 1) Primero entra lo que ya está comprado y viajando. Entre hoy y esa llegada el stock sigue bajando
+    //    (puede incluso quebrarse esperándolo, y así se ve en el gráfico).
+    if(transitoCant > 0){
+      cursorNivel = cursorNivel - producto.consumoDiario * (tTransito - cursorT) + transitoCant;
+      cursorT = tTransito;
+      llegadas.push({ t: tTransito, cantidad: transitoCant, tipo: 'transito' });
+    }
+    // 2) Recién de ahí en adelante se simula qué habría que pedir: el stock baja a Consumo Diario por día;
+    //    cuando toca el ROP se coloca el pedido; durante el tiempo de entrega el stock SIGUE bajando; al
+    //    llegar sube de golpe la cantidad pedida, y vuelve a empezar. El horizonte termina justo donde se
+    //    colocaría el 3er pedido: así se ven exactamente los 2 ciclos completos que pidió Piero.
     for(let k=0; k<=NUM_CICLOS_PEDIDO; k++){
       const diasHastaRop = Math.max(0, (cursorNivel - ropSim) / producto.consumoDiario);
       const tPedido = cursorT + diasHastaRop;
       if(k === NUM_CICLOS_PEDIDO){ horizonDias = tPedido; break; }
       const tLlega = tPedido + leadDias;
       pedidos.push({ tPedido, tLlega });
+      llegadas.push({ t: tLlega, cantidad: cantidadPedido, tipo: 'pedido', nPedido: k+1, tPedido });
       cursorNivel = cursorNivel - producto.consumoDiario * (tLlega - cursorT) + cantidadPedido;
       cursorT = tLlega;
     }
@@ -4033,21 +4079,21 @@ function drawKardex(){
     // (el pedido se consume casi entero en el tránsito) y el horizonte se podría disparar.
     horizonDias = Math.min(Math.max(horizonDias, 7), 1095);
 
-    // Nivel simulado en el día t, recorriendo los pedidos ya colocados.
+    // Nivel simulado en el día t, recorriendo todas las entradas (tránsito + pedidos) en orden.
     const nivelEn = (t)=>{
       let nivel = stockSuc, desde = 0;
-      for(const p of pedidos){
-        if(t < p.tLlega) break;
-        nivel = nivel - producto.consumoDiario * (p.tLlega - desde) + cantidadPedido;
-        desde = p.tLlega;
+      for(const l of llegadas){
+        if(t < l.t) break;
+        nivel = nivel - producto.consumoDiario * (l.t - desde) + l.cantidad;
+        desde = l.t;
       }
       return nivel - producto.consumoDiario * (t - desde);
     };
-    // Días desde la última llegada (o desde hoy, si todavía no llegó ninguna): la incertidumbre se reinicia
-    // con cada pedido que entra, mismo criterio que antes y que el Stock de Seguridad de Piero.
+    // Días desde la última entrada (o desde hoy, si todavía no llegó ninguna): la incertidumbre se reinicia
+    // con cada llegada, mismo criterio que antes y que el Stock de Seguridad de Piero.
     const diasDesdeReposicion = (t)=>{
       let ultima = 0;
-      for(const p of pedidos){ if(t >= p.tLlega) ultima = p.tLlega; }
+      for(const l of llegadas){ if(t >= l.t) ultima = l.t; }
       return t - ultima;
     };
     const stepDias = 7; // paso semanal, igual que el histórico: 1 índice del eje = 1 semana en todo el gráfico
@@ -4064,8 +4110,14 @@ function drawKardex(){
       // bien la incertidumbre) y recién ahí se recorta cada extremo a 0. Si la caída esperada ya cruzó
       // cero antes de que llegue el pedido simulado, el resultado es una línea central en 0 (quiebre de
       // stock) con una cola superior que sigue mostrando el rango optimista.
+      // Unidades contables (UND, PAR, ROL...): el stock simulado se muestra en enteros, porque "2.44 UND"
+      // no existe (15.09.2026, pedido de Piero). Las unidades que sí se miden (MTS, MT2, KGR...) se dejan
+      // con decimales. El redondeo es solo del nivel dibujado: las fechas de pedido/llegada se siguen
+      // calculando con el consumo diario real, sin redondear.
       projPeriods.push({ key: isoDay(curDate) });
-      projMean.push(Math.max(0, meanRaw)); projUpper.push(Math.max(0, meanRaw+sigma)); projLower.push(Math.max(0, meanRaw-sigma));
+      projMean.push(redondeaUm(Math.max(0, meanRaw)));
+      projUpper.push(redondeaUm(Math.max(0, meanRaw+sigma)));
+      projLower.push(redondeaUm(Math.max(0, meanRaw-sigma)));
     }
   }
   // Fecha real (sin redondear a la semana) de un día t de la simulación, para las etiquetas y los KPI.
@@ -4076,15 +4128,19 @@ function drawKardex(){
   };
   // Nivel al que llega el stock justo antes de que entre cada pedido: es el punto más bajo del ciclo y, con
   // tiempo de entrega de por medio, el número que de verdad dice si se va a quebrar el stock esperando.
-  const nivelAlLlegar = pedidos.map(p=>{
+  // Nivel JUSTO ANTES de una llegada: el punto más bajo de ese tramo y, con tiempo de entrega de por
+  // medio, el número que dice si se va a quebrar el stock esperando. Recorre todas las entradas (tránsito
+  // incluido), no solo los pedidos simulados.
+  const nivelAntesDe = (tObjetivo)=>{
     let nivel = stockSuc, desde = 0;
-    for(const q of pedidos){
-      if(q.tLlega >= p.tLlega) break;
-      nivel = nivel - producto.consumoDiario * (q.tLlega - desde) + cantidadPedido;
-      desde = q.tLlega;
+    for(const l of llegadas){
+      if(l.t >= tObjetivo) break;
+      nivel = nivel - producto.consumoDiario * (l.t - desde) + l.cantidad;
+      desde = l.t;
     }
-    return nivel - producto.consumoDiario * (p.tLlega - desde);
-  });
+    return nivel - producto.consumoDiario * (tObjetivo - desde);
+  };
+  const nivelAlLlegar = pedidos.map(p=>nivelAntesDe(p.tLlega));
 
   // --- Etiqueta grande: "¿hay que pedir?" ---
   // 15.09.2026, pedido de Piero en el chat: "debe salir en la parte de arriba como etiqueta grande qué
@@ -4165,7 +4221,9 @@ function drawKardex(){
   if(!allVals.length) allVals.push(1);
   // 14.09.2026, comentario de Piero: "podrias colocar más números en el eje y?" — más líneas de grilla
   // (antes 5) para que se puedan leer más valores intermedios sin tener que calcularlos a ojo.
-  const { step: gridStep, niceMin: minValRaw, niceMax: maxVal } = niceAxisRange(allVals, 8);
+  const { step: gridStepRaw, niceMin: minValRaw, niceMax: maxVal } = niceAxisRange(allVals, 8);
+  // En unidades contables el eje tampoco tiene por qué mostrar medias unidades: el paso mínimo es 1.
+  const gridStep = umFraccion ? gridStepRaw : Math.max(1, Math.round(gridStepRaw));
   // El stock nunca es negativo (pedido de Piero) — se fuerza el piso del eje a 0 pase lo que pase.
   const minVal = Math.max(0, minValRaw);
 
@@ -4246,17 +4304,18 @@ function drawKardex(){
       const projPts = projLineIdx.map(i=>[xForGlobal(i), yFor(valAt(i))]);
       const projPath = stepPath(projPts);
       projLineSvg = `<path class="kdx-line-proj" clip-path="url(#kdxPlotClip)" d="${projPath}"></path>`;
-      const upperPts = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockFin[i] : projUpper[i-n])]);
+      // 15.09.2026, Piero: "los colores se pierden, el amarillo solo debe estar por debajo de la curva
+      // proyectada". Antes el naranja era el relleno de la banda ±1 desvest, que va POR ENCIMA y por
+      // debajo de la línea y, en productos con Desvest grande, tapaba el gráfico entero. Ahora el relleno
+      // es el área bajo la curva proyectada — igual que el área verde del histórico — y la banda queda
+      // solo como sus dos bordes punteados, que muestran el rango sin comerse el color de nadie.
+      bandSvg = `<path class="kdx-band" clip-path="url(#kdxPlotClip)" d="${projPath} L${projPts[projPts.length-1][0].toFixed(1)},${baseY} L${projPts[0][0].toFixed(1)},${baseY} Z"></path>`;
+      // De la banda ±1 desvest queda solo el borde de ABAJO: es el escenario pesimista, el que dice cuándo
+      // te quedarías sin stock, y va dentro del área naranja. El borde de arriba se quitó el 15.09.2026
+      // porque en productos con Desvest grande se sale del eje y quedaban trozos punteados flotando en la
+      // parte alta del gráfico, que era parte de lo que Piero veía como "los colores se pierden".
       const lowerPtsAsc = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockFin[i] : projLower[i-n])]);
-      const bandPath = stepPath(upperPts) + ' ' + stepPath(lowerPtsAsc.slice().reverse()).replace(/^M/,'L') + ' Z';
-      bandSvg = `<path class="kdx-band" clip-path="url(#kdxPlotClip)" d="${bandPath}"></path>`;
-      // 15.09.2026, pregunta de Piero: "estas considerando ... la desviacion estandar?" — sí, pero cuando
-      // el Desvest es grande frente al Consumo Diario la banda satura el eje casi de inmediato y el
-      // relleno se ve como un fondo plano. Se dibujan también los bordes (superior/inferior) como líneas
-      // punteadas, recortadas por el mismo clip-path, para que el límite de la incertidumbre se note
-      // incluso cuando el relleno está saturado contra el techo/piso del gráfico.
-      bandEdgeSvg = `<path class="kdx-band-edge" clip-path="url(#kdxPlotClip)" d="${stepPath(upperPts)}"></path>`
-        + `<path class="kdx-band-edge" clip-path="url(#kdxPlotClip)" d="${stepPath(lowerPtsAsc)}"></path>`;
+      bandEdgeSvg = `<path class="kdx-band-edge" clip-path="url(#kdxPlotClip)" d="${stepPath(lowerPtsAsc)}"></path>`;
     }
   }
 
@@ -4292,6 +4351,23 @@ function drawKardex(){
   if(tieneProyeccion && m>0){
     const idxDeDia = (t)=> (n-1) + t/7;
     const dentroDeVista = (idx)=> idx >= idxView[0]-0.5 && idx <= idxView[idxView.length-1]+0.5;
+    // Llegada del stock EN TRÁNSITO (15.09.2026, pedido de Piero). Va en el verde del histórico, no en el
+    // naranja de la simulación, porque no es un pedido estimado: es mercadería ya comprada que va a entrar.
+    if(transitoCant > 0){
+      const idxTr = idxDeDia(tTransito);
+      if(dentroDeVista(idxTr)){
+        const x = xFor(idxTr - viewStart);
+        const nivelTrDespues = nivelNumUm(Math.max(0, nivelAntesDe(tTransito)) + transitoCant);
+        const yTr = Math.min(padT+plotH, Math.max(padT, yFor(nivelTrDespues)));
+        pedidosSvg += `<line class="kdx-transito-line" x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT+plotH}"></line>`
+          + `<text class="kdx-transito-label" style="paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;" x="${x.toFixed(1)}" y="${padT-6}" text-anchor="middle">LLEGA TRÁNSITO</text>`
+          + `<circle class="kdx-transito-dot" cx="${x.toFixed(1)}" cy="${yTr.toFixed(1)}" r="6"`
+          + ` data-cant="${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'')}"`
+          + ` data-fllega="${escapeHtml(fmtDate(fechaEnDia(tTransito)))}"`
+          + ` data-antes="${fmt2(nivelNumUm(Math.max(0, nivelAntesDe(tTransito))))}"`
+          + ` data-despues="${fmt2(nivelTrDespues)}"></circle>`;
+      }
+    }
     pedidos.forEach((p, k)=>{
       const idxPed = idxDeDia(p.tPedido);
       if(dentroDeVista(idxPed)){
@@ -4302,15 +4378,23 @@ function drawKardex(){
         pedidosSvg += `<line class="kdx-pedido-line" x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT+plotH}"></line>`
           + `<text class="kdx-pedido-label" style="paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;" x="${x.toFixed(1)}" y="${chocaConHoy ? padT+12 : padT-6}" text-anchor="middle">PEDIR ${k+1}${p.tPedido < 1 ? ' (hoy)' : ''}</text>`;
       }
-      // Llegada del pedido: el punto donde el stock sube de golpe, rotulado con CUÁNTO entra (15.09.2026,
-      // Piero: "y que se vea cuánto se va a pedir"). Se dibuja siempre, también cuando no hay tiempo de
-      // entrega en el Excel — ahí la llegada cae el mismo día del pedido.
+      // Llegada del pedido: el punto donde el stock sube de golpe. La cantidad ya no va escrita fija sobre
+      // el gráfico (15.09.2026, Piero: "la cantidad que se pide debe estar puesta cuando se pone el click
+      // sobre el punto, sobreponiéndose al gráfico") — el punto es clicable y la muestra en el globo, así
+      // el gráfico queda limpio. Se dibuja siempre, también sin tiempo de entrega en el Excel: ahí la
+      // llegada cae el mismo día del pedido.
       const idxLlega = idxDeDia(p.tLlega);
       if(dentroDeVista(idxLlega)){
         const x = xFor(idxLlega - viewStart);
-        const yLlega = Math.min(padT+plotH, Math.max(padT, yFor(nivelAlLlegar[k] + cantidadPedido)));
-        pedidosSvg += `<circle class="kdx-llega-dot" cx="${x.toFixed(1)}" cy="${yLlega.toFixed(1)}" r="5"></circle>`
-          + `<text class="kdx-pedido-label" style="paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;" x="${x.toFixed(1)}" y="${(yLlega-10).toFixed(1)}" text-anchor="middle">+${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'')}</text>`;
+        const nivelDespues = nivelNumUm(nivelAlLlegar[k] + cantidadPedido);
+        const yLlega = Math.min(padT+plotH, Math.max(padT, yFor(nivelDespues)));
+        pedidosSvg += `<circle class="kdx-llega-dot" cx="${x.toFixed(1)}" cy="${yLlega.toFixed(1)}" r="6"`
+          + ` data-pedido="${k+1}"`
+          + ` data-cant="${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'')}"`
+          + ` data-fpedido="${escapeHtml(p.tPedido < 1 ? 'hoy' : fmtDate(fechaEnDia(p.tPedido)))}"`
+          + ` data-fllega="${escapeHtml(fmtDate(fechaEnDia(p.tLlega)))}"`
+          + ` data-antes="${fmt2(nivelNumUm(Math.max(0, nivelAlLlegar[k])))}"`
+          + ` data-despues="${fmt2(nivelDespues)}"></circle>`;
       }
     });
     // ROP de importación: solo se dibuja cuando es distinto del ROP nacional que ya está en rojo — así se
@@ -4347,7 +4431,8 @@ function drawKardex(){
   const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado (histórico)</span>`
     + (producto.rop!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--red);"></span>ROP</span>` : '')
     + (producto.stockSeguridad!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-c);"></span>Stock de seguridad</span>` : '')
-    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--amber);"></span>Simulación: pedido de ${mesesInput} ${mesesInput===1?'mes':'meses'} ${tieneLead ? `con ${fmt2(leadDias)} días de entrega (${esImportado?'importación':'nacional'})` : 'sin tiempo de entrega en el Excel'} (±1 desviación estándar)</span>`
+    + (tieneProyeccion && transitoCant>0 ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--brand-2-dark);"></span>Llega el stock en tránsito (${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'')})</span>` : '')
+    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--amber);"></span>Simulación: pedido de ${mesesInput} ${mesesInput===1?'mes':'meses'} ${tieneLead ? `con ${fmt2(leadDias)} días de entrega (${esImportado?'importación':'nacional'})` : 'sin tiempo de entrega en el Excel'} </span><span class="lg-item"><span class="lg-swatch dashed" style="color:var(--amber-ink);"></span>Escenario pesimista (−1 desviación estándar)</span>`
         : (kardexSucursal!=='lima'
             ? `<span class="lg-item" style="color:var(--red);">Sin proyección: solo disponible con Lima San Pedro seleccionada</span>`
             : `<span class="lg-item" style="color:var(--red);">Sin proyección: falta "Consumo Diario" o "Desvest" para este producto en Análisis Inventario</span>`))
@@ -4380,7 +4465,7 @@ function drawKardex(){
   // dejar un gráfico que parece no hacer nada.
   const pedidoFueraDeVentana = tieneProyeccion && pedidos.length && pedidos[0].tPedido > horizonDias;
   const calcCaption = tieneProyeccion
-    ? `<div class="kdx-caption"><b>Cómo se lee la simulación (naranja):</b> el stock baja ${fmt2(producto.consumoDiario)}/día y al tocar el ${esImportado?'ROP de importación':'ROP'} ${fmt2(ropSim)} se pide <b>${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'unidades')}</b> = ${mesesInput} ${mesesInput===1?'mes':'meses'} de rotación (${fmt2(producto.consumoDiario)}/día × ${cicloDias} días). ${tieneLead ? `Durante los ${fmt2(leadDias)} días de entrega el stock sigue bajando; recién ahí sube de golpe.` : 'Sin Lead Time en tu Excel, el pedido se simula llegando el mismo día.'} Se muestran ${NUM_CICLOS_PEDIDO} ciclos; la banda es ±1 desviación estándar (Desvest ${fmt2(producto.desvest)}), que se reinicia con cada llegada.${quiebre ? ` <b style="color:var(--red);">Ojo: con ${mesesInput} ${mesesInput===1?'mes':'meses'} el stock llega a 0 antes de que entre el pedido</b> — hay que pedir más cantidad o pedir antes.` : ''}${pedidoFueraDeVentana ? ` Este producto rota tan lento que recién tocaría el ROP el ${fmtDate(fechaEnDia(pedidos[0].tPedido))}, fuera de la ventana del gráfico (3 años).` : ''}</div>`
+    ? `<div class="kdx-caption">${transitoCant>0 ? `<b>Stock en tránsito:</b> hay ${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'unidades')} ya compradas en camino. El Excel no trae su fecha de llegada, así que se estima con el mismo tiempo de entrega del producto (${fmt2(leadDias)} días${esImportado?', de importación':''}): entran el ${fmtDate(fechaEnDia(tTransito))}, marcadas en verde, y la simulación de qué pedir arranca recién desde ahí. ` : ''}<b>Cómo se lee la simulación (naranja):</b> el stock baja ${fmt2(producto.consumoDiario)}/día y al tocar el ${esImportado?'ROP de importación':'ROP'} ${fmt2(ropSim)} se pide <b>${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'unidades')}</b> = ${mesesInput} ${mesesInput===1?'mes':'meses'} de rotación (${fmt2(producto.consumoDiario)}/día × ${cicloDias} días). ${tieneLead ? `Durante los ${fmt2(leadDias)} días de entrega el stock sigue bajando; recién ahí sube de golpe.` : 'Sin Lead Time en tu Excel, el pedido se simula llegando el mismo día.'} Se muestran ${NUM_CICLOS_PEDIDO} ciclos; la punteada de abajo es el escenario pesimista (−1 desviación estándar, Desvest ${fmt2(producto.desvest)}), que se reinicia con cada llegada.${quiebre ? ` <b style="color:var(--red);">Ojo: con ${mesesInput} ${mesesInput===1?'mes':'meses'} el stock llega a 0 antes de que entre el pedido</b> — hay que pedir más cantidad o pedir antes.` : ''}${pedidoFueraDeVentana ? ` Este producto rota tan lento que recién tocaría el ROP el ${fmtDate(fechaEnDia(pedidos[0].tPedido))}, fuera de la ventana del gráfico (3 años).` : ''}</div>`
     : (kardexSucursal!=='lima' ? `<div class="kdx-caption">Sin proyección para ${escapeHtml(sucInfo.label)}: Consumo Diario y Desvest de tu Excel son del producto completo (las 3 sucursales juntas), no por sucursal — la proyección solo se muestra con Lima San Pedro seleccionada.</div>` : '');
   // 15.09.2026, pedido de Piero: el stock de este gráfico es solo lo físico de la sucursal elegida —
   // Tránsito y las otras 2 sucursales NO están incluidos, a diferencia del stock que decide el estado en
@@ -4389,10 +4474,12 @@ function drawKardex(){
   // y esos dos. No hay fecha de llegada en el Excel para el tránsito ni para traslados entre sucursales,
   // así que no se inventa cuándo "sube" — el día que llegue de verdad a la sucursal elegida, el kardex lo
   // va a mostrar solo porque va a aparecer como un Ingreso real en tu Excel para esa sucursal.
+  // El tránsito dejó de estar en esta lista cuando se muestra su llegada en el gráfico (15.09.2026): ahí ya
+  // no es "algo no incluido", sino una llegada estimada que sí se dibuja.
   const otrosAlmacenes = KARDEX_SUCURSALES
     .filter(s=>s.key!==kardexSucursal)
     .map(s=> producto[s.key] ? `${s.label} ${fmt2(producto[s.key])}` : null)
-    .concat([producto.transito ? `En tránsito ${fmt2(producto.transito)}` : null])
+    .concat([(producto.transito && !transitoCant) ? `En tránsito ${fmt2(producto.transito)}` : null])
     .filter(Boolean);
   const transitoCaption = otrosAlmacenes.length
     ? `<div class="kdx-caption">No incluido en este gráfico: ${otrosAlmacenes.join(' · ')} — se suma a ${escapeHtml(sucInfo.label)} recién cuando llega físicamente y quede registrado como Ingreso ahí. El ROP/Stock de seguridad de tu Excel sí se comparan contra Lima + Tránsito (el mismo stock que usa Alertas de Reposición), por eso pueden verse "cruzados" contra esta línea si hay tránsito o stock en otras sucursales.</div>`
@@ -4492,6 +4579,38 @@ function drawKardex(){
     });
     dot.addEventListener('mouseleave', ()=>{ tooltip.style.display = 'none'; });
   });
+  // Puntos de llegada (pedido simulado y stock en tránsito): 15.09.2026, pedido de Piero — "la cantidad
+  // que se pide debe estar puesta cuando se pone el click sobre el punto, sobreponiéndose al gráfico".
+  // Con clic el globo se queda fijo hasta que se haga clic en otro lado; al pasar el mouse también se
+  // muestra, pero se va solo. Así el gráfico no necesita la cantidad escrita encima todo el tiempo.
+  let globoFijo = null;
+  const ponerGlobo = (el, html)=>{
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    // Sobre el punto, centrado: se posiciona con las coordenadas del círculo dentro del SVG, llevadas a
+    // píxeles de la tarjeta (el SVG escala con el ancho, así que no sirve usar el viewBox directo).
+    const svg = el.ownerSVGElement;
+    const rectSvg = svg.getBoundingClientRect(), rectChart = chart.getBoundingClientRect();
+    const escala = rectSvg.width / svg.viewBox.baseVal.width;
+    const cx = Number(el.getAttribute('cx')) * escala + (rectSvg.left - rectChart.left);
+    const cy = Number(el.getAttribute('cy')) * escala + (rectSvg.top - rectChart.top);
+    tooltip.style.left = Math.max(0, cx - tooltip.offsetWidth/2) + 'px';
+    tooltip.style.top = Math.max(0, cy - tooltip.offsetHeight - 12) + 'px';
+  };
+  const htmlPedido = d => `<b>Pedido ${d.pedido} — llega el ${d.fllega}</b><br>Cantidad a pedir: <b>${d.cant}</b><br>Se coloca el ${d.fpedido} · el stock baja a ${d.antes} y sube a ${d.despues}`;
+  const htmlTransito = d => `<b>Stock en tránsito — llega el ${d.fllega}</b><br>Cantidad en camino: <b>${d.cant}</b><br>Ya comprado · el stock baja a ${d.antes} y sube a ${d.despues}`;
+  chart.querySelectorAll('.kdx-llega-dot, .kdx-transito-dot').forEach(dot=>{
+    const html = ()=> dot.classList.contains('kdx-transito-dot') ? htmlTransito(dot.dataset) : htmlPedido(dot.dataset);
+    dot.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(globoFijo === dot){ globoFijo = null; tooltip.style.display = 'none'; return; }
+      globoFijo = dot;
+      ponerGlobo(dot, html());
+    });
+    dot.addEventListener('mouseenter', ()=>{ if(!globoFijo) ponerGlobo(dot, html()); });
+    dot.addEventListener('mouseleave', ()=>{ if(!globoFijo) tooltip.style.display = 'none'; });
+  });
+  chart.addEventListener('click', ()=>{ if(globoFijo){ globoFijo = null; tooltip.style.display = 'none'; } });
 
   if(zoomed){
     const curStart = kardexZoom.startIdx, curEnd = kardexZoom.endIdx;
