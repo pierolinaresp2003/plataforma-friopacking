@@ -667,7 +667,13 @@
       <div class="card" id="kardexCard" style="padding:18px 20px 14px;margin-bottom:18px;display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
           <h3 style="margin:0 0 2px;font-size:14px;color:var(--ink);" id="kardexTitle">Kardex</h3>
-          <span id="kardexMesesSlot"></span>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <span id="kardexMesesSlot"></span>
+            <!-- 15.09.2026, pedido de Piero: "puedes añadir una opción para exportar como imagen el
+                 detalle de esto? ojo que esta imagen debe estar en grande y debe darme el gráfico así
+                 como el detalle del consumo" — ver buildKardexImageHtml(). -->
+            <button class="btn secondary" id="btnImgKardex" type="button">🖼️ Exportar imagen</button>
+          </div>
         </div>
         <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;" id="kardexSub"></div>
         <div id="kardexChart"></div>
@@ -3858,6 +3864,13 @@ function renderAlertas(){
     });
     document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'inventario-almacen-general', e.currentTarget));
     document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-inventario-almacen-general', e.currentTarget));
+    // Imagen del Kardex del producto abierto (15.09.2026). Reusa downloadProImage: el buildFn devuelve el
+    // HTML ya armado y el renderFn solo lo deja pasar, porque este diseño no usa el esqueleto general.
+    document.getElementById('btnImgKardex').addEventListener('click', (e)=> downloadProImage(
+      buildKardexImageHtml,
+      'kardex-' + ((kardexUltimo && kardexUltimo.producto.codigo) || 'producto'),
+      e.currentTarget,
+      html => html));
     alertasListenersBound = true;
   }
   drawAlertas();
@@ -3947,6 +3960,9 @@ let kardexLastKey = null;
 // a un rango que ya no existe y la simulación nueva saldría cortada por la derecha: en ese caso se vuelve
 // a encuadrar sola (ver drawKardex). Mientras el largo no cambie, el zoom que él haya hecho se respeta.
 let kardexLastTotal = null;
+// Foto de lo último que dibujó drawKardex(): la imagen exportable (ver buildKardexImageHtml) se arma con
+// esto en vez de recalcular, así no se puede desviar de lo que Piero está viendo en pantalla.
+let kardexUltimo = null;
 // 15.09.2026, pedido de Piero: "el kardex que se muestre es por sucursal... debes permitirme filtrar el
 // gráfico por esas 3 sucursales" (Ica/Lima San Pedro/Trujillo) — se guarda la sucursal elegida igual que
 // el zoom, y se reinicia a 'lima' cada vez que cambia el producto (ver esProductoNuevo más abajo).
@@ -4171,7 +4187,11 @@ function drawKardex(){
       const tLlega = tPedido + leadDias;
       pedidos.push({ tPedido, tLlega });
       llegadas.push({ t: tLlega, cantidad: cantidadPedido, tipo: 'pedido', nPedido: k+1, tPedido });
-      cursorNivel = cursorNivel - producto.consumoDiario * (tLlega - cursorT) + cantidadPedido;
+      // Math.max(0, ...): si el stock se acaba antes de que llegue el pedido, esa demanda se pierde, no se
+      // acumula contra el pedido que viene (15.09.2026, Piero: "sale que se piden 22 und y que eso llega,
+      // pero en el gráfico no está exactamente donde correspondería, que sería 22"). Antes el pedido
+      // entraba sobre un saldo negativo y aterrizaba más abajo de lo pedido.
+      cursorNivel = Math.max(0, cursorNivel - producto.consumoDiario * (tLlega - cursorT)) + cantidadPedido;
       cursorT = tLlega;
     }
     // Tope de 3 años: con un tiempo de entrega muy largo frente a lo que se pide, los ciclos se degeneran
@@ -4186,11 +4206,40 @@ function drawKardex(){
     // pantalla no se consume. Ahora, en esas unidades, solo se descuenta stock cuando se completa una
     // unidad entera de consumo (el consumo diario sigue siendo el promedio real; lo que cambia es que el
     // saldo baja de uno en uno, como en la vida real). En metros, kilos y demás sí se descuenta continuo.
-    const consumidoEn = (t)=> umFraccion
-      ? producto.consumoDiario * t
-      : Math.floor(producto.consumoDiario * t + 1e-9);
-    const entradasHasta = (t, incluirEnT)=> llegadas.reduce((a,l)=> a + ((incluirEnT ? l.t <= t : l.t < t) ? l.cantidad : 0), 0);
-    const nivelEn = (t)=> stockSuc + entradasHasta(t, true) - consumidoEn(t);
+    // Se recorre el tiempo hacia adelante llevando el saldo, en vez de una fórmula cerrada, por dos
+    // motivos que la fórmula no puede expresar: (1) el saldo nunca baja de 0 — sin stock no hay nada que
+    // consumir y esa demanda NO se acumula contra el pedido que viene, así que el pedido aterriza en la
+    // cantidad pedida completa; (2) en unidades contables el saldo baja de a una unidad entera, llevando
+    // aparte la fracción pendiente.
+    let nivelSim = stockSuc, tAnterior = 0, fraccionPendiente = 0, iProxLlegada = 0;
+    const consumirHasta = (tFin)=>{
+      const dias = tFin - tAnterior;
+      tAnterior = tFin;
+      if(dias <= 0) return;
+      let baja;
+      if(umFraccion){
+        baja = producto.consumoDiario * dias;
+      } else {
+        fraccionPendiente += producto.consumoDiario * dias;
+        baja = Math.floor(fraccionPendiente + 1e-9);
+        fraccionPendiente -= baja;
+      }
+      nivelSim = nivelSim - baja;
+      // Sin stock la demanda se pierde: no queda "deuda" que descontar del próximo pedido.
+      if(nivelSim <= 0){ nivelSim = 0; fraccionPendiente = 0; }
+    };
+    const nivelEn = (t)=>{
+      while(iProxLlegada < llegadas.length && llegadas[iProxLlegada].t <= t){
+        const l = llegadas[iProxLlegada];
+        consumirHasta(l.t);
+        l.nivelAntes = nivelSim;          // para el globo del punto donde entra
+        nivelSim += l.cantidad;
+        l.nivelDespues = nivelSim;
+        iProxLlegada++;
+      }
+      consumirHasta(t);
+      return nivelSim;
+    };
     // Días desde la última entrada (o desde hoy, si todavía no llegó ninguna): la incertidumbre se reinicia
     // con cada llegada, mismo criterio que antes y que el Stock de Seguridad de Piero.
     const diasDesdeReposicion = (t)=>{
@@ -4229,18 +4278,12 @@ function drawKardex(){
     d.setUTCDate(d.getUTCDate() + Math.round(t));
     return d;
   };
-  // Nivel al que llega el stock justo antes de que entre cada pedido: es el punto más bajo del ciclo y, con
-  // tiempo de entrega de por medio, el número que de verdad dice si se va a quebrar el stock esperando.
-  // Nivel JUSTO ANTES de una llegada: el punto más bajo de ese tramo y, con tiempo de entrega de por
-  // medio, el número que dice si se va a quebrar el stock esperando. Recorre todas las entradas (tránsito
-  // incluido), no solo los pedidos simulados.
-  const nivelAntesDe = (tObjetivo)=>{
-    const consumido = umFraccion
-      ? (producto.consumoDiario||0) * tObjetivo
-      : Math.floor((producto.consumoDiario||0) * tObjetivo + 1e-9);
-    const entradas = llegadas.reduce((a,l)=> a + (l.t < tObjetivo ? l.cantidad : 0), 0);
-    return stockSuc + entradas - consumido;
-  };
+  // Nivel justo antes y justo después de cada entrada: lo anota el propio recorrido de la simulación (ver
+  // nivelEn más arriba), que es el único que conoce el piso en 0 y el redondeo por unidad. Buscarlo con
+  // una fórmula aparte fue lo que hizo que el pedido aterrizara más abajo de lo pedido.
+  const entradaEn = (t)=> llegadas.filter(l=>Math.abs(l.t - t) < 1e-9)[0] || null;
+  const nivelAntesDe = (t)=>{ const l = entradaEn(t); return l && l.nivelAntes != null ? l.nivelAntes : stockSuc; };
+  const nivelDespuesDe = (t)=>{ const l = entradaEn(t); return l && l.nivelDespues != null ? l.nivelDespues : stockSuc; };
   const nivelAlLlegar = pedidos.map(p=>nivelAntesDe(p.tLlega));
 
   // --- Etiqueta grande: "¿hay que pedir?" ---
@@ -4483,12 +4526,12 @@ function drawKardex(){
       const idxTr = idxDeDia(tTransito);
       if(dentroDeVista(idxTr)){
         const x = xFor(idxTr - viewStart);
-        const nivelTrDespues = nivelNumUm(Math.max(0, nivelAntesDe(tTransito)) + transitoCant);
+        const nivelTrDespues = nivelNumUm(nivelDespuesDe(tTransito));
         const yTr = Math.min(padT+plotH, Math.max(padT, yFor(nivelTrDespues)));
         pedidosSvg += `<circle class="kdx-transito-dot" cx="${x.toFixed(1)}" cy="${yTr.toFixed(1)}" r="6"`
           + ` data-cant="${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'')}"`
           + ` data-fllega="${escapeHtml(fmtDate(fechaEnDia(tTransito)))}"`
-          + ` data-antes="${fmt2(nivelNumUm(Math.max(0, nivelAntesDe(tTransito))))}"`
+          + ` data-antes="${fmt2(nivelNumUm(nivelAntesDe(tTransito)))}"`
           + ` data-despues="${fmt2(nivelTrDespues)}"></circle>`;
       }
     }
@@ -4654,6 +4697,19 @@ function drawKardex(){
   // muestran. Se siguen armando por si hay que volver a mostrarlos: calcCaption, transitoCaption y
   // fuenteCaption. Lo accionable de esos textos ya está en la etiqueta grande de arriba.
   void calcCaption; void transitoCaption; void fuenteCaption;
+
+  // Foto del estado para la imagen exportable (ver buildKardexImageHtml).
+  kardexUltimo = {
+    producto, sucursal: kardexSucursal, sucLabel: sucInfo.label, stockSuc, movsSuc, saldoDespues,
+    umFraccion, mesesInput, tieneProyeccion, cantidadPedido, cicloDias, ropSim, leadDias, tieneLead,
+    esImportado, transitoCant,
+    fechaTransito: transitoCant > 0 ? fmtDate(fechaEnDia(tTransito)) : null,
+    pedido1: (tieneProyeccion && pedidos.length) ? {
+      hoy: pedidos[0].tPedido < 1,
+      fPedido: fmtDate(fechaEnDia(pedidos[0].tPedido)),
+      fLlega: fmtDate(fechaEnDia(pedidos[0].tLlega)),
+    } : null,
+  };
 
   chart.querySelectorAll('.kdx-suc-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -5638,6 +5694,158 @@ function proImageHtml(opts){
     ${opts.footnote ? `<div style="padding:2px 40px 26px;font-size:11px;color:#8b98a4;line-height:1.5;font-family:Inter,Arial,sans-serif;">${opts.footnote}</div>` : ''}
     ${proFooterBarHtml(opts.footerBar)}
     ${bottomSpacer}
+  </div>`;
+}
+// ---------- Imagen exportable del Kardex (15.09.2026) ----------
+// Pedido de Piero: "puedes añadir una opción para exportar como imagen el detalle de esto? ojo que esta
+// imagen debe estar en grande y debe darme el gráfico así como el detalle del consumo. toma como
+// inspiración la imagen que te pasé, pero no lo hagas exactamente igual". De su referencia se toma la
+// idea: encabezado con el producto, una fila de cifras clave, el gráfico grande y el cálculo escrito
+// abajo. Lo demás es propio: se agrega el consumo mes a mes (que es "el detalle del consumo" que pidió)
+// y el detalle de los últimos movimientos reales, que la referencia no tenía.
+// El gráfico NO se vuelve a dibujar: se clona el SVG que está en pantalla, así la imagen siempre coincide
+// con lo que Piero está viendo (sucursal elegida, zoom, meses a abastecer).
+function svgParaImagen(svgOriginal, escala){
+  // html2canvas serializa el SVG por su cuenta y en esa copia NO se aplican las clases CSS de la página,
+  // así que cada atributo de estilo se pasa en línea antes de exportar. Los ids internos (clip-path) se
+  // renombran para que la copia no termine apuntando al SVG original que sigue en pantalla.
+  const clon = svgOriginal.cloneNode(true);
+  const props = ['fill','fill-opacity','stroke','stroke-width','stroke-dasharray','stroke-linejoin',
+    'stroke-linecap','opacity','font-size','font-weight','font-family','text-anchor','paint-order','display'];
+  const origs = svgOriginal.querySelectorAll('*'), clones = clon.querySelectorAll('*');
+  for(let i=0;i<origs.length;i++){
+    const cs = getComputedStyle(origs[i]);
+    let css = '';
+    props.forEach(pr=>{ const v = cs.getPropertyValue(pr); if(v && v!=='none' || pr==='fill' || pr==='stroke') css += pr+':'+v+';'; });
+    clones[i].setAttribute('style', css);
+    clones[i].removeAttribute('class');
+  }
+  let html = clon.outerHTML.replace(/kdxPlotClip/g, 'kdxPlotClipImg');
+  // Ancho fijo para la imagen: el SVG tiene viewBox, así que escala sin deformarse.
+  html = html.replace('<svg ', `<svg width="${escala}" `);
+  return html;
+}
+// Consumo mes a mes de la sucursal que se está viendo, a partir de los movimientos reales (salidas).
+// Es el "detalle del consumo" del pedido: de dónde sale realmente la rotación.
+function kardexConsumoPorMes(movs, nMeses){
+  const meses = {};
+  movs.forEach(m=>{
+    if(m.q >= 0) return;               // solo salidas
+    const k = m.f.slice(0,7);          // YYYY-MM
+    meses[k] = (meses[k]||0) + (-m.q);
+  });
+  const keys = Object.keys(meses).sort();
+  const ultimos = keys.slice(-nMeses);
+  return ultimos.map(k=>({ mes:k, salidas: meses[k] }));
+}
+function buildKardexImageHtml(){
+  const d = kardexUltimo;
+  if(!d) return '<div id="proImgInner"></div>';
+  const p = d.producto;
+  const um = (p.unidad||'').trim();
+  const n2 = v => v==null ? '—' : Number(v).toLocaleString('es-PE', {maximumFractionDigits:2});
+  const svgVivo = document.querySelector('#kardexChart svg.kdx-svg');
+  const svgHtml = svgVivo ? svgParaImagen(svgVivo, 1400) : '';
+
+  const consumo = kardexConsumoPorMes(d.movsSuc, 12);
+  const maxMes = consumo.reduce((a,c)=>Math.max(a,c.salidas), 0) || 1;
+  const totalConsumo = consumo.reduce((a,c)=>a+c.salidas, 0);
+  const promedio = consumo.length ? totalConsumo/consumo.length : 0;
+  const nombreMes = k => {
+    const [a,m] = k.split('-');
+    return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'][Number(m)-1] + ' ' + a.slice(2);
+  };
+  const filasConsumo = consumo.length ? consumo.map(c=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
+      <div style="width:56px;font-size:12.5px;color:#5b6876;font-weight:600;">${nombreMes(c.mes)}</div>
+      <div style="flex:1;background:#eef1f5;border-radius:4px;height:14px;overflow:hidden;">
+        <div style="width:${Math.max(2, Math.round(c.salidas/maxMes*100))}%;height:100%;background:#2a9d8f;border-radius:4px;"></div>
+      </div>
+      <div style="width:60px;text-align:right;font-size:12.5px;font-weight:800;color:#0a1e64;">${n2(c.salidas)}</div>
+    </div>`).join('')
+    : '<div style="font-size:12.5px;color:#8b98a4;">Sin salidas registradas en esta sucursal.</div>';
+
+  // Últimos movimientos reales, que es lo que sostiene todo el cálculo.
+  const ultimos = d.movsSuc.map((m,i)=>({ m, saldo: d.saldoDespues[i] })).slice(-12).reverse();
+  const filasMovs = ultimos.length ? ultimos.map(x=>{
+    const esIng = x.m.q > 0;
+    const f = x.m.f.split('-');
+    return `<tr>
+      <td style="padding:7px 10px;font-size:12.5px;color:#31404f;border-bottom:1px solid #eef1f5;">${f[2]}/${f[1]}/${f[0]}</td>
+      <td style="padding:7px 10px;font-size:12px;font-weight:700;border-bottom:1px solid #eef1f5;color:${esIng?'#0ca30c':'#d03b3b'};">${esIng?'Ingreso':'Salida'}</td>
+      <td style="padding:7px 10px;font-size:12.5px;text-align:right;font-weight:700;border-bottom:1px solid #eef1f5;color:#31404f;">${esIng?'+':'−'}${n2(Math.abs(x.m.q))}</td>
+      <td style="padding:7px 10px;font-size:12.5px;text-align:right;font-weight:800;border-bottom:1px solid #eef1f5;color:#0a1e64;">${n2(x.saldo)}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="4" style="padding:12px;font-size:12.5px;color:#8b98a4;">Sin movimientos registrados en esta sucursal.</td></tr>';
+
+  const tile = (label, valor, nota, color) => `
+    <div style="flex:1;min-width:190px;background:#fff;border:1px solid #e2e8ee;border-radius:12px;padding:16px 18px;">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:#8b98a4;text-transform:uppercase;">${label}</div>
+      <div style="font-size:30px;font-weight:800;color:${color||'#0a1e64'};margin-top:6px;line-height:1.1;">${valor}</div>
+      <div style="font-size:11.5px;color:#5b6876;margin-top:5px;">${nota}</div>
+    </div>`;
+
+  const hayPedido = d.tieneProyeccion && d.pedido1;
+  const tiles = [
+    tile('Stock actual', `${n2(d.stockSuc)} <span style="font-size:15px;color:#8b98a4;">${escapeHtml(um)}</span>`, escapeHtml(d.sucLabel), null),
+    hayPedido
+      ? tile('Pedido simulado', `${n2(d.cantidadPedido)} <span style="font-size:15px;color:#8b98a4;">${escapeHtml(um)}</span>`, `${d.mesesInput} ${d.mesesInput===1?'mes':'meses'} de rotación`, '#e2960a')
+      : tile('Pedido simulado', 'No disponible', d.sucursal!=='lima' ? 'Solo con Lima San Pedro' : 'Falta Consumo Diario o Desvest', '#8b98a4'),
+    hayPedido
+      ? tile('Llegada simulada', d.pedido1.fLlega, d.tieneLead ? `Se coloca ${d.pedido1.hoy?'HOY':'el '+d.pedido1.fPedido} · ${n2(d.leadDias)} días de entrega${d.esImportado?' (importación)':''}` : 'Sin Lead Time en el Excel', null)
+      : tile('Llegada simulada', '—', 'Sin simulación', '#8b98a4'),
+    tile('Referencias', `${n2(p.rop)} <span style="font-size:15px;color:#8b98a4;">ROP</span>`, `Stock de seguridad ${n2(p.stockSeguridad)}${d.transitoCant>0 ? ` · en tránsito ${n2(d.transitoCant)} (llega ${d.fechaTransito})` : ''}`, null),
+  ].join('');
+
+  const calculo = hayPedido
+    ? `Consumo diario ${n2(p.consumoDiario)} × ${d.cicloDias} días = <b>${n2(d.cantidadPedido)} ${escapeHtml(um)}</b> por pedido · se coloca al tocar el ${d.esImportado?'ROP de importación':'ROP'} ${n2(d.ropSim)}`
+    : 'Sin simulación de pedido para esta vista.';
+
+  const fecha = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
+  const subt = [p.codigo, d.sucLabel, d.esImportado ? 'Compra de importación' : 'Compra nacional', um]
+    .filter(Boolean).join('  |  ');
+  return `
+  <div id="proImgInner" style="width:1500px;font-family:Inter,Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
+    ${proHeaderHtml((p.descripcion||'').trim() || p.codigo, subt, fecha, '📦')}
+    <div style="padding:22px 40px 0;display:flex;gap:14px;flex-wrap:wrap;">${tiles}</div>
+    <div style="padding:22px 40px 0;">
+      <div style="font-size:13px;font-weight:800;letter-spacing:.5px;color:#0a1e64;text-transform:uppercase;margin-bottom:10px;">
+        Movimientos registrados <span style="color:#8b98a4;">→</span> simulación del próximo pedido
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8ee;border-radius:14px;padding:16px 18px 10px;">
+        ${svgHtml}
+      </div>
+    </div>
+    <div style="padding:22px 40px 0;display:flex;gap:14px;align-items:stretch;">
+      <div style="flex:1;background:#fff;border:1px solid #e2e8ee;border-radius:14px;padding:18px 20px;">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.5px;color:#0a1e64;text-transform:uppercase;">Consumo por mes</div>
+        <div style="font-size:11.5px;color:#8b98a4;margin:4px 0 14px;">Salidas reales de ${escapeHtml(d.sucLabel)} · promedio ${n2(promedio)} ${escapeHtml(um)}/mes</div>
+        ${filasConsumo}
+      </div>
+      <div style="flex:1;background:#fff;border:1px solid #e2e8ee;border-radius:14px;padding:18px 20px;">
+        <div style="font-size:13px;font-weight:800;letter-spacing:.5px;color:#0a1e64;text-transform:uppercase;">Últimos movimientos</div>
+        <div style="font-size:11.5px;color:#8b98a4;margin:4px 0 10px;">Cada ingreso y salida con el saldo que dejó</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr>
+            <th style="text-align:left;padding:6px 10px;font-size:10.5px;letter-spacing:.5px;color:#8b98a4;text-transform:uppercase;border-bottom:2px solid #e2e8ee;">Fecha</th>
+            <th style="text-align:left;padding:6px 10px;font-size:10.5px;letter-spacing:.5px;color:#8b98a4;text-transform:uppercase;border-bottom:2px solid #e2e8ee;">Tipo</th>
+            <th style="text-align:right;padding:6px 10px;font-size:10.5px;letter-spacing:.5px;color:#8b98a4;text-transform:uppercase;border-bottom:2px solid #e2e8ee;">Cantidad</th>
+            <th style="text-align:right;padding:6px 10px;font-size:10.5px;letter-spacing:.5px;color:#8b98a4;text-transform:uppercase;border-bottom:2px solid #e2e8ee;">Saldo</th>
+          </tr></thead>
+          <tbody>${filasMovs}</tbody>
+        </table>
+      </div>
+    </div>
+    <div style="padding:20px 40px 8px;">
+      <div style="background:#fff;border-left:4px solid #e2960a;border-radius:10px;padding:14px 18px;font-size:13.5px;color:#31404f;">
+        <b style="color:#0a1e64;">Cálculo del pedido:</b> ${calculo}
+      </div>
+    </div>
+    <div style="padding:6px 40px 26px;font-size:11px;color:#8b98a4;line-height:1.5;">
+      El histórico se reconstruye movimiento por movimiento desde el stock actual de ${escapeHtml(d.sucLabel)}; cada escalón es un ingreso o una salida real.
+      La simulación es una referencia de planificación, no una garantía de cobertura.
+      Fuente: ${escapeHtml((ALMACEN_DATA && ALMACEN_DATA.filename) || 'Reporte Almacen.xlsx')} — hojas Análisis Inventario, Ingresos y Movimientos.
+    </div>
   </div>`;
 }
 async function downloadProImage(buildFn, filenamePrefix, btn, renderFn){
