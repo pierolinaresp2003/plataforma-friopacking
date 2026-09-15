@@ -4566,8 +4566,12 @@ function drawKardex(){
   // sucursales" — Ica / Lima San Pedro / Trujillo). Botones tipo pill, uno por sucursal; el activo queda
   // resaltado. Al hacer clic se guarda la elección (igual que el zoom) y se vuelve a dibujar el kardex
   // completo con los datos de esa sucursal.
+  // Se quitó por un rato ese mismo día y volvió enseguida, cuando apareció el caso que lo justifica: el
+  // código 007200500020 tiene 0 en Lima y 2 en Trujillo, así que el módulo dice "no hay que pedir" (el
+  // estado suma las 3 sucursales) mientras el kardex de Lima está en cero — sin el filtro no había forma
+  // de ver dónde estaba ese stock. Por eso ahora cada botón trae además la cantidad de su sucursal.
   const sucFilterSvg = `<div class="kdx-suc-filter"><span class="kdx-suc-label">Sucursal:</span>${KARDEX_SUCURSALES.map(s=>
-    `<button type="button" class="kdx-suc-btn${s.key===kardexSucursal?' active':''}" data-suc="${s.key}">${escapeHtml(s.label)}</button>`
+    `<button type="button" class="kdx-suc-btn${s.key===kardexSucursal?' active':''}" data-suc="${s.key}">${escapeHtml(s.label)} <b>${fmt2(producto[s.key]||0)}</b></button>`
   ).join('')}</div>`;
 
   // Debajo del gráfico: el cálculo en palabras (mismo criterio que Piero pidió varias veces — "¿cómo se
@@ -4589,18 +4593,30 @@ function drawKardex(){
   // va a mostrar solo porque va a aparecer como un Ingreso real en tu Excel para esa sucursal.
   // El tránsito dejó de estar en esta lista cuando se muestra su llegada en el gráfico (15.09.2026): ahí ya
   // no es "algo no incluido", sino una llegada estimada que sí se dibuja.
+  const umEsTrasladable = ALMACEN_UM_SIN_TRASLADO.indexOf((producto.unidad||'').trim().toUpperCase()) === -1;
   const otrosAlmacenes = KARDEX_SUCURSALES
     .filter(s=>s.key!==kardexSucursal)
     .map(s=> producto[s.key] ? `${s.label} ${fmt2(producto[s.key])}` : null)
     .concat([(producto.transito && !transitoCant) ? `En tránsito ${fmt2(producto.transito)}` : null])
     .filter(Boolean);
-  const transitoCaption = otrosAlmacenes.length
-    ? `<div class="kdx-caption">No incluido en este gráfico: ${otrosAlmacenes.join(' · ')} — se suma a ${escapeHtml(sucInfo.label)} recién cuando llega físicamente y quede registrado como Ingreso ahí. El ROP/Stock de seguridad de tu Excel sí se comparan contra Lima + Tránsito (el mismo stock que usa Alertas de Reposición), por eso pueden verse "cruzados" contra esta línea si hay tránsito o stock en otras sucursales.</div>`
+  const otrosCaption = otrosAlmacenes.length
+    ? `No incluido en este gráfico: ${otrosAlmacenes.join(' · ')} — se suma a ${escapeHtml(sucInfo.label)} recién cuando llega físicamente y quede registrado como Ingreso ahí. `
+    : '';
+  // Explicación de por qué el "¿hay que pedir?" puede decir que no aunque el kardex de esta sucursal esté
+  // en cero (15.09.2026, Piero: "me sale que hay 0 en lima y que no se debe pedir, pero en realidad hay 2
+  // en trujillo nada más"). Se muestra siempre que el stock que decide sea distinto del de esta sucursal,
+  // no solo cuando hay otras sucursales con saldo.
+  const decideDistinto = Math.abs((producto.stockRepo||0) - stockSuc) > 0.005;
+  const decisionCaption = decideDistinto
+    ? `<b>Ojo con la decisión de pedir:</b> no se decide contra esta línea sino contra ${escapeHtml(sucInfo.label)} + tránsito${umEsTrasladable ? ' + las otras sucursales' : ' (en ' + escapeHtml((producto.unidad||'').trim()) + ' las otras sucursales no cuentan, porque no se trasladan)'} = <b>${fmt2(producto.stockRepo)}</b> contra el ROP ${fmt2(producto.rop)} — el mismo criterio de Alertas de Reposición. Por eso puede decir que no hace falta pedir aunque acá la línea esté en cero: el stock está en otra sucursal.`
+    : '';
+  const transitoCaption = (otrosCaption || decisionCaption)
+    ? `<div class="kdx-caption">${otrosCaption}${decisionCaption}</div>`
     : '';
   const fuenteCaption = `<div class="kdx-caption kdx-fuente">Fuente: ${escapeHtml(ALMACEN_DATA.filename||'Reporte Almacen.xlsx')} — hojas Ingresos y Movimientos, movimiento por movimiento (cada ingreso y cada salida de ${escapeHtml(sucInfo.label)} con su fecha exacta). El eje muestra las semanas solo como referencia de tiempo.</div>`;
 
   const chart = document.getElementById('kardexChart');
-  chart.innerHTML = `${pedirBannerSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+  chart.innerHTML = `${pedirBannerSvg}${sucFilterSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
     <defs><clipPath id="kdxPlotClip"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect></clipPath></defs>
     ${gridSvg}
     <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
