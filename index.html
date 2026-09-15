@@ -4179,15 +4179,18 @@ function drawKardex(){
     horizonDias = Math.min(Math.max(horizonDias, 7), 1095);
 
     // Nivel simulado en el día t, recorriendo todas las entradas (tránsito + pedidos) en orden.
-    const nivelEn = (t)=>{
-      let nivel = stockSuc, desde = 0;
-      for(const l of llegadas){
-        if(t < l.t) break;
-        nivel = nivel - producto.consumoDiario * (l.t - desde) + l.cantidad;
-        desde = l.t;
-      }
-      return nivel - producto.consumoDiario * (t - desde);
-    };
+    // 15.09.2026, Piero: "por que sale que hay 1 en stock, que se pida 3 y sin consumirse ese 1 no llega a
+    // ser 4 en total de stock al llegar el pedido". Tenía razón: el nivel se calculaba con el consumo
+    // continuo, así que en los 20 días de entrega descontaba 0.67 de la unidad que había (1 → 0.33) y al
+    // sumar el pedido daba 3.33, que redondeado se veía como 3. En unidades contables eso no existe: media
+    // pantalla no se consume. Ahora, en esas unidades, solo se descuenta stock cuando se completa una
+    // unidad entera de consumo (el consumo diario sigue siendo el promedio real; lo que cambia es que el
+    // saldo baja de uno en uno, como en la vida real). En metros, kilos y demás sí se descuenta continuo.
+    const consumidoEn = (t)=> umFraccion
+      ? producto.consumoDiario * t
+      : Math.floor(producto.consumoDiario * t + 1e-9);
+    const entradasHasta = (t, incluirEnT)=> llegadas.reduce((a,l)=> a + ((incluirEnT ? l.t <= t : l.t < t) ? l.cantidad : 0), 0);
+    const nivelEn = (t)=> stockSuc + entradasHasta(t, true) - consumidoEn(t);
     // Días desde la última entrada (o desde hoy, si todavía no llegó ninguna): la incertidumbre se reinicia
     // con cada llegada, mismo criterio que antes y que el Stock de Seguridad de Piero.
     const diasDesdeReposicion = (t)=>{
@@ -4215,7 +4218,7 @@ function drawKardex(){
       // calculando con el consumo diario real, sin redondear.
       projPeriods.push({ key: isoDay(curDate) });
       projDias.push(t);
-      projMean.push(redondeaUm(Math.max(0, meanRaw)));
+      projMean.push(redondeaUm(Math.max(0, meanRaw)));  // ya es entero en unidades contables (ver consumidoEn)
       projUpper.push(redondeaUm(Math.max(0, meanRaw+sigma)));
       projLower.push(redondeaUm(Math.max(0, meanRaw-sigma)));
     }
@@ -4232,13 +4235,11 @@ function drawKardex(){
   // medio, el número que dice si se va a quebrar el stock esperando. Recorre todas las entradas (tránsito
   // incluido), no solo los pedidos simulados.
   const nivelAntesDe = (tObjetivo)=>{
-    let nivel = stockSuc, desde = 0;
-    for(const l of llegadas){
-      if(l.t >= tObjetivo) break;
-      nivel = nivel - producto.consumoDiario * (l.t - desde) + l.cantidad;
-      desde = l.t;
-    }
-    return nivel - producto.consumoDiario * (tObjetivo - desde);
+    const consumido = umFraccion
+      ? (producto.consumoDiario||0) * tObjetivo
+      : Math.floor((producto.consumoDiario||0) * tObjetivo + 1e-9);
+    const entradas = llegadas.reduce((a,l)=> a + (l.t < tObjetivo ? l.cantidad : 0), 0);
+    return stockSuc + entradas - consumido;
   };
   const nivelAlLlegar = pedidos.map(p=>nivelAntesDe(p.tLlega));
 
@@ -4281,10 +4282,14 @@ function drawKardex(){
   const avisoSimulacion = tablaDiceNoPedir
     ? ` · <b>Ojo:</b> en la tabla de arriba figura sin cantidad a pedir, porque ahí el stock se cuenta sumando las 3 sucursales y el tránsito (${fmt2(producto.stockRepo)} contra el ROP ${fmt2(producto.rop)}). Acá se mira solo ${escapeHtml(sucInfo.label)}.`
     : '';
+  void cuandoSim; void avisoSimulacion; // ya no se muestran en la etiqueta (ver comentario abajo)
   const pedirBannerSvg = mesesInput <= 0
     ? `<div class="kdx-pedir-banner kdx-pedir-neutral">Escribe cuántos meses quieres cubrir arriba, en "Meses a abastecer", para saber si hay que pedir.</div>`
     : (simulaPedirHoy
-        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(cantidadPedido)} ${um}</span><span class="kdx-pedir-sub">${escapeHtml(sucInfo.label)} está en ${fmt2(stockSuc)}, en el punto de reorden (${fmt2(ropSim)}) — es la misma cantidad que entra en la simulación naranja, ${mesesInput} ${mesesInput===1?'mes':'meses'} de rotación${cuandoSim ? ` · ${cuandoSim}` : ''}${avisoSimulacion}</span></div>`
+        // 15.09.2026, Piero (comentario en el artefacto): "quita esto" sobre la línea explicativa — la
+        // etiqueta queda con lo esencial: si hay que pedir y cuánto. El detalle (cuándo se coloca, cuándo
+        // llega, con qué stock se comparó) sigue estando en el gráfico y en el globo de cada punto.
+        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(cantidadPedido)} ${um}</span></div>`
         // Cuando no toca pedir no se muestra nada arriba (15.09.2026, Piero: "quita esto" sobre la etiqueta
         // verde). Cuándo tocaría el próximo pedido y por cuánto se sigue viendo en el gráfico y al hacer
         // clic en el punto donde entra.
@@ -4643,7 +4648,12 @@ function drawKardex(){
     ${refSvg}
     ${calloutSvg}
     ${xLabelsSvg}
-  </svg><div class="trend-tooltip" id="kardexTooltip"></div>${calcCaption}${transitoCaption}${fuenteCaption}`;
+  </svg><div class="trend-tooltip" id="kardexTooltip"></div>`;
+  // 15.09.2026, Piero (comentario en el artefacto): "quita toda esta explicación de los cuadros por
+  // favor" — los textos de abajo (cómo se lee la simulación, qué no está incluido y la fuente) ya no se
+  // muestran. Se siguen armando por si hay que volver a mostrarlos: calcCaption, transitoCaption y
+  // fuenteCaption. Lo accionable de esos textos ya está en la etiqueta grande de arriba.
+  void calcCaption; void transitoCaption; void fuenteCaption;
 
   chart.querySelectorAll('.kdx-suc-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -4925,12 +4935,14 @@ function drawPedirDetalle(grupos){
     + '<div class="table-card card" style="max-height:560px;overflow:auto;"><table class="pedir-tabla">'
     + '<colgroup><col style="width:112px"><col><col style="width:52px">'
     + '<col style="width:68px"><col style="width:76px"><col style="width:58px">'
-    + '<col style="width:80px"><col style="width:92px"><col style="width:80px"><col style="width:116px"></colgroup>'
+    // La última columna ("A pedir") se quitó el 15.09.2026 a pedido de Piero (comentario en el artefacto:
+    // "esto que es a pedir quitalo por favor, porque ya se tiene abajo en grande cuánto hay que pedir").
+    + '<col style="width:80px"><col style="width:92px"><col style="width:80px"></colgroup>'
     + '<thead><tr>'
     + '<th>Código</th><th>Descripción</th><th class="um">UM</th>'
     + '<th class="num">LIMA</th><th class="num">Trujillo</th><th class="num">ICA</th>'
     + '<th class="num">En tránsito</th><th class="num">Rotación</th><th class="num">ROP</th>'
-    + '<th class="num pedir-col">A pedir</th></tr></thead><tbody>'
+    + '</tr></thead><tbody>'
     // Solo el código principal: Piero pidió no listar los códigos homologados debajo (09.09.2026,
     // comentario en el artefacto: "no pongas esto"). La homologación sigue aplicándose — los códigos
     // gemelos están en r.codigos y el buscador general los sigue encontrando.
@@ -4942,8 +4954,7 @@ function drawPedirDetalle(grupos){
         + '<td class="num">' + fmt(r.ica) + '</td>'
         + '<td class="num">' + fmt(r.transito) + '</td>'
         + '<td class="num"><b>' + fmt(r.consumoMensual) + '</b></td>'
-        + '<td class="num">' + fmt(r.rop) + '</td>'
-        + '<td class="num pedir-col">' + (r.hayQuePedir === false ? '<span style="opacity:.35;font-weight:600;">—</span>' : fmt(arriba(r.aPedir))) + '</td></tr>').join('')
+        + '<td class="num">' + fmt(r.rop) + '</td></tr>').join('')
     + '</tbody></table></div>';
   const volver = document.getElementById('pedirVolver');
   if(volver) volver.addEventListener('click', ()=>{ pedirCatSel = null; drawPedirPorCategoria(); });
