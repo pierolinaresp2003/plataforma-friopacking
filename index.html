@@ -238,6 +238,8 @@
   .kdx-svg .kdx-area{fill:var(--brand-2-dark);fill-opacity:.12;pointer-events:none;}
   .kdx-svg .kdx-line{stroke:var(--brand-2-dark);stroke-width:2;fill:none;pointer-events:none;}
   .kdx-svg .kdx-dot{fill:var(--brand-2-dark);cursor:pointer;}
+  /* Un punto por movimiento (15.09.2026): relleno = ingreso, hueco = salida. */
+  .kdx-svg .kdx-dot-sal{fill:var(--card);stroke:var(--brand-2-dark);stroke-width:2;}
   .kdx-svg .kdx-rop{stroke:var(--red);stroke-width:1.5;stroke-dasharray:4 3;fill:none;pointer-events:none;}
   .kdx-svg .kdx-seg{stroke:var(--seg-c);stroke-width:1.5;stroke-dasharray:4 3;fill:none;pointer-events:none;}
   .kdx-svg .kdx-ref-label{font-size:11px;font-weight:600;pointer-events:none;}
@@ -1647,7 +1649,11 @@ function buildSnapshot(){
     // ROP/Stock de Seguridad de importación) para la simulación con tiempo de entrega del kardex. A
     // diferencia de los saltos anteriores, este NO invalida nada: un snapshot 4 se sigue leyendo igual
     // (kardexVigente sigue pidiendo >= 4), solo que sin tiempo de entrega hasta que se vuelva a publicar.
-    almacenSchemaVersion: 5,
+    // Sube a 6 el 15.09.2026: el kardex pasa a dibujarse movimiento por movimiento ("kmv") en vez de con
+    // los totales por semana, que escondían las entradas y salidas ocurridas dentro de una misma semana.
+    // Un snapshot anterior no trae esa lista, así que el kardex se oculta hasta volver a publicar — mismo
+    // criterio que en los saltos de esquema anteriores.
+    almacenSchemaVersion: 6,
     almacen: (ALMACEN_DATA && ALMACEN_DATA.rows) ? {
       filename: ALMACEN_DATA.filename,
       sheetName: ALMACEN_DATA.sheetName,
@@ -1681,6 +1687,10 @@ function buildSnapshot(){
           ki: na(r.kardexIngresos), km: na(r.kardexMovimientos),
           kis: r.kardexIngresosPorSucursal ? { i: na(r.kardexIngresosPorSucursal.ica), l: na(r.kardexIngresosPorSucursal.lima), t: na(r.kardexIngresosPorSucursal.trujillo) } : undefined,
           kms: r.kardexMovimientosPorSucursal ? { i: na(r.kardexMovimientosPorSucursal.ica), l: na(r.kardexMovimientosPorSucursal.lima), t: na(r.kardexMovimientosPorSucursal.trujillo) } : undefined,
+          // Movimientos uno por uno, que es lo que dibuja el kardex desde el 15.09.2026: [fecha, cantidad
+          // con signo, inicial de la sucursal]. Ocupa bastante menos que los arreglos semanales (una
+          // entrada por transacción real en vez de una casilla por semana y sucursal, casi todas en cero).
+          kmv: r.kardexMovs ? r.kardexMovs.map(m=>[m.f, n(m.q), m.s.charAt(0)]) : undefined,
         };
       }),
     } : null,
@@ -1889,7 +1899,7 @@ function loadFromSnapshot(snap){
   // tiene el "key" viejo, que weekLabelFor/drawKardex ya no saben leer — se descarta en vez de intentar
   // mostrarlo mal, y el kardex se comporta igual que si el Excel publicado no tuviera esas hojas (avisa
   // que hay que volver a publicar), hasta que se vuelva a publicar con el archivo actual.
-  const kardexVigente = (snap.almacen && (snap.almacenSchemaVersion||0) >= 4);
+  const kardexVigente = (snap.almacen && (snap.almacenSchemaVersion||0) >= 6);
   ALMACEN_DATA = (snap.almacen && snap.almacen.rows) ? Object.assign({}, snap.almacen, {
     fromSnapshot: true,
     // El estado y el stock que cuenta para el ROP se RECALCULAN acá, no se publican: así el link
@@ -1911,6 +1921,7 @@ function loadFromSnapshot(snap){
       kardexMovimientos: kardexVigente ? (r.km || undefined) : undefined,
       kardexIngresosPorSucursal: (kardexVigente && r.kis) ? { ica: r.kis.i, lima: r.kis.l, trujillo: r.kis.t } : undefined,
       kardexMovimientosPorSucursal: (kardexVigente && r.kms) ? { ica: r.kms.i, lima: r.kms.l, trujillo: r.kms.t } : undefined,
+      kardexMovs: (kardexVigente && r.kmv) ? r.kmv.map(m=>({ f:m[0], q:m[1], s: m[2]==='i' ? 'ica' : m[2]==='t' ? 'trujillo' : 'lima' })) : undefined,
       disponible: (r.l||0) + (r.tr||0) - (r.rv||0) - (r.pk||0),
     })),
   }) : null;
@@ -2634,6 +2645,7 @@ function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candC
   const iSuc = candSucursal ? findCol(headerRow, candSucursal) : -1;
   const porCodigo = {};
   const porCodigoPorSucursal = { ica:{}, lima:{}, trujillo:{} };
+  const movs = {};
   let minDate = null, maxDate = null;
   for(let r=headerRowIdx+1; r<rows.length; r++){
     const row = rows[r];
@@ -2651,16 +2663,20 @@ function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candC
     const wk = weekKeyFor(fecha);
     const porSemana = porCodigo[codigo] = porCodigo[codigo] || {};
     porSemana[wk] = (porSemana[wk]||0) + cant;
-    if(iSuc!==-1){
-      const sucKey = normalizeSucursalKardex(row[iSuc]);
-      if(sucKey){
-        const bucket = porCodigoPorSucursal[sucKey];
-        const porSemanaSuc = bucket[codigo] = bucket[codigo] || {};
-        porSemanaSuc[wk] = (porSemanaSuc[wk]||0) + cant;
-      }
+    const sucKey = iSuc!==-1 ? normalizeSucursalKardex(row[iSuc]) : null;
+    if(sucKey){
+      const bucket = porCodigoPorSucursal[sucKey];
+      const porSemanaSuc = bucket[codigo] = bucket[codigo] || {};
+      porSemanaSuc[wk] = (porSemanaSuc[wk]||0) + cant;
     }
+    // Movimiento por movimiento (15.09.2026, pedido de Piero: "debes mostrar cada movimiento en la
+    // gráfica"). Agrupar por semana escondía justo lo que él quería ver: cuando algo entra y sale dentro
+    // de la MISMA semana, el neto es 0 y en el gráfico no pasaba nada. Ejemplo real del código
+    // 004300500327: el 10.08.2026 entran 24+24 y el 13.08 entra 27 y salen 24+24+27 — la semana neteaba
+    // cero y el pico de 75 unidades era invisible. Ahora se guarda cada transacción con su fecha exacta.
+    (movs[codigo] = movs[codigo] || []).push({ f: isoDay(fecha), q: cant, s: sucKey || 'lima' });
   }
-  return { porCodigo, porCodigoPorSucursal, minDate, maxDate };
+  return { porCodigo, porCodigoPorSucursal, movs, minDate, maxDate };
 }
 function processAlmacen(wb, filename){
   let sheetName = wb.SheetNames.find(n => /an[áa]lisis.*inventario/i.test(n.trim()));
@@ -2875,6 +2891,18 @@ function processAlmacen(wb, filename){
         p.kardexIngresosPorSucursal[suc] = kardexPeriods.map(per => sumaSemana(kardexIng && kardexIng.porCodigoPorSucursal && kardexIng.porCodigoPorSucursal[suc], per.key));
         p.kardexMovimientosPorSucursal[suc] = kardexPeriods.map(per => sumaSemana(kardexMov && kardexMov.porCodigoPorSucursal && kardexMov.porCodigoPorSucursal[suc], per.key));
       });
+      // Lista de movimientos, uno por uno (15.09.2026, ver nota en parseTransacciones): [fecha, cantidad
+      // con signo (+ ingreso / − salida), sucursal]. Es lo que dibuja el kardex desde esta ronda; los
+      // arreglos semanales de arriba se mantienen porque los usan las imágenes de resumen. En el mismo día
+      // los ingresos van antes que las salidas: el Excel no trae la hora, y es el orden que tiene sentido
+      // (entra la mercadería y de ahí sale), además de ser el que hace que el saldo nunca quede negativo.
+      const movsProd = [];
+      codigos.forEach(c=>{
+        ((kardexIng && kardexIng.movs[c]) || []).forEach(m=> movsProd.push({ f:m.f, q:m.q, s:m.s }));
+        ((kardexMov && kardexMov.movs[c]) || []).forEach(m=> movsProd.push({ f:m.f, q:-m.q, s:m.s }));
+      });
+      movsProd.sort((a,b)=> a.f < b.f ? -1 : a.f > b.f ? 1 : (b.q - a.q));
+      p.kardexMovs = movsProd;
     });
   }
 
@@ -3958,7 +3986,7 @@ function drawKardex(){
   const fmt2 = v => v==null ? '—' : Number(v).toLocaleString('es-PE', {maximumFractionDigits:2});
 
   const periods = ALMACEN_DATA.kardexPeriods;
-  if(!periods || !periods.length || !producto.kardexIngresos){
+  if(!periods || !periods.length || !producto.kardexMovs){
     document.getElementById('kardexChart').innerHTML = '<div class="kdx-empty">Para ver el kardex de este producto, tu Reporte Almacen.xlsx debe tener las hojas "Ingresos" y "Movimientos" (o hay que volver a "☁ Guardar y compartir" si el link publicado es de antes de que existieran).</div>';
     kardexLastKey = null;
     return;
@@ -3985,13 +4013,57 @@ function drawKardex(){
   const n = periods.length;
   const stockSuc = producto[kardexSucursal] != null ? producto[kardexSucursal]
     : (kardexSucursal==='lima' ? producto.stockRepo : 0);
-  const kIngSuc = (producto.kardexIngresosPorSucursal && producto.kardexIngresosPorSucursal[kardexSucursal]) || periods.map(()=>0);
-  const kMovSuc = (producto.kardexMovimientosPorSucursal && producto.kardexMovimientosPorSucursal[kardexSucursal]) || periods.map(()=>0);
-  const stockFin = new Array(n);
-  let cur = stockSuc;
-  for(let i=n-1; i>=0; i--){
-    stockFin[i] = cur;
-    cur = cur - (kIngSuc[i]||0) + (kMovSuc[i]||0);
+  // Movimiento por movimiento (15.09.2026, Piero: "en la base de datos se tienen ingresos y salidas de
+  // sucursal lurin y no son como la gráfica ... debes mostrar cada movimiento en la gráfica"). Antes esto
+  // se reconstruía con los totales POR SEMANA, y ahí estaba el error de fondo: lo que entra y sale dentro
+  // de la misma semana se netea, así que el gráfico no mostraba nada. En el código 004300500327, por
+  // ejemplo, el 10.08.2026 entraban 24+24, el 13.08 entraba 27 y salían 24+24+27: la semana daba cero y el
+  // pico de 75 unidades no existía en el gráfico. Ahora cada transacción es su propio escalón.
+  // El saldo se reconstruye hacia atrás desde el stock actual (que es el dato duro del Excel): el saldo
+  // después del último movimiento es el stock de hoy, y hacia atrás se le resta cada movimiento.
+  const movsSuc = (producto.kardexMovs || []).filter(m=>m.s === kardexSucursal);
+  const saldoDespues = new Array(movsSuc.length);
+  let saldo = stockSuc;
+  for(let i=movsSuc.length-1; i>=0; i--){
+    saldoDespues[i] = saldo;
+    saldo = saldo - movsSuc[i].q;
+  }
+  const saldoInicial = saldo; // saldo antes del primer movimiento registrado
+  // Posición de una fecha en la escala del gráfico. El eje sigue siendo semanal (1 índice = 1 semana), así
+  // que un movimiento cae en un índice fraccionario: su semana + el día dentro de la semana / 7. Los
+  // movimientos del mismo día se reparten dentro de ese día para que cada uno tenga su propio punto (al
+  // alejar el gráfico quedan encimados, pero al acercar se separan).
+  const idxPorSemana = {};
+  periods.forEach((per,i)=>{ idxPorSemana[per.key] = i; });
+  const idxDeFecha = (f)=>{
+    const d = fromIsoDay(f);
+    if(!d || isNaN(d.getTime())) return null;
+    const wi = idxPorSemana[isoDay(isoWeekStart(d))];
+    if(wi === undefined) return null;
+    return wi + Math.round((d - fromIsoDay(isoDay(isoWeekStart(d)))) / 86400000) / 7;
+  };
+  const porFecha = {};
+  movsSuc.forEach(m=>{ porFecha[m.f] = (porFecha[m.f]||0) + 1; });
+  const vistos = {};
+  const histSerie = [];
+  movsSuc.forEach((m,k)=>{
+    const base = idxDeFecha(m.f);
+    if(base == null) return;
+    const enDia = porFecha[m.f], orden = (vistos[m.f] = (vistos[m.f]||0));
+    vistos[m.f] = orden + 1;
+    histSerie.push({
+      idx: base + (enDia>1 ? (orden/enDia)/7 : 0),
+      v: saldoDespues[k], antes: saldoDespues[k] - m.q, mov: m,
+    });
+  });
+  // Punto de arranque (saldo antes del primer movimiento) y punto de hoy, para que la línea empiece en el
+  // borde izquierdo y llegue hasta HOY con el stock actual.
+  if(histSerie.length){
+    histSerie.unshift({ idx: 0, v: saldoInicial, antes: saldoInicial, mov: null });
+    histSerie.push({ idx: n-1, v: stockSuc, antes: stockSuc, mov: null });
+  } else {
+    histSerie.push({ idx: 0, v: stockSuc, antes: stockSuc, mov: null });
+    histSerie.push({ idx: n-1, v: stockSuc, antes: stockSuc, mov: null });
   }
 
   // --- Proyección: simulación de pedido periódico ---
@@ -4245,8 +4317,12 @@ function drawKardex(){
   // reportó ("se ve diminuto, no puedo ver los puntos de ingresos y salidas"). En vez de eso, el eje se
   // queda en la escala de los datos reales/esperados, y la banda que se pase de ese rango se recorta
   // visualmente (ver clip-path más abajo) en vez de deformar todo el gráfico.
-  const valAt = (i) => i<n ? stockFin[i] : projMean[i-n];
-  const allVals = idxView.map(valAt);
+  const valAt = (i) => i<n ? stockSuc : projMean[i-n];
+  const visDesde = idxView[0], visHasta = idxView[idxView.length-1];
+  const allVals = [];
+  histSerie.forEach(pt=>{ if(pt.idx >= visDesde-1 && pt.idx <= visHasta+1){ allVals.push(pt.v); allVals.push(pt.antes); } });
+  idxView.forEach(i=>{ if(i>=n) allVals.push(projMean[i-n]); });
+  allVals.push(stockSuc);
   if(producto.rop!=null) allVals.push(producto.rop);
   if(producto.stockSeguridad!=null) allVals.push(producto.stockSeguridad);
   if(!allVals.length) allVals.push(1);
@@ -4306,9 +4382,10 @@ function drawKardex(){
     ? `M${p[0].toFixed(1)},${p[1].toFixed(1)}`
     : `H${p[0].toFixed(1)} V${p[1].toFixed(1)}`).join(' ') : '';
 
-  // Histórico: área + línea sólida, solo hasta el índice n-1 (stock real reconstruido).
-  const histIdx = idxView.filter(i=>i<n);
-  const histPts = histIdx.map(i=>[xForGlobal(i), yFor(stockFin[i])]);
+  // Histórico: área + línea sólida, un escalón por movimiento (ver histSerie). Se dibuja completo y se
+  // recorta con el clip-path del gráfico, en vez de filtrar los puntos: así la línea entra y sale del
+  // borde sin cortarse antes de tiempo cuando hay zoom.
+  const histPts = histSerie.map(pt=>[xFor(pt.idx - viewStart), yFor(pt.v)]);
   const linePath = stepPath(histPts);
   const baseY = yFor(minVal).toFixed(1); // minVal nunca baja de 0 (ver más arriba)
   const areaPath = histPts.length ? linePath + ` L${histPts[histPts.length-1][0].toFixed(1)},${baseY} L${histPts[0][0].toFixed(1)},${baseY} Z` : '';
@@ -4347,7 +4424,7 @@ function drawKardex(){
       // te quedarías sin stock, y va dentro del área naranja. El borde de arriba se quitó el 15.09.2026
       // porque en productos con Desvest grande se sale del eje y quedaban trozos punteados flotando en la
       // parte alta del gráfico, que era parte de lo que Piero veía como "los colores se pierden".
-      const lowerPtsAsc = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockFin[i] : projLower[i-n])]);
+      const lowerPtsAsc = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockSuc : projLower[i-n])]);
       bandEdgeSvg = `<path class="kdx-band-edge" clip-path="url(#kdxPlotClip)" d="${stepPath(lowerPtsAsc)}"></path>`;
     }
   }
@@ -4358,9 +4435,9 @@ function drawKardex(){
   // seguridad) evita que se mezclen con la línea o la grilla.
   const calloutStyle = color => `fill:${color};paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;font-weight:700;`;
   if(idxView.indexOf(n-1)!==-1){
-    const x = xForGlobal(n-1), y = yFor(stockFin[n-1]);
+    const x = xForGlobal(n-1), y = yFor(stockSuc);
     const arriba = y > padT+22;
-    calloutSvg += `<text class="kdx-callout" style="${calloutStyle('var(--brand-2-dark)')}" x="${x}" y="${arriba ? y-12 : y+18}" text-anchor="middle">${fmt2(stockFin[n-1])} hoy</text>`;
+    calloutSvg += `<text class="kdx-callout" style="${calloutStyle('var(--brand-2-dark)')}" x="${x}" y="${arriba ? y-12 : y+18}" text-anchor="middle">${fmt2(stockSuc)} hoy</text>`;
   }
   if(tieneProyeccion && m>0 && idxView.indexOf(ntotal-1)!==-1){
     const x = xForGlobal(ntotal-1), y = Math.min(padT+plotH, Math.max(padT, yFor(projMean[m-1])));
@@ -4424,13 +4501,24 @@ function drawKardex(){
   const xLabelsSvg = idxView.map((i,li)=> (li%labelStep===0 || li===idxView.length-1)
     ? `<text x="${xFor(li)}" y="${H-8}" text-anchor="middle">${weekLabelFor(allPeriods[i].key)}</text>` : '').join('');
 
+  // Un punto por MOVIMIENTO real (15.09.2026): su fecha, si fue ingreso o salida, cuánto y con qué saldo
+  // quedó. Solo se dibujan los que caen dentro de la ventana visible.
+  const histDotsSvg = histSerie.map(pt=>{
+    if(!pt.mov) return '';
+    if(pt.idx < visDesde-0.5 || pt.idx > visHasta+0.5) return '';
+    const x = xFor(pt.idx - viewStart), y = yFor(pt.v);
+    if(y < padT-1 || y > padT+plotH+1) return '';
+    const esIngreso = pt.mov.q > 0;
+    return `<circle class="kdx-dot${esIngreso ? ' kdx-dot-ing' : ' kdx-dot-sal'}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"`
+      + ` data-fecha="${escapeHtml(fmtDate(fromIsoDay(pt.mov.f)))}"`
+      + ` data-tipo="${esIngreso ? 'Ingreso' : 'Salida'}"`
+      + ` data-cant="${fmt2(Math.abs(pt.mov.q))}"`
+      + ` data-antes="${fmt2(pt.antes)}" data-saldo="${fmt2(pt.v)}"></circle>`;
+  }).join('');
+
   const dotsSvg = idxView.map(i=>{
     const x = xForGlobal(i);
-    if(i<n){
-      const y = yFor(stockFin[i]);
-      const lbl = weekLabelFor(periods[i].key) + (i===n-1 ? ' (actual)' : '');
-      return `<circle class="kdx-dot" cx="${x}" cy="${y}" r="4" data-label="${escapeHtml(lbl)}" data-stock="${stockFin[i].toFixed(2)}" data-ing="${(kIngSuc[i]||0).toFixed(2)}" data-mov="${(kMovSuc[i]||0).toFixed(2)}"></circle>`;
-    }
+    if(i<n) return '';
     const j = i-n;
     // El punto se ancla al borde del gráfico si la media proyectada cae fuera del rango del eje (mismo
     // motivo que el clip-path de la banda: el eje ya no se estira para acomodar valores extremos) — el
@@ -4509,7 +4597,7 @@ function drawKardex(){
   const transitoCaption = otrosAlmacenes.length
     ? `<div class="kdx-caption">No incluido en este gráfico: ${otrosAlmacenes.join(' · ')} — se suma a ${escapeHtml(sucInfo.label)} recién cuando llega físicamente y quede registrado como Ingreso ahí. El ROP/Stock de seguridad de tu Excel sí se comparan contra Lima + Tránsito (el mismo stock que usa Alertas de Reposición), por eso pueden verse "cruzados" contra esta línea si hay tránsito o stock en otras sucursales.</div>`
     : '';
-  const fuenteCaption = `<div class="kdx-caption kdx-fuente">Fuente: ${escapeHtml(ALMACEN_DATA.filename||'Reporte Almacen.xlsx')} — hojas Ingresos y Movimientos, agrupadas por semana ISO (lunes a domingo).</div>`;
+  const fuenteCaption = `<div class="kdx-caption kdx-fuente">Fuente: ${escapeHtml(ALMACEN_DATA.filename||'Reporte Almacen.xlsx')} — hojas Ingresos y Movimientos, movimiento por movimiento (cada ingreso y cada salida de ${escapeHtml(sucInfo.label)} con su fecha exacta). El eje muestra las semanas solo como referencia de tiempo.</div>`;
 
   const chart = document.getElementById('kardexChart');
   chart.innerHTML = `${pedirBannerSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
@@ -4518,11 +4606,12 @@ function drawKardex(){
     <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
     ${bandSvg}
     ${bandEdgeSvg}
-    <path class="kdx-area" d="${areaPath}"></path>
-    <path class="kdx-line" d="${linePath}"></path>
+    <path class="kdx-area" clip-path="url(#kdxPlotClip)" d="${areaPath}"></path>
+    <path class="kdx-line" clip-path="url(#kdxPlotClip)" d="${linePath}"></path>
     ${projLineSvg}
     ${hoyLineSvg}
     ${pedidosSvg}
+    ${histDotsSvg}
     ${dotsSvg}
     ${refSvg}
     ${calloutSvg}
@@ -4580,18 +4669,7 @@ function drawKardex(){
   }, { passive:false });
 
   const tooltip = document.getElementById('kardexTooltip');
-  chart.querySelectorAll('.kdx-dot').forEach(dot=>{
-    dot.addEventListener('mouseenter', ()=>{
-      tooltip.innerHTML = `<b>${dot.dataset.label}</b><br>Stock: ${Number(dot.dataset.stock).toLocaleString('es-PE',{maximumFractionDigits:2})}<br>Ingresos de la semana: ${Number(dot.dataset.ing).toLocaleString('es-PE',{maximumFractionDigits:2})} · Salidas: ${Number(dot.dataset.mov).toLocaleString('es-PE',{maximumFractionDigits:2})}`;
-      tooltip.style.display = 'block';
-    });
-    dot.addEventListener('mousemove', (e)=>{
-      const rect = chart.getBoundingClientRect();
-      tooltip.style.left = (e.clientX - rect.left + 12) + 'px';
-      tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
-    });
-    dot.addEventListener('mouseleave', ()=>{ tooltip.style.display = 'none'; });
-  });
+
 
   // Puntos de llegada (pedido simulado y stock en tránsito): 15.09.2026, pedido de Piero — "la cantidad
   // que se pide debe estar puesta cuando se pone el click sobre el punto, sobreponiéndose al gráfico".
@@ -4619,8 +4697,11 @@ function drawKardex(){
     + (d.cant ? (d.tipo === 'transito'
         ? `<br><br><b>Acá entra el stock en tránsito: ${d.cant}</b><br>Llega el ${d.fllega} (ya comprado)`
         : `<br><br><b>Acá entra el pedido ${d.pedido}: ${d.cant}</b><br>Se coloca el ${d.fpedido} y llega el ${d.fllega}`) : '');
-  chart.querySelectorAll('.kdx-dot-proj, .kdx-transito-dot').forEach(dot=>{
-    const html = ()=> dot.classList.contains('kdx-transito-dot') ? htmlTransito(dot.dataset) : htmlProy(dot.dataset);
+  // Movimiento real del histórico: fecha, si entró o salió, cuánto y con qué saldo quedó.
+  const htmlMov = d => `<b>${d.fecha} — ${d.tipo} de ${d.cant}</b><br>Saldo: ${d.antes} → <b>${d.saldo}</b>`;
+  chart.querySelectorAll('.kdx-dot-proj, .kdx-transito-dot, .kdx-dot').forEach(dot=>{
+    const html = ()=> dot.classList.contains('kdx-transito-dot') ? htmlTransito(dot.dataset)
+      : dot.classList.contains('kdx-dot') ? htmlMov(dot.dataset) : htmlProy(dot.dataset);
     dot.addEventListener('click', (e)=>{
       e.stopPropagation();
       if(globoFijo === dot){ globoFijo = null; tooltip.style.display = 'none'; return; }
