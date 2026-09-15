@@ -6526,18 +6526,28 @@ function buildProImageComprasResponsable(){
 // las letras "PE".
 // ============================================================================
 const PRO_C_NAVY = '#0a1e64', PRO_C_TEAL = '#1f9aa8', PRO_C_GRIS = '#7b8a99';
+// Negrita reforzada para títulos, números y porcentajes (pedido de Piero, 15.09.2026: "pon esto
+// más en negrita y lo mismo para todo lo que escribas de azul de números y %"). La fuente del
+// sistema no tiene un peso real de 900 — 800 y 900 se ven idénticos —, así que el grosor extra se
+// consigue con un text-shadow del mismo color en las 4 direcciones. Se eligió esa vía y no
+// -webkit-text-stroke porque html2canvas ignora el stroke al exportar el PNG, pero sí dibuja el
+// text-shadow: así se ve igual de grueso en pantalla y en la imagen descargada.
+const PRO_C_BOLD = 'font-weight:900;text-shadow:.6px 0 0 currentColor,-.6px 0 0 currentColor,0 .6px 0 currentColor,0 -.6px 0 currentColor;';
+// Los números grandes van con los dígitos más juntos (mismo pedido: "haz más pegados los números
+// porque tienen mucho espacio entre dígitos o símbolos").
+const PRO_C_NUM = PRO_C_BOLD + 'letter-spacing:-.025em;';
 function proCIconBox(svg, bg){
-  return `<div style="width:62px;height:62px;border-radius:16px;background:${bg||'#dcefff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${svg}</div>`;
+  return `<div style="width:56px;height:56px;border-radius:15px;background:${bg||'#dcefff'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${svg}</div>`;
 }
 function proCSvgDoc(){
-  return `<svg width="38" height="38" viewBox="0 0 24 24"><path d="M6 2h8l4 4v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" fill="${PRO_C_TEAL}"/><path d="M14 2l4 4h-4z" fill="${PRO_C_NAVY}"/><g fill="#fff"><rect x="8" y="10" width="8" height="1.7" rx=".85"/><rect x="8" y="13.4" width="8" height="1.7" rx=".85"/><rect x="8" y="16.8" width="5.5" height="1.7" rx=".85"/></g></svg>`;
+  return `<svg width="34" height="34" viewBox="0 0 24 24"><path d="M6 2h8l4 4v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" fill="${PRO_C_TEAL}"/><path d="M14 2l4 4h-4z" fill="${PRO_C_NAVY}"/><g fill="#fff"><rect x="8" y="10" width="8" height="1.7" rx=".85"/><rect x="8" y="13.4" width="8" height="1.7" rx=".85"/><rect x="8" y="16.8" width="5.5" height="1.7" rx=".85"/></g></svg>`;
 }
 function proCSvgReloj(color, size){
-  const s = size || 38, c = color || PRO_C_TEAL;
+  const s = size || 34, c = color || PRO_C_TEAL;
   return `<svg width="${s}" height="${s}" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="${c}"/><circle cx="12" cy="12" r="7.6" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M12 7.2v5.1l3.4 2" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 function proCSvgCamion(){
-  return `<svg width="40" height="40" viewBox="0 0 28 24"><rect x="1" y="6" width="15" height="11" rx="1.6" fill="${PRO_C_TEAL}"/><path d="M16 9h5.2l4 4.2V17H16z" fill="${PRO_C_NAVY}"/><rect x="17.4" y="10.3" width="4.4" height="3" rx=".7" fill="#dcefff"/><circle cx="7" cy="18.4" r="3" fill="#2b3440"/><circle cx="7" cy="18.4" r="1.2" fill="#fff"/><circle cx="21" cy="18.4" r="3" fill="#2b3440"/><circle cx="21" cy="18.4" r="1.2" fill="#fff"/></svg>`;
+  return `<svg width="36" height="36" viewBox="0 0 28 24"><rect x="1" y="6" width="15" height="11" rx="1.6" fill="${PRO_C_TEAL}"/><path d="M16 9h5.2l4 4.2V17H16z" fill="${PRO_C_NAVY}"/><rect x="17.4" y="10.3" width="4.4" height="3" rx=".7" fill="#dcefff"/><circle cx="7" cy="18.4" r="3" fill="#2b3440"/><circle cx="7" cy="18.4" r="1.2" fill="#fff"/><circle cx="21" cy="18.4" r="3" fill="#2b3440"/><circle cx="21" cy="18.4" r="1.2" fill="#fff"/></svg>`;
 }
 function proCSvgBandera(w){
   const a = w || 104, h = Math.round(a*0.66);
@@ -6598,7 +6608,7 @@ function proCHeaderHtml(spec){
     <img src="${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}" style="height:78px;flex-shrink:0;" alt="Grupo Friopacking">
     <div style="width:3px;height:118px;background:#dbe6f0;border-radius:2px;flex-shrink:0;"></div>
     <div style="flex:1;min-width:0;text-align:center;">
-      <div style="font-size:52px;font-weight:800;color:${PRO_C_NAVY};letter-spacing:.3px;line-height:1;font-family:Inter,Arial,sans-serif;white-space:nowrap;">REPORTE DE COMPRAS</div>
+      <div style="font-size:52px;${PRO_C_BOLD}color:${PRO_C_NAVY};letter-spacing:.2px;line-height:1;font-family:Inter,Arial,sans-serif;white-space:nowrap;">REPORTE DE COMPRAS</div>
       <div style="display:flex;gap:14px;margin-top:18px;justify-content:center;">
         <div style="display:flex;align-items:center;gap:12px;background:${PRO_C_TEAL};color:#fff;font-size:33px;font-weight:800;padding:12px 28px;border-radius:38px;font-family:Inter,Arial,sans-serif;white-space:nowrap;letter-spacing:.4px;">${proCSvgPersona(32)}<span>${chipUsuario}</span></div>
         <div style="display:flex;align-items:center;gap:12px;background:#e8f3fd;color:${PRO_C_NAVY};font-size:33px;font-weight:700;padding:12px 28px;border-radius:38px;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${proCSvgCalendario(32)}<span>${escapeHtml(spec.dateLabel)}</span></div>
@@ -6610,27 +6620,28 @@ function proCKpiCardHtml(icono, labelA, labelB, valor, unidad, meta){
   // El número va lo más grande posible SIN salirse de la tarjeta: se calcula el tamaño a partir
   // del ancho útil (302px) y de cuántos caracteres tiene la cifra más su unidad. Así "89" sale
   // enorme como en la referencia y "18.5 d.h." se acomoda solo, sin desbordar.
-  // El rótulo va en 2 líneas fijas (como la referencia): la 1ra al costado del ícono y la 2da a
-  // todo el ancho. El tamaño se calcula para que ninguna de las dos se parta ni se salga.
-  const fsLbl = Math.max(19, Math.min(26, Math.min(
-    Math.floor(214/(labelA.length*0.60)),
-    Math.floor(288/(labelB.length*0.60)))));
+  // El ícono va entero a la izquierda y las 2 líneas del rótulo COMPLETAS a su derecha — ninguna
+  // letra queda debajo del ícono (pedido de Piero, 15.09.2026, comentario sobre la imagen 1). Por
+  // eso el tamaño se calcula contra el ancho que queda al costado del ícono (228px) tomando la
+  // línea más larga, así las dos entran sin partirse.
+  const largoMax = Math.max(labelA.length, labelB.length);
+  const fsLbl = Math.max(18, Math.min(26, Math.floor(228/(largoMax*0.63))));
   const anchoUtil = 292;
   const factor = String(valor).length*0.56 + (unidad ? String(unidad).length*0.56*0.34 + 0.08 : 0);
   const fsNum = Math.max(72, Math.min(142, Math.floor(anchoUtil/factor)));
   return `
   <div style="flex:1;min-width:0;box-sizing:border-box;background:#fff;border-radius:22px;padding:18px 10px;display:flex;flex-direction:column;">
-    <div style="padding:0 4px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        ${proCIconBox(icono)}
-        <div style="flex:1;min-width:0;font-size:${fsLbl}px;font-weight:800;color:${PRO_C_NAVY};line-height:1.15;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${labelA}</div>
+    <div style="padding:0 4px;display:flex;align-items:center;gap:10px;">
+      ${proCIconBox(icono)}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:${fsLbl}px;${PRO_C_BOLD}color:${PRO_C_NAVY};line-height:1.2;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${labelA}</div>
+        <div style="font-size:${fsLbl}px;${PRO_C_BOLD}color:${PRO_C_NAVY};line-height:1.2;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${labelB}</div>
       </div>
-      <div style="font-size:${fsLbl}px;font-weight:800;color:${PRO_C_NAVY};line-height:1.15;margin-top:4px;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${labelB}</div>
     </div>
     <div style="flex:1;display:flex;align-items:flex-end;justify-content:center;">
       <div style="display:flex;align-items:baseline;gap:5px;">
-        <span style="font-size:${fsNum}px;font-weight:800;color:${PRO_C_NAVY};line-height:1;font-family:Inter,Arial,sans-serif;">${valor}</span>
-        ${unidad ? `<span style="font-size:${Math.round(fsNum*0.34)}px;font-weight:800;color:${PRO_C_GRIS};font-family:Inter,Arial,sans-serif;">${escapeHtml(unidad)}</span>` : ''}
+        <span style="font-size:${fsNum}px;${PRO_C_NUM}color:${PRO_C_NAVY};line-height:1;font-family:Inter,Arial,sans-serif;">${valor}</span>
+        ${unidad ? `<span style="font-size:${Math.round(fsNum*0.34)}px;${PRO_C_BOLD}color:${PRO_C_GRIS};font-family:Inter,Arial,sans-serif;">${escapeHtml(unidad)}</span>` : ''}
       </div>
     </div>
     <div style="height:36px;text-align:center;font-size:24px;font-weight:700;color:${PRO_C_GRIS};white-space:nowrap;font-family:Inter,Arial,sans-serif;">${meta || ''}</div>
@@ -6640,7 +6651,7 @@ function proCKpisHtml(spec){
   const emision = spec.tiempoEmisionProm==null ? ['—',''] : [spec.tiempoEmisionProm.toFixed(1), 'd.h.'];
   const entrega = (spec.tiempoEntregaN>0 && spec.tiempoEntregaProm!=null) ? [spec.tiempoEntregaProm.toFixed(1), 'd.h.'] : ['—',''];
   return `
-  <div style="height:318px;display:flex;gap:16px;">
+  <div style="height:310px;display:flex;gap:16px;">
     ${proCKpiCardHtml(proCSvgDoc(), 'ÓRDENES DE', 'COMPRA GENERADAS', spec.totalOC.toLocaleString('es-PE'), 'OC', '')}
     ${proCKpiCardHtml(proCSvgReloj(), 'TIEMPO DE', 'EMISIÓN DE OC', emision[0], emision[1], 'Meta: ≤ 2 d.h.')}
     ${proCKpiCardHtml(proCSvgCamion(), 'TIEMPO DE ENTREGA', 'DE OC EN LURÍN', entrega[0], entrega[1], 'Meta: ≤ plazo pactado')}
@@ -6649,18 +6660,18 @@ function proCKpisHtml(spec){
 function proCBloqueDobleHtml(titulo, alto, columnas){
   // columnas: [{icono, simbolo, pct, pie}] — 2 o 3 columnas separadas por una línea fina.
   const cols = columnas.map((c,i)=>`
-    ${i ? `<div style="width:2px;height:130px;background:#e4ecf4;flex-shrink:0;"></div>` : ''}
-    <div style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:${columnas.length>2?10:14}px;">
-      ${c.icono ? `<div style="flex-shrink:0;display:flex;align-items:center;">${c.icono}</div>` : ''}
-      ${c.simbolo ? `<div style="font-size:${columnas.length>2?52:68}px;font-weight:800;color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;line-height:1;flex-shrink:0;">${c.simbolo}</div>` : ''}
-      <div style="min-width:0;">
-        <div style="font-size:${columnas.length>2?64:92}px;font-weight:800;color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;line-height:1;white-space:nowrap;">${c.pct}</div>
-        <div style="font-size:${columnas.length>2?30:36}px;color:${PRO_C_GRIS};font-family:Inter,Arial,sans-serif;margin-top:10px;white-space:nowrap;">${c.pie}</div>
+    ${i ? `<div style="width:2px;height:140px;background:#e4ecf4;flex-shrink:0;"></div>` : ''}
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div style="display:flex;align-items:center;gap:${columnas.length>2?8:12}px;">
+        ${c.icono ? `<div style="flex-shrink:0;display:flex;align-items:center;">${c.icono}</div>` : ''}
+        ${c.simbolo ? `<div style="font-size:${columnas.length>2?52:68}px;${PRO_C_NUM}color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;line-height:1;flex-shrink:0;">${c.simbolo}</div>` : ''}
+        <div style="font-size:${columnas.length>2?64:92}px;${PRO_C_NUM}color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;line-height:1;white-space:nowrap;">${c.pct}</div>
       </div>
+      <div style="font-size:${columnas.length>2?30:36}px;color:${PRO_C_GRIS};font-family:Inter,Arial,sans-serif;margin-top:10px;white-space:nowrap;text-align:center;">${c.pie}</div>
     </div>`).join('');
   return `
   <div style="height:${alto}px;box-sizing:border-box;background:#fff;border-radius:22px;padding:22px 28px;display:flex;flex-direction:column;">
-    <div style="font-size:52px;font-weight:800;color:${PRO_C_NAVY};letter-spacing:.3px;font-family:Inter,Arial,sans-serif;">${titulo}</div>
+    <div style="font-size:52px;${PRO_C_BOLD}color:${PRO_C_NAVY};letter-spacing:.2px;font-family:Inter,Arial,sans-serif;">${titulo}</div>
     <div style="flex:1;display:flex;align-items:center;">${cols}</div>
   </div>`;
 }
@@ -6668,7 +6679,7 @@ function proCOrigenHtml(spec){
   const total = spec.nacionalN + spec.importadoN;
   const pctNac = total ? spec.nacionalN/total*100 : 0;
   const pctImp = total ? spec.importadoN/total*100 : 0;
-  return proCBloqueDobleHtml('ORIGEN DE COMPRAS', 240, [
+  return proCBloqueDobleHtml('ORIGEN DE COMPRAS', 236, [
     { icono: proCSvgBandera(112), pct: pctNac.toFixed(1)+'%', pie: spec.nacionalN + ' OC' },
     { icono: proCSvgGlobo(100),   pct: pctImp.toFixed(1)+'%', pie: spec.importadoN + ' OC' },
   ]);
@@ -6684,7 +6695,7 @@ function proCMontoHtml(spec){
   ].filter(c=>c.monto>0);
   if(!cols.length) return '';
   const suma = cols.reduce((a,c)=>a+c.monto,0) || 1;
-  return proCBloqueDobleHtml('MONTO COMPRADO', 240, cols.map(c=>({
+  return proCBloqueDobleHtml('MONTO COMPRADO', 236, cols.map(c=>({
     simbolo: c.simbolo,
     pct: (c.monto/suma*100).toFixed(1)+'%',
     pie: Math.round(c.monto).toLocaleString('es-PE'),
@@ -6697,13 +6708,13 @@ function proCCondicionHtml(spec){
     <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
         <span style="font-size:32px;font-weight:700;color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;">${escapeHtml(r.label)}</span>
-        <span style="font-size:32px;font-weight:800;color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;white-space:nowrap;">${r.pct.toFixed(1)}% <span style="color:${PRO_C_GRIS};font-weight:600;">(${r.n} OC)</span></span>
+        <span style="font-size:32px;${PRO_C_NUM}color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;white-space:nowrap;">${r.pct.toFixed(1)}% <span style="color:${PRO_C_GRIS};font-weight:600;">(${r.n} OC)</span></span>
       </div>
       <div style="height:20px;border-radius:10px;background:#e8f0f7;overflow:hidden;"><div style="width:${Math.max(0,Math.min(100,r.pct))}%;height:100%;background:${colorFor[r.label]||'#8b98a4'};border-radius:10px;"></div></div>
     </div>`).join('');
   return `
   <div style="flex:1;min-height:0;box-sizing:border-box;background:#fff;border-radius:22px;padding:16px 28px;display:flex;flex-direction:column;overflow:hidden;">
-    <div style="font-size:52px;font-weight:800;color:${PRO_C_NAVY};letter-spacing:.3px;font-family:Inter,Arial,sans-serif;margin-bottom:4px;">CONDICIÓN DE PAGO</div>
+    <div style="font-size:52px;${PRO_C_BOLD}color:${PRO_C_NAVY};letter-spacing:.2px;font-family:Inter,Arial,sans-serif;margin-bottom:4px;">CONDICIÓN DE PAGO</div>
     ${filas}
   </div>`;
 }
@@ -6715,8 +6726,8 @@ function proCAvisoFilaHtml(o){
     <div style="flex-shrink:0;">${proCSvgReloj(o.color, 116)}</div>
     <div style="width:3px;align-self:stretch;margin:30px 0;background:${o.color};opacity:.5;border-radius:2px;flex-shrink:0;"></div>
     <div style="flex:1;min-width:0;">
-      <div style="font-size:120px;font-weight:800;color:${o.color};line-height:.95;font-family:Inter,Arial,sans-serif;">${o.n}</div>
-      <div style="font-size:44px;font-weight:800;color:${PRO_C_NAVY};margin-top:8px;letter-spacing:.4px;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${o.titulo}</div>
+      <div style="font-size:120px;${PRO_C_NUM}color:${o.color};line-height:.95;font-family:Inter,Arial,sans-serif;">${o.n}</div>
+      <div style="font-size:44px;${PRO_C_BOLD}color:${PRO_C_NAVY};margin-top:8px;letter-spacing:.3px;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${o.titulo}</div>
       <div style="font-size:30px;color:#41506a;margin-top:4px;font-family:Inter,Arial,sans-serif;white-space:nowrap;">(${o.rango})</div>
     </div>
     <div style="width:3px;align-self:stretch;margin:30px 0;background:${o.color};opacity:.5;border-radius:2px;flex-shrink:0;"></div>
@@ -6730,12 +6741,12 @@ function proCNivelAvisoHtml(spec){
     <img src="${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}" style="height:110px;flex-shrink:0;" alt="Grupo Friopacking">
     <div style="width:3px;height:120px;background:#dbe6f0;border-radius:2px;flex-shrink:0;"></div>
     <div style="flex:1;min-width:0;">
-      <div style="font-size:58px;font-weight:800;color:${PRO_C_NAVY};letter-spacing:.3px;line-height:1.08;font-family:Inter,Arial,sans-serif;">NIVEL DE AVISO<br>DE ENTREGA</div>
+      <div style="font-size:58px;${PRO_C_BOLD}color:${PRO_C_NAVY};letter-spacing:.2px;line-height:1.08;font-family:Inter,Arial,sans-serif;">NIVEL DE AVISO<br>DE ENTREGA</div>
       <div style="font-size:31px;color:${PRO_C_GRIS};margin-top:8px;font-family:Inter,Arial,sans-serif;">${escapeHtml(spec.dateLabel)}${spec.esArea ? '' : ' · ' + escapeHtml(String(spec.comprador).toUpperCase())}</div>
     </div>
   </div>
   <div style="flex:1;min-height:0;display:flex;gap:26px;">
-    <div style="flex-shrink:0;display:flex;align-items:center;">${proCSvgSemaforo(748)}</div>
+    <div style="flex-shrink:0;display:flex;align-items:center;">${proCSvgSemaforo(730)}</div>
     <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:22px;">
       ${proCAvisoFilaHtml({ color:'#0f9d2f', fondo:'#e9f8ec', n:spec.leveN,    titulo:'LEVE',    rango:'1-2 d.h. tarde', glosa:'Órdenes con retraso leve en la entrega.' })}
       ${proCAvisoFilaHtml({ color:'#f08a00', fondo:'#fdf3e2', n:spec.mediaN,   titulo:'MEDIA',   rango:'3-5 d.h. tarde', glosa:'Órdenes con retraso medio en la entrega.' })}
@@ -6746,8 +6757,8 @@ function proCNivelAvisoHtml(spec){
     <div style="width:132px;height:132px;border-radius:66px;background:${PRO_C_NAVY};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${proCSvgBarras(70)}</div>
     <div style="width:3px;height:170px;background:#b9d4ec;border-radius:2px;flex-shrink:0;"></div>
     <div style="flex:1;min-width:0;text-align:center;">
-      <div style="font-size:132px;font-weight:800;color:${PRO_C_NAVY};line-height:1;font-family:Inter,Arial,sans-serif;">${pct}</div>
-      <div style="font-size:46px;font-weight:800;color:${PRO_C_NAVY};letter-spacing:.3px;line-height:1.1;margin-top:6px;font-family:Inter,Arial,sans-serif;">CUMPLIMIENTO<br>DE ENTREGA</div>
+      <div style="font-size:132px;${PRO_C_NUM}color:${PRO_C_NAVY};line-height:1;font-family:Inter,Arial,sans-serif;">${pct}</div>
+      <div style="font-size:46px;${PRO_C_BOLD}color:${PRO_C_NAVY};letter-spacing:.2px;line-height:1.1;margin-top:6px;font-family:Inter,Arial,sans-serif;">CUMPLIMIENTO<br>DE ENTREGA</div>
     </div>
     <div style="width:3px;height:170px;background:#b9d4ec;border-radius:2px;flex-shrink:0;"></div>
     <div style="width:290px;flex-shrink:0;font-size:32px;color:#2c3a52;line-height:1.32;font-family:Inter,Arial,sans-serif;">Órdenes entregadas dentro del plazo programado.</div>
@@ -6756,16 +6767,16 @@ function proCNivelAvisoHtml(spec){
 // Las 2 imágenes. Lienzo de alto fijo — la proporción es la que WhatsApp muestra completa en el
 // preview del chat (2:3 la primera, 4:5 la segunda).
 function proComprasResponsablePartesHtml(spec){
-  const lienzo = (w, h, bg, gap, contenido)=> `
-  <div id="proImgInner" style="width:${w}px;height:${h}px;box-sizing:border-box;font-family:Inter,Arial,sans-serif;background:${bg};padding:20px;display:flex;flex-direction:column;gap:${gap}px;overflow:hidden;">${contenido}</div>`;
+  const lienzo = (w, h, bg, gap, padAbajo, contenido)=> `
+  <div id="proImgInner" style="width:${w}px;height:${h}px;box-sizing:border-box;font-family:Inter,Arial,sans-serif;background:${bg};padding:20px 20px ${padAbajo}px;display:flex;flex-direction:column;gap:${gap}px;overflow:hidden;">${contenido}</div>`;
   return [
-    lienzo(1024, 1536, '#e9f3fd', 18, `
+    lienzo(1024, 1536, '#e9f3fd', 18, 44, `
       ${proCHeaderHtml(spec)}
       ${proCKpisHtml(spec)}
       ${proCOrigenHtml(spec)}
       ${proCMontoHtml(spec)}
       ${proCCondicionHtml(spec)}`),
-    lienzo(1080, 1350, '#ffffff', 22, proCNivelAvisoHtml(spec)),
+    lienzo(1080, 1350, '#ffffff', 22, 40, proCNivelAvisoHtml(spec)),
   ];
 }
 function downloadProComprasPartes(btn){
