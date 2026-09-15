@@ -238,20 +238,29 @@
   .kdx-svg .kdx-ref-label{font-size:11px;font-weight:600;pointer-events:none;}
   .kdx-svg text{font-size:11.5px;fill:var(--ink-soft);}
   .kdx-empty{font-size:12.5px;color:var(--ink-soft);padding:4px 0 10px;}
-  /* Proyección (10.09.2026): línea/banda/puntos en var(--seg-a) — azul, distinto del teal del histórico
-     y del rojo/morado de ROP/Stock seguridad — para que se distinga a simple vista cuál parte del
-     gráfico es dato real y cuál es estimado. */
-  .kdx-svg .kdx-line-proj{stroke:var(--seg-a);stroke-width:2;stroke-dasharray:6 4;fill:none;pointer-events:none;}
-  .kdx-svg .kdx-band{fill:var(--seg-a);fill-opacity:.14;stroke:none;pointer-events:none;}
+  /* Proyección (10.09.2026): línea/banda/puntos en un color propio, distinto del teal del histórico y del
+     rojo/morado de ROP/Stock seguridad — para que se distinga a simple vista cuál parte del gráfico es
+     dato real y cuál es estimado. 15.09.2026: pasa de azul (--seg-a) a NARANJA (--amber) a pedido de
+     Piero ("que simules de color naranja esa proyección de cómo sería el movimiento"), ahora que la
+     simulación considera el tiempo de entrega. */
+  .kdx-svg .kdx-line-proj{stroke:var(--amber);stroke-width:2;stroke-dasharray:6 4;fill:none;pointer-events:none;}
+  .kdx-svg .kdx-band{fill:var(--amber);fill-opacity:.14;stroke:none;pointer-events:none;}
   /* 15.09.2026, pregunta de Piero en el chat: "estas considerando en la simulacion el movimiento segun
      desviacion estandar?" — sí se considera (ver sigma en drawKardex), pero cuando el Desvest del
      producto es grande frente a su Consumo Diario, la banda ±1 desvest satura el eje casi de inmediato y
      el relleno solo se ve como un fondo plano, indistinguible de "no hay banda". Se agrega el trazo de
      los bordes superior/inferior de la banda (antes solo tenía relleno, sin stroke) para que el límite de
      la incertidumbre se note aunque el relleno esté saturado. */
-  .kdx-svg .kdx-band-edge{stroke:var(--seg-a);stroke-width:1;stroke-dasharray:2 3;fill:none;opacity:.55;pointer-events:none;}
-  .kdx-svg .kdx-dot-proj{fill:var(--card);stroke:var(--seg-a);stroke-width:2;cursor:pointer;}
-  .kdx-legend .lg-swatch.proj{background:none;border-top:2px dashed var(--seg-a);height:0;}
+  .kdx-svg .kdx-band-edge{stroke:var(--amber);stroke-width:1;stroke-dasharray:2 3;fill:none;opacity:.55;pointer-events:none;}
+  .kdx-svg .kdx-dot-proj{fill:var(--card);stroke:var(--amber);stroke-width:2;cursor:pointer;}
+  .kdx-legend .lg-swatch.proj{background:none;border-top:2px dashed var(--amber);height:0;}
+  /* Marcas de la simulación con tiempo de entrega (15.09.2026): la vertical donde se COLOCA el pedido y el
+     punto donde LLEGA, que es donde el stock sube de golpe. Sin estas dos marcas el diente de sierra no
+     dice cuándo hay que actuar, que es justo lo que Piero pidió ver. */
+  .kdx-svg .kdx-pedido-line{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:5 4;pointer-events:none;}
+  .kdx-svg .kdx-pedido-label{font-size:10.5px;font-weight:800;fill:var(--amber);pointer-events:none;}
+  .kdx-svg .kdx-llega-dot{fill:var(--amber);stroke:var(--card);stroke-width:1.5;pointer-events:none;}
+  .kdx-svg .kdx-rop-sim{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:4 3;fill:none;opacity:.8;pointer-events:none;}
   /* Rediseño 14.09.2026 (pedido de Piero, mostró un ejemplo de referencia: "en tu gráfico no se sabe casi
      nada"): tarjetas KPI arriba del gráfico, línea vertical "Hoy" separando histórico/proyección, y
      etiquetas escritas directo sobre el gráfico (no solo al pasar el mouse) — para que el gráfico se
@@ -1609,7 +1618,11 @@ function buildSnapshot(){
     // atrás (que desde el 15.09.2026 ya usaba solo el stock de UNA sucursal — ver drawKardex, stockSuc).
     // Un snapshot <4 no trae el desglose, así que se descarta el kardex igual que con las versiones
     // anteriores hasta volver a publicar.
-    almacenSchemaVersion: 4,
+    // Sube a 5 el 15.09.2026: se agregan "lt"/"lti"/"sgi"/"rpi" (Lead Time nacional e importación y el par
+    // ROP/Stock de Seguridad de importación) para la simulación con tiempo de entrega del kardex. A
+    // diferencia de los saltos anteriores, este NO invalida nada: un snapshot 4 se sigue leyendo igual
+    // (kardexVigente sigue pidiendo >= 4), solo que sin tiempo de entrega hasta que se vuelva a publicar.
+    almacenSchemaVersion: 5,
     almacen: (ALMACEN_DATA && ALMACEN_DATA.rows) ? {
       filename: ALMACEN_DATA.filename,
       sheetName: ALMACEN_DATA.sheetName,
@@ -1636,6 +1649,10 @@ function buildSnapshot(){
           rv: n(r.reserva), pk: n(r.picking), rp: n(r.rop), eq: n(r.eoq),
           cm: n(r.consumoMensual), cb: n(r.cobertura), sg: n(r.stockSeguridad),
           cd: n(r.consumoDiario), dv: n(r.desvest),
+          // Lead time y el par ROP/Stock de Seguridad de importación (15.09.2026) — los usa la simulación
+          // del kardex. No se redondean a 2 decimales con n() por gusto: son días y cantidades chicas, y
+          // 2 decimales alcanzan igual que en el resto.
+          lt: n(r.leadTime), lti: n(r.leadTimeImp), sgi: n(r.stockSeguridadImp), rpi: n(r.ropImp),
           ki: na(r.kardexIngresos), km: na(r.kardexMovimientos),
           kis: r.kardexIngresosPorSucursal ? { i: na(r.kardexIngresosPorSucursal.ica), l: na(r.kardexIngresosPorSucursal.lima), t: na(r.kardexIngresosPorSucursal.trujillo) } : undefined,
           kms: r.kardexMovimientosPorSucursal ? { i: na(r.kardexMovimientosPorSucursal.ica), l: na(r.kardexMovimientosPorSucursal.lima), t: na(r.kardexMovimientosPorSucursal.trujillo) } : undefined,
@@ -1861,6 +1878,10 @@ function loadFromSnapshot(snap){
       eoq: (r.eq!=null?r.eq:null), consumoMensual: (r.cm!=null?r.cm:null), cobertura: (r.cb!=null?r.cb:null),
       stockSeguridad: (r.sg!=null?r.sg:null),
       consumoDiario: (r.cd!=null?r.cd:null), desvest: (r.dv!=null?r.dv:null),
+      // Un snapshot publicado antes del 15.09.2026 no trae estos campos: quedan en null y la simulación
+      // simplemente avisa que no tiene tiempo de entrega, sin romperse (ver drawKardex).
+      leadTime: (r.lt!=null?r.lt:null), leadTimeImp: (r.lti!=null?r.lti:null),
+      stockSeguridadImp: (r.sgi!=null?r.sgi:null), ropImp: (r.rpi!=null?r.rpi:null),
       kardexIngresos: kardexVigente ? (r.ki || undefined) : undefined,
       kardexMovimientos: kardexVigente ? (r.km || undefined) : undefined,
       kardexIngresosPorSucursal: (kardexVigente && r.kis) ? { ica: r.kis.i, lima: r.kis.l, trujillo: r.kis.t } : undefined,
@@ -2656,6 +2677,19 @@ function processAlmacen(wb, filename){
     // el número de días, no de forma lineal).
     consumoDiario: findCol(headerRow, ["Consumo Diario"]),
     desvest: findCol(headerRow, ["Desvest"]),
+    // Lead Time (15.09.2026, Piero indicó las columnas exactas: "en hoja 'Análisis Inventario' se tiene en
+    // columna K lead time nacional y en columna L lead time importado ... columna O ROP nacional, columna N
+    // stock seguridad nacional, columna AE Stock seguridad importado, columna AF ROP importado"). Hace falta
+    // para la simulación del kardex: el pedido no llega en el momento, se coloca al cruzar el ROP y recién
+    // llega LT días después (ver drawKardex). Los encabezados reales son "Lead Time" y "Lead Time IMP":
+    // findCol prueba coincidencia EXACTA antes que parcial, así que "Lead Time" no se lleva por error la
+    // columna de importación. Un producto suele traer lleno solo uno de los dos (verificado en el archivo
+    // real: 1,587 solo nacional, 792 solo importación, 133 ambos) — es lo que distingue una compra local de
+    // una importada, y cada una va con SU par de ROP/Stock de Seguridad.
+    leadTime: findCol(headerRow, ["Lead Time"]),
+    leadTimeImp: findCol(headerRow, ["Lead Time IMP","Lead Time Importación","Lead Time Importacion"]),
+    stockSeguridadImp: findCol(headerRow, ["Stock Seguridad Importación","Stock Seguridad Importacion"]),
+    ropImp: findCol(headerRow, ["Punto de Reorden Importación","Punto de Reorden Importacion"]),
   };
   const faltantes = [];
   if(col.codigo===-1) faltantes.push("Código");
@@ -2707,6 +2741,12 @@ function processAlmacen(wb, filename){
       stockSeguridad: col.stockSeguridad!==-1 ? num(r[col.stockSeguridad]) : null,
       consumoDiario: col.consumoDiario!==-1 ? num(r[col.consumoDiario]) : null,
       desvest: col.desvest!==-1 ? num(r[col.desvest]) : null,
+      // El archivo real trae lead times en 0 y hasta negativos (restas de fechas mal cerradas): se guardan
+      // tal cual y es drawKardex el que los trata como "sin dato" (<=0), para no inventar acá un valor.
+      leadTime: col.leadTime!==-1 ? num(r[col.leadTime]) : null,
+      leadTimeImp: col.leadTimeImp!==-1 ? num(r[col.leadTimeImp]) : null,
+      stockSeguridadImp: col.stockSeguridadImp!==-1 ? num(r[col.stockSeguridadImp]) : null,
+      ropImp: col.ropImp!==-1 ? num(r[col.ropImp]) : null,
       disponible: lima + transito - reserva - picking,
     }));
   }
@@ -2719,6 +2759,11 @@ function processAlmacen(wb, filename){
     if(!grupos[k]){ grupos[k] = []; ordenGrupos.push(k); }
     grupos[k].push(r);
   }
+  // Lead time del grupo homologado: el más largo de los códigos que sí traen dato (>0), o null si ninguno.
+  const maxLead = (g, campo) => {
+    const vals = g.map(x=>x[campo]).filter(v=>v!=null && v>0);
+    return vals.length ? Math.max.apply(null, vals) : null;
+  };
   const productos = ordenGrupos.map(k=>{
     const g = grupos[k];
     if(g.length === 1) return Object.assign({}, g[0], { codigos:[g[0].codigo], nCodigos:1 });
@@ -2738,6 +2783,14 @@ function processAlmacen(wb, filename){
       // sumando VARIANZAS (desvest²) y sacando raíz — sumar las desvest directamente sobreestimaría la
       // incertidumbre del grupo homologado.
       desvest: g.some(x=>x.desvest!=null) ? Math.sqrt(g.reduce((a,x)=>a+Math.pow(x.desvest||0,2),0)) : null,
+      // Stock de Seguridad / ROP de importación: cantidades, se suman igual que sus equivalentes nacionales.
+      stockSeguridadImp: g.some(x=>x.stockSeguridadImp!=null) ? sum('stockSeguridadImp') : null,
+      ropImp: g.some(x=>x.ropImp!=null) ? sum('ropImp') : null,
+      // El lead time NO se suma: son días de entrega, no cantidades. Entre códigos homologados se toma el
+      // más largo de los que tengan dato — planificar con el plazo más corto dejaría corto justo al código
+      // que más demora.
+      leadTime: maxLead(g, 'leadTime'),
+      leadTimeImp: maxLead(g, 'leadTimeImp'),
       disponible: lima + transito - reserva - picking,
     }));
   });
@@ -3836,6 +3889,11 @@ function drawHomologacionNote(){
 // cual el patrón ya construido para drawIndicatorTrend()/.trend-svg.
 let kardexZoom = { startIdx: null, endIdx: null };
 let kardexLastKey = null;
+// Cantidad de puntos del último dibujo (histórico + simulación). Si cambia — porque Piero movió "Meses a
+// abastecer" y la simulación ahora dura más o menos, o porque cambió de sucursal — el zoom guardado apunta
+// a un rango que ya no existe y la simulación nueva saldría cortada por la derecha: en ese caso se vuelve
+// a encuadrar sola (ver drawKardex). Mientras el largo no cambie, el zoom que él haya hecho se respeta.
+let kardexLastTotal = null;
 // 15.09.2026, pedido de Piero: "el kardex que se muestre es por sucursal... debes permitirme filtrar el
 // gráfico por esas 3 sucursales" (Ica/Lima San Pedro/Trujillo) — se guarda la sucursal elegida igual que
 // el zoom, y se reinicia a 'lima' cada vez que cambia el producto (ver esProductoNuevo más abajo).
@@ -3911,46 +3969,91 @@ function drawKardex(){
   // exige exactamente 1 resultado), pedirRowsFor(mesesInput,'todos') devuelve ese mismo producto, con la
   // misma cantidad que Piero ya ve en esa tabla — nunca se pueden desalinear.
   const pedirRow = pedirRowsFor(mesesInput, 'todos').rows[0];
-  const pedirBannerSvg = mesesInput <= 0
-    ? `<div class="kdx-pedir-banner kdx-pedir-neutral">Escribe cuántos meses quieres cubrir arriba, en "Meses a abastecer", para saber si hay que pedir.</div>`
-    : (pedirRow && pedirRow.hayQuePedir
-        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(Math.round(pedirRow.aPedir))} ${escapeHtml(producto.unidad||'')}</span><span class="kdx-pedir-sub">para cubrir ${mesesInput} ${mesesInput===1?'mes':'meses'} — stock por debajo del ROP</span></div>`
-        : `<div class="kdx-pedir-banner kdx-pedir-no"><span class="kdx-pedir-tag">No es necesario pedir</span><span class="kdx-pedir-sub">${producto.estado==='reposicion' ? ('En reposición, pero el stock ya cubre ' + mesesInput + ' ' + (mesesInput===1?'mes':'meses')) : 'Stock por encima del ROP'}</span></div>`);
+  // El HTML de la etiqueta se arma más abajo (ver pedirBannerSvg), después de la simulación: para los
+  // productos de importación la simulación usa el ROP de importación y puede decir "pedir hoy" mientras
+  // esta etiqueta —que sigue la regla del resto del módulo, con el ROP nacional— dice que no hace falta.
+  // En vez de dejar los dos mensajes contradictorios en pantalla, la etiqueta avisa de esa diferencia.
 
   // Consumo Diario/Desvest son cifras del producto completo (los 3 almacenes juntos), no por sucursal —
   // el Excel no trae un consumo diario separado por Ica/Lima/Trujillo. Proyectar la caída de una sola
   // sucursal con el consumo del total inventaría un dato que no está: por eso la proyección solo se
   // muestra con Lima seleccionada (la sucursal principal, la más cercana al total).
-  const tieneProyeccion = kardexSucursal==='lima' && producto.consumoDiario != null && producto.desvest != null && mesesInput > 0;
+  const tieneProyeccion = kardexSucursal==='lima' && producto.consumoDiario != null && producto.consumoDiario > 0
+    && producto.desvest != null && mesesInput > 0;
   const NUM_CICLOS_PEDIDO = 2; // "al menos 2 ciclos" / "se deben mostrar 2 ciclos" — pedido explícito de Piero
+
+  // Tiempo de entrega (15.09.2026, pedido de Piero: "necesito que se vea en la simulación lo que se pediría
+  // considerando su tiempo de entrega"). El Excel trae dos plazos por producto y normalmente solo uno lleno:
+  // "Lead Time" (compra nacional) y "Lead Time IMP" (importación). Se usa el nacional cuando existe, y si no
+  // el de importación — y con él va SU par de ROP/Stock de Seguridad (columnas AF/AE), porque el punto de
+  // reorden de una importación de 90 días no tiene nada que ver con el de una compra local. Valores <= 0 se
+  // tratan como "sin dato" (el archivo real trae ceros y hasta negativos de restas de fechas mal cerradas).
+  const ltNacional = (producto.leadTime != null && producto.leadTime > 0) ? producto.leadTime : null;
+  const ltImportado = (producto.leadTimeImp != null && producto.leadTimeImp > 0) ? producto.leadTimeImp : null;
+  const esImportado = (ltNacional == null && ltImportado != null);
+  const leadDias = ltNacional != null ? ltNacional : (ltImportado != null ? ltImportado : 0);
+  const tieneLead = leadDias > 0;
+  // ROP que dispara el pedido en la simulación. Ojo: NO se toca el ROP del resto del módulo (Alertas de
+  // Reposición, "Cuánto pedir por categoría" y la línea roja del gráfico siguen con el nacional, que es la
+  // regla vigente en todo el reporte) — esto es solo el disparador de la simulación, y cuando difiere se
+  // dibuja aparte como línea naranja para que se vea de dónde sale.
+  const ropSim = (esImportado && producto.ropImp != null && producto.ropImp > 0) ? producto.ropImp : producto.rop;
+
   const projPeriods = [], projMean = [], projUpper = [], projLower = [];
-  let cicloDias = 0;
+  // pedidos: cada uno con el día en que se COLOCA (cruce del ROP) y el día en que LLEGA (LT días después).
+  const pedidos = [];
+  let cicloDias = 0, cantidadPedido = 0, horizonDias = 0;
   if(tieneProyeccion){
-    // Duración de 1 ciclo de pedido: "se pide el stock para N meses en base a la rotación mensual" — cada
-    // cicloDias días se simula un pedido que trae exactamente lo que se consumió en ese ciclo (Consumo
-    // Diario × cicloDias), así el pedido siguiente arranca del mismo nivel que el anterior.
-    cicloDias = Math.max(7, Math.round(mesesInput * 30.4));
-    const horizonDias = cicloDias * NUM_CICLOS_PEDIDO;
-    const stepDias = 7; // mismo paso semanal que el histórico, para que el eje quede parejo
+    // Cuánto se pide: los meses de rotación que Piero escriba arriba. Su Excel calcula el Consumo Diario
+    // como Consumo Mensual / 30 (verificado en el archivo real), así que se usan 30 días por mes para que
+    // la cantidad simulada coincida exactamente con el "Consumo Mensual × meses" de la etiqueta de arriba.
+    cicloDias = Math.max(7, Math.round(mesesInput * 30));
+    cantidadPedido = producto.consumoDiario * cicloDias;
+    // Simulación (Q,R) clásica: el stock baja a Consumo Diario por día; cuando toca el ROP se coloca el
+    // pedido; durante el tiempo de entrega el stock SIGUE bajando (acá está la diferencia con la versión
+    // anterior, que hacía llegar el pedido en el acto); al llegar sube de golpe la cantidad pedida, y vuelve
+    // a empezar. El horizonte termina justo donde se colocaría el 3er pedido: así se ven exactamente los 2
+    // ciclos completos que pidió Piero, ni uno de más.
+    let cursorT = 0, cursorNivel = stockSuc;
+    for(let k=0; k<=NUM_CICLOS_PEDIDO; k++){
+      const diasHastaRop = Math.max(0, (cursorNivel - ropSim) / producto.consumoDiario);
+      const tPedido = cursorT + diasHastaRop;
+      if(k === NUM_CICLOS_PEDIDO){ horizonDias = tPedido; break; }
+      const tLlega = tPedido + leadDias;
+      pedidos.push({ tPedido, tLlega });
+      cursorNivel = cursorNivel - producto.consumoDiario * (tLlega - cursorT) + cantidadPedido;
+      cursorT = tLlega;
+    }
+    // Tope de 3 años: con un tiempo de entrega muy largo frente a lo que se pide, los ciclos se degeneran
+    // (el pedido se consume casi entero en el tránsito) y el horizonte se podría disparar.
+    horizonDias = Math.min(Math.max(horizonDias, 7), 1095);
+
+    // Nivel simulado en el día t, recorriendo los pedidos ya colocados.
+    const nivelEn = (t)=>{
+      let nivel = stockSuc, desde = 0;
+      for(const p of pedidos){
+        if(t < p.tLlega) break;
+        nivel = nivel - producto.consumoDiario * (p.tLlega - desde) + cantidadPedido;
+        desde = p.tLlega;
+      }
+      return nivel - producto.consumoDiario * (t - desde);
+    };
+    // Días desde la última llegada (o desde hoy, si todavía no llegó ninguna): la incertidumbre se reinicia
+    // con cada pedido que entra, mismo criterio que antes y que el Stock de Seguridad de Piero.
+    const diasDesdeReposicion = (t)=>{
+      let ultima = 0;
+      for(const p of pedidos){ if(t >= p.tLlega) ultima = p.tLlega; }
+      return t - ultima;
+    };
+    const stepDias = 7; // paso semanal, igual que el histórico: 1 índice del eje = 1 semana en todo el gráfico
     let curDate = fromIsoDay(periods[n-1].key);
     let t = 0;
     while(t < horizonDias){
-      // Math.min al horizonte exacto (antes se podía pasar hasta 6 días, revelando el arranque de un 3er
-      // ciclo que Piero no pidió — "se deben mostrar 2 ciclos", ni uno de más): así el último punto cae
-      // justo en el mínimo del 2º ciclo, no un poco después.
       const pasoDias = Math.min(stepDias, horizonDias - t);
       t += pasoDias;
-      curDate = new Date(curDate); curDate.setUTCDate(curDate.getUTCDate()+pasoDias);
-      // Días transcurridos DESDE el último pedido simulado (1..cicloDias, se reinicia solo al cruzar cada
-      // límite de ciclo) — con esto la línea cae, toca su mínimo justo antes del próximo pedido, y el
-      // siguiente punto ya arranca de nuevo arriba: el propio trazo "escalonado" del gráfico (ver stepPath
-      // más abajo, ya usado para el histórico) dibuja ese salto como un pedido llegando de golpe.
-      const cyclePos = ((t - 1) % cicloDias) + 1;
-      const meanRaw = stockSuc - producto.consumoDiario * cyclePos;
-      // La incertidumbre (±1 desviación estándar) también se reinicia en cada ciclo: es sobre el consumo
-      // desde el ÚLTIMO pedido simulado, no acumulada desde hoy — mismo criterio que el Stock de Seguridad
-      // de Piero (que mide incertidumbre sobre el lead time, no sobre toda la vida del producto).
-      const sigma = producto.desvest * Math.sqrt(cyclePos);
+      curDate = new Date(curDate); curDate.setUTCDate(curDate.getUTCDate()+Math.round(pasoDias));
+      const meanRaw = nivelEn(t);
+      const sigma = producto.desvest * Math.sqrt(Math.max(0, diasDesdeReposicion(t)));
       // El stock nunca es negativo de verdad (pedido de Piero, comentario en el artefacto: "nunca debe
       // llegar por debajo de 0") — se calcula la banda sobre el valor crudo (para que el ancho refleje
       // bien la incertidumbre) y recién ahí se recorta cada extremo a 0. Si la caída esperada ya cruzó
@@ -3960,6 +4063,44 @@ function drawKardex(){
       projMean.push(Math.max(0, meanRaw)); projUpper.push(Math.max(0, meanRaw+sigma)); projLower.push(Math.max(0, meanRaw-sigma));
     }
   }
+  // Fecha real (sin redondear a la semana) de un día t de la simulación, para las etiquetas y los KPI.
+  const fechaEnDia = (t)=>{
+    const d = new Date(fromIsoDay(periods[n-1].key));
+    d.setUTCDate(d.getUTCDate() + Math.round(t));
+    return d;
+  };
+  // Nivel al que llega el stock justo antes de que entre cada pedido: es el punto más bajo del ciclo y, con
+  // tiempo de entrega de por medio, el número que de verdad dice si se va a quebrar el stock esperando.
+  const nivelAlLlegar = pedidos.map(p=>{
+    let nivel = stockSuc, desde = 0;
+    for(const q of pedidos){
+      if(q.tLlega >= p.tLlega) break;
+      nivel = nivel - producto.consumoDiario * (q.tLlega - desde) + cantidadPedido;
+      desde = q.tLlega;
+    }
+    return nivel - producto.consumoDiario * (p.tLlega - desde);
+  });
+
+  // --- Etiqueta grande: "¿hay que pedir?" ---
+  // 15.09.2026, pedido de Piero en el chat: "debe salir en la parte de arriba como etiqueta grande qué
+  // cantidad habría que pedir si es necesario o no". Reusa TAL CUAL pedirRowsFor() — la misma función que
+  // ya arma la columna "A pedir" de "Cuánto pedir por categoría" más abajo — en vez de inventar una
+  // segunda fórmula: como el buscador de arriba ya está filtrado a este único producto (kardexProductoActual
+  // exige exactamente 1 resultado), pedirRowsFor(mesesInput,'todos') devuelve ese mismo producto, con la
+  // misma cantidad que Piero ya ve en esa tabla — nunca se pueden desalinear.
+  // La simulación dice "pedir hoy" cuando el stock ya está en (o debajo de) el ROP que ella usa. En los
+  // productos de importación ese ROP es el de importación, que no es el que mira el resto del módulo: ahí
+  // los dos mensajes pueden diferir y hay que decirlo, no dejar una etiqueta verde sobre un gráfico que
+  // grita "PEDIR HOY".
+  const simulaPedirHoy = tieneProyeccion && pedidos.length > 0 && pedidos[0].tPedido < 1;
+  const avisoSimulacion = (simulaPedirHoy && ropSim !== producto.rop)
+    ? ` · <b>Ojo: con el ROP de importación (${fmt2(ropSim)}) y sus ${fmt2(leadDias)} días de entrega, la simulación de abajo dice que ya habría que pedir ${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'')}</b>`
+    : '';
+  const pedirBannerSvg = mesesInput <= 0
+    ? `<div class="kdx-pedir-banner kdx-pedir-neutral">Escribe cuántos meses quieres cubrir arriba, en "Meses a abastecer", para saber si hay que pedir.</div>`
+    : (pedirRow && pedirRow.hayQuePedir
+        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(Math.round(pedirRow.aPedir))} ${escapeHtml(producto.unidad||'')}</span><span class="kdx-pedir-sub">para cubrir ${mesesInput} ${mesesInput===1?'mes':'meses'} — stock por debajo del ROP</span></div>`
+        : `<div class="kdx-pedir-banner kdx-pedir-no"><span class="kdx-pedir-tag">No es necesario pedir</span><span class="kdx-pedir-sub">${producto.estado==='reposicion' ? ('En reposición, pero el stock ya cubre ' + mesesInput + ' ' + (mesesInput===1?'mes':'meses')) : 'Stock por encima del ROP'}${avisoSimulacion}</span></div>`);
   const m = projPeriods.length;
   const ntotal = n + m;
   const allPeriods = periods.concat(projPeriods);
@@ -3971,7 +4112,13 @@ function drawKardex(){
   // producto, arranca centrado en las últimas ~20 semanas de histórico + toda la proyección; sigue
   // pudiéndose alejar con la rueda del mouse para ver el histórico completo, igual que antes.
   const DEFAULT_HIST_WEEKS = 20;
-  if(esProductoNuevo){
+  // 15.09.2026: con la simulación por tiempo de entrega, el largo del horizonte ya no es fijo — depende de
+  // cuánto tarde el stock en llegar al ROP y de cuánto se pida. Si Piero cambia "Meses a abastecer" (o de
+  // sucursal) y el gráfico pasa a tener otra cantidad de puntos, el zoom guardado dejaba la simulación
+  // nueva cortada por la derecha: por eso también se vuelve a encuadrar cuando cambia el total de puntos.
+  const cambioHorizonte = kardexLastTotal !== ntotal;
+  kardexLastTotal = ntotal;
+  if(esProductoNuevo || cambioHorizonte){
     const defStart = Math.max(0, n - DEFAULT_HIST_WEEKS);
     kardexZoom = { startIdx: defStart, endIdx: ntotal-1 };
   }
@@ -4106,7 +4253,47 @@ function drawKardex(){
     const yTope = refYs.length ? Math.min(...refYs) - 16 : Infinity;
     const fechaFin = fmtDate(fromIsoDay(projPeriods[m-1].key));
     const yLabel = Math.min(arriba ? y-12 : y+18, yTope);
-    calloutSvg += `<text class="kdx-callout" style="${calloutStyle('var(--seg-a)')}" x="${x}" y="${yLabel}" text-anchor="end">${fmt2(projMean[m-1])} el ${fechaFin}</text>`;
+    calloutSvg += `<text class="kdx-callout" style="${calloutStyle('var(--amber)')}" x="${x}" y="${yLabel}" text-anchor="end">${fmt2(projMean[m-1])} el ${fechaFin}</text>`;
+  }
+
+  // Marcas de la simulación con tiempo de entrega (15.09.2026, pedido de Piero): una vertical naranja donde
+  // se COLOCA cada pedido (el cruce del ROP) y un punto donde LLEGA, que es donde el stock sube de golpe.
+  // El eje x va por índice (1 índice = 1 semana), así que un día t de la simulación cae en el índice
+  // fraccionario (n-1) + t/7 — xFor() es lineal, así que acepta índices con decimales sin problema y la
+  // marca queda en su fecha exacta, no redondeada a la semana.
+  let pedidosSvg = '';
+  if(tieneProyeccion && m>0){
+    const idxDeDia = (t)=> (n-1) + t/7;
+    const dentroDeVista = (idx)=> idx >= idxView[0]-0.5 && idx <= idxView[idxView.length-1]+0.5;
+    pedidos.forEach((p, k)=>{
+      const idxPed = idxDeDia(p.tPedido);
+      if(dentroDeVista(idxPed)){
+        const x = xFor(idxPed - viewStart);
+        // Cuando el pedido cae hoy mismo (stock ya en el ROP), esta vertical queda encima de la línea
+        // "HOY" y las dos etiquetas se pisaban: en ese caso la de PEDIR baja una línea y dice "hoy".
+        const chocaConHoy = idxView.indexOf(n-1)!==-1 && Math.abs(x - xForGlobal(n-1)) < 45;
+        pedidosSvg += `<line class="kdx-pedido-line" x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT+plotH}"></line>`
+          + `<text class="kdx-pedido-label" style="paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;" x="${x.toFixed(1)}" y="${chocaConHoy ? padT+12 : padT-6}" text-anchor="middle">PEDIR ${k+1}${p.tPedido < 1 ? ' (hoy)' : ''}</text>`;
+      }
+      const idxLlega = idxDeDia(p.tLlega);
+      if(tieneLead && dentroDeVista(idxLlega)){
+        const x = xFor(idxLlega - viewStart);
+        const yLlega = Math.min(padT+plotH, Math.max(padT, yFor(nivelAlLlegar[k] + cantidadPedido)));
+        pedidosSvg += `<circle class="kdx-llega-dot" cx="${x.toFixed(1)}" cy="${yLlega.toFixed(1)}" r="5"></circle>`;
+        if(k===0){
+          pedidosSvg += `<text class="kdx-pedido-label" style="paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;" x="${x.toFixed(1)}" y="${(yLlega-10).toFixed(1)}" text-anchor="middle">llega ${fmtDate(fechaEnDia(p.tLlega))}</text>`;
+        }
+      }
+    });
+    // ROP de importación: solo se dibuja cuando es distinto del ROP nacional que ya está en rojo — así se
+    // ve de dónde sale el disparador de la simulación sin duplicar una línea encima de la otra.
+    if(ropSim !== producto.rop && ropSim > 0){
+      const yRopSim = yFor(ropSim);
+      if(yRopSim >= padT && yRopSim <= padT+plotH){
+        pedidosSvg += `<line class="kdx-rop-sim" x1="${padL}" y1="${yRopSim.toFixed(1)}" x2="${W-padR}" y2="${yRopSim.toFixed(1)}"></line>`
+          + `<text class="kdx-ref-label" style="${refLabelStyle('var(--amber)')}" x="${padL+4}" y="${(yRopSim-4).toFixed(1)}">ROP importación ${fmt2(ropSim)}</text>`;
+      }
+    }
   }
 
   const labelStep = Math.max(1, Math.ceil(idxView.length/9));
@@ -4132,7 +4319,7 @@ function drawKardex(){
   const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado (histórico)</span>`
     + (producto.rop!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--red);"></span>ROP</span>` : '')
     + (producto.stockSeguridad!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-c);"></span>Stock de seguridad</span>` : '')
-    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-a);"></span>Simulación: pedido cada ${mesesInput} ${mesesInput===1?'mes':'meses'} (±1 desviación estándar)</span>`
+    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--amber);"></span>Simulación: pedido de ${mesesInput} ${mesesInput===1?'mes':'meses'} ${tieneLead ? `con ${fmt2(leadDias)} días de entrega (${esImportado?'importación':'nacional'})` : 'sin tiempo de entrega en el Excel'} (±1 desviación estándar)</span>`
         : (kardexSucursal!=='lima'
             ? `<span class="lg-item" style="color:var(--red);">Sin proyección: solo disponible con Lima San Pedro seleccionada</span>`
             : `<span class="lg-item" style="color:var(--red);">Sin proyección: falta "Consumo Diario" o "Desvest" para este producto en Análisis Inventario</span>`))
@@ -4144,8 +4331,11 @@ function drawKardex(){
   const kpiHoy = `<div class="card kpi kdx-kpi"><div class="label">Stock actual — ${escapeHtml(sucInfo.label)}</div><div class="value">${fmt2(stockSuc)}</div><div class="sub">Físico en ${escapeHtml(sucInfo.label)}, reconstruido a hoy con Ingresos/Movimientos</div></div>`;
   const kpiRop = producto.rop!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP</div><div class="value">${fmt2(producto.rop)}</div><div class="sub">Punto de reorden</div></div>` : '';
   const kpiSeg = producto.stockSeguridad!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad</div><div class="value">${fmt2(producto.stockSeguridad)}</div><div class="sub">Referencia de tu Excel</div></div>` : '';
-  const kpiProy = tieneProyeccion && m>0
-    ? `<div class="card kpi kdx-kpi"><div class="label">Mínimo antes del próximo pedido (${fmtDate(fromIsoDay(projPeriods[m-1].key))})</div><div class="value" style="color:var(--seg-a);">${fmt2(projMean[m-1])}</div><div class="sub">${NUM_CICLOS_PEDIDO} pedidos simulados de ${mesesInput} ${mesesInput===1?'mes':'meses'} cada uno · consumo ${fmt2(producto.consumoDiario)}/día</div></div>`
+  // 4ª tarjeta (15.09.2026): con el tiempo de entrega metido en la simulación, el dato accionable ya no es
+  // el mínimo del ciclo sino CUÁNDO hay que colocar el pedido para que llegue a tiempo — por eso el valor
+  // grande es esa fecha (o "HOY" si el stock ya está en el punto de reorden).
+  const kpiProy = tieneProyeccion && pedidos.length
+    ? `<div class="card kpi kdx-kpi"><div class="label">Pedir (simulado)</div><div class="value" style="color:var(--amber);font-size:${pedidos[0].tPedido < 1 ? 20 : 18}px;">${pedidos[0].tPedido < 1 ? 'HOY' : fmtDate(fechaEnDia(pedidos[0].tPedido))}</div><div class="sub">${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'')} · ${tieneLead ? `llega el ${fmtDate(fechaEnDia(pedidos[0].tLlega))} (${fmt2(leadDias)} días de entrega${esImportado?', importación':''})` : 'sin Lead Time en tu Excel: se simula llegada inmediata'}</div></div>`
     : `<div class="card kpi kdx-kpi"><div class="label">Proyección</div><div class="value" style="font-size:16px;color:var(--red);">No disponible</div><div class="sub">${kardexSucursal!=='lima' ? 'Solo disponible con Lima San Pedro' : 'Falta Consumo Diario o Desvest en Análisis Inventario'}</div></div>`;
   const kpiGridSvg = `<div class="kdx-kpi-grid">${kpiHoy}${kpiRop}${kpiSeg}${kpiProy}</div>`;
 
@@ -4159,8 +4349,13 @@ function drawKardex(){
 
   // Debajo del gráfico: el cálculo en palabras (mismo criterio que Piero pidió varias veces — "¿cómo se
   // calcula esto?" — dejarlo escrito de una, no solo poder preguntarlo) y de dónde sale el dato.
+  const quiebre = nivelAlLlegar.filter(v=>v<=0).length;
+  // Productos de rotación muy lenta (stock para años): el ROP recién se tocaría fuera del tope de 3 años
+  // del gráfico, así que no hay marca de "PEDIR" que mostrar — se dice con todas sus letras en vez de
+  // dejar un gráfico que parece no hacer nada.
+  const pedidoFueraDeVentana = tieneProyeccion && pedidos.length && pedidos[0].tPedido > horizonDias;
   const calcCaption = tieneProyeccion
-    ? `<div class="kdx-caption">Simulación de pedido: cada ${mesesInput} ${mesesInput===1?'mes':'meses'} se simula un pedido nuevo por lo que se consumiría en ese tiempo (Consumo Diario ${fmt2(producto.consumoDiario)}/día × ${cicloDias} días ≈ ${fmt2(producto.consumoDiario*cicloDias)} unidades), así que el stock cae y vuelve a subir de golpe cuando "llega" cada pedido — se muestran ${NUM_CICLOS_PEDIDO} pedidos seguidos para ver el patrón. La banda de ±1 desviación estándar (Desvest ${fmt2(producto.desvest)}) se reinicia en cada pedido y crece con la raíz de los días desde el último — mismo criterio que tu Stock de Seguridad. Cambia "Meses a abastecer" arriba para simular otra frecuencia de pedido.</div>`
+    ? `<div class="kdx-caption">Simulación en naranja (con tiempo de entrega): el stock baja ${fmt2(producto.consumoDiario)}/día; cuando toca el ${esImportado?'ROP de importación':'ROP'} ${fmt2(ropSim)} se coloca el pedido de ${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'unidades')} (${mesesInput} ${mesesInput===1?'mes':'meses'} de rotación: ${fmt2(producto.consumoDiario)}/día × ${cicloDias} días); ${tieneLead ? `durante los ${fmt2(leadDias)} días de entrega${esImportado?' (Lead Time IMP de tu Excel)':' (Lead Time de tu Excel)'} el stock SIGUE bajando, y recién ahí sube de golpe cuando llega` : 'como este producto no tiene Lead Time en tu Excel, el pedido se simula llegando el mismo día'}. Se muestran ${NUM_CICLOS_PEDIDO} pedidos seguidos para ver el patrón. La banda de ±1 desviación estándar (Desvest ${fmt2(producto.desvest)}) se reinicia con cada pedido que entra y crece con la raíz de los días desde el último — mismo criterio que tu Stock de Seguridad. Cambia "Meses a abastecer" arriba para simular otra cantidad por pedido.${quiebre ? ` <b style="color:var(--red);">Ojo: pidiendo solo ${mesesInput} ${mesesInput===1?'mes':'meses'} el stock llega a 0 antes de que entre el pedido</b> — con ${fmt2(leadDias)} días de entrega hay que pedir más cantidad o pedir antes.` : ''}${pedidoFueraDeVentana ? ` Este producto rota tan lento que, al ritmo actual, recién tocaría el ROP el ${fmtDate(fechaEnDia(pedidos[0].tPedido))}: por eso no aparece ninguna marca de "PEDIR" en el gráfico, que llega hasta 3 años.` : ''}</div>`
     : (kardexSucursal!=='lima' ? `<div class="kdx-caption">Sin proyección para ${escapeHtml(sucInfo.label)}: Consumo Diario y Desvest de tu Excel son del producto completo (las 3 sucursales juntas), no por sucursal — la proyección solo se muestra con Lima San Pedro seleccionada.</div>` : '');
   // 15.09.2026, pedido de Piero: el stock de este gráfico es solo lo físico de la sucursal elegida —
   // Tránsito y las otras 2 sucursales NO están incluidos, a diferencia del stock que decide el estado en
@@ -4190,6 +4385,7 @@ function drawKardex(){
     <path class="kdx-line" d="${linePath}"></path>
     ${projLineSvg}
     ${hoyLineSvg}
+    ${pedidosSvg}
     ${dotsSvg}
     ${refSvg}
     ${calloutSvg}
