@@ -6477,24 +6477,38 @@ function buildProImageComprasResponsable(){
   // de cada OC — limite4For), así que el "exceso" se mide contra ESE plazo individual, no una meta
   // global; mismos 3 umbrales que ya se habían usado para el Indicador 2 en el primer intento (Leve
   // 1-2 d.h. de exceso, Media 3-5, Crítica > 5 d.h.).
-  let leveN=0, mediaN=0, criticaN=0;
+  //
+  // El % de cumplimiento del pie de esa misma imagen se calcula ACÁ, en este mismo recorrido, y no
+  // con stIND4.cumplePct (ronda 41, 15.09.2026 — Piero preguntó por qué no coincidía con la tarjeta
+  // "Tiempo de Entrega de OC en Lurín"). El criterio de "cumple" es el mismo del Indicador 4 —llegó
+  // dentro de su plazo pactado—, pero la UNIDAD es distinta: stIND4 promedia LÍNEAS de OC, mientras
+  // que leve/media/crítica se cuentan por OC. Con el % por línea, una OC de 5 líneas pesaba 5 veces
+  // en el % y 1 sola en el semáforo, así que los 4 bloques no cuadraban entre sí. Ahora los 4 se
+  // miden sobre las mismas OC entregadas. Eso hace que el % de la imagen NO sea igual al de la
+  // tarjeta de la plataforma, que además excluye los pedidos directos de PedidoSinReq — decisión
+  // explícita de Piero: prima la coherencia interna de la infografía.
+  let leveN=0, mediaN=0, criticaN=0, aTiempoN=0;
   for(const r of ocRows.values()){
     if(!r.fRecep) continue;
     const lim4 = limite4For(r);
     if(!lim4) continue;
     const fRecepDia = new Date(Date.UTC(r.fRecep.getUTCFullYear(), r.fRecep.getUTCMonth(), r.fRecep.getUTCDate()));
     const exceso = busdayCount(lim4, fRecepDia); // positivo = llegó tarde, según su propio plazo pactado
-    if(exceso==null || exceso<=0) continue;
+    if(exceso==null) continue;
+    if(exceso<=0){ aTiempoN++; continue; }
     if(exceso<=2) leveN++;
     else if(exceso<=5) mediaN++;
     else criticaN++;
   }
+  const entregadasMedibles = aTiempoN + leveN + mediaN + criticaN;
+  const cumplimientoEntregaOCPct = entregadasMedibles ? aTiempoN/entregadasMedibles*100 : null;
 
   return {
     comprador, esArea, compradoresN, totalOC, nacionalN, importadoN, comparativo,
     montoNat: { soles, dolares, euros },
     tiempoEmisionProm: stIND2.promedio,
-    tiempoEntregaProm: stIND4.promedio, tiempoEntregaN: stIND4.n, cumplimientoEntregaPct: stIND4.cumplePct,
+    tiempoEntregaProm: stIND4.promedio, tiempoEntregaN: stIND4.n,
+    cumplimientoEntregaPct: cumplimientoEntregaOCPct, cumplimientoEntregaOCn: entregadasMedibles,
     creditoRows, creditoExtra,
     catRows, catTotales,
     proyRows, proyTotales, proyPedTotal,
