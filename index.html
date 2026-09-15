@@ -230,14 +230,40 @@
   .kdx-svg{display:block;overflow:visible;max-width:100%;user-select:none;-webkit-user-select:none;}
   .kdx-svg .kdx-grid{stroke:var(--border);stroke-width:1;}
   .kdx-svg .kdx-zoom-overlay{fill:transparent;cursor:zoom-in;}
-  .kdx-svg .kdx-area{fill:var(--brand-2-dark);fill-opacity:.12;}
-  .kdx-svg .kdx-line{stroke:var(--brand-2-dark);stroke-width:2;fill:none;}
+  .kdx-svg .kdx-area{fill:var(--brand-2-dark);fill-opacity:.12;pointer-events:none;}
+  .kdx-svg .kdx-line{stroke:var(--brand-2-dark);stroke-width:2;fill:none;pointer-events:none;}
   .kdx-svg .kdx-dot{fill:var(--brand-2-dark);cursor:pointer;}
   .kdx-svg .kdx-rop{stroke:var(--red);stroke-width:1.5;stroke-dasharray:4 3;fill:none;pointer-events:none;}
   .kdx-svg .kdx-seg{stroke:var(--seg-c);stroke-width:1.5;stroke-dasharray:4 3;fill:none;pointer-events:none;}
   .kdx-svg .kdx-ref-label{font-size:11px;font-weight:600;pointer-events:none;}
   .kdx-svg text{font-size:11.5px;fill:var(--ink-soft);}
   .kdx-empty{font-size:12.5px;color:var(--ink-soft);padding:4px 0 10px;}
+  /* Proyección (10.09.2026): línea/banda/puntos en var(--seg-a) — azul, distinto del teal del histórico
+     y del rojo/morado de ROP/Stock seguridad — para que se distinga a simple vista cuál parte del
+     gráfico es dato real y cuál es estimado. */
+  .kdx-svg .kdx-line-proj{stroke:var(--seg-a);stroke-width:2;stroke-dasharray:6 4;fill:none;pointer-events:none;}
+  .kdx-svg .kdx-band{fill:var(--seg-a);fill-opacity:.14;stroke:none;pointer-events:none;}
+  .kdx-svg .kdx-dot-proj{fill:var(--card);stroke:var(--seg-a);stroke-width:2;cursor:pointer;}
+  .kdx-legend .lg-swatch.proj{background:none;border-top:2px dashed var(--seg-a);height:0;}
+  /* Rediseño 14.09.2026 (pedido de Piero, mostró un ejemplo de referencia: "en tu gráfico no se sabe casi
+     nada"): tarjetas KPI arriba del gráfico, línea vertical "Hoy" separando histórico/proyección, y
+     etiquetas escritas directo sobre el gráfico (no solo al pasar el mouse) — para que el gráfico se
+     entienda de un vistazo, sin tener que interactuar con él. */
+  .kdx-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px;}
+  .kdx-kpi.kpi{padding:10px 14px;}
+  .kdx-kpi.kpi .label{font-size:10.5px;}
+  .kdx-kpi.kpi .value{font-size:20px;margin-top:4px;}
+  .kdx-kpi.kpi .sub{font-size:11px;margin-top:2px;}
+  .kdx-svg .kdx-hoy{stroke:var(--ink-soft);stroke-width:1.5;stroke-dasharray:3 3;pointer-events:none;}
+  .kdx-svg .kdx-hoy-label{font-size:10.5px;font-weight:700;fill:var(--ink-soft);pointer-events:none;}
+  .kdx-svg .kdx-callout{font-size:12px;pointer-events:none;}
+  .kdx-caption{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:10px;}
+  .kdx-caption.kdx-fuente{font-size:11px;margin-top:4px;opacity:.8;}
+  .kdx-suc-filter{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  .kdx-suc-filter .kdx-suc-label{font-size:11.5px;color:var(--ink-soft);font-weight:600;}
+  .kdx-suc-btn{border:1px solid var(--border);background:var(--surface-2);color:var(--brand-ink);padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+  .kdx-suc-btn:hover{background:var(--surface-2-hover);}
+  .kdx-suc-btn.active{background:var(--brand-2);color:#08281f;border-color:var(--brand-2);}
 
   .proc-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
   @media (max-width:960px){ .proc-kpi-grid{grid-template-columns:repeat(2,1fr);} }
@@ -558,17 +584,6 @@
            volver a mostrarlo; el detalle de cada producto sigue listando sus códigos homologados. -->
       <div id="alertasHomNote" style="display:none;"></div>
 
-      <!-- Kardex del producto (09.09.2026, pedido de Piero: "quiero que cuando se filtre así un solo
-           producto que abajo salga el detalle del kardex de este producto, cómo se fue moviendo con
-           ingresos y salidas"). Se arma con las hojas "Ingresos"/"Movimientos" de Reporte Almacen.xlsx
-           (ver parsePivotMensual/processAlmacen) y solo aparece cuando el buscador de arriba deja
-           exactamente 1 producto a la vista — ver kardexProductoActual/drawKardex. -->
-      <div class="card" id="kardexCard" style="padding:18px 20px 14px;margin-bottom:18px;display:none;">
-        <h3 style="margin:0 0 2px;font-size:14px;color:var(--ink);" id="kardexTitle">Kardex</h3>
-        <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;" id="kardexSub"></div>
-        <div id="kardexChart"></div>
-      </div>
-
       <!-- "Cuánto pedir por categoría" (08.09.2026, pedido de Piero: "cuánto es lo que se debería pedir
            para los productos que son críticos... por categorías (las mismas que se usan en módulo 2)...
            en base a los meses que yo quiera para abastecerme"). Ver drawPedirPorCategoria(). -->
@@ -587,6 +602,20 @@
         </div>
         <div id="chartPedir"></div>
         <div id="pedirDetalle" style="margin-top:14px;"></div>
+      </div>
+
+      <!-- Kardex del producto (09.09.2026, pedido de Piero: "quiero que cuando se filtre así un solo
+           producto que abajo salga el detalle del kardex de este producto, cómo se fue moviendo con
+           ingresos y salidas"). Movido debajo de "Cuánto pedir por categoría" (10.09.2026, pedido de
+           Piero: "mejor ponlo abajo el kardex de la categoria para que asi tengas mucho espacio") y
+           agrandado ("se ve bien en grande") — ver drawKardex(). Se arma con las hojas
+           "Ingresos"/"Movimientos" de Reporte Almacen.xlsx (ver parseTransaccionesSemanal/processAlmacen)
+           y solo aparece cuando el buscador de arriba deja exactamente 1 producto a la vista — ver
+           kardexProductoActual/drawKardex. -->
+      <div class="card" id="kardexCard" style="padding:18px 20px 14px;margin-bottom:18px;display:none;">
+        <h3 style="margin:0 0 2px;font-size:14px;color:var(--ink);" id="kardexTitle">Kardex</h3>
+        <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;" id="kardexSub"></div>
+        <div id="kardexChart"></div>
       </div>
 
       <!-- Tabla de inventario producto por producto: oculta a pedido de Piero (09.09.2026, comentario
@@ -1546,7 +1575,22 @@ function buildSnapshot(){
     // Sube a 2 el 09.09.2026: se agrega "sg" (Stock Seguridad) y el kardex mensual (ki/km + kardexPeriods)
     // para el detalle de un solo producto (ver drawKardex). Un snapshot viejo (<2) no trae ninguno de los
     // 2 — loadFromSnapshot los deja en null y el kardex simplemente no se muestra hasta volver a publicar.
-    almacenSchemaVersion: 2,
+    // Sube a 3 el 10.09.2026: "Ingresos"/"Movimientos" pasaron de tabla dinámica mensual a detalle
+    // transaccional por fecha real, agrupado ahora por SEMANA ISO (kardexPeriods ya no tiene year/month,
+    // solo "key" = lunes de esa semana); se agregan "cd" (Consumo Diario) y "dv" (Desvest) para la
+    // proyección del kardex (ver drawKardex). El "key" viejo (year/month) ya no es compatible con
+    // weekLabelFor/drawKardex, así que un snapshot <3 no muestra ningún kardex (ni histórico ni
+    // proyección) hasta que se vuelva a publicar con el nuevo Reporte Almacen.xlsx — mismo criterio que
+    // "Excel sin las hojas Ingresos/Movimientos": se oculta por completo en vez de mostrar algo a medias.
+    // Sube a 4 el 15.09.2026: pedido de Piero ("el kardex que se muestre es por sucursal... debes
+    // permitirme filtrar el gráfico por esas 3 sucursales") — se agregan "kis"/"kms" (kardexIngresos y
+    // kardexMovimientos YA desglosados por sucursal: Ica/Lima San Pedro/Trujillo, ver
+    // kardexIngresosPorSucursal en processAlmacen). Antes "ki"/"km" mezclaban las 3 sucursales en un solo
+    // total, lo cual además de no dejar filtrar era INCONSISTENTE con el ancla de la reconstrucción hacia
+    // atrás (que desde el 15.09.2026 ya usaba solo el stock de UNA sucursal — ver drawKardex, stockSuc).
+    // Un snapshot <4 no trae el desglose, así que se descarta el kardex igual que con las versiones
+    // anteriores hasta volver a publicar.
+    almacenSchemaVersion: 4,
     almacen: (ALMACEN_DATA && ALMACEN_DATA.rows) ? {
       filename: ALMACEN_DATA.filename,
       sheetName: ALMACEN_DATA.sheetName,
@@ -1572,7 +1616,10 @@ function buildSnapshot(){
           i: n(r.ica), l: n(r.lima), t: n(r.trujillo), tr: n(r.transito),
           rv: n(r.reserva), pk: n(r.picking), rp: n(r.rop), eq: n(r.eoq),
           cm: n(r.consumoMensual), cb: n(r.cobertura), sg: n(r.stockSeguridad),
+          cd: n(r.consumoDiario), dv: n(r.desvest),
           ki: na(r.kardexIngresos), km: na(r.kardexMovimientos),
+          kis: r.kardexIngresosPorSucursal ? { i: na(r.kardexIngresosPorSucursal.ica), l: na(r.kardexIngresosPorSucursal.lima), t: na(r.kardexIngresosPorSucursal.trujillo) } : undefined,
+          kms: r.kardexMovimientosPorSucursal ? { i: na(r.kardexMovimientosPorSucursal.ica), l: na(r.kardexMovimientosPorSucursal.lima), t: na(r.kardexMovimientosPorSucursal.trujillo) } : undefined,
         };
       }),
     } : null,
@@ -1776,13 +1823,17 @@ function loadFromSnapshot(snap){
   } : null;
   // Inventario · Almacén General (09.09.2026). Un snapshot publicado antes de esta ronda no trae
   // "almacen": el módulo queda vacío y avisa que hay que volver a publicar, en vez de salir en blanco.
+  // kardexPeriods cambió de forma el 10.09.2026 (de {col,year,month,key="2025-01"} a {key="2025-01-06"},
+  // el lunes de esa semana ISO): un snapshot publicado ANTES de ese cambio (almacenSchemaVersion < 3)
+  // tiene el "key" viejo, que weekLabelFor/drawKardex ya no saben leer — se descarta en vez de intentar
+  // mostrarlo mal, y el kardex se comporta igual que si el Excel publicado no tuviera esas hojas (avisa
+  // que hay que volver a publicar), hasta que se vuelva a publicar con el archivo actual.
+  const kardexVigente = (snap.almacen && (snap.almacenSchemaVersion||0) >= 4);
   ALMACEN_DATA = (snap.almacen && snap.almacen.rows) ? Object.assign({}, snap.almacen, {
     fromSnapshot: true,
     // El estado y el stock que cuenta para el ROP se RECALCULAN acá, no se publican: así el link
     // público usa siempre la regla vigente (ver stockParaReposicion) y no una congelada al publicar.
-    // kardexPeriods/ki/km (09.09.2026): un snapshot viejo (almacenSchemaVersion < 2) no los trae — quedan
-    // en null/undefined y el kardex simplemente no aparece hasta volver a publicar con el Excel actual.
-    kardexPeriods: snap.almacen.kardexPeriods || null,
+    kardexPeriods: kardexVigente ? (snap.almacen.kardexPeriods || null) : null,
     rows: snap.almacen.rows.map(r => conEstadoRepo({
       codigo: r.c, codigos: (r.cs || [r.c]), nCodigos: (r.cs ? r.cs.length : 1),
       descripcion: r.d || "", unidad: r.u || "",
@@ -1790,7 +1841,11 @@ function loadFromSnapshot(snap){
       reserva: r.rv||0, picking: r.pk||0, rop: r.rp||0,
       eoq: (r.eq!=null?r.eq:null), consumoMensual: (r.cm!=null?r.cm:null), cobertura: (r.cb!=null?r.cb:null),
       stockSeguridad: (r.sg!=null?r.sg:null),
-      kardexIngresos: r.ki || undefined, kardexMovimientos: r.km || undefined,
+      consumoDiario: (r.cd!=null?r.cd:null), desvest: (r.dv!=null?r.dv:null),
+      kardexIngresos: kardexVigente ? (r.ki || undefined) : undefined,
+      kardexMovimientos: kardexVigente ? (r.km || undefined) : undefined,
+      kardexIngresosPorSucursal: (kardexVigente && r.kis) ? { ica: r.kis.i, lima: r.kis.l, trujillo: r.kis.t } : undefined,
+      kardexMovimientosPorSucursal: (kardexVigente && r.kms) ? { ica: r.kms.i, lima: r.kms.l, trujillo: r.kms.t } : undefined,
       disponible: (r.l||0) + (r.tr||0) - (r.rv||0) - (r.pk||0),
     })),
   }) : null;
@@ -2476,51 +2531,71 @@ function firmaProducto(desc){
 // alerta a 13,325 filas sin que ninguna sea accionable. Fill-rate real del archivo, para tenerlo
 // presente: ROP 4,444 · Consumo Mensual y Cobertura 4,722 · EOQ solo 2,112 · ICA/LIMA/TRUJILLO/tránsito
 // las 15,317.
-// Lee una tabla dinámica de Excel "código × mes" (hojas "Ingresos"/"Movimientos" de Reporte Almacen.xlsx,
-// agregadas el 09.09.2026). Formato real verificado con el archivo de Piero: una fila con "20XX" en la
-// columna del primer mes de ese año (celda combinada, solo aparece en la primera columna del año), la
-// fila siguiente con las 21 etiquetas de mes (Ene 2025 → Set 2026), una fila "Etiquetas de fila" y de ahí
-// para abajo una fila por código con su valor mensual, terminando en una fila "Total general". No se
-// asume la posición exacta de columnas (aparte de que el código homologado "traduce" nombre de hoja, y a
-// futuro con más meses la tabla dinámica crece hacia la derecha), así que esta función encuentra las 2
-// filas de encabezado buscándolas, en vez de asumir número de fila u columna fijos.
-const MESES_KEY = {ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,set:9,sep:9,oct:10,nov:11,dic:12};
-function parsePivotMensual(wb, sheetName){
+// Lee el detalle transaccional real de "Ingresos"/"Movimientos" de Reporte Almacen.xlsx (rediseñadas por
+// Piero el 10.09.2026: antes eran una tabla dinámica código×mes, ahora es una fila por cada ingreso o
+// salida real, con su fecha exacta — "Ingresos": Código/Cantidad/Fecha; "Movimientos": PRODUCTO/CANTIDAD/
+// FECHA SALIDA). Se agrupa por SEMANA ISO (lunes a domingo — mismo criterio que el diagrama de tendencia
+// de Tiempos del Proceso, ver weekKeyFor/isoWeekStart) en vez de por mes: da más resolución real y no
+// depende de que la hoja traiga una columna por periodo. headerHints identifica la fila de encabezado
+// buscando esas palabras (sin asumir una fila fija), y candCodigo/candCantidad/candFecha ubican cada
+// columna por nombre (findCol), no por posición — así no se rompe si Piero agrega o mueve columnas.
+// Normaliza la columna "Sucursal" de Ingresos/Movimientos a una de las 3 sucursales que pidió Piero
+// filtrar (15.09.2026): "SUCURSAL LIMA LURIN (SAN PEDRO)", "SUCURSAL ICA", "SUCURSAL TRUJILLO" (con
+// espacios de sobra en el propio Excel — de ahí el trim/sinAcentos). "includes" en vez de igualdad exacta
+// por si el texto trae variantes menores; null si no calza con ninguna de las 3 (no se inventa una cuarta).
+function normalizeSucursalKardex(raw){
+  const s = sinAcentos((raw==null?'':raw.toString()).trim().toUpperCase());
+  if(s.indexOf('LIMA')!==-1) return 'lima';
+  if(s.indexOf('TRUJILLO')!==-1) return 'trujillo';
+  if(s.indexOf('ICA')!==-1) return 'ica';
+  return null;
+}
+function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candCantidad, candFecha, candSucursal){
   if(!sheetName || !wb.Sheets[sheetName]) return null;
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, raw:true, defval:null});
-  let yearRowIdx = -1, labelRowIdx = -1;
-  for(let i=0; i<Math.min(12, rows.length); i++){
-    const row = rows[i] || [];
-    if(yearRowIdx===-1 && row.some(c => /^20\d\d$/.test(String(c==null?'':c).trim()))) yearRowIdx = i;
-    if(String(row[0]==null?'':row[0]).trim().toLowerCase()==='etiquetas de fila'){ labelRowIdx = i; break; }
+  let headerRowIdx = -1, headerRow = null;
+  // sinAcentos en la comparación: por si el encabezado real trae "Código" con tilde y el hint no la trae
+  // (o viceversa) — no debería depender de eso para reconocer la fila.
+  for(let i=0; i<Math.min(10, rows.length); i++){
+    const strs = (rows[i]||[]).map(c => sinAcentos((c==null?"":c.toString()).trim().toLowerCase()));
+    if(headerHints.every(h => strs.indexOf(sinAcentos(h.toLowerCase())) !== -1)){ headerRowIdx = i; headerRow = rows[i]; break; }
   }
-  if(yearRowIdx===-1 || labelRowIdx===-1 || labelRowIdx <= yearRowIdx) return null;
-  const yearRow = rows[yearRowIdx], monthRow = rows[yearRowIdx+1] || [];
-  const periods = [];
-  let curYear = null;
-  for(let c=1; c<Math.max(yearRow.length, monthRow.length); c++){
-    const yv = yearRow[c];
-    if(yv!=null && /^20\d\d$/.test(String(yv).trim())) curYear = parseInt(yv, 10);
-    const mv = monthRow[c];
-    const mKey = mv==null ? null : MESES_KEY[String(mv).trim().toLowerCase().replace(/\.$/,'')];
-    if(!mKey || !curYear) break; // llegamos a la columna "Total general" (o similar): ahí termina la tabla
-    periods.push({ col:c, year:curYear, month:mKey, key: curYear + '-' + String(mKey).padStart(2,'0') });
+  if(headerRowIdx===-1) return null;
+  const iCod = findCol(headerRow, candCodigo), iCant = findCol(headerRow, candCantidad), iFec = findCol(headerRow, candFecha);
+  if(iCod===-1 || iCant===-1 || iFec===-1) return null;
+  // Columna Sucursal (15.09.2026, pedido de Piero: "el kardex que se muestre es por sucursal... debes
+  // permitirme filtrar el gráfico por esas 3 sucursales") — opcional: si no se encuentra, porCodigoPorSucursal
+  // queda vacío y el kardex simplemente no puede filtrar por sucursal para esa hoja (se avisa en drawKardex).
+  const iSuc = candSucursal ? findCol(headerRow, candSucursal) : -1;
+  const porCodigo = {};
+  const porCodigoPorSucursal = { ica:{}, lima:{}, trujillo:{} };
+  let minDate = null, maxDate = null;
+  for(let r=headerRowIdx+1; r<rows.length; r++){
+    const row = rows[r];
+    if(!row) continue;
+    const codigo = row[iCod]==null ? '' : row[iCod].toString().trim();
+    if(!codigo) continue;
+    const cv = row[iCant];
+    const cant = (typeof cv==='number' && isFinite(cv)) ? cv : ((cv!=null && cv!=='' && isFinite(Number(cv))) ? Number(cv) : 0);
+    if(!cant) continue;
+    const fv = row[iFec];
+    const fecha = (fv instanceof Date && !isNaN(fv.getTime())) ? fv : null;
+    if(!fecha) continue;
+    if(!minDate || fecha<minDate) minDate = fecha;
+    if(!maxDate || fecha>maxDate) maxDate = fecha;
+    const wk = weekKeyFor(fecha);
+    const porSemana = porCodigo[codigo] = porCodigo[codigo] || {};
+    porSemana[wk] = (porSemana[wk]||0) + cant;
+    if(iSuc!==-1){
+      const sucKey = normalizeSucursalKardex(row[iSuc]);
+      if(sucKey){
+        const bucket = porCodigoPorSucursal[sucKey];
+        const porSemanaSuc = bucket[codigo] = bucket[codigo] || {};
+        porSemanaSuc[wk] = (porSemanaSuc[wk]||0) + cant;
+      }
+    }
   }
-  if(!periods.length) return null;
-  const byCodigo = {};
-  for(let i=labelRowIdx+1; i<rows.length; i++){
-    const row = rows[i];
-    if(!row || row[0]==null) continue;
-    const codigo = String(row[0]).trim();
-    if(!codigo || /^total general$/i.test(codigo)) continue;
-    const porPeriodo = {};
-    periods.forEach(p=>{
-      const v = row[p.col];
-      porPeriodo[p.key] = (typeof v === 'number' && isFinite(v)) ? v : ((v!=null && v!=="" && isFinite(Number(v))) ? Number(v) : 0);
-    });
-    byCodigo[codigo] = porPeriodo;
-  }
-  return { periods, byCodigo };
+  return { porCodigo, porCodigoPorSucursal, minDate, maxDate };
 }
 function processAlmacen(wb, filename){
   let sheetName = wb.SheetNames.find(n => /an[áa]lisis.*inventario/i.test(n.trim()));
@@ -2555,6 +2630,13 @@ function processAlmacen(wb, filename){
     // Stock Seguridad (09.09.2026): no se usaba hasta ahora — hace falta como línea de referencia en el
     // kardex (ver drawKardex). Es la columna M de "Análisis Inventario".
     stockSeguridad: findCol(headerRow, ["Stock Seguridad","Stock de Seguridad"]),
+    // Consumo Diario y Desvest (10.09.2026): hacen falta para la PROYECCIÓN del kardex (ver drawKardex) —
+    // el consumo diario marca la pendiente de caída esperada y la desviación estándar el ancho de la
+    // banda de incertidumbre, creciendo con la raíz del tiempo (mismo criterio estadístico que ya usa el
+    // Stock de Seguridad de Piero: la varianza de una suma de consumos diarios independientes crece con
+    // el número de días, no de forma lineal).
+    consumoDiario: findCol(headerRow, ["Consumo Diario"]),
+    desvest: findCol(headerRow, ["Desvest"]),
   };
   const faltantes = [];
   if(col.codigo===-1) faltantes.push("Código");
@@ -2604,6 +2686,8 @@ function processAlmacen(wb, filename){
       consumoMensual: col.consumoMensual!==-1 ? num(r[col.consumoMensual]) : null,
       cobertura: col.cobertura!==-1 ? num(r[col.cobertura]) : null,
       stockSeguridad: col.stockSeguridad!==-1 ? num(r[col.stockSeguridad]) : null,
+      consumoDiario: col.consumoDiario!==-1 ? num(r[col.consumoDiario]) : null,
+      desvest: col.desvest!==-1 ? num(r[col.desvest]) : null,
       disponible: lima + transito - reserva - picking,
     }));
   }
@@ -2630,6 +2714,11 @@ function processAlmacen(wb, filename){
       eoq: g.some(x=>x.eoq!=null) ? sum('eoq') : null,
       consumoMensual: g.some(x=>x.consumoMensual!=null) ? sum('consumoMensual') : null,
       stockSeguridad: g.some(x=>x.stockSeguridad!=null) ? sum('stockSeguridad') : null,
+      consumoDiario: g.some(x=>x.consumoDiario!=null) ? sum('consumoDiario') : null,
+      // Desvest NO se suma: son desviaciones estándar de demandas independientes, así que se combinan
+      // sumando VARIANZAS (desvest²) y sacando raíz — sumar las desvest directamente sobreestimaría la
+      // incertidumbre del grupo homologado.
+      desvest: g.some(x=>x.desvest!=null) ? Math.sqrt(g.reduce((a,x)=>a+Math.pow(x.desvest||0,2),0)) : null,
       disponible: lima + transito - reserva - picking,
     }));
   });
@@ -2641,29 +2730,54 @@ function processAlmacen(wb, filename){
     return Object.keys(ums).length > 1;
   }).map(f => porFirma[f].map(r=>({ codigo:r.codigo, unidad:(r.unidad||'').trim(), descripcion:r.descripcion })));
 
-  // --- Kardex: hojas "Ingresos" y "Movimientos" (09.09.2026) ---
+  // --- Kardex: hojas "Ingresos" y "Movimientos" (09.09.2026, rediseñadas por Piero el 10.09.2026) ---
   // Pedido de Piero: al filtrar el buscador a un solo producto, mostrar abajo el kardex (cómo se fue
   // moviendo el stock con ingresos y salidas), con un gráfico con zoom/arrastre y líneas de ROP y Stock
-  // de Seguridad. Las 2 hojas nuevas son tablas dinámicas de Excel por código × mes (Ene 2025 en
-  // adelante) — "Ingresos" = cuánto entró, "Movimientos" = cuánto salió (su "Consumo Mensual" por código
-  // coincide exacto con el de "Análisis Inventario", verificado contra el archivo real: código
-  // 004300500164 → 21.52 en ambas hojas). Se agregan por producto YA homologado (sumando los códigos
-  // gemelos, igual que el resto de esta función) para que el kardex hable del mismo producto que ve Piero.
-  const kardexIng = parsePivotMensual(wb, wb.SheetNames.find(n=>/ingres/i.test(n)));
-  const kardexMov = parsePivotMensual(wb, wb.SheetNames.find(n=>/movimient/i.test(n)));
+  // de Seguridad. Las 2 hojas ya no son una tabla dinámica mes a mes: ahora traen el detalle real de cada
+  // transacción con su fecha exacta (ver parseTransaccionesSemanal) — se agrupan por semana ISO. Se
+  // agregan por producto YA homologado (sumando los códigos gemelos, igual que el resto de esta función)
+  // para que el kardex hable del mismo producto que ve Piero. Se pasa también la columna "Sucursal" (15.09.2026,
+  // "el kardex que se muestre es por sucursal... debes permitirme filtrar el gráfico por esas 3
+  // sucursales") para poder desglosar Ingresos/Movimientos por Ica/Lima San Pedro/Trujillo, no solo el total.
+  const kardexIng = parseTransaccionesSemanal(wb, wb.SheetNames.find(n=>/ingres/i.test(n)),
+    ['codigo','cantidad','fecha'], ["Código","Codigo"], ["Cantidad"], ["Fecha"], ["Sucursal"]);
+  const kardexMov = parseTransaccionesSemanal(wb, wb.SheetNames.find(n=>/movimient/i.test(n)),
+    ['producto','cantidad','fecha salida'], ["Producto"], ["Cantidad"], ["Fecha Salida","Fecha de Salida"], ["Sucursal"]);
   let kardexPeriods = null;
   if(kardexIng || kardexMov){
-    // Unión de los periodos de ambas hojas, por si alguna trae un mes que la otra todavía no (ej. recién
-    // se generó una y no la otra) — ordenados cronológicamente. En el archivo real ambas traen los mismos
-    // 21 meses (Ene 2025 a Set 2026).
-    const porKey = {};
-    (kardexIng ? kardexIng.periods : []).concat(kardexMov ? kardexMov.periods : []).forEach(p=>{ porKey[p.key] = p; });
-    kardexPeriods = Object.keys(porKey).map(k=>porKey[k]).sort((a,b)=> a.key.localeCompare(b.key));
+    // Semanas ISO (lunes a domingo) desde la primera transacción real hasta HOY inclusive — así la última
+    // semana siempre incluye el día de hoy, y el stock reconstruido en ese punto coincide exacto con el
+    // stock actual (ver drawKardex). No se asume ningún rango de fechas fijo: si el archivo trae más o
+    // menos historia, esto se ajusta solo.
+    const minDate = [kardexIng, kardexMov].filter(Boolean).map(k=>k.minDate).filter(Boolean)
+      .reduce((a,d)=> (!a || d<a) ? d : a, null);
+    if(minDate){
+      const keys = [];
+      let cur = isoWeekStart(minDate);
+      const hoyWk = isoWeekStart(new Date());
+      while(cur <= hoyWk){
+        keys.push(isoDay(cur));
+        cur = new Date(cur); cur.setUTCDate(cur.getUTCDate()+7);
+      }
+      kardexPeriods = keys.map(k=>({ key:k }));
+    }
+  }
+  if(kardexPeriods && kardexPeriods.length){
     productos.forEach(p=>{
       const codigos = p.codigos || [p.codigo];
-      const sumaPeriodo = (fuente, key) => codigos.reduce((a,c)=> a + (((fuente && fuente[c]) || {})[key] || 0), 0);
-      p.kardexIngresos = kardexPeriods.map(per => sumaPeriodo(kardexIng && kardexIng.byCodigo, per.key));
-      p.kardexMovimientos = kardexPeriods.map(per => sumaPeriodo(kardexMov && kardexMov.byCodigo, per.key));
+      const sumaSemana = (fuente, key) => codigos.reduce((a,c)=> a + (((fuente && fuente[c]) || {})[key] || 0), 0);
+      p.kardexIngresos = kardexPeriods.map(per => sumaSemana(kardexIng && kardexIng.porCodigo, per.key));
+      p.kardexMovimientos = kardexPeriods.map(per => sumaSemana(kardexMov && kardexMov.porCodigo, per.key));
+      // Desglose por sucursal (15.09.2026, ver nota arriba) — mismo cálculo de arriba pero leyendo del
+      // balde de cada sucursal en vez del total combinado, para que drawKardex pueda reconstruir el
+      // histórico de UNA sola sucursal a la vez (y que calce con el stock actual de esa misma sucursal,
+      // que también es por sucursal — ver ica/lima/trujillo en Análisis Inventario).
+      p.kardexIngresosPorSucursal = {};
+      p.kardexMovimientosPorSucursal = {};
+      ['ica','lima','trujillo'].forEach(suc=>{
+        p.kardexIngresosPorSucursal[suc] = kardexPeriods.map(per => sumaSemana(kardexIng && kardexIng.porCodigoPorSucursal && kardexIng.porCodigoPorSucursal[suc], per.key));
+        p.kardexMovimientosPorSucursal[suc] = kardexPeriods.map(per => sumaSemana(kardexMov && kardexMov.porCodigoPorSucursal && kardexMov.porCodigoPorSucursal[suc], per.key));
+      });
     });
   }
 
@@ -3703,7 +3817,15 @@ function drawHomologacionNote(){
 // cual el patrón ya construido para drawIndicatorTrend()/.trend-svg.
 let kardexZoom = { startIdx: null, endIdx: null };
 let kardexLastKey = null;
-const MESES_LABEL = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
+// 15.09.2026, pedido de Piero: "el kardex que se muestre es por sucursal... debes permitirme filtrar el
+// gráfico por esas 3 sucursales" (Ica/Lima San Pedro/Trujillo) — se guarda la sucursal elegida igual que
+// el zoom, y se reinicia a 'lima' cada vez que cambia el producto (ver esProductoNuevo más abajo).
+let kardexSucursal = 'lima';
+const KARDEX_SUCURSALES = [
+  { key:'ica', label:'Ica' },
+  { key:'lima', label:'Lima San Pedro' },
+  { key:'trujillo', label:'Trujillo' },
+];
 function drawKardex(){
   const card = document.getElementById('kardexCard');
   const producto = kardexProductoActual();
@@ -3712,6 +3834,7 @@ function drawKardex(){
   document.getElementById('kardexTitle').textContent = 'Kardex — ' + producto.codigo
     + (producto.nCodigos>1 ? ' (' + producto.nCodigos + ' códigos homologados)' : '');
   document.getElementById('kardexSub').textContent = (producto.descripcion||'').trim();
+  const fmt2 = v => v==null ? '—' : Number(v).toLocaleString('es-PE', {maximumFractionDigits:2});
 
   const periods = ALMACEN_DATA.kardexPeriods;
   if(!periods || !periods.length || !producto.kardexIngresos){
@@ -3720,33 +3843,126 @@ function drawKardex(){
     return;
   }
   const key = producto.codigo;
-  if(kardexLastKey !== key){ kardexZoom = { startIdx: null, endIdx: null }; kardexLastKey = key; }
+  const esProductoNuevo = kardexLastKey !== key;
+  kardexLastKey = key;
 
+  // --- Histórico: reconstrucción hacia atrás desde el stock actual ---
+  // 15.09.2026, pedido de Piero en la tabla de Alertas de Reposición: "el stock no debería ser el que
+  // está en Lima? hasta que el 'en tránsito' llegue y luego ahí recién sube" — el kardex (a diferencia
+  // del estado de Alertas de Reposición y "Cuánto pedir por categoría", que siguen usando
+  // stockParaReposicion = Lima + Tránsito, sin cambios ahí) arranca solo del stock físico de UNA sucursal
+  // a la vez.
+  // 15.09.2026, pedido de Piero: "ya vi el problema es que el kardex que se muestre es por sucursal...
+  // entonces debes permitirme filtrar el gráfico por esas 3 sucursales" — stock, ingresos y salidas ahora
+  // se reconstruyen SOLO con los movimientos de la sucursal elegida (kardexSucursal), no el total
+  // combinado de las 3. Las otras 2 sucursales (y Tránsito) quedan fuera a propósito de este cálculo: no
+  // hay fecha de llegada en el Excel para proyectar cuándo "sube" el stock de la sucursal elegida con lo
+  // que hay en las demás, así que en vez de inventar esa fecha se avisa en una nota bajo el gráfico (ver
+  // transitoCaption más abajo). Al cambiar de producto se vuelve a 'lima' (la sucursal principal).
+  if(esProductoNuevo) kardexSucursal = 'lima';
+  const sucInfo = KARDEX_SUCURSALES.find(s=>s.key===kardexSucursal) || KARDEX_SUCURSALES[1];
   const n = periods.length;
+  const stockSuc = producto[kardexSucursal] != null ? producto[kardexSucursal]
+    : (kardexSucursal==='lima' ? producto.stockRepo : 0);
+  const kIngSuc = (producto.kardexIngresosPorSucursal && producto.kardexIngresosPorSucursal[kardexSucursal]) || periods.map(()=>0);
+  const kMovSuc = (producto.kardexMovimientosPorSucursal && producto.kardexMovimientosPorSucursal[kardexSucursal]) || periods.map(()=>0);
   const stockFin = new Array(n);
-  let cur = producto.stockRepo;
+  let cur = stockSuc;
   for(let i=n-1; i>=0; i--){
     stockFin[i] = cur;
-    cur = cur - (producto.kardexIngresos[i]||0) + (producto.kardexMovimientos[i]||0);
+    cur = cur - (kIngSuc[i]||0) + (kMovSuc[i]||0);
   }
 
-  const zoomed = kardexZoom.startIdx!=null && kardexZoom.endIdx!=null;
-  const idxView = (zoomed ? periods.slice(kardexZoom.startIdx, kardexZoom.endIdx+1) : periods).map((p,li)=> (zoomed ? kardexZoom.startIdx : 0) + li);
+  // --- Proyección (10.09.2026, pedido de Piero: "una proyección en base a los meses que se coloque
+  // considerando la desviación estándar, al menos 2 ciclos", "de otro color"). Arranca del mismo stock
+  // actual que ve Piero (stockFin[n-1], ahora Lima solamente — ver nota arriba). Línea central = caída
+  // lineal al ritmo de Consumo Diario; el
+  // ancho de la banda crece con la raíz del tiempo porque es la desviación estándar de una SUMA de
+  // consumos diarios independientes — mismo criterio estadístico que ya usa el Stock de Seguridad de
+  // Piero, pero mostrado honestamente como "±1 desviación estándar" en vez de inventarle un factor Z
+  // específico que no pude reconstruir con certeza a partir de su fórmula interna. Horizonte = 2x "Meses
+  // a abastecer" (reutiliza el mismo input que ya existía en "Cuánto pedir por categoría" — "al menos 2
+  // ciclos"). Si el Excel no trae Consumo Diario o Desvest para este producto, no se inventa una
+  // proyección: se avisa en la leyenda.
+  const mesesInput = Math.max(0, Number(document.getElementById('mesesAbastecer').value) || 0);
+  // Consumo Diario/Desvest son cifras del producto completo (los 3 almacenes juntos), no por sucursal —
+  // el Excel no trae un consumo diario separado por Ica/Lima/Trujillo. Proyectar la caída de una sola
+  // sucursal con el consumo del total inventaría un dato que no está: por eso la proyección solo se
+  // muestra con Lima seleccionada (la sucursal principal, la más cercana al total).
+  const tieneProyeccion = kardexSucursal==='lima' && producto.consumoDiario != null && producto.desvest != null && mesesInput > 0;
+  const projPeriods = [], projMean = [], projUpper = [], projLower = [];
+  if(tieneProyeccion){
+    const horizonDias = Math.max(14, Math.round(mesesInput * 2 * 30.4));
+    const stepDias = 7; // mismo paso semanal que el histórico, para que el eje quede parejo
+    let curDate = fromIsoDay(periods[n-1].key);
+    let t = 0;
+    while(t < horizonDias){
+      t += stepDias;
+      curDate = new Date(curDate); curDate.setUTCDate(curDate.getUTCDate()+stepDias);
+      const meanRaw = stockSuc - producto.consumoDiario * t;
+      const sigma = producto.desvest * Math.sqrt(t);
+      // El stock nunca es negativo de verdad (pedido de Piero, comentario en el artefacto: "nunca debe
+      // llegar por debajo de 0") — se calcula la banda sobre el valor crudo (para que el ancho refleje
+      // bien la incertidumbre) y recién ahí se recorta cada extremo a 0. Si la caída esperada ya cruzó
+      // cero, el resultado es una línea central en 0 (quiebre de stock) con una cola superior que sigue
+      // mostrando el rango optimista.
+      projPeriods.push({ key: isoDay(curDate) });
+      projMean.push(Math.max(0, meanRaw)); projUpper.push(Math.max(0, meanRaw+sigma)); projLower.push(Math.max(0, meanRaw-sigma));
+    }
+  }
+  const m = projPeriods.length;
+  const ntotal = n + m;
+  const allPeriods = periods.concat(projPeriods);
 
-  const W = 900, H = 300, padL = 46, padR = 14, padT = 16, padB = 26;
+  // Vista inicial (14.09.2026, comentario de Piero en el artefacto: "que el gráfico esté más cerca
+  // porque se aleja mucho") — antes, al entrar a un producto nuevo, se mostraba TODO el histórico desde
+  // la primera transacción registrada, que para productos con mucho tiempo en el sistema puede ser
+  // años de semanas: el gráfico se ve "lejos" (líneas y puntos apretados). Ahora, al cambiar de
+  // producto, arranca centrado en las últimas ~20 semanas de histórico + toda la proyección; sigue
+  // pudiéndose alejar con la rueda del mouse para ver el histórico completo, igual que antes.
+  const DEFAULT_HIST_WEEKS = 20;
+  if(esProductoNuevo){
+    const defStart = Math.max(0, n - DEFAULT_HIST_WEEKS);
+    kardexZoom = { startIdx: defStart, endIdx: ntotal-1 };
+  }
+  const zoomed = kardexZoom.startIdx!=null && kardexZoom.endIdx!=null;
+  const idxView = (zoomed ? allPeriods.slice(kardexZoom.startIdx, kardexZoom.endIdx+1) : allPeriods).map((p,li)=> (zoomed ? kardexZoom.startIdx : 0) + li);
+  const viewStart = idxView[0];
+
+  // Más grande a pedido de Piero ("casi ni se ve... ajústalo para que se vea bien en grande" / "lo más
+  // grande posible"): antes era 900x300 (proporción 3:1, muy achatado); ahora 1100x520 (~2.1:1) — al
+  // estirarse a todo el ancho de la tarjeta (que además ahora tiene mucho más espacio, debajo de "Cuánto
+  // pedir por categoría"), se ve notoriamente más alto y legible.
+  const W = 1100, H = 520, padL = 58, padR = 20, padT = 22, padB = 42;
   const plotW = W-padL-padR, plotH = H-padT-padB;
 
-  const allVals = idxView.map(i=>stockFin[i]);
+  // El eje se calcula con el histórico + la línea central de la proyección — a propósito SIN la banda
+  // (projUpper/projLower): cuando el Desvest de un producto es muy grande frente a su Consumo Diario, la
+  // banda de incertidumbre puede ser enorme (cientos o miles de unidades) y si el eje se estirara para
+  // que quepa entera, el histórico real quedaría aplastado en una franja minúscula — justo lo que Piero
+  // reportó ("se ve diminuto, no puedo ver los puntos de ingresos y salidas"). En vez de eso, el eje se
+  // queda en la escala de los datos reales/esperados, y la banda que se pase de ese rango se recorta
+  // visualmente (ver clip-path más abajo) en vez de deformar todo el gráfico.
+  const valAt = (i) => i<n ? stockFin[i] : projMean[i-n];
+  const allVals = idxView.map(valAt);
   if(producto.rop!=null) allVals.push(producto.rop);
   if(producto.stockSeguridad!=null) allVals.push(producto.stockSeguridad);
   if(!allVals.length) allVals.push(1);
-  const { step: gridStep, niceMin: minVal, niceMax: maxVal } = niceAxisRange(allVals, 4);
+  // 14.09.2026, comentario de Piero: "podrias colocar más números en el eje y?" — más líneas de grilla
+  // (antes 5) para que se puedan leer más valores intermedios sin tener que calcularlos a ojo.
+  const { step: gridStep, niceMin: minValRaw, niceMax: maxVal } = niceAxisRange(allVals, 8);
+  // El stock nunca es negativo (pedido de Piero) — se fuerza el piso del eje a 0 pase lo que pase.
+  const minVal = Math.max(0, minValRaw);
 
   const xFor = (localI)=> padL + (idxView.length===1 ? plotW/2 : (localI/(idxView.length-1))*plotW);
+  const xForGlobal = (i)=> xFor(i - viewStart);
   const yFor = (v)=> padT + plotH - ((v-minVal)/(maxVal-minVal))*plotH;
 
   let gridSvg = '';
-  for(let v=0; v<=maxVal+1e-9; v+=gridStep){
+  // minVal nunca baja de 0, pero puede no ser exactamente 0 (niceAxisRange lo redondea) — se arranca en
+  // el primer múltiplo de gridStep que cae dentro del rango real, en vez de asumir que siempre es 0.
+  const gridStart = Math.ceil((minVal - 1e-9) / gridStep) * gridStep;
+  for(let v=gridStart; v<=maxVal+1e-9; v+=gridStep){
     const y = yFor(v);
     gridSvg += `<line class="kdx-grid" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line><text x="${padL-8}" y="${y+3}" text-anchor="end">${Math.round(v)}</text>`;
   }
@@ -3768,40 +3984,174 @@ function drawKardex(){
     refSvg += `<line class="kdx-seg" x1="${padL}" y1="${ySeg}" x2="${W-padR}" y2="${ySeg}"></line><text class="kdx-ref-label" style="${refLabelStyle('var(--seg-c)')}" x="${W-padR}" y="${yLabel}" text-anchor="end">Stock seguridad ${Math.round(producto.stockSeguridad*10)/10}</text>`;
   }
 
-  const pts = idxView.map((i,li)=>[xFor(li), yFor(stockFin[i])]);
-  const linePath = pts.map((p,li)=>(li===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-  const baseY = yFor(minVal).toFixed(1);
-  const areaPath = pts.length ? linePath + ` L${pts[pts.length-1][0].toFixed(1)},${baseY} L${pts[0][0].toFixed(1)},${baseY} Z` : '';
+  // Paso a paso (14.09.2026, pedido de Piero: "no podrías hacerlo algo así como la imagen... en tu
+  // gráfico no se sabe casi nada", mostró un ejemplo con línea "escalonada" en vez de diagonal). El stock
+  // se mantiene igual durante toda la semana y recién cambia de golpe cuando entra/sale mercadería —una
+  // línea escalonada (horizontal y luego vertical) representa eso con más fidelidad que unir los puntos
+  // en diagonal, y de paso se lee más parecido a un kardex real.
+  const stepPath = pts => pts.length ? pts.map((p,li)=> li===0
+    ? `M${p[0].toFixed(1)},${p[1].toFixed(1)}`
+    : `H${p[0].toFixed(1)} V${p[1].toFixed(1)}`).join(' ') : '';
 
-  const monthLabel = p => MESES_LABEL[p.month-1] + ' ' + String(p.year).slice(2);
-  const labelStep = Math.max(1, Math.ceil(idxView.length/8));
+  // Histórico: área + línea sólida, solo hasta el índice n-1 (stock real reconstruido).
+  const histIdx = idxView.filter(i=>i<n);
+  const histPts = histIdx.map(i=>[xForGlobal(i), yFor(stockFin[i])]);
+  const linePath = stepPath(histPts);
+  const baseY = yFor(minVal).toFixed(1); // minVal nunca baja de 0 (ver más arriba)
+  const areaPath = histPts.length ? linePath + ` L${histPts[histPts.length-1][0].toFixed(1)},${baseY} L${histPts[0][0].toFixed(1)},${baseY} Z` : '';
+
+  // Línea vertical "Hoy" que separa el histórico real de la proyección — en el ejemplo de Piero es justo
+  // esa línea punteada la que deja clarísimo dónde termina el dato real y empieza el estimado.
+  let hoyLineSvg = '';
+  if(idxView.indexOf(n-1)!==-1){
+    const xHoy = xForGlobal(n-1);
+    hoyLineSvg = `<line class="kdx-hoy" x1="${xHoy.toFixed(1)}" y1="${padT}" x2="${xHoy.toFixed(1)}" y2="${padT+plotH}"></line>`
+      + `<text class="kdx-hoy-label" x="${xHoy.toFixed(1)}" y="${padT-6}" text-anchor="middle">HOY</text>`;
+  }
+
+  // Proyección: línea discontinua + banda ±1 desvest, en otro color (var(--seg-a), azul, no usado en el
+  // resto del kardex) — arranca del índice n-1 (el mismo punto donde termina el histórico) para que no
+  // quede un salto visual entre las dos. Como el eje ya NO se estira para que quepa la banda entera (ver
+  // más arriba), acá se recorta con un clip-path al rectángulo del gráfico — así, si la banda es enorme
+  // frente a los datos reales, se ve "llegando hasta el borde" en vez de salirse de la tarjeta o forzar
+  // una escala inútil.
+  let projLineSvg = '', bandSvg = '', calloutSvg = '';
+  if(tieneProyeccion && m>0){
+    const projLineIdx = (idxView.indexOf(n-1)!==-1 ? [n-1] : []).concat(idxView.filter(i=>i>=n));
+    if(projLineIdx.length>1){
+      const projPts = projLineIdx.map(i=>[xForGlobal(i), yFor(valAt(i))]);
+      const projPath = stepPath(projPts);
+      projLineSvg = `<path class="kdx-line-proj" clip-path="url(#kdxPlotClip)" d="${projPath}"></path>`;
+      const upperPts = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockFin[i] : projUpper[i-n])]);
+      const lowerPts = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockFin[i] : projLower[i-n])]).reverse();
+      const bandPath = stepPath(upperPts) + ' ' + stepPath(lowerPts).replace(/^M/,'L') + ' Z';
+      bandSvg = `<path class="kdx-band" clip-path="url(#kdxPlotClip)" d="${bandPath}"></path>`;
+    }
+  }
+
+  // Etiquetas directas sobre el gráfico (14.09.2026, mismo pedido de arriba): el valor de hoy y el valor
+  // al final del horizonte proyectado, escritos en el gráfico mismo — así no hace falta pasar el mouse
+  // para "saber algo", que era la queja concreta de Piero. El halo blanco (mismo truco que ROP/Stock
+  // seguridad) evita que se mezclen con la línea o la grilla.
+  const calloutStyle = color => `fill:${color};paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;font-weight:700;`;
+  if(idxView.indexOf(n-1)!==-1){
+    const x = xForGlobal(n-1), y = yFor(stockFin[n-1]);
+    const arriba = y > padT+22;
+    calloutSvg += `<text class="kdx-callout" style="${calloutStyle('var(--brand-2-dark)')}" x="${x}" y="${arriba ? y-12 : y+18}" text-anchor="middle">${fmt2(stockFin[n-1])} hoy</text>`;
+  }
+  if(tieneProyeccion && m>0 && idxView.indexOf(ntotal-1)!==-1){
+    const x = xForGlobal(ntotal-1), y = Math.min(padT+plotH, Math.max(padT, yFor(projMean[m-1])));
+    const arriba = y > padT+22;
+    // El punto final de la proyección suele quedar muy cerca del ROP/Stock de seguridad (justo la zona
+    // baja del gráfico que motiva mirarlo) — si la etiqueta cayera encima de esas líneas de referencia,
+    // se sube un poco más para no encimarse.
+    const refYs = [yRop, ySeg].filter(v=>v!=null);
+    const yTope = refYs.length ? Math.min(...refYs) - 16 : Infinity;
+    const fechaFin = fmtDate(fromIsoDay(projPeriods[m-1].key));
+    const yLabel = Math.min(arriba ? y-12 : y+18, yTope);
+    calloutSvg += `<text class="kdx-callout" style="${calloutStyle('var(--seg-a)')}" x="${x}" y="${yLabel}" text-anchor="end">${fmt2(projMean[m-1])} el ${fechaFin}</text>`;
+  }
+
+  const labelStep = Math.max(1, Math.ceil(idxView.length/9));
   const xLabelsSvg = idxView.map((i,li)=> (li%labelStep===0 || li===idxView.length-1)
-    ? `<text x="${xFor(li)}" y="${H-6}" text-anchor="middle">${monthLabel(periods[i])}</text>` : '').join('');
+    ? `<text x="${xFor(li)}" y="${H-8}" text-anchor="middle">${weekLabelFor(allPeriods[i].key)}</text>` : '').join('');
 
-  const dotsSvg = idxView.map((i,li)=>{
-    const [x,y] = [xFor(li), yFor(stockFin[i])];
-    const lbl = monthLabel(periods[i]) + (i===n-1 ? ' (actual)' : '');
-    return `<circle class="kdx-dot" cx="${x}" cy="${y}" r="4" data-label="${escapeHtml(lbl)}" data-stock="${stockFin[i].toFixed(2)}" data-ing="${(producto.kardexIngresos[i]||0).toFixed(2)}" data-mov="${(producto.kardexMovimientos[i]||0).toFixed(2)}"></circle>`;
+  const dotsSvg = idxView.map(i=>{
+    const x = xForGlobal(i);
+    if(i<n){
+      const y = yFor(stockFin[i]);
+      const lbl = weekLabelFor(periods[i].key) + (i===n-1 ? ' (actual)' : '');
+      return `<circle class="kdx-dot" cx="${x}" cy="${y}" r="4" data-label="${escapeHtml(lbl)}" data-stock="${stockFin[i].toFixed(2)}" data-ing="${(kIngSuc[i]||0).toFixed(2)}" data-mov="${(kMovSuc[i]||0).toFixed(2)}"></circle>`;
+    }
+    const j = i-n;
+    // El punto se ancla al borde del gráfico si la media proyectada cae fuera del rango del eje (mismo
+    // motivo que el clip-path de la banda: el eje ya no se estira para acomodar valores extremos) — el
+    // tooltip sigue mostrando el número real.
+    const y = Math.min(padT+plotH, Math.max(padT, yFor(projMean[j])));
+    const lbl = weekLabelFor(projPeriods[j].key) + ' (estimado)';
+    return `<circle class="kdx-dot-proj" cx="${x}" cy="${y}" r="3.5" data-label="${escapeHtml(lbl)}" data-mean="${projMean[j].toFixed(2)}" data-upper="${projUpper[j].toFixed(2)}" data-lower="${projLower[j].toFixed(2)}"></circle>`;
   }).join('');
 
-  const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado</span>`
+  const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado (histórico)</span>`
     + (producto.rop!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--red);"></span>ROP</span>` : '')
     + (producto.stockSeguridad!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-c);"></span>Stock de seguridad</span>` : '')
+    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-a);"></span>Proyección (±1 desviación estándar)</span>`
+        : (kardexSucursal!=='lima'
+            ? `<span class="lg-item" style="color:var(--red);">Sin proyección: solo disponible con Lima San Pedro seleccionada</span>`
+            : `<span class="lg-item" style="color:var(--red);">Sin proyección: falta "Consumo Diario" o "Desvest" para este producto en Análisis Inventario</span>`))
     + `</div>`;
 
+  // Tarjetas KPI arriba del gráfico (14.09.2026, mismo pedido: que se entienda de un vistazo, sin tener
+  // que leer el gráfico entero). Solo con datos que de verdad tengo — no invento "pedido estimado" ni
+  // "llegada simulada" con un lead time que no verifiqué, eso queda para cuando Piero lo pida.
+  const kpiHoy = `<div class="card kpi kdx-kpi"><div class="label">Stock actual — ${escapeHtml(sucInfo.label)}</div><div class="value">${fmt2(stockSuc)}</div><div class="sub">Físico en ${escapeHtml(sucInfo.label)}, reconstruido a hoy con Ingresos/Movimientos</div></div>`;
+  const kpiRop = producto.rop!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP</div><div class="value">${fmt2(producto.rop)}</div><div class="sub">Punto de reorden</div></div>` : '';
+  const kpiSeg = producto.stockSeguridad!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad</div><div class="value">${fmt2(producto.stockSeguridad)}</div><div class="sub">Referencia de tu Excel</div></div>` : '';
+  const kpiProy = tieneProyeccion && m>0
+    ? `<div class="card kpi kdx-kpi"><div class="label">Proyección a ${fmtDate(fromIsoDay(projPeriods[m-1].key))}</div><div class="value" style="color:var(--seg-a);">${fmt2(projMean[m-1])}</div><div class="sub">${mesesInput*2} meses de horizonte (${m} semanas) · consumo ${fmt2(producto.consumoDiario)}/día</div></div>`
+    : `<div class="card kpi kdx-kpi"><div class="label">Proyección</div><div class="value" style="font-size:16px;color:var(--red);">No disponible</div><div class="sub">${kardexSucursal!=='lima' ? 'Solo disponible con Lima San Pedro' : 'Falta Consumo Diario o Desvest en Análisis Inventario'}</div></div>`;
+  const kpiGridSvg = `<div class="kdx-kpi-grid">${kpiHoy}${kpiRop}${kpiSeg}${kpiProy}</div>`;
+
+  // Filtro por sucursal (15.09.2026, pedido de Piero: "debes permitirme filtrar el gráfico por esas 3
+  // sucursales" — Ica / Lima San Pedro / Trujillo). Botones tipo pill, uno por sucursal; el activo queda
+  // resaltado. Al hacer clic se guarda la elección (igual que el zoom) y se vuelve a dibujar el kardex
+  // completo con los datos de esa sucursal.
+  const sucFilterSvg = `<div class="kdx-suc-filter"><span class="kdx-suc-label">Sucursal:</span>${KARDEX_SUCURSALES.map(s=>
+    `<button type="button" class="kdx-suc-btn${s.key===kardexSucursal?' active':''}" data-suc="${s.key}">${escapeHtml(s.label)}</button>`
+  ).join('')}</div>`;
+
+  // Debajo del gráfico: el cálculo en palabras (mismo criterio que Piero pidió varias veces — "¿cómo se
+  // calcula esto?" — dejarlo escrito de una, no solo poder preguntarlo) y de dónde sale el dato.
+  const calcCaption = tieneProyeccion
+    ? `<div class="kdx-caption">Proyección: ${fmt2(stockSuc)} (stock físico en ${escapeHtml(sucInfo.label)} hoy) − ${fmt2(producto.consumoDiario)}/día × días transcurridos, con una banda de ±1 desviación estándar (Desvest ${fmt2(producto.desvest)}) que crece con la raíz del tiempo — mismo criterio que tu Stock de Seguridad. Horizonte: 2 × "Meses a abastecer" (${mesesInput} × 2 = ${mesesInput*2} meses).</div>`
+    : (kardexSucursal!=='lima' ? `<div class="kdx-caption">Sin proyección para ${escapeHtml(sucInfo.label)}: Consumo Diario y Desvest de tu Excel son del producto completo (las 3 sucursales juntas), no por sucursal — la proyección solo se muestra con Lima San Pedro seleccionada.</div>` : '');
+  // 15.09.2026, pedido de Piero: el stock de este gráfico es solo lo físico de la sucursal elegida —
+  // Tránsito y las otras 2 sucursales NO están incluidos, a diferencia del stock que decide el estado en
+  // Alertas de Reposición y "Cuánto pedir por categoría" (ese sigue siendo Lima + Tránsito, sin cambios,
+  // y no depende de este filtro). Se avisa acá para que no se lea como una contradicción entre el kardex
+  // y esos dos. No hay fecha de llegada en el Excel para el tránsito ni para traslados entre sucursales,
+  // así que no se inventa cuándo "sube" — el día que llegue de verdad a la sucursal elegida, el kardex lo
+  // va a mostrar solo porque va a aparecer como un Ingreso real en tu Excel para esa sucursal.
+  const otrosAlmacenes = KARDEX_SUCURSALES
+    .filter(s=>s.key!==kardexSucursal)
+    .map(s=> producto[s.key] ? `${s.label} ${fmt2(producto[s.key])}` : null)
+    .concat([producto.transito ? `En tránsito ${fmt2(producto.transito)}` : null])
+    .filter(Boolean);
+  const transitoCaption = otrosAlmacenes.length
+    ? `<div class="kdx-caption">No incluido en este gráfico: ${otrosAlmacenes.join(' · ')} — se suma a ${escapeHtml(sucInfo.label)} recién cuando llega físicamente y quede registrado como Ingreso ahí. El ROP/Stock de seguridad de tu Excel sí se comparan contra Lima + Tránsito (el mismo stock que usa Alertas de Reposición), por eso pueden verse "cruzados" contra esta línea si hay tránsito o stock en otras sucursales.</div>`
+    : '';
+  const fuenteCaption = `<div class="kdx-caption kdx-fuente">Fuente: ${escapeHtml(ALMACEN_DATA.filename||'Reporte Almacen.xlsx')} — hojas Ingresos y Movimientos, agrupadas por semana ISO (lunes a domingo).</div>`;
+
   const chart = document.getElementById('kardexChart');
-  chart.innerHTML = `${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+  chart.innerHTML = `${sucFilterSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+    <defs><clipPath id="kdxPlotClip"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect></clipPath></defs>
     ${gridSvg}
     <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
+    ${bandSvg}
     <path class="kdx-area" d="${areaPath}"></path>
     <path class="kdx-line" d="${linePath}"></path>
+    ${projLineSvg}
+    ${hoyLineSvg}
     ${dotsSvg}
     ${refSvg}
+    ${calloutSvg}
     ${xLabelsSvg}
-  </svg><div class="trend-tooltip" id="kardexTooltip"></div>`;
+  </svg><div class="trend-tooltip" id="kardexTooltip"></div>${calcCaption}${transitoCaption}${fuenteCaption}`;
+
+  chart.querySelectorAll('.kdx-suc-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const suc = btn.dataset.suc;
+      if(suc === kardexSucursal) return;
+      kardexSucursal = suc;
+      // Cambiar de sucursal no cuenta como "producto nuevo" — se mantiene el zoom que Piero ya tenía
+      // elegido, solo cambian los datos que se grafican.
+      drawKardex();
+    });
+  });
 
   // Zoom con la rueda del mouse, centrado en el cursor, y arrastre para desplazarse dentro del rango con
-  // zoom — mismo patrón exacto de drawIndicatorTrend() (ver ahí el porqué de cada detalle).
+  // zoom — mismo patrón exacto de drawIndicatorTrend() (ver ahí el porqué de cada detalle), generalizado
+  // de "n" a "ntotal" para poder recorrer histórico + proyección como una sola línea de tiempo.
   const overlay = document.getElementById('kardexZoomOverlay');
   const svgXFromClientX = (clientX)=>{
     const rect = chart.querySelector('.kdx-svg').getBoundingClientRect();
@@ -3810,7 +4160,7 @@ function drawKardex(){
   overlay.addEventListener('wheel', (e)=>{
     e.preventDefault();
     const curStart = zoomed ? kardexZoom.startIdx : 0;
-    const curEnd = zoomed ? kardexZoom.endIdx : n-1;
+    const curEnd = zoomed ? kardexZoom.endIdx : ntotal-1;
     const curLen = curEnd - curStart + 1;
 
     const x = svgXFromClientX(e.clientX);
@@ -3822,16 +4172,16 @@ function drawKardex(){
     const ZOOM_FACTOR = 0.8;
     const zoomingIn = e.deltaY < 0;
     let newLen = zoomingIn ? Math.round(curLen*ZOOM_FACTOR) : Math.round(curLen/ZOOM_FACTOR);
-    newLen = Math.max(2, Math.min(n, newLen));
+    newLen = Math.max(2, Math.min(ntotal, newLen));
 
-    if(newLen >= n){
+    if(newLen >= ntotal){
       if(!zoomed) return;
       kardexZoom = { startIdx: null, endIdx: null };
       drawKardex();
       return;
     }
     let newStart = Math.round(pivotIdx - fraction*(newLen-1));
-    newStart = Math.max(0, Math.min(n-newLen, newStart));
+    newStart = Math.max(0, Math.min(ntotal-newLen, newStart));
     const newEnd = newStart + newLen - 1;
     if(newStart===curStart && newEnd===curEnd) return;
     kardexZoom = { startIdx: newStart, endIdx: newEnd };
@@ -3841,7 +4191,19 @@ function drawKardex(){
   const tooltip = document.getElementById('kardexTooltip');
   chart.querySelectorAll('.kdx-dot').forEach(dot=>{
     dot.addEventListener('mouseenter', ()=>{
-      tooltip.innerHTML = `<b>${dot.dataset.label}</b><br>Stock: ${Number(dot.dataset.stock).toLocaleString('es-PE',{maximumFractionDigits:2})}<br>Ingresos del mes: ${Number(dot.dataset.ing).toLocaleString('es-PE',{maximumFractionDigits:2})} · Salidas: ${Number(dot.dataset.mov).toLocaleString('es-PE',{maximumFractionDigits:2})}`;
+      tooltip.innerHTML = `<b>${dot.dataset.label}</b><br>Stock: ${Number(dot.dataset.stock).toLocaleString('es-PE',{maximumFractionDigits:2})}<br>Ingresos de la semana: ${Number(dot.dataset.ing).toLocaleString('es-PE',{maximumFractionDigits:2})} · Salidas: ${Number(dot.dataset.mov).toLocaleString('es-PE',{maximumFractionDigits:2})}`;
+      tooltip.style.display = 'block';
+    });
+    dot.addEventListener('mousemove', (e)=>{
+      const rect = chart.getBoundingClientRect();
+      tooltip.style.left = (e.clientX - rect.left + 12) + 'px';
+      tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+    });
+    dot.addEventListener('mouseleave', ()=>{ tooltip.style.display = 'none'; });
+  });
+  chart.querySelectorAll('.kdx-dot-proj').forEach(dot=>{
+    dot.addEventListener('mouseenter', ()=>{
+      tooltip.innerHTML = `<b>${dot.dataset.label}</b><br>Proyección: ${Number(dot.dataset.mean).toLocaleString('es-PE',{maximumFractionDigits:2})}<br>Rango (±1 desvest): ${Number(dot.dataset.lower).toLocaleString('es-PE',{maximumFractionDigits:2})} – ${Number(dot.dataset.upper).toLocaleString('es-PE',{maximumFractionDigits:2})}`;
       tooltip.style.display = 'block';
     });
     dot.addEventListener('mousemove', (e)=>{
@@ -3860,7 +4222,7 @@ function drawKardex(){
     const onPanMove = (clientX)=>{
       const dxSvg = svgXFromClientX(clientX) - svgXFromClientX(panStartClientX);
       const shift = Math.round(-dxSvg / spacing);
-      const newStart = Math.max(0, Math.min(n-curLen, curStart+shift));
+      const newStart = Math.max(0, Math.min(ntotal-curLen, curStart+shift));
       const newEnd = newStart+curLen-1;
       if(newStart!==kardexZoom.startIdx || newEnd!==kardexZoom.endIdx){
         kardexZoom = { startIdx: newStart, endIdx: newEnd };
@@ -6017,7 +6379,16 @@ function niceAxisRange(values, targetLines){
   const niceNorm = norm<=1 ? 1 : norm<=2 ? 2 : norm<=5 ? 5 : 10;
   const step = niceNorm * mag;
   const niceMax = Math.ceil((dataMax + span*0.15) / step) * step;
-  const niceMin = Math.max(0, Math.floor((dataMin - span*0.15) / step) * step);
+  // Antes se forzaba niceMin a nunca bajar de 0 (asumía que todo valor de este eje era una duración o un
+  // monto, siempre positivo). La banda de proyección del kardex (10.09.2026, ver drawKardex) puede bajar
+  // de 0 de verdad (el stock estimado se vuelve negativo si la desviación estándar es grande frente al
+  // consumo diario) — mostrarlo en 0 en vez de dejarlo bajar escondería justo la señal de "riesgo de
+  // quiebre de stock" que la proyección existe para mostrar. Si TODOS los valores de origen son >=0 (caso
+  // de los demás gráficos que usan este helper: duraciones, montos, o el kardex sin proyección), el
+  // comportamiento no cambia — el eje sigue empezando en 0 igual que antes.
+  const niceMin = dataMin >= 0
+    ? Math.max(0, Math.floor((dataMin - span*0.15) / step) * step)
+    : Math.floor((dataMin - span*0.15) / step) * step;
   return { step, niceMin, niceMax };
 }
 
