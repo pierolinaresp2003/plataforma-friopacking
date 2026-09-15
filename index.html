@@ -3873,39 +3873,55 @@ function drawKardex(){
     cur = cur - (kIngSuc[i]||0) + (kMovSuc[i]||0);
   }
 
-  // --- Proyección (10.09.2026, pedido de Piero: "una proyección en base a los meses que se coloque
-  // considerando la desviación estándar, al menos 2 ciclos", "de otro color"). Arranca del mismo stock
-  // actual que ve Piero (stockFin[n-1], ahora Lima solamente — ver nota arriba). Línea central = caída
-  // lineal al ritmo de Consumo Diario; el
-  // ancho de la banda crece con la raíz del tiempo porque es la desviación estándar de una SUMA de
-  // consumos diarios independientes — mismo criterio estadístico que ya usa el Stock de Seguridad de
-  // Piero, pero mostrado honestamente como "±1 desviación estándar" en vez de inventarle un factor Z
-  // específico que no pude reconstruir con certeza a partir de su fórmula interna. Horizonte = 2x "Meses
-  // a abastecer" (reutiliza el mismo input que ya existía en "Cuánto pedir por categoría" — "al menos 2
-  // ciclos"). Si el Excel no trae Consumo Diario o Desvest para este producto, no se inventa una
-  // proyección: se avisa en la leyenda.
+  // --- Proyección: simulación de pedido periódico ---
+  // 10.09.2026, pedido inicial de Piero: "una proyección en base a los meses que se coloque considerando
+  // la desviación estándar, al menos 2 ciclos". 15.09.2026, comentario de Piero en el artefacto aclarando
+  // qué significa "ciclos": simular qué pasaría si cada "Meses a abastecer" se pide stock nuevo por esa
+  // cantidad de meses de rotación, mostrando 2 pedidos seguidos (diente de sierra: cae, llega el pedido,
+  // sube de nuevo, cae, llega el 2º pedido) "para que se vea la lógica de cómo funcionaria este pedido
+  // simulado" — no solo una caída continua como antes. Y "si yo cambio la cantidad de mes a pedir debe
+  // cambiar la simulación también": ya pasa solo, mesesInput lee el input en vivo y hay un listener de
+  // 'input' en #mesesAbastecer que vuelve a llamar drawKardex() en cada cambio (ver drawAlertas).
   const mesesInput = Math.max(0, Number(document.getElementById('mesesAbastecer').value) || 0);
   // Consumo Diario/Desvest son cifras del producto completo (los 3 almacenes juntos), no por sucursal —
   // el Excel no trae un consumo diario separado por Ica/Lima/Trujillo. Proyectar la caída de una sola
   // sucursal con el consumo del total inventaría un dato que no está: por eso la proyección solo se
   // muestra con Lima seleccionada (la sucursal principal, la más cercana al total).
   const tieneProyeccion = kardexSucursal==='lima' && producto.consumoDiario != null && producto.desvest != null && mesesInput > 0;
+  const NUM_CICLOS_PEDIDO = 2; // "al menos 2 ciclos" / "se deben mostrar 2 ciclos" — pedido explícito de Piero
   const projPeriods = [], projMean = [], projUpper = [], projLower = [];
+  let cicloDias = 0;
   if(tieneProyeccion){
-    const horizonDias = Math.max(14, Math.round(mesesInput * 2 * 30.4));
+    // Duración de 1 ciclo de pedido: "se pide el stock para N meses en base a la rotación mensual" — cada
+    // cicloDias días se simula un pedido que trae exactamente lo que se consumió en ese ciclo (Consumo
+    // Diario × cicloDias), así el pedido siguiente arranca del mismo nivel que el anterior.
+    cicloDias = Math.max(7, Math.round(mesesInput * 30.4));
+    const horizonDias = cicloDias * NUM_CICLOS_PEDIDO;
     const stepDias = 7; // mismo paso semanal que el histórico, para que el eje quede parejo
     let curDate = fromIsoDay(periods[n-1].key);
     let t = 0;
     while(t < horizonDias){
-      t += stepDias;
-      curDate = new Date(curDate); curDate.setUTCDate(curDate.getUTCDate()+stepDias);
-      const meanRaw = stockSuc - producto.consumoDiario * t;
-      const sigma = producto.desvest * Math.sqrt(t);
+      // Math.min al horizonte exacto (antes se podía pasar hasta 6 días, revelando el arranque de un 3er
+      // ciclo que Piero no pidió — "se deben mostrar 2 ciclos", ni uno de más): así el último punto cae
+      // justo en el mínimo del 2º ciclo, no un poco después.
+      const pasoDias = Math.min(stepDias, horizonDias - t);
+      t += pasoDias;
+      curDate = new Date(curDate); curDate.setUTCDate(curDate.getUTCDate()+pasoDias);
+      // Días transcurridos DESDE el último pedido simulado (1..cicloDias, se reinicia solo al cruzar cada
+      // límite de ciclo) — con esto la línea cae, toca su mínimo justo antes del próximo pedido, y el
+      // siguiente punto ya arranca de nuevo arriba: el propio trazo "escalonado" del gráfico (ver stepPath
+      // más abajo, ya usado para el histórico) dibuja ese salto como un pedido llegando de golpe.
+      const cyclePos = ((t - 1) % cicloDias) + 1;
+      const meanRaw = stockSuc - producto.consumoDiario * cyclePos;
+      // La incertidumbre (±1 desviación estándar) también se reinicia en cada ciclo: es sobre el consumo
+      // desde el ÚLTIMO pedido simulado, no acumulada desde hoy — mismo criterio que el Stock de Seguridad
+      // de Piero (que mide incertidumbre sobre el lead time, no sobre toda la vida del producto).
+      const sigma = producto.desvest * Math.sqrt(cyclePos);
       // El stock nunca es negativo de verdad (pedido de Piero, comentario en el artefacto: "nunca debe
       // llegar por debajo de 0") — se calcula la banda sobre el valor crudo (para que el ancho refleje
       // bien la incertidumbre) y recién ahí se recorta cada extremo a 0. Si la caída esperada ya cruzó
-      // cero, el resultado es una línea central en 0 (quiebre de stock) con una cola superior que sigue
-      // mostrando el rango optimista.
+      // cero antes de que llegue el pedido simulado, el resultado es una línea central en 0 (quiebre de
+      // stock) con una cola superior que sigue mostrando el rango optimista.
       projPeriods.push({ key: isoDay(curDate) });
       projMean.push(Math.max(0, meanRaw)); projUpper.push(Math.max(0, meanRaw+sigma)); projLower.push(Math.max(0, meanRaw-sigma));
     }
@@ -4075,7 +4091,7 @@ function drawKardex(){
   const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado (histórico)</span>`
     + (producto.rop!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--red);"></span>ROP</span>` : '')
     + (producto.stockSeguridad!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-c);"></span>Stock de seguridad</span>` : '')
-    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-a);"></span>Proyección (±1 desviación estándar)</span>`
+    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-a);"></span>Simulación: pedido cada ${mesesInput} ${mesesInput===1?'mes':'meses'} (±1 desviación estándar)</span>`
         : (kardexSucursal!=='lima'
             ? `<span class="lg-item" style="color:var(--red);">Sin proyección: solo disponible con Lima San Pedro seleccionada</span>`
             : `<span class="lg-item" style="color:var(--red);">Sin proyección: falta "Consumo Diario" o "Desvest" para este producto en Análisis Inventario</span>`))
@@ -4088,7 +4104,7 @@ function drawKardex(){
   const kpiRop = producto.rop!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP</div><div class="value">${fmt2(producto.rop)}</div><div class="sub">Punto de reorden</div></div>` : '';
   const kpiSeg = producto.stockSeguridad!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad</div><div class="value">${fmt2(producto.stockSeguridad)}</div><div class="sub">Referencia de tu Excel</div></div>` : '';
   const kpiProy = tieneProyeccion && m>0
-    ? `<div class="card kpi kdx-kpi"><div class="label">Proyección a ${fmtDate(fromIsoDay(projPeriods[m-1].key))}</div><div class="value" style="color:var(--seg-a);">${fmt2(projMean[m-1])}</div><div class="sub">${mesesInput*2} meses de horizonte (${m} semanas) · consumo ${fmt2(producto.consumoDiario)}/día</div></div>`
+    ? `<div class="card kpi kdx-kpi"><div class="label">Mínimo antes del próximo pedido (${fmtDate(fromIsoDay(projPeriods[m-1].key))})</div><div class="value" style="color:var(--seg-a);">${fmt2(projMean[m-1])}</div><div class="sub">${NUM_CICLOS_PEDIDO} pedidos simulados de ${mesesInput} ${mesesInput===1?'mes':'meses'} cada uno · consumo ${fmt2(producto.consumoDiario)}/día</div></div>`
     : `<div class="card kpi kdx-kpi"><div class="label">Proyección</div><div class="value" style="font-size:16px;color:var(--red);">No disponible</div><div class="sub">${kardexSucursal!=='lima' ? 'Solo disponible con Lima San Pedro' : 'Falta Consumo Diario o Desvest en Análisis Inventario'}</div></div>`;
   const kpiGridSvg = `<div class="kdx-kpi-grid">${kpiHoy}${kpiRop}${kpiSeg}${kpiProy}</div>`;
 
@@ -4103,7 +4119,7 @@ function drawKardex(){
   // Debajo del gráfico: el cálculo en palabras (mismo criterio que Piero pidió varias veces — "¿cómo se
   // calcula esto?" — dejarlo escrito de una, no solo poder preguntarlo) y de dónde sale el dato.
   const calcCaption = tieneProyeccion
-    ? `<div class="kdx-caption">Proyección: ${fmt2(stockSuc)} (stock físico en ${escapeHtml(sucInfo.label)} hoy) − ${fmt2(producto.consumoDiario)}/día × días transcurridos, con una banda de ±1 desviación estándar (Desvest ${fmt2(producto.desvest)}) que crece con la raíz del tiempo — mismo criterio que tu Stock de Seguridad. Horizonte: 2 × "Meses a abastecer" (${mesesInput} × 2 = ${mesesInput*2} meses).</div>`
+    ? `<div class="kdx-caption">Simulación de pedido: cada ${mesesInput} ${mesesInput===1?'mes':'meses'} se simula un pedido nuevo por lo que se consumiría en ese tiempo (Consumo Diario ${fmt2(producto.consumoDiario)}/día × ${cicloDias} días ≈ ${fmt2(producto.consumoDiario*cicloDias)} unidades), así que el stock cae y vuelve a subir de golpe cuando "llega" cada pedido — se muestran ${NUM_CICLOS_PEDIDO} pedidos seguidos para ver el patrón. La banda de ±1 desviación estándar (Desvest ${fmt2(producto.desvest)}) se reinicia en cada pedido y crece con la raíz de los días desde el último — mismo criterio que tu Stock de Seguridad. Cambia "Meses a abastecer" arriba para simular otra frecuencia de pedido.</div>`
     : (kardexSucursal!=='lima' ? `<div class="kdx-caption">Sin proyección para ${escapeHtml(sucInfo.label)}: Consumo Diario y Desvest de tu Excel son del producto completo (las 3 sucursales juntas), no por sucursal — la proyección solo se muestra con Lima San Pedro seleccionada.</div>` : '');
   // 15.09.2026, pedido de Piero: el stock de este gráfico es solo lo físico de la sucursal elegida —
   // Tránsito y las otras 2 sucursales NO están incluidos, a diferencia del stock que decide el estado en
