@@ -227,6 +227,11 @@
   .kdx-legend .lg-item{display:inline-flex;align-items:center;gap:6px;}
   .kdx-legend .lg-swatch{width:16px;height:2px;border-radius:2px;background:var(--brand-2-dark);flex-shrink:0;}
   .kdx-legend .lg-swatch.dashed{background:none;border-top:2px dashed currentColor;height:0;}
+  /* 15.09.2026, Piero: "cuando coloco el cursor sobre un punto de la grafica, se muestra el cuadro de
+     texto arriba de la grafica, no se sobrepone". El globo es position:absolute y sus coordenadas se
+     calculan respecto de #kardexChart, pero este no estaba posicionado: el navegador lo ubicaba contra un
+     ancestro más arriba y el cuadro caía fuera del gráfico. Con position:relative queda encima, donde va. */
+  #kardexChart{position:relative;}
   .kdx-svg{display:block;overflow:visible;max-width:100%;user-select:none;-webkit-user-select:none;}
   .kdx-svg .kdx-grid{stroke:var(--border);stroke-width:1;}
   .kdx-svg .kdx-zoom-overlay{fill:transparent;cursor:zoom-in;}
@@ -255,6 +260,8 @@
      la incertidumbre se note aunque el relleno esté saturado. */
   .kdx-svg .kdx-band-edge{stroke:var(--amber-ink);stroke-width:1.2;stroke-dasharray:2 3;fill:none;opacity:.75;pointer-events:none;}
   .kdx-svg .kdx-dot-proj{fill:var(--card);stroke:var(--amber);stroke-width:2;cursor:pointer;}
+  /* La semana en la que entra un pedido o el tránsito: mismo punto hueco, un poco más marcado. */
+  .kdx-svg .kdx-dot-proj.kdx-dot-entra{stroke-width:2.6;}
   .kdx-legend .lg-swatch.proj{background:none;border-top:2px dashed var(--amber);height:0;}
   /* Marcas de la simulación con tiempo de entrega (15.09.2026): la vertical donde se COLOCA el pedido y el
      punto donde LLEGA, que es donde el stock sube de golpe. Sin estas dos marcas el diente de sierra no
@@ -607,12 +614,16 @@
              los que no? porque quiero ver la consulta de todos los productos que existen no solo de los
              que son para pedir"). Ver pedirRowsFor(). -->
         <select id="filterReposicionEstado">
+          <!-- 15.09.2026, Piero: "debe estar filtrado siempre al inicio por todos los productos". -->
           <option value="pedir">Solo los que hay que pedir</option>
-          <option value="todos">Todos los productos</option>
+          <option value="todos" selected>Todos los productos</option>
           <option value="nopedir">Solo los que NO hay que pedir</option>
         </select>
       </div>
-      <div class="kpi-grid" id="kpiGridAlertas"></div>
+      <!-- Tarjetas "Productos en seguimiento / En reposición / Sin stock en Lima": ocultas a pedido
+           de Piero (15.09.2026, comentario en el artefacto: "quita esto") — mismo criterio que las
+           otras notas del módulo: drawAlertas() las sigue calculando, solo no se muestran. -->
+      <div class="kpi-grid" id="kpiGridAlertas" style="display:none;"></div>
       <!-- Aviso del resultado de la homologación: oculto a pedido de Piero (09.09.2026, comentario en
            el artefacto: "QUITA ESTO"). La homologación sigue aplicándose igual — solo se dejó de
            anunciar en pantalla. drawHomologacionNote() ya no se llama, pero se mantiene por si hay que
@@ -628,9 +639,13 @@
         <h3 style="display:none;margin:0 0 4px;font-size:14px;color:var(--ink);">Cuánto pedir, por categoría</h3>
         <p style="display:none;margin:0 0 12px;font-size:12.5px;color:var(--ink-soft);line-height:1.5;">Solo los productos en <b>REPOSICIÓN</b>. Cantidad a pedir = <b>consumo mensual × meses − stock</b>, con el mismo stock que define el estado. La categoría se resuelve por código de producto con la misma homologación de Concentración de Gasto.</p>
         <div class="toolbar">
-          <label style="font-size:13px;color:var(--ink);display:inline-flex;align-items:center;gap:8px;font-weight:600;">Meses a abastecer
+          <!-- 15.09.2026, Piero: "esta opción ponlo a la derecha del titulo de abajo que dice kardex".
+               El campo es UNO solo y se mueve por DOM entre este slot y el del Kardex (ver drawKardex):
+               cuando el Kardex está abierto vive junto a su título, y cuando no, vuelve acá — así el
+               módulo "Cuánto pedir por categoría" nunca se queda sin su control. -->
+          <span id="pedirMesesSlot"><label id="mesesAbastecerLabel" style="font-size:13px;color:var(--ink);display:inline-flex;align-items:center;gap:8px;font-weight:600;">Meses a abastecer
             <input type="number" id="mesesAbastecer" value="3" min="0.5" max="36" step="0.5" style="width:92px;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--ink);font-weight:700;">
-          </label>
+          </label></span>
           <!-- Resumen "N productos a pedir en N categorías..." oculto a pedido de Piero (09.09.2026,
                comentario en el artefacto: "quita esto"). drawPedirPorCategoria() lo sigue llenando. -->
           <span id="pedirResumen" style="display:none;font-size:12.5px;color:var(--ink-soft);"></span>
@@ -648,7 +663,10 @@
            y solo aparece cuando el buscador de arriba deja exactamente 1 producto a la vista — ver
            kardexProductoActual/drawKardex. -->
       <div class="card" id="kardexCard" style="padding:18px 20px 14px;margin-bottom:18px;display:none;">
-        <h3 style="margin:0 0 2px;font-size:14px;color:var(--ink);" id="kardexTitle">Kardex</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <h3 style="margin:0 0 2px;font-size:14px;color:var(--ink);" id="kardexTitle">Kardex</h3>
+          <span id="kardexMesesSlot"></span>
+        </div>
         <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px;" id="kardexSub"></div>
         <div id="kardexChart"></div>
       </div>
@@ -3920,11 +3938,20 @@ function umEsFraccionable(um){
   const t = (um||'').toString().trim().toUpperCase();
   return UM_FRACCIONABLES.indexOf(t) !== -1;
 }
+// 15.09.2026, Piero: "esta opción ponlo a la derecha del titulo de abajo que dice kardex". El campo
+// "Meses a abastecer" es UNO solo (todo el módulo lee #mesesAbastecer): en vez de duplicarlo, se mueve
+// entre los dos slots según el Kardex esté abierto o no, así nunca queda escondido.
+function ubicarCampoMeses(enKardex){
+  const label = document.getElementById('mesesAbastecerLabel');
+  const destino = document.getElementById(enKardex ? 'kardexMesesSlot' : 'pedirMesesSlot');
+  if(label && destino && label.parentElement !== destino) destino.appendChild(label);
+}
 function drawKardex(){
   const card = document.getElementById('kardexCard');
   const producto = kardexProductoActual();
-  if(!producto){ card.style.display = 'none'; kardexLastKey = null; return; }
+  if(!producto){ card.style.display = 'none'; kardexLastKey = null; ubicarCampoMeses(false); return; }
   card.style.display = '';
+  ubicarCampoMeses(true);
   document.getElementById('kardexTitle').textContent = 'Kardex — ' + producto.codigo
     + (producto.nCodigos>1 ? ' (' + producto.nCodigos + ' códigos homologados)' : '');
   document.getElementById('kardexSub').textContent = (producto.descripcion||'').trim();
@@ -4021,7 +4048,7 @@ function drawKardex(){
   // dibuja aparte como línea naranja para que se vea de dónde sale.
   const ropSim = (esImportado && producto.ropImp != null && producto.ropImp > 0) ? producto.ropImp : producto.rop;
 
-  const projPeriods = [], projMean = [], projUpper = [], projLower = [];
+  const projPeriods = [], projMean = [], projUpper = [], projLower = [], projDias = [];
   // pedidos: cada uno con el día en que se COLOCA (cruce del ROP) y el día en que LLEGA (LT días después).
   const pedidos = [];
   // Stock en tránsito (15.09.2026, pedido de Piero: "quiero que consideres si hay stock en tránsito, veas
@@ -4115,6 +4142,7 @@ function drawKardex(){
       // con decimales. El redondeo es solo del nivel dibujado: las fechas de pedido/llegada se siguen
       // calculando con el consumo diario real, sin redondear.
       projPeriods.push({ key: isoDay(curDate) });
+      projDias.push(t);
       projMean.push(redondeaUm(Math.max(0, meanRaw)));
       projUpper.push(redondeaUm(Math.max(0, meanRaw+sigma)));
       projLower.push(redondeaUm(Math.max(0, meanRaw-sigma)));
@@ -4174,7 +4202,10 @@ function drawKardex(){
     ? `<div class="kdx-pedir-banner kdx-pedir-neutral">Escribe cuántos meses quieres cubrir arriba, en "Meses a abastecer", para saber si hay que pedir.</div>`
     : (pedirRow && pedirRow.hayQuePedir
         ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(Math.round(pedirRow.aPedir))} ${um}</span><span class="kdx-pedir-sub">Para cubrir ${mesesInput} ${mesesInput===1?'mes':'meses'}, descontando el stock que ya tienes${cuandoSim ? ` · ${cuandoSim}` : ''}</span></div>`
-        : `<div class="kdx-pedir-banner kdx-pedir-no"><span class="kdx-pedir-tag">No es necesario pedir todavía</span>${(tieneProyeccion && pedidos.length && !simulaPedirHoy) ? `<span class="kdx-pedir-cant">${fmt2(cantidadPedido)} ${um}</span>` : ''}<span class="kdx-pedir-sub">${producto.estado==='reposicion' ? ('En reposición, pero el stock ya cubre ' + mesesInput + ' ' + (mesesInput===1?'mes':'meses')) : 'Stock por encima del ROP'}${cuandoSim ? ` · ${cuandoSim}` : ''}${avisoSimulacion}</span></div>`);
+        // 15.09.2026, Piero: "quita esto" sobre la etiqueta verde — cuando no hay que pedir no se muestra
+        // nada arriba. La etiqueta grande queda solo para el caso accionable (sí hay que pedir); cuándo
+        // tocaría el próximo pedido y por cuánto se sigue viendo en el gráfico y al hacer clic en el punto.
+        : '');
   const m = projPeriods.length;
   const ntotal = n + m;
   const allPeriods = periods.concat(projPeriods);
@@ -4287,8 +4318,10 @@ function drawKardex(){
   let hoyLineSvg = '';
   if(idxView.indexOf(n-1)!==-1){
     const xHoy = xForGlobal(n-1);
-    hoyLineSvg = `<line class="kdx-hoy" x1="${xHoy.toFixed(1)}" y1="${padT}" x2="${xHoy.toFixed(1)}" y2="${padT+plotH}"></line>`
-      + `<text class="kdx-hoy-label" x="${xHoy.toFixed(1)}" y="${padT-6}" text-anchor="middle">HOY</text>`;
+    // 15.09.2026, Piero: "quita las lineas verticales del grafico que indican transito, hoy, pedir 1,
+    // pedir 2" — el corte entre histórico y simulación ya se distingue por el color (verde vs naranja), y
+    // el detalle de cada llegada está al hacer clic en su punto.
+    hoyLineSvg = '';
   }
 
   // Proyección: línea discontinua + banda ±1 desvest, en otro color (var(--seg-a), azul, no usado en el
@@ -4359,9 +4392,7 @@ function drawKardex(){
         const x = xFor(idxTr - viewStart);
         const nivelTrDespues = nivelNumUm(Math.max(0, nivelAntesDe(tTransito)) + transitoCant);
         const yTr = Math.min(padT+plotH, Math.max(padT, yFor(nivelTrDespues)));
-        pedidosSvg += `<line class="kdx-transito-line" x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT+plotH}"></line>`
-          + `<text class="kdx-transito-label" style="paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;" x="${x.toFixed(1)}" y="${padT-6}" text-anchor="middle">LLEGA TRÁNSITO</text>`
-          + `<circle class="kdx-transito-dot" cx="${x.toFixed(1)}" cy="${yTr.toFixed(1)}" r="6"`
+        pedidosSvg += `<circle class="kdx-transito-dot" cx="${x.toFixed(1)}" cy="${yTr.toFixed(1)}" r="6"`
           + ` data-cant="${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'')}"`
           + ` data-fllega="${escapeHtml(fmtDate(fechaEnDia(tTransito)))}"`
           + ` data-antes="${fmt2(nivelNumUm(Math.max(0, nivelAntesDe(tTransito))))}"`
@@ -4369,33 +4400,14 @@ function drawKardex(){
       }
     }
     pedidos.forEach((p, k)=>{
-      const idxPed = idxDeDia(p.tPedido);
-      if(dentroDeVista(idxPed)){
-        const x = xFor(idxPed - viewStart);
-        // Cuando el pedido cae hoy mismo (stock ya en el ROP), esta vertical queda encima de la línea
-        // "HOY" y las dos etiquetas se pisaban: en ese caso la de PEDIR baja una línea y dice "hoy".
-        const chocaConHoy = idxView.indexOf(n-1)!==-1 && Math.abs(x - xForGlobal(n-1)) < 45;
-        pedidosSvg += `<line class="kdx-pedido-line" x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT+plotH}"></line>`
-          + `<text class="kdx-pedido-label" style="paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;" x="${x.toFixed(1)}" y="${chocaConHoy ? padT+12 : padT-6}" text-anchor="middle">PEDIR ${k+1}${p.tPedido < 1 ? ' (hoy)' : ''}</text>`;
-      }
       // Llegada del pedido: el punto donde el stock sube de golpe. La cantidad ya no va escrita fija sobre
       // el gráfico (15.09.2026, Piero: "la cantidad que se pide debe estar puesta cuando se pone el click
       // sobre el punto, sobreponiéndose al gráfico") — el punto es clicable y la muestra en el globo, así
       // el gráfico queda limpio. Se dibuja siempre, también sin tiempo de entrega en el Excel: ahí la
       // llegada cae el mismo día del pedido.
-      const idxLlega = idxDeDia(p.tLlega);
-      if(dentroDeVista(idxLlega)){
-        const x = xFor(idxLlega - viewStart);
-        const nivelDespues = nivelNumUm(nivelAlLlegar[k] + cantidadPedido);
-        const yLlega = Math.min(padT+plotH, Math.max(padT, yFor(nivelDespues)));
-        pedidosSvg += `<circle class="kdx-llega-dot" cx="${x.toFixed(1)}" cy="${yLlega.toFixed(1)}" r="6"`
-          + ` data-pedido="${k+1}"`
-          + ` data-cant="${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'')}"`
-          + ` data-fpedido="${escapeHtml(p.tPedido < 1 ? 'hoy' : fmtDate(fechaEnDia(p.tPedido)))}"`
-          + ` data-fllega="${escapeHtml(fmtDate(fechaEnDia(p.tLlega)))}"`
-          + ` data-antes="${fmt2(nivelNumUm(Math.max(0, nivelAlLlegar[k])))}"`
-          + ` data-despues="${fmt2(nivelDespues)}"></circle>`;
-      }
+      // 15.09.2026, Piero: "quita este punto" sobre los puntos rellenos de la llegada del pedido. El dato
+      // no se pierde: el punto de la propia curva de esa semana lleva ahora la cantidad y las fechas, y se
+      // ve al hacer clic encima (ver dotsSvg más abajo).
     });
     // ROP de importación: solo se dibuja cuando es distinto del ROP nacional que ya está en rojo — así se
     // ve de dónde sale el disparador de la simulación sin duplicar una línea encima de la otra.
@@ -4425,7 +4437,18 @@ function drawKardex(){
     // tooltip sigue mostrando el número real.
     const y = Math.min(padT+plotH, Math.max(padT, yFor(projMean[j])));
     const lbl = weekLabelFor(projPeriods[j].key) + ' (estimado)';
-    return `<circle class="kdx-dot-proj" cx="${x}" cy="${y}" r="3.5" data-label="${escapeHtml(lbl)}" data-mean="${projMean[j].toFixed(2)}" data-upper="${projUpper[j].toFixed(2)}" data-lower="${projLower[j].toFixed(2)}"></circle>`;
+    // Si en esta semana entra un pedido (o el tránsito), el punto lleva encima su detalle: cuánto entra,
+    // cuándo se coloca y cuándo llega. Es lo que Piero pidió ver al hacer clic, ahora sobre el punto de la
+    // propia curva en vez de un punto extra dibujado aparte (15.09.2026).
+    const desde = j>0 ? projDias[j-1] : 0;
+    const entra = llegadas.filter(l=>l.t > desde && l.t <= projDias[j])[0];
+    const datosEntra = entra
+      ? ` data-cant="${fmt2(entra.cantidad)} ${escapeHtml(producto.unidad||'')}"`
+        + ` data-tipo="${entra.tipo}"`
+        + (entra.tipo==='pedido' ? ` data-pedido="${entra.nPedido}" data-fpedido="${escapeHtml(entra.tPedido < 1 ? 'hoy' : fmtDate(fechaEnDia(entra.tPedido)))}"` : '')
+        + ` data-fllega="${escapeHtml(fmtDate(fechaEnDia(entra.t)))}"`
+      : '';
+    return `<circle class="kdx-dot-proj${entra ? ' kdx-dot-entra' : ''}" cx="${x}" cy="${y}" r="${entra ? 5 : 3.5}" data-label="${escapeHtml(lbl)}" data-mean="${projMean[j].toFixed(2)}" data-upper="${projUpper[j].toFixed(2)}" data-lower="${projLower[j].toFixed(2)}"${datosEntra}></circle>`;
   }).join('');
 
   const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado (histórico)</span>`
@@ -4441,9 +4464,11 @@ function drawKardex(){
   // Tarjetas KPI arriba del gráfico (14.09.2026, mismo pedido: que se entienda de un vistazo, sin tener
   // que leer el gráfico entero). Solo con datos que de verdad tengo — no invento "pedido estimado" ni
   // "llegada simulada" con un lead time que no verifiqué, eso queda para cuando Piero lo pida.
-  const kpiHoy = `<div class="card kpi kdx-kpi"><div class="label">Stock actual — ${escapeHtml(sucInfo.label)}</div><div class="value">${fmt2(stockSuc)}</div><div class="sub">Físico en ${escapeHtml(sucInfo.label)}, reconstruido a hoy con Ingresos/Movimientos</div></div>`;
-  const kpiRop = producto.rop!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP</div><div class="value">${fmt2(producto.rop)}</div><div class="sub">Punto de reorden</div></div>` : '';
-  const kpiSeg = producto.stockSeguridad!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad</div><div class="value">${fmt2(producto.stockSeguridad)}</div><div class="sub">Referencia de tu Excel</div></div>` : '';
+  // Sin subtítulos: 15.09.2026, Piero pidió quitarlos uno por uno ("quita esto" en los tres) — las
+  // tarjetas quedan solo con su nombre y su número.
+  const kpiHoy = `<div class="card kpi kdx-kpi"><div class="label">Stock actual — ${escapeHtml(sucInfo.label)}</div><div class="value">${fmt2(stockSuc)}</div></div>`;
+  const kpiRop = producto.rop!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP</div><div class="value">${fmt2(producto.rop)}</div></div>` : '';
+  const kpiSeg = producto.stockSeguridad!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad</div><div class="value">${fmt2(producto.stockSeguridad)}</div></div>` : '';
   // La 4ª tarjeta ("Pedir (simulado)") se eliminó el 15.09.2026 al simplificar: cuándo pedir, cuánto y
   // cuándo llega ya están arriba, en la etiqueta grande (ver pedirBannerSvg). Quedan las 3 tarjetas de
   // referencia — stock, ROP y stock de seguridad — que son contra lo que se lee el gráfico.
@@ -4487,7 +4512,7 @@ function drawKardex(){
   const fuenteCaption = `<div class="kdx-caption kdx-fuente">Fuente: ${escapeHtml(ALMACEN_DATA.filename||'Reporte Almacen.xlsx')} — hojas Ingresos y Movimientos, agrupadas por semana ISO (lunes a domingo).</div>`;
 
   const chart = document.getElementById('kardexChart');
-  chart.innerHTML = `${pedirBannerSvg}${sucFilterSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+  chart.innerHTML = `${pedirBannerSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
     <defs><clipPath id="kdxPlotClip"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect></clipPath></defs>
     ${gridSvg}
     <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
@@ -4567,18 +4592,7 @@ function drawKardex(){
     });
     dot.addEventListener('mouseleave', ()=>{ tooltip.style.display = 'none'; });
   });
-  chart.querySelectorAll('.kdx-dot-proj').forEach(dot=>{
-    dot.addEventListener('mouseenter', ()=>{
-      tooltip.innerHTML = `<b>${dot.dataset.label}</b><br>Proyección: ${Number(dot.dataset.mean).toLocaleString('es-PE',{maximumFractionDigits:2})}<br>Rango (±1 desvest): ${Number(dot.dataset.lower).toLocaleString('es-PE',{maximumFractionDigits:2})} – ${Number(dot.dataset.upper).toLocaleString('es-PE',{maximumFractionDigits:2})}`;
-      tooltip.style.display = 'block';
-    });
-    dot.addEventListener('mousemove', (e)=>{
-      const rect = chart.getBoundingClientRect();
-      tooltip.style.left = (e.clientX - rect.left + 12) + 'px';
-      tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
-    });
-    dot.addEventListener('mouseleave', ()=>{ tooltip.style.display = 'none'; });
-  });
+
   // Puntos de llegada (pedido simulado y stock en tránsito): 15.09.2026, pedido de Piero — "la cantidad
   // que se pide debe estar puesta cuando se pone el click sobre el punto, sobreponiéndose al gráfico".
   // Con clic el globo se queda fijo hasta que se haga clic en otro lado; al pasar el mouse también se
@@ -4597,10 +4611,16 @@ function drawKardex(){
     tooltip.style.left = Math.max(0, cx - tooltip.offsetWidth/2) + 'px';
     tooltip.style.top = Math.max(0, cy - tooltip.offsetHeight - 12) + 'px';
   };
-  const htmlPedido = d => `<b>Pedido ${d.pedido} — llega el ${d.fllega}</b><br>Cantidad a pedir: <b>${d.cant}</b><br>Se coloca el ${d.fpedido} · el stock baja a ${d.antes} y sube a ${d.despues}`;
+  const num = v => Number(v).toLocaleString('es-PE', {maximumFractionDigits:2});
   const htmlTransito = d => `<b>Stock en tránsito — llega el ${d.fllega}</b><br>Cantidad en camino: <b>${d.cant}</b><br>Ya comprado · el stock baja a ${d.antes} y sube a ${d.despues}`;
-  chart.querySelectorAll('.kdx-llega-dot, .kdx-transito-dot').forEach(dot=>{
-    const html = ()=> dot.classList.contains('kdx-transito-dot') ? htmlTransito(dot.dataset) : htmlPedido(dot.dataset);
+  // Punto de la curva proyectada: siempre el estimado de esa semana y, si ahí entra un pedido o el
+  // tránsito, además cuánto entra y en qué fechas.
+  const htmlProy = d => `<b>${d.label}</b><br>Proyección: ${num(d.mean)}<br>Escenario pesimista (−1 desvest): ${num(d.lower)}`
+    + (d.cant ? (d.tipo === 'transito'
+        ? `<br><br><b>Acá entra el stock en tránsito: ${d.cant}</b><br>Llega el ${d.fllega} (ya comprado)`
+        : `<br><br><b>Acá entra el pedido ${d.pedido}: ${d.cant}</b><br>Se coloca el ${d.fpedido} y llega el ${d.fllega}`) : '');
+  chart.querySelectorAll('.kdx-dot-proj, .kdx-transito-dot').forEach(dot=>{
+    const html = ()=> dot.classList.contains('kdx-transito-dot') ? htmlTransito(dot.dataset) : htmlProy(dot.dataset);
     dot.addEventListener('click', (e)=>{
       e.stopPropagation();
       if(globoFijo === dot){ globoFijo = null; tooltip.style.display = 'none'; return; }
@@ -4751,7 +4771,9 @@ function drawPedirPorCategoria(){
           + '<div class="pc-top"><span class="pc-ic">' + iconForFamilia(sinAcentos(g.label)) + '</span>'
           + '<div class="pc-name">' + escapeHtml(g.label) + '</div></div>'
           + '</div>').join('') + '</div>'
-    : '<div style="font-size:12.5px;color:var(--ink-soft);padding:6px 0;">Nada que pedir con esos meses de cobertura 🎉</div>';
+    // 15.09.2026, Piero: "quita esto" — el aviso de "nada que pedir" ya no se muestra; si no hay nada
+    // que pedir, la zona simplemente queda vacía.
+    : '';
   Array.prototype.forEach.call(chart.querySelectorAll('.pedir-card'), el=>{
     el.addEventListener('click', ()=>{
       pedirCatSel = el.getAttribute('data-cat');
