@@ -5239,8 +5239,40 @@ function indCumple(ind, row){
   if(ind.meta==null) return null;
   return d <= ind.meta;
 }
+// Los Indicadores 2, 3 y 4 miden pasos de la ORDEN DE COMPRA, no de cada línea: la fecha de emisión
+// (FechaOrden), la de aprobación y la de recepción son de la OC completa y se repiten idénticas en
+// todas sus líneas — verificado con datos reales (de 155 líneas de un comprador en un mes, solo 2
+// traían un valor distinto dentro de su misma OC, por OC reemitida). Promediar por línea hacía que
+// una OC de 20 líneas pesara 20 veces y una de 1 línea una sola, así que el indicador terminaba
+// ponderado por el tamaño de la OC en vez de medir el proceso; el efecto era real y no menor (en
+// julio 2026, Aprobación daba 89.7% por línea y 83.6% por OC — las OC que se aprueban rápido tienden
+// a ser las de más líneas). Desde el 15.09.2026, por pedido de Piero ("sí, quiero que sea por OC"),
+// estos 3 indicadores se calculan sobre UNA fila por CodOrden.
+//
+// El Indicador 1 (Generación de Pedido) y el 6 (Atención directa desde stock) NO se tocan: esos sí
+// son genuinamente por línea de requerimiento.
+//
+// De cada OC se conserva la línea con el MAYOR valor del indicador (prefiriendo siempre una con dato
+// sobre una sin dato), no la primera que aparezca: así el resultado no depende del orden del Excel
+// cuando alguna OC sí trae valores distintos entre sus líneas, y en el Indicador 4 no se elige por
+// error una línea marcada como regularización (que queda con d4=null) habiendo otra medible.
+const INDICADORES_POR_OC = ['d2','d3','d4'];
+function filasPorOC(rows, ind){
+  if(INDICADORES_POR_OC.indexOf(ind.key) === -1) return rows;
+  const porOrden = new Map();
+  const sinOrden = [];
+  for(const r of rows){
+    if(!r.codOrden){ sinOrden.push(r); continue; }
+    const prev = porOrden.get(r.codOrden);
+    if(!prev){ porOrden.set(r.codOrden, r); continue; }
+    const a = r[ind.key], b = prev[ind.key];
+    if(b == null && a != null) porOrden.set(r.codOrden, r);
+    else if(a != null && b != null && a > b) porOrden.set(r.codOrden, r);
+  }
+  return Array.from(porOrden.values()).concat(sinOrden);
+}
 function aggStatsForIndicator(rows, ind){
-  const applicable = rows.filter(r=>r.camino===ind.camino);
+  const applicable = filasPorOC(rows.filter(r=>r.camino===ind.camino), ind);
   const valid = applicable.filter(r=>r[ind.key]!=null);
   const n = valid.length;
   // Promedio simple sobre TODOS los casos válidos, sin excluir ni ajustar nada (pedido explícito de
@@ -5263,7 +5295,7 @@ function groupKeyFor(r, ind, groupField){
   return (r[groupField]||'').toString().trim() || '—';
 }
 function groupRowsFor(rows, ind, groupField){
-  const applicable = rows.filter(r=>r.camino===ind.camino && r[ind.key]!=null);
+  const applicable = filasPorOC(rows.filter(r=>r.camino===ind.camino), ind).filter(r=>r[ind.key]!=null);
   const groups = {};
   for(const r of applicable){
     const key = groupKeyFor(r, ind, groupField);
@@ -7405,8 +7437,14 @@ function openDrilldown(ind, rows, groupLabel){
   const withoutVal = rows.length - withVal.length - regRows.length - pendingRows.length;
   const sorted = withVal.slice().sort((a,b)=>(b[ind.key]||0)-(a[ind.key]||0));
   const capped = sorted.slice(0,500);
+  // Los Indicadores 2, 3 y 4 se calculan por OC (ver filasPorOC), pero este detalle sigue listando
+  // LÍNEA por línea a propósito: es la vista de auditoría, y ahí importa ver qué producto de qué
+  // requerimiento entró en cada orden. Para que no parezca que los números no cuadran con la tarjeta,
+  // la nota de arriba dice cuántas OC distintas representan esas líneas.
+  const ocDistintas = INDICADORES_POR_OC.indexOf(ind.key) !== -1
+    ? new Set(withVal.map(r=>r.codOrden).filter(Boolean)).size : null;
   document.getElementById('procDetailTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.stage + (groupLabel ? ' · ' + groupLabel : '');
-  document.getElementById('procDetailNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + (pendingRows.length>0 ? ' · ' + pendingRows.length.toLocaleString('es-PE') + ' pendientes de llegar (se listan al final)' : '') + (regRows.length>0 ? ' · ' + regRows.length.toLocaleString('es-PE') + ' excluidas del cálculo por regularización (se listan al final)' : '') + '.';
+  document.getElementById('procDetailNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (ocDistintas!=null ? ' (' + ocDistintas.toLocaleString('es-PE') + ' OC distintas — el indicador se calcula por OC, no por línea)' : '') + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + (pendingRows.length>0 ? ' · ' + pendingRows.length.toLocaleString('es-PE') + ' pendientes de llegar (se listan al final)' : '') + (regRows.length>0 ? ' · ' + regRows.length.toLocaleString('es-PE') + ' excluidas del cálculo por regularización (se listan al final)' : '') + '.';
   const table = document.getElementById('tableDrilldown');
   table.querySelector('thead').innerHTML = '<tr><th>Requerimiento</th><th>Proyecto</th><th>Cód. producto</th><th>Descripción</th><th>Pedido</th><th>OC</th><th>Proveedor</th><th>Responsable</th><th>Fecha inicial</th><th>Fecha final</th><th>Días hábiles</th><th>Meta</th><th>Estado</th></tr>';
   function rowHtml(r, forced){
