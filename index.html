@@ -4267,16 +4267,27 @@ function drawKardex(){
   // En los productos de importación la simulación usa el ROP de importación, que no es el que mira el
   // resto del módulo: ahí los dos mensajes pueden diferir y hay que decirlo, no dejar una etiqueta verde
   // sobre un gráfico que grita "PEDIR HOY".
-  const avisoSimulacion = (simulaPedirHoy && ropSim !== producto.rop)
-    ? ` · <b>Ojo: con el ROP de importación (${fmt2(ropSim)}) la simulación dice que ya habría que pedir ${fmt2(cantidadPedido)} ${um}</b>`
+  // 15.09.2026, Piero: "por qué no sale que debemos pedir? si el stock en lima está como 0 y estoy viendo
+  // el kardex de lima ... no debería recomendarme pedir la cantidad x los meses que coloque para
+  // abastecer y que eso esté reflejado en lo naranja??". Tenía razón: la etiqueta seguía la regla del
+  // resto del módulo (stock de las 3 sucursales + tránsito) mientras el gráfico hablaba de UNA sucursal,
+  // así que en un producto con 0 en Lima y saldo en Trujillo la simulación naranja pedía hoy y arriba no
+  // decía nada. Ahora la etiqueta la manda la MISMA simulación que se ve en el gráfico: si el stock de la
+  // sucursal que estás viendo ya está en el punto de reorden, dice que hay que pedir y cuánto — la misma
+  // cantidad que el diente de sierra naranja. Cuando eso no coincide con la tabla de arriba (que sigue
+  // sumando las otras sucursales, sin cambios), se avisa en la misma etiqueta en vez de dejar los dos
+  // mensajes contradiciéndose en silencio.
+  const tablaDiceNoPedir = simulaPedirHoy && !(pedirRow && pedirRow.hayQuePedir);
+  const avisoSimulacion = tablaDiceNoPedir
+    ? ` · <b>Ojo:</b> en la tabla de arriba figura sin cantidad a pedir, porque ahí el stock se cuenta sumando las 3 sucursales y el tránsito (${fmt2(producto.stockRepo)} contra el ROP ${fmt2(producto.rop)}). Acá se mira solo ${escapeHtml(sucInfo.label)}.`
     : '';
   const pedirBannerSvg = mesesInput <= 0
     ? `<div class="kdx-pedir-banner kdx-pedir-neutral">Escribe cuántos meses quieres cubrir arriba, en "Meses a abastecer", para saber si hay que pedir.</div>`
-    : (pedirRow && pedirRow.hayQuePedir
-        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(Math.round(pedirRow.aPedir))} ${um}</span><span class="kdx-pedir-sub">Para cubrir ${mesesInput} ${mesesInput===1?'mes':'meses'}, descontando el stock que ya tienes${cuandoSim ? ` · ${cuandoSim}` : ''}</span></div>`
-        // 15.09.2026, Piero: "quita esto" sobre la etiqueta verde — cuando no hay que pedir no se muestra
-        // nada arriba. La etiqueta grande queda solo para el caso accionable (sí hay que pedir); cuándo
-        // tocaría el próximo pedido y por cuánto se sigue viendo en el gráfico y al hacer clic en el punto.
+    : (simulaPedirHoy
+        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(cantidadPedido)} ${um}</span><span class="kdx-pedir-sub">${escapeHtml(sucInfo.label)} está en ${fmt2(stockSuc)}, en el punto de reorden (${fmt2(ropSim)}) — es la misma cantidad que entra en la simulación naranja, ${mesesInput} ${mesesInput===1?'mes':'meses'} de rotación${cuandoSim ? ` · ${cuandoSim}` : ''}${avisoSimulacion}</span></div>`
+        // Cuando no toca pedir no se muestra nada arriba (15.09.2026, Piero: "quita esto" sobre la etiqueta
+        // verde). Cuándo tocaría el próximo pedido y por cuánto se sigue viendo en el gráfico y al hacer
+        // clic en el punto donde entra.
         : '');
   const m = projPeriods.length;
   const ntotal = n + m;
