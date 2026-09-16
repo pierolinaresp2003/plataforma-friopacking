@@ -6376,8 +6376,15 @@ function buildProImageComprasResponsable(){
   const montoEqTotal = (soles + dolares*TIPO_CAMBIO['US$'] + euros*TIPO_CAMBIO['€']) || 1;
 
   const IND2 = INDICATORS.find(i=>i.key==='d2'), IND4 = INDICATORS.find(i=>i.key==='d4');
-  const stIND2 = aggStatsForIndicator(rowsOrden, IND2);
-  const stIND4 = aggStatsForIndicator(rowsOrden, IND4);
+  // Los tiempos de los Indicadores 2 y 4 se calculan sobre EXACTAMENTE el mismo conjunto de filas que
+  // las tarjetas de la plataforma (ronda 41, 15.09.2026 — Piero pidió coincidencia exacta): NO sobre
+  // `rowsOrden`, que agrega los pedidos directos de PedidoSinReq. Los pedidos directos sí se siguen
+  // contando en el total de OC generadas, en origen, en montos y en condición de pago — solo quedan
+  // fuera de los indicadores de tiempo, que es donde la infografía tiene que decir lo mismo que la
+  // plataforma. `rowsForIndicator` ya viene filtrado por el comprador elegido.
+  const rowsIndicadores = rowsForIndicator(IND4);
+  const stIND2 = aggStatsForIndicator(rowsIndicadores, IND2);
+  const stIND4 = aggStatsForIndicator(rowsIndicadores, IND4);
   const comparativo = periodoAnteriorComparativo(comprador);
 
   // Condición de pago — por OC distinta. Los 4 buckets de crédito del diseño de referencia van SIEMPRE
@@ -6519,16 +6526,28 @@ function buildProImageComprasResponsable(){
   // miden sobre las mismas OC entregadas. Eso hace que el % de la imagen NO sea igual al de la
   // tarjeta de la plataforma, que además excluye los pedidos directos de PedidoSinReq — decisión
   // explícita de Piero: prima la coherencia interna de la infografía.
+  // Se recorre el MISMO conjunto de OC que usa la tarjeta "Tiempo de Entrega de OC en Lurín"
+  // (`filasPorOC` + d4 con dato), por dos motivos que Piero verificó el 15.09.2026:
+  //   1. Quedan fuera las líneas marcadas "Regularización" — él mismo pidió excluirlas del Indicador 4
+  //      el 02.09.2026, la tarjeta ya lo hacía y esta imagen no. No era un detalle: en julio 2026, 8 de
+  //      las 12 OC que la imagen mostraba en CRÍTICA eran regularizaciones, y el cumplimiento salía
+  //      63% en vez de 71%.
+  //   2. Quedan fuera los pedidos directos de PedidoSinReq, para que el % de la imagen sea idéntico al
+  //      de la tarjeta y no haya que explicar una diferencia cada vez que alguien compare.
+  // El "a tiempo" se decide con indCumple (o sea, r.d4cumple), el mismo campo que usa la tarjeta, así
+  // que el % coincide al decimal; busdayCount solo se usa para repartir las atrasadas en leve/media/
+  // crítica. Verificación que siempre debe cumplirse: aTiempoN + leveN + mediaN + criticaN === el
+  // denominador de la tarjeta, y aTiempoN/ese total === su "Cumple X%".
+  const filasD4 = filasPorOC(rowsIndicadores.filter(r=>r.camino===IND4.camino), IND4).filter(r=>r.d4!=null);
   let leveN=0, mediaN=0, criticaN=0, aTiempoN=0;
-  for(const r of ocRows.values()){
-    if(!r.fRecep) continue;
+  for(const r of filasD4){
+    const cumple = indCumple(IND4, r);
+    if(cumple==null) continue;
+    if(cumple){ aTiempoN++; continue; }
     const lim4 = limite4For(r);
-    if(!lim4) continue;
-    const fRecepDia = new Date(Date.UTC(r.fRecep.getUTCFullYear(), r.fRecep.getUTCMonth(), r.fRecep.getUTCDate()));
-    const exceso = busdayCount(lim4, fRecepDia); // positivo = llegó tarde, según su propio plazo pactado
-    if(exceso==null) continue;
-    if(exceso<=0){ aTiempoN++; continue; }
-    if(exceso<=2) leveN++;
+    const fRecepDia = r.fRecep ? new Date(Date.UTC(r.fRecep.getUTCFullYear(), r.fRecep.getUTCMonth(), r.fRecep.getUTCDate())) : null;
+    const exceso = (lim4 && fRecepDia) ? busdayCount(lim4, fRecepDia) : null; // d.h. de más sobre su plazo pactado
+    if(exceso==null || exceso<=2) leveN++;
     else if(exceso<=5) mediaN++;
     else criticaN++;
   }
