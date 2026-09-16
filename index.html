@@ -2615,8 +2615,6 @@ const FIRMA_PREFIJOS = [/^C\s*\/?\s*ALIMENTADOR\s*-?\s*FUERZA\b/, /^CABLE\b/, /^
 // distinguen productos en otras familias: "VÁLVULA DE CONTROL DE FLUJO 2\"" no es una "VÁLVULA 2\"", y
 // borrar CONTROL en todo el catálogo las juntaría. Acá solo se aplican si la descripción es de un cable.
 const FIRMA_RUIDO_CABLE = [
-  /\bDE\s+INSTRUMENTACION\b/g, /\bINSTRUMENTACION\b/g,
-  /\bDE\s+CONTROL\b/g, /\bCONTROL\b/g,
   /\bOLFLEX\b/g, /\bCLASSIC\b/g, /\bOPVC\b/g, /\bJZ\b/g, /\bCY\b/g, /\bSTP\b/g, /\bUL\b/g,
   /\bAPROX\.?\b/g, /\bPVC\b/g,
   /\bLIBRE\s+HALOG\.?\b/g, /\bHALOG\.?\b/g,   // abreviatura de "libre de halógenos" que usa el archivo
@@ -2659,13 +2657,27 @@ function firmaProducto(desc){
     FIRMA_RUIDO_CABLE.forEach(rx=>{ s = s.replace(rx, ' '); });
     // Calibre AWG a su equivalente en mm²: "2X18AWG" -> "2X1MM2", "3X18 AWG" -> "3X1MM2".
     s = s.replace(/(\d+)\s*AWG\b/g, (m, awg)=> AWG_A_MM2[awg] ? AWG_A_MM2[awg] + 'MM2' : m);
+    // En cables apantallados, instrumentación y control son productos distintos, y cuando la
+    // descripción no dice "instrumentación" es de control (regla de Piero, 16.09.2026: "si no define
+    // que es de instrumentación entonces es control y tampoco sería igual"). Se normaliza a UN token
+    // explícito para que la distinción quede en la firma en vez de depender de cómo lo escribieron.
+    if(/APANTALLAD/.test(s)){
+      const esInstrumentacion = /INSTRUMENTACION/.test(s);
+      s = s.replace(/\bDE\s+INSTRUMENTACION\b/g, ' ').replace(/\bINSTRUMENTACION\b/g, ' ')
+           .replace(/\bDE\s+CONTROL\b/g, ' ').replace(/\bCONTROL\b/g, ' ');
+      s += esInstrumentacion ? ' INSTRUMENTACION' : ' CONTROL';
+    }
   }
   FIRMA_PREFIJOS.forEach(rx=>{ s = s.replace(rx, ' '); });
   s = s.replace(/\bRZ1\s*-?\s*K\b/g, 'RZ1K');
   // "3X1MM" sin el 2 es la misma sección que "3X1MM2" (el archivo real trae las dos escrituras).
   if(esCable) s = s.replace(/\b(\d+)\s*([GX])\s*([\d.]+)\s*MM\b(?!\s*2)/g, '$1$2$3MM2');
   s = s.replace(/\b(\d+)\s*G\s*X?\s*([\d.]+)\s*MM\s*2/g, '$1G$2MM2');
-  s = s.replace(/\b(\d+)\s*X\s*([\d.]+)\s*MM\s*2/g,      '$1G$2MM2');
+  // La G y la X NO son lo mismo (corrección de Piero, 16.09.2026: "3G1 es distinto a 3X1 porque uno
+  // tiene conductor tierra y el otro no"). Antes se normalizaban las dos a G y eso juntaba cables con
+  // tierra y sin tierra. Cada una conserva su letra; lo único que se normaliza es la escritura
+  // "3G X 1.5" -> "3G1.5" (ahí la X es el signo de multiplicar, no el tipo de cable).
+  s = s.replace(/\b(\d+)\s*X\s*([\d.]+)\s*MM\s*2/g,      '$1X$2MM2');
   s = s.replace(/([\d.]+)\s*MM\s*2/g, '$1MM2');
   // Ceros de más en la sección: "1.00MM2" y "1.0MM2" son "1MM2"; "1.50MM2" es "1.5MM2".
   s = s.replace(/(\d+)\.(\d*?)0+MM2/g, (m, ent, dec)=> dec ? ent + '.' + dec + 'MM2' : ent + 'MM2');
