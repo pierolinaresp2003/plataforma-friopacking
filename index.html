@@ -4142,7 +4142,7 @@ function drawAlertas(){
       <td>${fmt(r.transito)}</td>
       <td>${fmt(r.reserva)}</td>
       <td>${fmt(r.picking)}</td>
-      <td>${fmt(r.rop)}</td>
+      <td>${fmt(ropEfectivo(r))}</td>
       <td>${fmt(r.eoq)}</td>
       <td>${fmt(r.consumoMensual)}</td>
       <td>${fmt(r.cobertura)}</td>
@@ -4641,7 +4641,12 @@ function drawKardex(){
         // 15.09.2026, Piero (comentario en el artefacto): "quita esto" sobre la línea explicativa — la
         // etiqueta queda con lo esencial: si hay que pedir y cuánto. El detalle (cuándo se coloca, cuándo
         // llega, con qué stock se comparó) sigue estando en el gráfico y en el globo de cada punto.
-        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(cantidadPedido)} ${um}</span></div>`
+        // 16.09.2026, Piero: "por qué sale 44 y arriba 37?". La etiqueta mostraba cantidadPedido, que es
+        // el LOTE DEL CICLO que simula el gráfico (consumo diario × días del ciclo, sin descontar nada), y
+        // la tabla muestra el DÉFICIT (consumo × meses − stock). Para una orden de compra el número útil es
+        // el déficit: lo que ya está en almacén o en tránsito no se vuelve a comprar. El lote del ciclo
+        // sigue rotulado en el pie del gráfico, que es donde sí describe la simulación.
+        ? `<div class="kdx-pedir-banner kdx-pedir-si"><span class="kdx-pedir-tag">Sí, hay que pedir</span><span class="kdx-pedir-cant">${fmt2(Math.max(1, Math.round(faltanteConsolidado)))} ${um}</span></div>`
         // Cuando no toca pedir no se muestra nada arriba (15.09.2026, Piero: "quita esto" sobre la etiqueta
         // verde). Cuándo tocaría el próximo pedido y por cuánto se sigue viendo en el gráfico y al hacer
         // clic en el punto donde entra.
@@ -5363,7 +5368,7 @@ function drawPedirDetalle(grupos){
         + '<td class="num">' + fmt(r.ica) + '</td>'
         + '<td class="num">' + fmt(r.transito) + '</td>'
         + '<td class="num"><b>' + fmt(r.consumoMensual) + '</b></td>'
-        + '<td class="num">' + fmt(r.rop) + '</td>'
+        + '<td class="num">' + fmt(ropEfectivo(r)) + '</td>'
         // Cuánto pedir de ESE producto con los meses que esté puesto arriba (16.09.2026, pedido de
         // Piero: "a la derecha, coloca resaltado, cuánto se debería pedir en base a lo que yo coloque
         // arriba en los meses a abastecer"). Es el mismo r.aPedir que suma el total de la categoría
