@@ -5320,8 +5320,35 @@ function matchesProcesoFiltrosOC(r){
   }
   return true;
 }
+// Órdenes de compra DIRECTAS (PedidoSinReq.xlsx): OC que no nacen de un requerimiento y que por eso no
+// están en Reporte Maestro. Son 350 OC reales — el 16% del total de órdenes — y hasta el 16.09.2026
+// solo se veían en el reporte por comprador: las tarjetas de Tiempos del Proceso, las tablas agrupadas
+// y el detalle 🔍 las ignoraban por completo. Lo detectó Piero contando las OC de un comprador en una
+// tabla dinámica ("me sale un total de 68 oc que parten de un req + 12 oc que parten de pedido sin
+// requerimiento... solo se está evidenciando las oc con req en la data que muestras").
+//
+// Decisión suya, 16.09.2026: entran en TODO lo que mide la ORDEN — el conteo de OC y los Indicadores 2
+// (Emisión), 3 (Aprobación) y 4 (Entrega) — y NO en el Indicador 1 (Generación de Pedido), porque sin
+// requerimiento no hay tiempo de generación que medir. Por eso se agregan acá, en la función que usan
+// los indicadores de OC, y no en filteredProcesoRows, que es la que alimenta al Indicador 1 y al 6.
+// (Estas filas traen d1 = null de todos modos, así que quedan fuera del Indicador 1 por partida doble.)
+//
+// Se descarta la OC que ya esté en Reporte Maestro por CodOrden — hay solape real, 108 casos — para no
+// contarla dos veces. El set se arma sobre TODO el maestro, no sobre el maestro ya filtrado, para que
+// una misma OC no pueda entrar por los dos lados según el filtro de fecha que esté puesto.
+// La familia se refresca acá por si PedidoSinReq.xlsx se cargó ANTES que Reporte Maestro.xlsx:
+// FAMILIA_BY_PRODUCTO recién termina de armarse con ese segundo archivo.
+function ordenesDirectasFiltradas(yaEnMaestro){
+  return PEDIDO_SIN_REQ_ROWS
+    .filter(r=> r.codOrden && !yaEnMaestro.has(r.codOrden))
+    .map(r=> (r.idProducto && FAMILIA_BY_PRODUCTO[r.idProducto] && FAMILIA_BY_PRODUCTO[r.idProducto]!==r.familia)
+      ? Object.assign({}, r, { familia: FAMILIA_BY_PRODUCTO[r.idProducto] }) : r)
+    .filter(matchesProcesoFiltrosOC);
+}
 function filteredProcesoRowsByOrden(){
-  return getProcesoRows().filter(matchesProcesoFiltrosOC);
+  const todas = getProcesoRows();
+  const yaEnMaestro = new Set(todas.map(r=>r.codOrden).filter(Boolean));
+  return todas.filter(matchesProcesoFiltrosOC).concat(ordenesDirectasFiltradas(yaEnMaestro));
 }
 // Devuelve el set de filas correcto para un indicador: los que miden un paso de la OC (Emisión,
 // Aprobación, Entrega — Indicadores 2, 3 y 4) filtran Año/Mes/Semana por FechaOrden; el resto
@@ -6448,22 +6475,12 @@ function procesoFilterDateRangeFooter(){
 // directas de PedidoSinReq.xlsx que el Maestro nunca trae. Está aparte para que el reporte por
 // comprador y el panel COMPRAS del reporte del área cuenten exactamente lo mismo (08.09.2026: el área
 // mostraba menos OC que el individual porque solo miraba el Maestro).
+// Desde el 16.09.2026 los pedidos directos ya vienen incluidos en filteredProcesoRowsByOrden (ver el
+// comentario de ordenesDirectasFiltradas), así que este reporte ya no tiene que agregarlos por su
+// cuenta: usa exactamente el mismo universo que las tarjetas de la plataforma.
 function rowsOrdenComprasFor(comprador){
   const esArea = (comprador === 'all');
-  const rowsOrdenMaestro = filteredProcesoRowsByOrden().filter(r=>r.camino==='compra' && (esArea || r.usuarioCompras===comprador));
-  // Pedidos directos de PedidoSinReq.xlsx (ver comentario junto a PEDIDO_SIN_REQ_ROWS) — filtrados con
-  // el mismo criterio de proveedor/familia/origen/año/mes/semana que el resto, y sin duplicar una OC
-  // que por algún motivo ya esté en Reporte Maestro (106 casos verificados de solape real).
-  const codOrdenYaIncluidos = new Set(rowsOrdenMaestro.map(r=>r.codOrden).filter(Boolean));
-  // La familia se refresca acá (no queda fija desde que se cargó PedidoSinReq.xlsx) por si ese archivo
-  // se cargó ANTES que Reporte Maestro.xlsx — FAMILIA_BY_PRODUCTO recién se termina de armar con ese
-  // segundo archivo, y para entonces este reporte ya se puede estar viendo.
-  const rowsOrdenDirectas = PEDIDO_SIN_REQ_ROWS
-    .filter(r=>(esArea || r.usuarioCompras===comprador) && !codOrdenYaIncluidos.has(r.codOrden))
-    .map(r=> (r.idProducto && FAMILIA_BY_PRODUCTO[r.idProducto] && FAMILIA_BY_PRODUCTO[r.idProducto]!==r.familia)
-      ? Object.assign({}, r, { familia: FAMILIA_BY_PRODUCTO[r.idProducto] }) : r)
-    .filter(matchesProcesoFiltrosOC);
-  return rowsOrdenMaestro.concat(rowsOrdenDirectas);
+  return filteredProcesoRowsByOrden().filter(r=>r.camino==='compra' && (esArea || r.usuarioCompras===comprador));
 }
 function buildProImageComprasResponsable(){
   const comprador = document.getElementById('filterProcesoResponsable').value;
