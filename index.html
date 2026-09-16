@@ -276,6 +276,7 @@
   .kdx-svg .kdx-transito-line{stroke:var(--brand-2-dark);stroke-width:1.5;stroke-dasharray:5 4;opacity:.7;pointer-events:none;}
   .kdx-svg .kdx-transito-label{font-size:10.5px;font-weight:800;fill:var(--brand-2-dark);pointer-events:none;}
   .kdx-svg .kdx-transito-dot{fill:var(--brand-2-dark);stroke:var(--card);stroke-width:1.5;cursor:pointer;}
+  .kdx-svg .kdx-oc-label{font-size:10px;font-weight:800;fill:var(--brand-2-dark);pointer-events:none;}
   .kdx-svg .kdx-rop-sim{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:4 3;fill:none;opacity:.8;pointer-events:none;}
   /* Rediseño 14.09.2026 (pedido de Piero, mostró un ejemplo de referencia: "en tu gráfico no se sabe casi
      nada"): tarjetas KPI arriba del gráfico, línea vertical "Hoy" separando histórico/proyección, y
@@ -2573,13 +2574,27 @@ const FIRMA_RUIDO = [
   /\bLIBRE\s+DE\s+HALOGENOS?\b/g, /\bLIBRE\s+HALOGENOS?\b/g,
   /\bPOLIETILENO\s+RETICULADO\b/g, /\bLSZH\b/g, /\bXLPE\b/g, /\bCLASE\s*5\b/g, /\bUNIPOLAR\b/g,
   /\bAF[EI]R[EI]NAS(?:\s*-\s*X)?\b/g, /\bTOXFREE\s*ZH\b/g, /\bEXZHELLENT\b/g,
+  // Marcas (16.09.2026) — salieron de auditar el archivo completo buscando pares de códigos que solo
+  // se diferencian en 1-2 palabras. Una marca no cambia el producto físico:
+  //   004300300331 CABLE APANTALLADO 2X1.5MM2      vs 004300300361 CABLE APANTALLADO TKD 2X 1.5 MM2
+  //   008700300003 CODO 90 PP-R FUSION PN 20 63 MM vs 003800401007 CODO ... STEIN - REHOME 63 MM
+  /\bTKD\b/g, /\bSTEIN\b/g, /\bREHOME\b/g,
 ];
 const FIRMA_PREFIJOS = [/^C\s*\/?\s*ALIMENTADOR\s*-?\s*FUERZA\b/, /^CABLE\b/, /^CONDUCTOR\s+ELECTRICO\b/];
 function firmaProducto(desc){
   let s = sinAcentos(String(desc==null?'':desc)).toUpperCase();
   s = s.replace(/²/g,'2').replace(/³/g,'3').replace(/[“”]/g,'"').replace(/[’′]/g,"'");
   s = s.replace(/(\d),(\d)/g, '$1.$2');
-  s = s.replace(/\b0?\.?6\.?\s*[\/-]\s*1\s*KV\b/g, ' ');
+  // Tensión nominal del cable: es especificación redundante, no identifica al producto. El separador
+  // decimal aparece en el archivo real en TODAS las posiciones posibles — "0,6/1KV", "0.6/1KV",
+  // "06,/1KV", "06/1KV" —, así que la coma o el punto se aceptan en cualquiera de los dos lugares.
+  // El bug que esto arregla (16.09.2026, caso que reportó Piero): "06,/1KV" no calzaba con el patrón
+  // anterior porque la coma iba DESPUÉS del 6, y el "06" sobrevivía como palabra suelta en la firma:
+  //   004300300312 C/ALIMENTADOR-FUERZA 4G2.5MM2 AFERINAS-X RZ1-K 06,/1KV ... → firma "06 4G2.5MM2 RZ1K"
+  //   004300300374 CABLE RZ1-K 4G2.5MM2.                                    → firma "4G2.5MM2 RZ1K"
+  // Son el mismo cable y quedaban como 2 productos distintos, cada uno con su propio ROP y su pedido.
+  s = s.replace(/\b0\s*[.,]?\s*6\s*[.,]?\s*[\/-]\s*1\s*[.,]?\s*KV\b/g, ' ');
+  s = s.replace(/\b600\s*[\/-]\s*1000\s*V\b/g, ' ');
   s = s.replace(/\b1\s*KV\b/g, ' ');
   FIRMA_RUIDO.forEach(rx=>{ s = s.replace(rx, ' '); });
   FIRMA_PREFIJOS.forEach(rx=>{ s = s.replace(rx, ' '); });
@@ -3177,6 +3192,58 @@ function creditoBucketFor(formaPagoTexto){
 // fuentes.md, sección 6; re-verificado contra Consulta.xlsx el 03.09.2026: "OCO 0001-..."/"OCO 0002-...").
 function origenForDocumento(documento){
   return /0002-/.test((documento||"").toString()) ? 'importado' : 'nacional';
+}
+
+// ---------- Cruce Almacén ↔ Órdenes de Compra (16.09.2026) ----------
+// Pedido de Piero: "necesito que revises si consideras importación o nacional para LT (en base a eso
+// colocar LT) '0001' nacional o '0002' importado" y "cuando hay un pedido en tránsito, en el punto debe
+// verse el número de la oc también (o números de oc) porque tal vez hay más de una oc en tránsito".
+//
+// El Reporte Almacen no dice si un producto se compra local o importado: trae las 2 columnas de Lead
+// Time (K nacional, L importado) y muchas veces las 2 tienen valor — 134 productos del archivo real —,
+// así que elegir "la que esté llena" no alcanza. Quien sí lo sabe es la orden de compra: el prefijo del
+// CodOrden en Reporte Maestro (0001 = nacional, 0002 = importado), que es la misma regla que ya usa el
+// módulo 1. Se cruza por IdProducto contra los códigos del producto (todos los del grupo homologado).
+//
+// El índice se arma una sola vez y se reusa; se reconstruye si cambia la cantidad de filas del maestro
+// (carga de un archivo nuevo). Si no hay Reporte Maestro cargado, todo esto devuelve null y el kardex
+// cae a la regla anterior, sin romperse.
+let OC_POR_PRODUCTO = null, OC_POR_PRODUCTO_N = -1;
+function indiceOcPorProducto(){
+  const filas = getProcesoRows();
+  if(OC_POR_PRODUCTO && OC_POR_PRODUCTO_N === filas.length) return OC_POR_PRODUCTO;
+  const idx = new Map();
+  for(const r of filas){
+    const k = String(r.idProducto==null?'':r.idProducto).trim();
+    if(!k || !r.codOrden) continue;
+    let g = idx.get(k);
+    if(!g){ g = new Map(); idx.set(k, g); }
+    if(!g.has(r.codOrden)) g.set(r.codOrden, r);
+  }
+  OC_POR_PRODUCTO = idx; OC_POR_PRODUCTO_N = filas.length;
+  return idx;
+}
+function comprasDeProducto(codigos){
+  const idx = indiceOcPorProducto();
+  const ocs = new Map();
+  for(const c of (codigos||[])){
+    const g = idx.get(String(c==null?'':c).trim());
+    if(!g) continue;
+    g.forEach((r, oc)=>{ if(!ocs.has(oc)) ocs.set(oc, r); });
+  }
+  const lista = Array.from(ocs.values());
+  if(!lista.length) return { origen:null, nOc:0, pendientes:[] };
+  // Manda la OC más reciente: es como se está comprando el producto HOY. Un producto que antes se
+  // importaba y ahora se compra local tiene que usar el lead time local, no el de importación.
+  const ts = r => (r.fOrden ? r.fOrden.getTime() : (r.fAprob ? r.fAprob.getTime() : 0));
+  lista.sort((a,b)=> ts(b) - ts(a));
+  // "En tránsito" = aprobada y todavía sin recepcionar. Es el mismo criterio de "pendiente de llegar"
+  // que ya usa el detalle del Indicador 4 en Tiempos del Proceso.
+  const pendientes = lista.filter(r=> r.fAprob && !r.fRecep)
+    .sort((a,b)=> (a.fAprob?a.fAprob.getTime():0) - (b.fAprob?b.fAprob.getTime():0))
+    .map(r=>({ oc: r.codOrden, origen: origenForDocumento(r.codOrden),
+               fAprob: r.fAprob, proveedor: r.proveedor || '' }));
+  return { origen: origenForDocumento(lista[0].codOrden), nOc: lista.length, pendientes };
 }
 
 function getGastoRows(){
@@ -4127,8 +4194,21 @@ function drawKardex(){
   const nivelNumUm = v => umFraccion ? v : Math.round(v);
   const ltNacional = (producto.leadTime != null && producto.leadTime > 0) ? producto.leadTime : null;
   const ltImportado = (producto.leadTimeImp != null && producto.leadTimeImp > 0) ? producto.leadTimeImp : null;
-  const esImportado = (ltNacional == null && ltImportado != null);
-  const leadDias = ltNacional != null ? ltNacional : (ltImportado != null ? ltImportado : 0);
+  // Nacional o importado lo decide la ORDEN DE COMPRA, no cuál columna de Lead Time esté llena
+  // (16.09.2026, pedido de Piero). Ver comprasDeProducto: prefijo 0001 = nacional, 0002 = importado,
+  // tomando la OC más reciente del producto. Solo si el producto no tiene ninguna OC en Reporte Maestro
+  // —o si el maestro no está cargado— se cae a la regla anterior (la columna que tenga dato).
+  const compras = comprasDeProducto(producto.codigos || [producto.codigo]);
+  const esImportado = compras.origen != null
+    ? (compras.origen === 'importado')
+    : (ltNacional == null && ltImportado != null);
+  // Elegido el origen, se usa SU lead time; si justo ese viene vacío en el Excel se usa el otro, para no
+  // quedarse sin simulación por un dato faltante (se avisa en la leyenda).
+  const leadPreferido = esImportado ? ltImportado : ltNacional;
+  const leadAlterno   = esImportado ? ltNacional : ltImportado;
+  const leadDias = leadPreferido != null ? leadPreferido : (leadAlterno != null ? leadAlterno : 0);
+  const leadEsDelOtroOrigen = leadPreferido == null && leadAlterno != null;
+  const origenPorOC = compras.origen != null;
   const tieneLead = leadDias > 0;
   // ROP que dispara el pedido en la simulación. Ojo: NO se toca el ROP del resto del módulo (Alertas de
   // Reposición, "Cuánto pedir por categoría" y la línea roja del gráfico siguen con el nacional, que es la
@@ -4147,6 +4227,12 @@ function drawKardex(){
   // el de importación, según cuál de los dos tenga lleno (ver leadDias/esImportado arriba).
   const transitoCant = (kardexSucursal==='lima' && producto.transito > 0) ? producto.transito : 0;
   const tTransito = transitoCant > 0 ? leadDias : null;
+  // Las OC que están detrás de ese stock en tránsito: aprobadas y aún sin recepcionar (ver
+  // comprasDeProducto). Pueden ser varias — es justo el caso que Piero anticipó.
+  const ocsTransito = transitoCant > 0 ? compras.pendientes : [];
+  const ocsTransitoTexto = ocsTransito.length
+    ? ocsTransito.map(o=>o.oc + ' (' + (o.origen==='importado' ? 'imp.' : 'nac.') + (o.fAprob ? ', aprob. ' + fmtDate(o.fAprob) : '') + ')').join(' · ')
+    : '';
   // Todas las entradas de stock de la simulación, en orden: primero el tránsito ya comprado y después los
   // pedidos que la simulación decide colocar. La proyección de "qué habría que pedir" arranca recién
   // después de que entre el tránsito, que es justo lo que pidió Piero.
@@ -4247,13 +4333,23 @@ function drawKardex(){
       for(const l of llegadas){ if(t >= l.t) ultima = l.t; }
       return t - ultima;
     };
-    const stepDias = 7; // paso semanal, igual que el histórico: 1 índice del eje = 1 semana en todo el gráfico
-    let curDate = fromIsoDay(periods[n-1].key);
-    let t = 0;
-    while(t < horizonDias){
-      const pasoDias = Math.min(stepDias, horizonDias - t);
-      t += pasoDias;
-      curDate = new Date(curDate); curDate.setUTCDate(curDate.getUTCDate()+Math.round(pasoDias));
+    const stepDias = 7; // paso semanal, igual que el histórico
+    // Además del paso semanal se muestrea JUSTO ANTES y JUSTO AL LLEGAR cada entrada (tránsito y cada
+    // pedido). Sin esos 2 puntos, una llegada que cae a mitad de semana nunca se dibuja a su altura
+    // real: la curva salta del lunes anterior al lunes siguiente, para entonces ya se consumió otra
+    // unidad, y el pico queda invisible. Es el mismo problema que Piero detectó en el histórico
+    // ("debes mostrar cada movimiento en la gráfica"), acá en la proyección.
+    // 16.09.2026, caso que reportó: stock 4 + 5 en tránsito con 20 días de entrega — el punto verde
+    // mostraba 7 (el nivel del lunes siguiente, ya con otra unidad consumida) en vez del 8 que sube de
+    // golpe el día que llega, y encima quedaba flotando fuera de la línea.
+    const base = fromIsoDay(periods[n-1].key);
+    const instantes = [];
+    for(let tt = stepDias; tt < horizonDias; tt += stepDias) instantes.push(tt);
+    instantes.push(horizonDias);
+    llegadas.forEach(l=>{ if(l.t > 0 && l.t <= horizonDias){ instantes.push(Math.max(0, l.t - 1e-6)); instantes.push(l.t); } });
+    instantes.sort((a,b)=>a-b);
+    for(const t of instantes){
+      const curDate = new Date(base); curDate.setUTCDate(curDate.getUTCDate()+Math.round(t));
       const meanRaw = nivelEn(t);
       const sigma = producto.desvest * Math.sqrt(Math.max(0, diasDesdeReposicion(t)));
       // El stock nunca es negativo de verdad (pedido de Piero, comentario en el artefacto: "nunca debe
@@ -4393,8 +4489,15 @@ function drawKardex(){
   // El stock nunca es negativo (pedido de Piero) — se fuerza el piso del eje a 0 pase lo que pase.
   const minVal = Math.max(0, minValRaw);
 
-  const xFor = (localI)=> padL + (idxView.length===1 ? plotW/2 : (localI/(idxView.length-1))*plotW);
-  const xForGlobal = (i)=> xFor(i - viewStart);
+  // Posición de cada muestra en el eje, medida en SEMANAS desde el inicio del histórico. El histórico
+  // va de a una semana por índice; la proyección se ubica por su día real (projDias), así los puntos
+  // extra que se muestrean al llegar un pedido caen en su fecha exacta y no desplazan a los semanales
+  // (para una muestra semanal j, (n-1)+7*(j+1)/7 = n+j, o sea exactamente donde estaba antes).
+  const posGlobal = (i)=> i < n ? i : (n-1) + projDias[i-n]/7;
+  const posMax = posGlobal(ntotal-1);
+  const spanView = Math.max(1e-9, Math.min(posMax, idxView[idxView.length-1]) - viewStart);
+  const xFor = (localI)=> padL + (idxView.length===1 ? plotW/2 : (localI/spanView)*plotW);
+  const xForGlobal = (i)=> xFor(posGlobal(i) - viewStart);
   const yFor = (v)=> padT + plotH - ((v-minVal)/(maxVal-minVal))*plotH;
 
   let gridSvg = '';
@@ -4532,7 +4635,21 @@ function drawKardex(){
           + ` data-cant="${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'')}"`
           + ` data-fllega="${escapeHtml(fmtDate(fechaEnDia(tTransito)))}"`
           + ` data-antes="${fmt2(nivelNumUm(nivelAntesDe(tTransito)))}"`
+          + ` data-ocs="${escapeHtml(ocsTransitoTexto)}"`
           + ` data-despues="${fmt2(nivelTrDespues)}"></circle>`;
+        // El número de OC va escrito sobre el punto, no solo en el globo (16.09.2026, pedido de Piero:
+        // "en el punto debe verse el número de la oc también (o números de oc) porque tal vez hay más
+        // de una oc en tránsito"). Se apilan hasta 3; si hay más, la última línea dice cuántas faltan y
+        // el globo del clic las lista todas.
+        if(ocsTransito.length){
+          const visibles = ocsTransito.slice(0, 3);
+          const resto = ocsTransito.length - visibles.length;
+          const lineas = visibles.map(o=>o.oc).concat(resto>0 ? ['+' + resto + ' OC más'] : []);
+          const yBase = yTr - 12 - (lineas.length-1)*11;
+          pedidosSvg += `<text class="kdx-oc-label" x="${x.toFixed(1)}" y="${yBase.toFixed(1)}" text-anchor="middle">`
+            + lineas.map((txt,li)=>`<tspan x="${x.toFixed(1)}" dy="${li===0?0:11}">${escapeHtml(txt)}</tspan>`).join('')
+            + `</text>`;
+        }
       }
     }
     pedidos.forEach((p, k)=>{
@@ -4783,7 +4900,8 @@ function drawKardex(){
     tooltip.style.top = Math.max(0, cy - tooltip.offsetHeight - 12) + 'px';
   };
   const num = v => Number(v).toLocaleString('es-PE', {maximumFractionDigits:2});
-  const htmlTransito = d => `<b>Stock en tránsito — llega el ${d.fllega}</b><br>Cantidad en camino: <b>${d.cant}</b><br>Ya comprado · el stock baja a ${d.antes} y sube a ${d.despues}`;
+  const htmlTransito = d => `<b>Stock en tránsito — llega el ${d.fllega}</b><br>Cantidad en camino: <b>${d.cant}</b><br>Ya comprado · el stock baja a ${d.antes} y sube a ${d.despues}`
+    + (d.ocs ? `<br><br><b>Órdenes de compra en tránsito</b><br>${d.ocs.split(' · ').join('<br>')}` : '');
   // Punto de la curva proyectada: siempre el estimado de esa semana y, si ahí entra un pedido o el
   // tránsito, además cuánto entra y en qué fechas.
   const htmlProy = d => `<b>${d.label}</b><br>Proyección: ${num(d.mean)}<br>Escenario pesimista (−1 desvest): ${num(d.lower)}`
