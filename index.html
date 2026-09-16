@@ -5333,22 +5333,33 @@ function matchesProcesoFiltrosOC(r){
 // los indicadores de OC, y no en filteredProcesoRows, que es la que alimenta al Indicador 1 y al 6.
 // (Estas filas traen d1 = null de todos modos, así que quedan fuera del Indicador 1 por partida doble.)
 //
-// Se descarta la OC que ya esté en Reporte Maestro por CodOrden — hay solape real, 108 casos — para no
-// contarla dos veces. El set se arma sobre TODO el maestro, no sobre el maestro ya filtrado, para que
-// una misma OC no pueda entrar por los dos lados según el filtro de fecha que esté puesto.
+// Los 2 archivos son COMPLEMENTARIOS, no duplicados — regla que aclaró Piero el 16.09.2026: "la parte
+// de Reporte Maestro son las oc que nacen con un requerimiento establecido, la parte de PedidoSinReq es
+// exclusivamente de los pedidos que se hacen directos sin necesidad de un requerimiento, entonces si
+// comparten oc no significa que deban coincidir".
+//
+// O sea: una MISMA orden de compra puede tener líneas de las 2 clases, y cuando el mismo CodOrden
+// aparece en los 2 archivos no es un duplicado — son partes distintas de la misma orden y se SUMAN.
+// Ejemplo real, OC 0001-0011948: el maestro trae 2 lentes y 1 bota (lo pedido por requerimiento) y
+// PedidoSinReq trae 10 lentes y 3 botas (lo pedido directo). La orden completa son 12 lentes y 4 botas,
+// S/ 1,242.40 — no S/ 300.70 ni S/ 941.70.
+//
+// Por eso acá NO se descarta ninguna línea. La unicidad de la ORDEN se resuelve donde corresponde: todo
+// lo que cuenta órdenes ya agrupa por CodOrden (filasPorOC para los indicadores, y los Map por codOrden
+// de buildProImageComprasResponsable para el conteo, la condición de pago, las familias y los
+// proyectos), así que una orden con líneas de las 2 clases sigue contando como UNA.
+//
 // La familia se refresca acá por si PedidoSinReq.xlsx se cargó ANTES que Reporte Maestro.xlsx:
 // FAMILIA_BY_PRODUCTO recién termina de armarse con ese segundo archivo.
-function ordenesDirectasFiltradas(yaEnMaestro){
+function ordenesDirectasFiltradas(){
   return PEDIDO_SIN_REQ_ROWS
-    .filter(r=> r.codOrden && !yaEnMaestro.has(r.codOrden))
+    .filter(r=> r.codOrden)
     .map(r=> (r.idProducto && FAMILIA_BY_PRODUCTO[r.idProducto] && FAMILIA_BY_PRODUCTO[r.idProducto]!==r.familia)
       ? Object.assign({}, r, { familia: FAMILIA_BY_PRODUCTO[r.idProducto] }) : r)
     .filter(matchesProcesoFiltrosOC);
 }
 function filteredProcesoRowsByOrden(){
-  const todas = getProcesoRows();
-  const yaEnMaestro = new Set(todas.map(r=>r.codOrden).filter(Boolean));
-  return todas.filter(matchesProcesoFiltrosOC).concat(ordenesDirectasFiltradas(yaEnMaestro));
+  return getProcesoRows().filter(matchesProcesoFiltrosOC).concat(ordenesDirectasFiltradas());
 }
 // Devuelve el set de filas correcto para un indicador: los que miden un paso de la OC (Emisión,
 // Aprobación, Entrega — Indicadores 2, 3 y 4) filtran Año/Mes/Semana por FechaOrden; el resto
