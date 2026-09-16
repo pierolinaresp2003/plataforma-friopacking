@@ -2573,12 +2573,34 @@ function stockParaReposicion(r){
   const traslada = ALMACEN_UM_SIN_TRASLADO.indexOf(um) === -1;
   return r.lima + transitoDisponible(r) + (traslada ? ((r.ica||0) + (r.trujillo||0)) : 0);
 }
+// Punto de reorden que corresponde al ORIGEN real del producto (16.09.2026, Piero sobre el 001900700004:
+// "por qué este código me sale así en la plataforma?"). El Excel trae dos puntos de reorden, nacional y de
+// importación, y para un producto que solo se importa el Lead Time nacional viene en 0, así que su ROP
+// nacional colapsa a 0.1 y el propio Excel lo marca "OK". La simulación del gráfico ya usaba el ROP de
+// importación (ver ropSim en drawKardex), pero la DECISIÓN de comprar seguía comparando contra el
+// nacional: la tarjeta decía "no hay que pedir" mientras el gráfico dibujaba un ROP muy por encima del
+// stock. Se usa el mismo criterio de origen que el gráfico: el prefijo de la OC manda (0001 nacional /
+// 0002 importado) y, sin OC que lo diga, se cae al único lead time que el Excel trae con valor.
+// Verificado contra el archivo real: 58 productos con consumo quedaban invisibles, 33 de ellos marcados
+// "OK" por el Excel.
+function ropEfectivo(r){
+  const ropImp = (r.ropImp != null && r.ropImp > 0) ? r.ropImp : null;
+  if(ropImp == null) return r.rop;
+  const ltNacional = (r.leadTime != null && r.leadTime > 0) ? r.leadTime : null;
+  const ltImportado = (r.leadTimeImp != null && r.leadTimeImp > 0) ? r.leadTimeImp : null;
+  const compras = comprasDeProducto(r.codigos || [r.codigo]);
+  const esImportado = compras.origen != null
+    ? (compras.origen === 'importado')
+    : (ltNacional == null && ltImportado != null);
+  return esImportado ? ropImp : r.rop;
+}
 // Completa un producto con su stock para reposición, cuánto le falta para el ROP y su estado.
 function conEstadoRepo(o){
   const stockRepo = stockParaReposicion(o);
+  const rop = ropEfectivo(o);
   o.stockRepo = stockRepo;
-  o.faltante = o.rop - stockRepo;
-  o.estado = stockRepo <= o.rop ? 'reposicion' : 'ok';
+  o.faltante = rop - stockRepo;
+  o.estado = stockRepo <= rop ? 'reposicion' : 'ok';
   return o;
 }
 // ---------- Homologación de códigos por descripción (09.09.2026) ----------
@@ -4603,7 +4625,7 @@ function drawKardex(){
   const stockConsolidado = stockParaReposicion(producto);
   const faltanteConsolidado = (producto.consumoMensual > 0 && mesesInput > 0)
     ? (producto.consumoMensual * mesesInput) - stockConsolidado : 0;
-  const hayQueComprar = stockConsolidado <= producto.rop && faltanteConsolidado > 0;
+  const hayQueComprar = stockConsolidado <= ropEfectivo(producto) && faltanteConsolidado > 0;
   // Stock que hay en OTRAS sedes y que podría trasladarse en vez de comprar.
   const enOtrasSedes = ALMACEN_SEDES
     .map(s=>({ key:s.toLowerCase(), label:s, cant: Number(producto[s.toLowerCase()]) || 0 }))
@@ -4933,8 +4955,14 @@ function drawKardex(){
   // Sin subtítulos: 15.09.2026, Piero pidió quitarlos uno por uno ("quita esto" en los tres) — las
   // tarjetas quedan solo con su nombre y su número.
   const kpiHoy = `<div class="card kpi kdx-kpi"><div class="label">Stock actual — ${escapeHtml(sucInfo.label)}</div><div class="value">${fmt2(stockSuc)}</div></div>`;
-  const kpiRop = producto.rop!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP</div><div class="value">${fmt2(producto.rop)}</div></div>` : '';
-  const kpiSeg = producto.stockSeguridad!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad</div><div class="value">${fmt2(producto.stockSeguridad)}</div></div>` : '';
+  // Las tarjetas muestran el ROP y el stock de seguridad del ORIGEN real del producto (16.09.2026): en un
+  // producto que solo se importa, los de la columna nacional vienen en 0.1 y contradecían al gráfico, que
+  // ya dibujaba los de importación.
+  const segSim = (esImportado && producto.stockSeguridadImp != null && producto.stockSeguridadImp > 0)
+    ? producto.stockSeguridadImp : producto.stockSeguridad;
+  const etiqImp = esImportado && ropSim !== producto.rop ? ' de importación' : '';
+  const kpiRop = ropSim!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP${etiqImp}</div><div class="value">${fmt2(ropSim)}</div></div>` : '';
+  const kpiSeg = segSim!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad${etiqImp}</div><div class="value">${fmt2(segSim)}</div></div>` : '';
   // La 4ª tarjeta ("Pedir (simulado)") se eliminó el 15.09.2026 al simplificar: cuándo pedir, cuánto y
   // cuándo llega ya están arriba, en la etiqueta grande (ver pedirBannerSvg). Quedan las 3 tarjetas de
   // referencia — stock, ROP y stock de seguridad — que son contra lo que se lee el gráfico.
@@ -5202,7 +5230,7 @@ function pedirRowsFor(meses, modo){
     // ya tiene requerimiento.
     const stock = stockParaReposicion(r);
     const aPedirCrudo = conConsumo ? (r.consumoMensual * meses) - stock : null;
-    const enReposicion = stock <= r.rop;
+    const enReposicion = stock <= ropEfectivo(r);
     const hayQuePedir = enReposicion && conConsumo && aPedirCrudo > 0;
     if(modo === 'pedir'){
       if(!enReposicion) continue;
