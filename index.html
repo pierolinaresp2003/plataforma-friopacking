@@ -260,7 +260,6 @@
      el relleno solo se ve como un fondo plano, indistinguible de "no hay banda". Se agrega el trazo de
      los bordes superior/inferior de la banda (antes solo tenía relleno, sin stroke) para que el límite de
      la incertidumbre se note aunque el relleno esté saturado. */
-  .kdx-svg .kdx-band-edge{stroke:var(--amber-ink);stroke-width:1.2;stroke-dasharray:2 3;fill:none;opacity:.75;pointer-events:none;}
   .kdx-svg .kdx-dot-proj{fill:var(--card);stroke:var(--amber);stroke-width:2;cursor:pointer;}
   /* La semana en la que entra un pedido o el tránsito: mismo punto hueco, un poco más marcado. */
   .kdx-svg .kdx-dot-proj.kdx-dot-entra{stroke-width:2.6;}
@@ -276,7 +275,6 @@
   .kdx-svg .kdx-transito-line{stroke:var(--brand-2-dark);stroke-width:1.5;stroke-dasharray:5 4;opacity:.7;pointer-events:none;}
   .kdx-svg .kdx-transito-label{font-size:10.5px;font-weight:800;fill:var(--brand-2-dark);pointer-events:none;}
   .kdx-svg .kdx-transito-dot{fill:var(--brand-2-dark);stroke:var(--card);stroke-width:1.5;cursor:pointer;}
-  .kdx-svg .kdx-oc-label{font-size:10px;font-weight:800;fill:var(--brand-2-dark);pointer-events:none;}
   .kdx-svg .kdx-rop-sim{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:4 3;fill:none;opacity:.8;pointer-events:none;}
   /* Rediseño 14.09.2026 (pedido de Piero, mostró un ejemplo de referencia: "en tu gráfico no se sabe casi
      nada"): tarjetas KPI arriba del gráfico, línea vertical "Hoy" separando histórico/proyección, y
@@ -371,6 +369,16 @@
   .pedir-tabla tr:hover td.pedir-col{background:var(--surface-2-hover);}
   .pedir-volver{display:inline-block;font-size:12.5px;font-weight:700;color:var(--brand-ink);cursor:pointer;margin-bottom:12px;}
   .pedir-volver:hover{text-decoration:underline;}
+  /* Botón por fila que abre el kardex de ese producto (16.09.2026, pedido de Piero: "debes colocar a la
+     izquierda de los códigos una opción para que te lleve al análisis del gráfico, ya no funciona por
+     filtro arriba / ahora ingresas dando click a esto de la izquierda"). */
+  .pedir-kdx{border:1px solid var(--line);background:var(--card);color:var(--brand-ink);border-radius:7px;
+    width:28px;height:26px;line-height:1;font-size:13px;cursor:pointer;padding:0;}
+  .pedir-kdx:hover{background:var(--brand-2-soft);border-color:var(--brand-2);}
+  .pedir-tabla td.pedir-cant{background:var(--amber-bg);font-size:13.5px;white-space:nowrap;}
+  .pedir-tabla td.pedir-cant b{color:var(--amber-ink);font-size:15px;}
+  .pedir-cant-um{color:var(--muted);font-weight:700;font-size:11.5px;}
+  .pedir-cant-no{color:var(--muted);}
   .cod-hom{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.35;}
   .bar-row.clickable:hover .bar-label{color:var(--brand-ink);}
   .moneda-tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--ink-soft);margin-right:3px;}
@@ -666,6 +674,9 @@
            y solo aparece cuando el buscador de arriba deja exactamente 1 producto a la vista — ver
            kardexProductoActual/drawKardex. -->
       <div class="card" id="kardexCard" style="padding:18px 20px 14px;margin-bottom:18px;display:none;">
+        <!-- Solo aparece cuando se entró desde el botón 📈 de la tabla de categorías (16.09.2026, Piero:
+             "una vez se muestre el gráfico que se tenga la opción de volver a este menú anterior"). -->
+        <div class="pedir-volver" id="kardexVolver" style="display:none;">← Volver a la lista de productos</div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
           <h3 style="margin:0 0 2px;font-size:14px;color:var(--ink);" id="kardexTitle">Kardex</h3>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -2354,6 +2365,10 @@ function processWorkbook(wb, filename){
         moneda: col.moneda!==-1 ? (r[col.moneda]||"").toString().trim() : null,
         montoNativo: (col.cantidadOrden!==-1 && col.precioUnitario!==-1 && r[col.cantidadOrden]!=null && r[col.precioUnitario]!=null && !isNaN(Number(r[col.cantidadOrden])) && !isNaN(Number(r[col.precioUnitario])))
           ? Number(r[col.cantidadOrden]) * Number(r[col.precioUnitario]) : null,
+        // Cantidad de la línea (16.09.2026): hace falta para saber cuánto del stock en tránsito de un
+        // producto viene de una OC con requerimiento — ver transitoComprometido en drawKardex.
+        cantidadOrden: (col.cantidadOrden!==-1 && r[col.cantidadOrden]!=null && !isNaN(Number(r[col.cantidadOrden])))
+          ? Number(r[col.cantidadOrden]) : null,
         condiciones: col.condiciones!==-1 ? (r[col.condiciones]||"").toString().trim() : "",
         etd: col.etd!==-1 ? parseExcelDate(r[col.etd]) : null,
         fEntregaReal: col.fEntregaReal!==-1 ? parseExcelDate(r[col.fEntregaReal]) : null,
@@ -2479,6 +2494,8 @@ function processPedidoSinReq(wb, filename){
       moneda: col.moneda!==-1 ? (r[col.moneda]||"").toString().trim() : null,
       montoNativo: (col.cantidadOrden!==-1 && col.precioUnitario!==-1 && r[col.cantidadOrden]!=null && r[col.precioUnitario]!=null && !isNaN(Number(r[col.cantidadOrden])) && !isNaN(Number(r[col.precioUnitario])))
         ? Number(r[col.cantidadOrden]) * Number(r[col.precioUnitario]) : null,
+      cantidadOrden: (col.cantidadOrden!==-1 && r[col.cantidadOrden]!=null && !isNaN(Number(r[col.cantidadOrden])))
+        ? Number(r[col.cantidadOrden]) : null,
       condiciones: col.condiciones!==-1 ? (r[col.condiciones]||"").toString().trim() : "",
       etd: null, fEntregaReal: null,
       // Marca para poder distinguir estas filas en el detalle si hiciera falta más adelante.
@@ -2536,10 +2553,23 @@ const ALMACEN_SEDES = ['ICA','LIMA','TRUJILLO'];
 // descuenta de la cantidad a pedir (ver pedirRowsFor) — si no, el módulo se contradice: marcaría un
 // producto como "hay que pedir" y después le descontaría un stock distinto.
 const ALMACEN_UM_SIN_TRASLADO = ['MTS'];
+// Del stock en tránsito solo cuenta lo que va a QUEDARSE en almacén. Lo que viene contra un
+// requerimiento ya tiene salida programada (16.09.2026, regla de Piero), así que no es stock
+// disponible ni para el estado, ni para el ROP, ni para cuánto pedir. Misma regla que usa el kardex —
+// estaban dando números distintos justamente por eso ("aquí sale 0 a pedir y abajo sale que se debe
+// pedir 12 und").
+// Si todavía no hay datos de compras cargados (o el producto no tiene OC pendientes), no se descuenta
+// nada y el tránsito entra entero, que es como funcionaba antes.
+function transitoDisponible(r){
+  if(!(r.transito > 0)) return 0;
+  const compras = comprasDeProducto(r.codigos || [r.codigo]);
+  const comprometido = compras.pendientes.reduce((a,o)=> a + (o.cantReq || 0), 0);
+  return Math.max(0, r.transito - comprometido);
+}
 function stockParaReposicion(r){
   const um = (r.unidad || '').trim().toUpperCase();
   const traslada = ALMACEN_UM_SIN_TRASLADO.indexOf(um) === -1;
-  return r.lima + r.transito + (traslada ? ((r.ica||0) + (r.trujillo||0)) : 0);
+  return r.lima + transitoDisponible(r) + (traslada ? ((r.ica||0) + (r.trujillo||0)) : 0);
 }
 // Completa un producto con su stock para reposición, cuánto le falta para el ROP y su estado.
 function conEstadoRepo(o){
@@ -3213,13 +3243,21 @@ function indiceOcPorProducto(){
   const filas = getProcesoRows();
   if(OC_POR_PRODUCTO && OC_POR_PRODUCTO_N === filas.length) return OC_POR_PRODUCTO;
   const idx = new Map();
-  for(const r of filas){
+  // Se recorren los 2 archivos: Reporte Maestro (líneas nacidas de un requerimiento) y PedidoSinReq
+  // (pedidos directos). De cada OC se guarda una fila representativa —para las fechas y el origen— y
+  // aparte la cantidad acumulada de cada clase, que es lo que permite separar el tránsito comprometido.
+  const meter = (r, directo)=>{
     const k = String(r.idProducto==null?'':r.idProducto).trim();
-    if(!k || !r.codOrden) continue;
+    if(!k || !r.codOrden) return;
     let g = idx.get(k);
     if(!g){ g = new Map(); idx.set(k, g); }
-    if(!g.has(r.codOrden)) g.set(r.codOrden, r);
-  }
+    let o = g.get(r.codOrden);
+    if(!o){ o = { fila: r, cantReq: 0, cantDirecta: 0 }; g.set(r.codOrden, o); }
+    const c = (r.cantidadOrden != null && !isNaN(r.cantidadOrden)) ? Number(r.cantidadOrden) : 0;
+    if(directo) o.cantDirecta += c; else o.cantReq += c;
+  };
+  for(const r of filas) meter(r, false);
+  for(const r of PEDIDO_SIN_REQ_ROWS) meter(r, true);
   OC_POR_PRODUCTO = idx; OC_POR_PRODUCTO_N = filas.length;
   return idx;
 }
@@ -3229,9 +3267,14 @@ function comprasDeProducto(codigos){
   for(const c of (codigos||[])){
     const g = idx.get(String(c==null?'':c).trim());
     if(!g) continue;
-    g.forEach((r, oc)=>{ if(!ocs.has(oc)) ocs.set(oc, r); });
+    g.forEach((o, oc)=>{
+      const prev = ocs.get(oc);
+      if(!prev) ocs.set(oc, { fila:o.fila, cantReq:o.cantReq, cantDirecta:o.cantDirecta });
+      else { prev.cantReq += o.cantReq; prev.cantDirecta += o.cantDirecta; }
+    });
   }
-  const lista = Array.from(ocs.values());
+  const entradas = Array.from(ocs.values());
+  const lista = entradas.map(e=>e.fila);
   if(!lista.length) return { origen:null, nOc:0, pendientes:[] };
   // Manda la OC más reciente: es como se está comprando el producto HOY. Un producto que antes se
   // importaba y ahora se compra local tiene que usar el lead time local, no el de importación.
@@ -3239,10 +3282,13 @@ function comprasDeProducto(codigos){
   lista.sort((a,b)=> ts(b) - ts(a));
   // "En tránsito" = aprobada y todavía sin recepcionar. Es el mismo criterio de "pendiente de llegar"
   // que ya usa el detalle del Indicador 4 en Tiempos del Proceso.
-  const pendientes = lista.filter(r=> r.fAprob && !r.fRecep)
-    .sort((a,b)=> (a.fAprob?a.fAprob.getTime():0) - (b.fAprob?b.fAprob.getTime():0))
-    .map(r=>({ oc: r.codOrden, origen: origenForDocumento(r.codOrden),
-               fAprob: r.fAprob, proveedor: r.proveedor || '' }));
+  const pendientes = entradas.filter(e=> e.fila.fAprob && !e.fila.fRecep)
+    .sort((a,b)=> (a.fila.fAprob?a.fila.fAprob.getTime():0) - (b.fila.fAprob?b.fila.fAprob.getTime():0))
+    .map(e=>({ oc: e.fila.codOrden, origen: origenForDocumento(e.fila.codOrden),
+               fAprob: e.fila.fAprob, proveedor: e.fila.proveedor || '',
+               // Cantidad que viene por requerimiento y cantidad que viene de pedido directo. Una misma
+               // OC puede tener de las dos (ver ordenesDirectasFiltradas).
+               cantReq: e.cantReq, cantDirecta: e.cantDirecta }));
   return { origen: origenForDocumento(lista[0].codOrden), nOc: lista.length, pendientes };
 }
 
@@ -3861,7 +3907,16 @@ function reposicionScopeRows(){
 // Devuelve el producto a mostrar en el kardex: solo cuando el buscador de arriba (con algo escrito)
 // deja exactamente 1 producto a la vista (pedido de Piero, 09.09.2026: "cuando se filtre así un solo
 // producto"). Con el buscador vacío o con más de un resultado no hay kardex que mostrar.
+// Producto abierto desde el botón 📈 de la tabla "Cuánto pedir por categoría" (16.09.2026, Piero: "la
+// idea de este botón es dirigirse al gráfico, pero no debe filtrar en el buscador el código"). Manda
+// sobre el buscador y se limpia al volver, así el filtro de arriba queda intacto.
+let kardexCodigoDirecto = null;
 function kardexProductoActual(){
+  if(kardexCodigoDirecto){
+    const fila = (ALMACEN_DATA.rows||[]).filter(r=> (r.codigos||[r.codigo]).indexOf(kardexCodigoDirecto) !== -1)[0];
+    if(fila) return fila;
+    kardexCodigoDirecto = null;   // el producto ya no está en el universo (cambió el archivo)
+  }
   const q = (document.getElementById('searchReposicion').value||"").trim();
   if(!q) return null;
   const scope = reposicionScopeRows();
@@ -3938,6 +3993,15 @@ function renderAlertas(){
       'kardex-' + ((kardexUltimo && kardexUltimo.producto.codigo) || 'producto'),
       e.currentTarget,
       html => html));
+    // Volver a la tabla de categorías desde el kardex (16.09.2026). Se limpia el producto directo y se
+    // baja de nuevo a la tarjeta de "Cuánto pedir por categoría", que quedó tal cual estaba: no se toca
+    // el buscador ni la categoría abierta.
+    document.getElementById('kardexVolver').addEventListener('click', ()=>{
+      kardexCodigoDirecto = null;
+      drawKardex();
+      const destino = document.getElementById('pedirCard');
+      if(destino) destino.scrollIntoView({ behavior:'smooth', block:'start' });
+    });
     alertasListenersBound = true;
   }
   drawAlertas();
@@ -4063,6 +4127,9 @@ function drawKardex(){
   if(!producto){ card.style.display = 'none'; kardexLastKey = null; ubicarCampoMeses(false); return; }
   card.style.display = '';
   ubicarCampoMeses(true);
+  // El "volver" solo tiene sentido si se llegó acá desde la tabla de categorías.
+  const volverKdx = document.getElementById('kardexVolver');
+  if(volverKdx) volverKdx.style.display = kardexCodigoDirecto ? '' : 'none';
   document.getElementById('kardexTitle').textContent = 'Kardex — ' + producto.codigo
     + (producto.nCodigos>1 ? ' (' + producto.nCodigos + ' códigos homologados)' : '');
   document.getElementById('kardexSub').textContent = (producto.descripcion||'').trim();
@@ -4225,13 +4292,29 @@ function drawKardex(){
   // así que entra en el gráfico como una llegada real, no como un pedido simulado. El Excel no trae la
   // fecha de llegada del tránsito: se estima con el mismo tiempo de entrega del producto — el nacional o
   // el de importación, según cuál de los dos tenga lleno (ver leadDias/esImportado arriba).
-  const transitoCant = (kardexSucursal==='lima' && producto.transito > 0) ? producto.transito : 0;
+  // El tránsito que NACE DE UN REQUERIMIENTO no es stock (16.09.2026, regla de Piero: "los pedidos en
+  // tránsito que correspondan a Reporte Maestro, es decir, que partan de un req, esos significan que no
+  // son para stock, cuando lleguen se van a ir, entonces no se deberían considerar para el análisis del
+  // stock que se tiene disponible porque son ingresos que ya tienen una salida programada").
+  //
+  // El Excel trae el tránsito como UN solo número por producto, sin abrir por OC. La apertura sale de
+  // cruzar las OC pendientes del producto (aprobadas y sin recepcionar) y sumar la cantidad de cada
+  // clase: lo que viene por requerimiento ya tiene destino y se descuenta; lo que viene de pedido
+  // directo sí entra al almacén como stock. Se descuenta contra el total del Excel (nunca por debajo de
+  // 0), no se reemplaza, porque el Excel es el que manda sobre cuánto hay realmente en camino.
+  const transitoExcel = (kardexSucursal==='lima' && producto.transito > 0) ? producto.transito : 0;
+  const pendientesProducto = transitoExcel > 0 ? compras.pendientes : [];
+  const transitoComprometido = pendientesProducto.reduce((a,o)=> a + (o.cantReq || 0), 0);
+  const transitoCant = Math.max(0, transitoExcel - transitoComprometido);
+  const hayTransitoComprometido = transitoComprometido > 0;
   const tTransito = transitoCant > 0 ? leadDias : null;
-  // Las OC que están detrás de ese stock en tránsito: aprobadas y aún sin recepcionar (ver
-  // comprasDeProducto). Pueden ser varias — es justo el caso que Piero anticipó.
-  const ocsTransito = transitoCant > 0 ? compras.pendientes : [];
+  // Para el globo solo interesan las OC que aportan stock (las que traen cantidad directa). Las que son
+  // puro requerimiento se listan aparte, para que se vea por qué el tránsito del Excel no entró entero.
+  const ocsTransito = transitoCant > 0 ? pendientesProducto.filter(o=>(o.cantDirecta||0) > 0) : [];
+  const ocsComprometidas = pendientesProducto.filter(o=>(o.cantReq||0) > 0);
   const ocsTransitoTexto = ocsTransito.length
-    ? ocsTransito.map(o=>o.oc + ' (' + (o.origen==='importado' ? 'imp.' : 'nac.') + (o.fAprob ? ', aprob. ' + fmtDate(o.fAprob) : '') + ')').join(' · ')
+    ? ocsTransito.map(o=>o.oc + ' — ' + fmt2(o.cantDirecta) + ' ' + (producto.unidad||'')
+        + ' (' + (o.origen==='importado' ? 'imp.' : 'nac.') + (o.fAprob ? ', aprob. ' + fmtDate(o.fAprob) : '') + ')').join(' · ')
     : '';
   // Todas las entradas de stock de la simulación, en orden: primero el tránsito ya comprado y después los
   // pedidos que la simulación decide colocar. La proyección de "qué habría que pedir" arranca recién
@@ -4456,7 +4539,6 @@ function drawKardex(){
   }
   const zoomed = kardexZoom.startIdx!=null && kardexZoom.endIdx!=null;
   const idxView = (zoomed ? allPeriods.slice(kardexZoom.startIdx, kardexZoom.endIdx+1) : allPeriods).map((p,li)=> (zoomed ? kardexZoom.startIdx : 0) + li);
-  const viewStart = idxView[0];
 
   // Más grande a pedido de Piero ("casi ni se ve... ajústalo para que se vea bien en grande" / "lo más
   // grande posible"): antes era 900x300 (proporción 3:1, muy achatado); ahora 1100x520 (~2.1:1) — al
@@ -4494,10 +4576,18 @@ function drawKardex(){
   // extra que se muestrean al llegar un pedido caen en su fecha exacta y no desplazan a los semanales
   // (para una muestra semanal j, (n-1)+7*(j+1)/7 = n+j, o sea exactamente donde estaba antes).
   const posGlobal = (i)=> i < n ? i : (n-1) + projDias[i-n]/7;
-  const posMax = posGlobal(ntotal-1);
-  const spanView = Math.max(1e-9, Math.min(posMax, idxView[idxView.length-1]) - viewStart);
-  const xFor = (localI)=> padL + (idxView.length===1 ? plotW/2 : (localI/spanView)*plotW);
-  const xForGlobal = (i)=> xFor(posGlobal(i) - viewStart);
+  // TODO lo que se dibuja se posiciona en ESTA escala (semanas desde el inicio del histórico), nunca en
+  // la posición ordinal dentro del arreglo. Es la corrección del 16.09.2026: al muestrear la proyección
+  // también en el instante de cada llegada, dos muestras consecutivas pueden caer casi en la misma
+  // fecha, así que el número de muestra dejó de ser proporcional al tiempo. Mezclar las dos escalas era
+  // lo que descuadraba el gráfico al hacer zoom (Piero: "el gráfico amarillo se está bugeando al acercar
+  // la imagen") — las etiquetas del eje y los puntos quedaban en sitios distintos.
+  const posInicio = posGlobal(idxView[0]);
+  const posFin = posGlobal(idxView[idxView.length-1]);
+  const spanView = Math.max(1e-9, posFin - posInicio);
+  // Recibe un desplazamiento YA en semanas respecto del inicio de la vista.
+  const xFor = (localPos)=> padL + (idxView.length===1 ? plotW/2 : (localPos/spanView)*plotW);
+  const xForGlobal = (i)=> xFor(posGlobal(i) - posInicio);
   const yFor = (v)=> padT + plotH - ((v-minVal)/(maxVal-minVal))*plotH;
 
   let gridSvg = '';
@@ -4547,7 +4637,7 @@ function drawKardex(){
   // Histórico: área + línea sólida, un escalón por movimiento (ver histSerie). Se dibuja completo y se
   // recorta con el clip-path del gráfico, en vez de filtrar los puntos: así la línea entra y sale del
   // borde sin cortarse antes de tiempo cuando hay zoom.
-  const histPts = histSerie.map(pt=>[xFor(pt.idx - viewStart), yFor(pt.v)]);
+  const histPts = histSerie.map(pt=>[xFor(pt.idx - posInicio), yFor(pt.v)]);
   const linePath = stepPath(histPts);
   const baseY = yFor(minVal).toFixed(1); // minVal nunca baja de 0 (ver más arriba)
   const areaPath = histPts.length ? linePath + ` L${histPts[histPts.length-1][0].toFixed(1)},${baseY} L${histPts[0][0].toFixed(1)},${baseY} Z` : '';
@@ -4569,7 +4659,7 @@ function drawKardex(){
   // más arriba), acá se recorta con un clip-path al rectángulo del gráfico — así, si la banda es enorme
   // frente a los datos reales, se ve "llegando hasta el borde" en vez de salirse de la tarjeta o forzar
   // una escala inútil.
-  let projLineSvg = '', bandSvg = '', bandEdgeSvg = '', calloutSvg = '';
+  let projLineSvg = '', bandSvg = '', calloutSvg = '';
   if(tieneProyeccion && m>0){
     const projLineIdx = (idxView.indexOf(n-1)!==-1 ? [n-1] : []).concat(idxView.filter(i=>i>=n));
     if(projLineIdx.length>1){
@@ -4582,12 +4672,11 @@ function drawKardex(){
       // es el área bajo la curva proyectada — igual que el área verde del histórico — y la banda queda
       // solo como sus dos bordes punteados, que muestran el rango sin comerse el color de nadie.
       bandSvg = `<path class="kdx-band" clip-path="url(#kdxPlotClip)" d="${projPath} L${projPts[projPts.length-1][0].toFixed(1)},${baseY} L${projPts[0][0].toFixed(1)},${baseY} Z"></path>`;
-      // De la banda ±1 desvest queda solo el borde de ABAJO: es el escenario pesimista, el que dice cuándo
-      // te quedarías sin stock, y va dentro del área naranja. El borde de arriba se quitó el 15.09.2026
-      // porque en productos con Desvest grande se sale del eje y quedaban trozos punteados flotando en la
-      // parte alta del gráfico, que era parte de lo que Piero veía como "los colores se pierden".
-      const lowerPtsAsc = projLineIdx.map(i=>[xForGlobal(i), yFor(i<n ? stockSuc : projLower[i-n])]);
-      bandEdgeSvg = `<path class="kdx-band-edge" clip-path="url(#kdxPlotClip)" d="${stepPath(lowerPtsAsc)}"></path>`;
+      // La banda ±1 desvest ya no se dibuja (16.09.2026, Piero: "puedes quitar esas líneas? no le veo el
+      // sentido a usarlas en el gráfico"). Primero se había quitado el borde de arriba (15.09.2026) y
+      // ahora también el de abajo: en productos con Desvest grande el punteado cruzaba la curva de un
+      // lado a otro y se leía como si fuera otro movimiento de stock. El número sigue disponible en el
+      // globo de cada punto, que es donde no estorba.
     }
   }
 
@@ -4622,13 +4711,15 @@ function drawKardex(){
   let pedidosSvg = '';
   if(tieneProyeccion && m>0){
     const idxDeDia = (t)=> (n-1) + t/7;
-    const dentroDeVista = (idx)=> idx >= idxView[0]-0.5 && idx <= idxView[idxView.length-1]+0.5;
+    // idx acá ya viene en semanas (idxDeDia), así que se compara contra los extremos de la vista en la
+    // misma escala — no contra los índices del arreglo.
+    const dentroDeVista = (idx)=> idx >= posInicio-0.5 && idx <= posFin+0.5;
     // Llegada del stock EN TRÁNSITO (15.09.2026, pedido de Piero). Va en el verde del histórico, no en el
     // naranja de la simulación, porque no es un pedido estimado: es mercadería ya comprada que va a entrar.
     if(transitoCant > 0){
       const idxTr = idxDeDia(tTransito);
       if(dentroDeVista(idxTr)){
-        const x = xFor(idxTr - viewStart);
+        const x = xFor(idxTr - posInicio);
         const nivelTrDespues = nivelNumUm(nivelDespuesDe(tTransito));
         const yTr = Math.min(padT+plotH, Math.max(padT, yFor(nivelTrDespues)));
         pedidosSvg += `<circle class="kdx-transito-dot" cx="${x.toFixed(1)}" cy="${yTr.toFixed(1)}" r="6"`
@@ -4636,20 +4727,13 @@ function drawKardex(){
           + ` data-fllega="${escapeHtml(fmtDate(fechaEnDia(tTransito)))}"`
           + ` data-antes="${fmt2(nivelNumUm(nivelAntesDe(tTransito)))}"`
           + ` data-ocs="${escapeHtml(ocsTransitoTexto)}"`
+          + ` data-comprometido="${hayTransitoComprometido ? escapeHtml(fmt2(transitoComprometido) + ' ' + (producto.unidad||'') + ' del tránsito ya tienen requerimiento y no se cuentan como stock') : ''}"`
           + ` data-despues="${fmt2(nivelTrDespues)}"></circle>`;
-        // El número de OC va escrito sobre el punto, no solo en el globo (16.09.2026, pedido de Piero:
-        // "en el punto debe verse el número de la oc también (o números de oc) porque tal vez hay más
-        // de una oc en tránsito"). Se apilan hasta 3; si hay más, la última línea dice cuántas faltan y
-        // el globo del clic las lista todas.
-        if(ocsTransito.length){
-          const visibles = ocsTransito.slice(0, 3);
-          const resto = ocsTransito.length - visibles.length;
-          const lineas = visibles.map(o=>o.oc).concat(resto>0 ? ['+' + resto + ' OC más'] : []);
-          const yBase = yTr - 12 - (lineas.length-1)*11;
-          pedidosSvg += `<text class="kdx-oc-label" x="${x.toFixed(1)}" y="${yBase.toFixed(1)}" text-anchor="middle">`
-            + lineas.map((txt,li)=>`<tspan x="${x.toFixed(1)}" dy="${li===0?0:11}">${escapeHtml(txt)}</tspan>`).join('')
-            + `</text>`;
-        }
+        // Los números de OC NO se escriben sobre el gráfico (16.09.2026, Piero: "los números de oc
+        // deben verse solo cuando se pone el mouse por encima en esa ventana que se abre, no así como
+        // lo ponemos ahora sobre el gráfico de verde, eso está mal"). Van en data-ocs y los muestra el
+        // globo al pasar el mouse por el punto — mismo criterio que ya se había tomado con la cantidad
+        // del pedido, para que el gráfico quede limpio.
       }
     }
     pedidos.forEach((p, k)=>{
@@ -4673,16 +4757,25 @@ function drawKardex(){
     }
   }
 
-  const labelStep = Math.max(1, Math.ceil(idxView.length/9));
-  const xLabelsSvg = idxView.map((i,li)=> (li%labelStep===0 || li===idxView.length-1)
-    ? `<text x="${xFor(li)}" y="${H-8}" text-anchor="middle">${weekLabelFor(allPeriods[i].key)}</text>` : '').join('');
+  // Las fechas del eje se colocan con xForGlobal (la misma escala que todo lo demás) y no cada N
+  // muestras: con las muestras extra de las llegadas, "cada N" podía poner 2 fechas encima de la otra.
+  // Se recorre la vista y se escribe una fecha solo si quedó a más de 90px de la anterior.
+  let ultimaXLabel = -1e9;
+  const xLabelsSvg = idxView.map((i, li)=>{
+    const x = xForGlobal(i);
+    const esUltima = li === idxView.length-1;
+    if(!esUltima && x - ultimaXLabel < 90) return '';
+    if(esUltima && x - ultimaXLabel < 50) return '';
+    ultimaXLabel = x;
+    return `<text x="${x.toFixed(1)}" y="${H-8}" text-anchor="middle">${weekLabelFor(allPeriods[i].key)}</text>`;
+  }).join('');
 
   // Un punto por MOVIMIENTO real (15.09.2026): su fecha, si fue ingreso o salida, cuánto y con qué saldo
   // quedó. Solo se dibujan los que caen dentro de la ventana visible.
   const histDotsSvg = histSerie.map(pt=>{
     if(!pt.mov) return '';
     if(pt.idx < visDesde-0.5 || pt.idx > visHasta+0.5) return '';
-    const x = xFor(pt.idx - viewStart), y = yFor(pt.v);
+    const x = xFor(pt.idx - posInicio), y = yFor(pt.v);
     if(y < padT-1 || y > padT+plotH+1) return '';
     const esIngreso = pt.mov.q > 0;
     return `<circle class="kdx-dot${esIngreso ? ' kdx-dot-ing' : ' kdx-dot-sal'}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"`
@@ -4718,8 +4811,9 @@ function drawKardex(){
   const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado (histórico)</span>`
     + (producto.rop!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--red);"></span>ROP</span>` : '')
     + (producto.stockSeguridad!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-c);"></span>Stock de seguridad</span>` : '')
-    + (tieneProyeccion && transitoCant>0 ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--brand-2-dark);"></span>Llega el stock en tránsito (${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'')})</span>` : '')
-    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--amber);"></span>Simulación: pedido de ${mesesInput} ${mesesInput===1?'mes':'meses'} ${tieneLead ? `con ${fmt2(leadDias)} días de entrega (${esImportado?'importación':'nacional'})` : 'sin tiempo de entrega en el Excel'} </span><span class="lg-item"><span class="lg-swatch dashed" style="color:var(--amber-ink);"></span>Escenario pesimista (−1 desviación estándar)</span>`
+    + (tieneProyeccion && transitoCant>0 ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--brand-2-dark);"></span>Llega el stock en tránsito (${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'')}${hayTransitoComprometido ? ` de ${fmt2(transitoExcel)}: ${fmt2(transitoComprometido)} ya tienen requerimiento` : ''})</span>` : '')
+    + (tieneProyeccion && transitoCant===0 && hayTransitoComprometido ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--muted);"></span>El tránsito (${fmt2(transitoExcel)} ${escapeHtml(producto.unidad||'')}) ya tiene requerimiento: no entra como stock</span>` : '')
+    + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--amber);"></span>Simulación: pedido de ${mesesInput} ${mesesInput===1?'mes':'meses'} ${tieneLead ? `con ${fmt2(leadDias)} días de entrega (${esImportado?'importación':'nacional'})` : 'sin tiempo de entrega en el Excel'} </span>`
         : (kardexSucursal!=='lima'
             ? `<span class="lg-item" style="color:var(--red);">Sin proyección: solo disponible con Lima San Pedro seleccionada</span>`
             : `<span class="lg-item" style="color:var(--red);">Sin proyección: falta "Consumo Diario" o "Desvest" para este producto en Análisis Inventario</span>`))
@@ -4758,7 +4852,7 @@ function drawKardex(){
   // dejar un gráfico que parece no hacer nada.
   const pedidoFueraDeVentana = tieneProyeccion && pedidos.length && pedidos[0].tPedido > horizonDias;
   const calcCaption = tieneProyeccion
-    ? `<div class="kdx-caption">${transitoCant>0 ? `<b>Stock en tránsito:</b> hay ${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'unidades')} ya compradas en camino. El Excel no trae su fecha de llegada, así que se estima con el mismo tiempo de entrega del producto (${fmt2(leadDias)} días${esImportado?', de importación':''}): entran el ${fmtDate(fechaEnDia(tTransito))}, marcadas en verde, y la simulación de qué pedir arranca recién desde ahí. ` : ''}<b>Cómo se lee la simulación (naranja):</b> el stock baja ${fmt2(producto.consumoDiario)}/día y al tocar el ${esImportado?'ROP de importación':'ROP'} ${fmt2(ropSim)} se pide <b>${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'unidades')}</b> = ${mesesInput} ${mesesInput===1?'mes':'meses'} de rotación (${fmt2(producto.consumoDiario)}/día × ${cicloDias} días). ${tieneLead ? `Durante los ${fmt2(leadDias)} días de entrega el stock sigue bajando; recién ahí sube de golpe.` : 'Sin Lead Time en tu Excel, el pedido se simula llegando el mismo día.'} Se muestran ${NUM_CICLOS_PEDIDO} ciclos; la punteada de abajo es el escenario pesimista (−1 desviación estándar, Desvest ${fmt2(producto.desvest)}), que se reinicia con cada llegada.${quiebre ? ` <b style="color:var(--red);">Ojo: con ${mesesInput} ${mesesInput===1?'mes':'meses'} el stock llega a 0 antes de que entre el pedido</b> — hay que pedir más cantidad o pedir antes.` : ''}${pedidoFueraDeVentana ? ` Este producto rota tan lento que recién tocaría el ROP el ${fmtDate(fechaEnDia(pedidos[0].tPedido))}, fuera de la ventana del gráfico (3 años).` : ''}</div>`
+    ? `<div class="kdx-caption">${transitoCant>0 ? `<b>Stock en tránsito:</b> hay ${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'unidades')} ya compradas en camino. El Excel no trae su fecha de llegada, así que se estima con el mismo tiempo de entrega del producto (${fmt2(leadDias)} días${esImportado?', de importación':''}): entran el ${fmtDate(fechaEnDia(tTransito))}, marcadas en verde, y la simulación de qué pedir arranca recién desde ahí. ` : ''}<b>Cómo se lee la simulación (naranja):</b> el stock baja ${fmt2(producto.consumoDiario)}/día y al tocar el ${esImportado?'ROP de importación':'ROP'} ${fmt2(ropSim)} se pide <b>${fmt2(cantidadPedido)} ${escapeHtml(producto.unidad||'unidades')}</b> = ${mesesInput} ${mesesInput===1?'mes':'meses'} de rotación (${fmt2(producto.consumoDiario)}/día × ${cicloDias} días). ${tieneLead ? `Durante los ${fmt2(leadDias)} días de entrega el stock sigue bajando; recién ahí sube de golpe.` : 'Sin Lead Time en tu Excel, el pedido se simula llegando el mismo día.'} Se muestran ${NUM_CICLOS_PEDIDO} ciclos. El escenario pesimista (−1 desviación estándar, Desvest ${fmt2(producto.desvest)}) ya no se dibuja: sale en el globo de cada punto.${quiebre ? ` <b style="color:var(--red);">Ojo: con ${mesesInput} ${mesesInput===1?'mes':'meses'} el stock llega a 0 antes de que entre el pedido</b> — hay que pedir más cantidad o pedir antes.` : ''}${pedidoFueraDeVentana ? ` Este producto rota tan lento que recién tocaría el ROP el ${fmtDate(fechaEnDia(pedidos[0].tPedido))}, fuera de la ventana del gráfico (3 años).` : ''}</div>`
     : (kardexSucursal!=='lima' ? `<div class="kdx-caption">Sin proyección para ${escapeHtml(sucInfo.label)}: Consumo Diario y Desvest de tu Excel son del producto completo (las 3 sucursales juntas), no por sucursal — la proyección solo se muestra con Lima San Pedro seleccionada.</div>` : '');
   // 15.09.2026, pedido de Piero: el stock de este gráfico es solo lo físico de la sucursal elegida —
   // Tránsito y las otras 2 sucursales NO están incluidos, a diferencia del stock que decide el estado en
@@ -4797,7 +4891,6 @@ function drawKardex(){
     ${gridSvg}
     <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
     ${bandSvg}
-    ${bandEdgeSvg}
     <path class="kdx-area" clip-path="url(#kdxPlotClip)" d="${areaPath}"></path>
     <path class="kdx-line" clip-path="url(#kdxPlotClip)" d="${linePath}"></path>
     ${projLineSvg}
@@ -4900,7 +4993,8 @@ function drawKardex(){
     tooltip.style.top = Math.max(0, cy - tooltip.offsetHeight - 12) + 'px';
   };
   const num = v => Number(v).toLocaleString('es-PE', {maximumFractionDigits:2});
-  const htmlTransito = d => `<b>Stock en tránsito — llega el ${d.fllega}</b><br>Cantidad en camino: <b>${d.cant}</b><br>Ya comprado · el stock baja a ${d.antes} y sube a ${d.despues}`
+  const htmlTransito = d => `<b>Stock en tránsito — llega el ${d.fllega}</b><br>Cantidad que entra al stock: <b>${d.cant}</b><br>Ya comprado · el stock baja a ${d.antes} y sube a ${d.despues}`
+    + (d.comprometido ? `<br><br>${d.comprometido}` : '')
     + (d.ocs ? `<br><br><b>Órdenes de compra en tránsito</b><br>${d.ocs.split(' · ').join('<br>')}` : '');
   // Punto de la curva proyectada: siempre el estimado de esa semana y, si ahí entra un pedido o el
   // tránsito, además cuánto entra y en qué fechas.
@@ -4995,11 +5089,15 @@ function pedirRowsFor(meses, modo){
     const conConsumo = (r.consumoMensual !== null && r.consumoMensual > 0);
     // Se descuenta el MISMO stock que decidió el estado (ver stockParaReposicion): Lima + tránsito
     // siempre, más Ica y Trujillo cuando la unidad de medida no es MTS.
-    const stock = (r.stockRepo != null) ? r.stockRepo : stockParaReposicion(r);
+    // Se recalcula acá y no se usa r.stockRepo (congelado al cargar el Excel de almacén): Reporte
+    // Maestro y PedidoSinReq se pueden haber cargado DESPUÉS, y son los que dicen cuánto del tránsito
+    // ya tiene requerimiento.
+    const stock = stockParaReposicion(r);
     const aPedirCrudo = conConsumo ? (r.consumoMensual * meses) - stock : null;
-    const hayQuePedir = (r.estado === 'reposicion') && conConsumo && aPedirCrudo > 0;
+    const enReposicion = stock <= r.rop;
+    const hayQuePedir = enReposicion && conConsumo && aPedirCrudo > 0;
     if(modo === 'pedir'){
-      if(r.estado !== 'reposicion') continue;
+      if(!enReposicion) continue;
       // Sin consumo mensual registrado no hay forma de traducir "meses" a cantidad: se cuentan aparte
       // en vez de asumir 0 y hacerlos desaparecer del resumen.
       if(!conConsumo){ sinConsumo++; continue; }
@@ -5089,38 +5187,39 @@ function drawPedirDetalle(grupos){
   // productos de mayor rotación a menor, y ahí ya podré ver qué cantidad pedir de esos que serían los
   // críticos"). La rotación es el consumo mensual del producto ya homologado.
   const rows = g.rows.slice().sort((a,b)=> (b.consumoMensual||0)-(a.consumoMensual||0) || b.aPedir-a.aPedir);
-  const nPedir = rows.filter(r=>r.hayQuePedir !== false).length;
-  // Solo unidades de medida con algo que pedir: con el redondeo, un total de 0.16 CTO quedaba en
-  // "0 CTO", que no dice nada.
-  const ums = Object.keys(g.porUm).filter(u=> g.porUm[u] > 0).sort((a,b)=> g.porUm[b]-g.porUm[a]);
-  const totales = ums.map(u=> '<b>' + fmt(g.porUm[u]) + '</b>' + (u==='—' ? '' : ' ' + escapeHtml(u))).join(' · ');
   box.innerHTML = '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'
     + '<div class="pedir-detalle-head"><span>' + iconForFamilia(sinAcentos(g.label)) + '</span>'
       + escapeHtml(g.label) + '</div>'
-    + '<div class="pedir-detalle-sub">' + g.n.toLocaleString('es-PE') + ' producto(s)'
-      + (nPedir < g.n ? ', ' + nPedir.toLocaleString('es-PE') + ' con cantidad a pedir' : ' a pedir')
-      + (totales ? ' · total: ' + totales : '')
-      + ' · ordenados de mayor a menor rotación</div>'
+    // 16.09.2026, Piero: "quita esto" sobre la línea de resumen (N productos · total por UM · ordenados
+    // por rotación). El dato de cuánto pedir ahora está fila por fila en la última columna.
     // Orden de columnas y ancho fijo pedidos por Piero (09.09.2026, comentario en el artefacto:
     // "que no quede tanto espacio en blanco y que luego de UM vaya el stock en Lima Trujillo Ica /
     // Luego el en tránsito / Luego la rotación / Luego el ROP y finalmente la cantidad a pedir al final
     // resaltado"). table-layout:fixed + colgroup: los números se quedan en columnas angostas y la
     // descripción se lleva todo el ancho sobrante, que es lo que dejaba el espacio en blanco.
     + '<div class="table-card card" style="max-height:560px;overflow:auto;"><table class="pedir-tabla">'
-    + '<colgroup><col style="width:112px"><col><col style="width:52px">'
+    // Descripción con ancho propio (16.09.2026, Piero: "reduce el espacio de esta columna, está muy
+    // largo"): antes era la única columna sin width, así que se quedaba con TODO el espacio sobrante.
+    // Con un ancho declarado solo recibe su parte proporcional del sobrante, y las columnas numéricas
+    // dejan de quedar apretadas contra el borde. La 1ra columna es el botón que abre el kardex.
+    + '<colgroup><col style="width:40px"><col style="width:112px"><col style="width:280px"><col style="width:52px">'
     + '<col style="width:68px"><col style="width:76px"><col style="width:58px">'
     // La última columna ("A pedir") se quitó el 15.09.2026 a pedido de Piero (comentario en el artefacto:
     // "esto que es a pedir quitalo por favor, porque ya se tiene abajo en grande cuánto hay que pedir").
-    + '<col style="width:80px"><col style="width:92px"><col style="width:80px"></colgroup>'
+    + '<col style="width:80px"><col style="width:92px"><col style="width:80px"><col style="width:104px"></colgroup>'
     + '<thead><tr>'
-    + '<th>Código</th><th>Descripción</th><th class="um">UM</th>'
+    + '<th></th><th>Código</th><th>Descripción</th><th class="um">UM</th>'
     + '<th class="num">LIMA</th><th class="num">Trujillo</th><th class="num">ICA</th>'
     + '<th class="num">En tránsito</th><th class="num">Rotación</th><th class="num">ROP</th>'
+    + '<th class="num">A pedir</th>'
     + '</tr></thead><tbody>'
     // Solo el código principal: Piero pidió no listar los códigos homologados debajo (09.09.2026,
     // comentario en el artefacto: "no pongas esto"). La homologación sigue aplicándose — los códigos
     // gemelos están en r.codigos y el buscador general los sigue encontrando.
-    + rows.map(r=> '<tr><td>' + escapeHtml(r.codigo) + '</td>'
+    + rows.map(r=> '<tr>'
+        + '<td><button type="button" class="pedir-kdx" data-cod="' + escapeHtml(r.codigo) + '"'
+          + ' title="Ver el kardex y la simulación de este producto">📈</button></td>'
+        + '<td>' + escapeHtml(r.codigo) + '</td>'
         + '<td style="white-space:normal;">' + (escapeHtml(r.descripcion) || '—') + '</td>'
         + '<td class="um">' + (escapeHtml(r.unidad) || '—') + '</td>'
         + '<td class="num">' + fmt(r.lima) + '</td>'
@@ -5128,10 +5227,30 @@ function drawPedirDetalle(grupos){
         + '<td class="num">' + fmt(r.ica) + '</td>'
         + '<td class="num">' + fmt(r.transito) + '</td>'
         + '<td class="num"><b>' + fmt(r.consumoMensual) + '</b></td>'
-        + '<td class="num">' + fmt(r.rop) + '</td></tr>').join('')
+        + '<td class="num">' + fmt(r.rop) + '</td>'
+        // Cuánto pedir de ESE producto con los meses que esté puesto arriba (16.09.2026, pedido de
+        // Piero: "a la derecha, coloca resaltado, cuánto se debería pedir en base a lo que yo coloque
+        // arriba en los meses a abastecer"). Es el mismo r.aPedir que suma el total de la categoría
+        // —consumo mensual × meses − stock—, así que la columna cuadra con ese total. Entero, porque no
+        // se compran fracciones.
+        + '<td class="num pedir-cant">' + (r.hayQuePedir === false || !(r.aPedir > 0)
+            ? '<span class="pedir-cant-no">—</span>'
+            : '<b>' + fmt(arriba(r.aPedir)) + '</b>' + (r.unidad ? ' <span class="pedir-cant-um">' + escapeHtml(r.unidad) + '</span>' : ''))
+        + '</td></tr>').join('')
     + '</tbody></table></div>';
   const volver = document.getElementById('pedirVolver');
   if(volver) volver.addEventListener('click', ()=>{ pedirCatSel = null; drawPedirPorCategoria(); });
+  // Cada botón entra al kardex de su producto: escribe el código en el buscador del módulo (que es de
+  // donde drawKardex toma el producto, así que sigue siendo un solo camino de entrada, no uno paralelo)
+  // y baja hasta el gráfico.
+  box.querySelectorAll('.pedir-kdx').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      kardexCodigoDirecto = btn.dataset.cod;
+      drawKardex();
+      const card = document.getElementById('kardexCard');
+      if(card) card.scrollIntoView({ behavior:'smooth', block:'start' });
+    });
+  });
 }
 
 // Colores nacional/importado (categóricos ya usados en la plataforma para distinguir grupos que no son
