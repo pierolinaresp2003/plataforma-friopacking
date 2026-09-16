@@ -2627,16 +2627,22 @@ const FIRMA_RUIDO_CABLE = [
 // descripción son el mismo cable". Los calibres que no están en la tabla (23 AWG de un cable de red,
 // por ejemplo) se dejan intactos a propósito.
 const AWG_A_MM2 = { '24':'0.25','22':'0.34','20':'0.5','18':'1','16':'1.5','14':'2.5','12':'4','10':'6','8':'10','6':'16','4':'25','2':'35' };
+// Detección de "esto es un cable". Se agregaron las familias que el archivo escribe SIN la palabra
+// "cable" (16.09.2026): "OPVC-JZ 4G X 0.75 MM2" no traía ninguna de las señales anteriores —la X entre
+// la G y la sección rompía el patrón— y quedaba fuera de todas las reglas de cable.
+// El patrón numérico exige MM2 (sección de conductor): sin esa condición, "TEE RED. PP-R FUSIÓN PN 20
+// 63X20 MM" se tomaba por cable. "C/" al inicio es como el archivo abrevia los cables (C/CONTROL,
+// C/ALIMENTADOR-FUERZA, C/AMARILLO-TIERRA, C/ETHERNET).
+// Sin /g a propósito: se usa con .test() desde dos lugares (firmaProducto y categoriaGenericaFor) y
+// con la bandera global .test() arrastraría lastIndex entre llamadas.
+const RX_ES_CABLE = /APANTALLAD|\bCABLE\b|CONDUCTOR|\bAWG\b|\d+\s*[GX]\s*X?\s*[\d.]+\s*MM\s*2|\bOPVC\b|\bOLFLEX\b|\bYSL|\bRZ1|\bNHX\b|\bTHW\b|\bN2X|^C\s*\//;
+function esCableDescripcion(desc){
+  return RX_ES_CABLE.test(sinAcentos(String(desc==null?'':desc)).toUpperCase());
+}
 function firmaProducto(desc){
   let s = sinAcentos(String(desc==null?'':desc)).toUpperCase();
   // ¿Es un cable? Se evalúa sobre el texto original, antes de recortar prefijos.
-  // Detección de "esto es un cable". Se agregaron las familias que el archivo escribe SIN la palabra
-  // "cable" (16.09.2026): "OPVC-JZ 4G X 0.75 MM2" no traía ninguna de las señales anteriores —la X entre
-  // la G y la sección rompía el patrón— y quedaba fuera de todas las reglas de cable.
-  // El patrón numérico exige MM2 (sección de conductor): sin esa condición, "TEE RED. PP-R FUSIÓN PN 20
-  // 63X20 MM" se tomaba por cable. "C/" al inicio es como el archivo abrevia los cables (C/CONTROL,
-  // C/ALIMENTADOR-FUERZA, C/AMARILLO-TIERRA, C/ETHERNET).
-  const esCable = /APANTALLAD|\bCABLE\b|CONDUCTOR|\bAWG\b|\d+\s*[GX]\s*X?\s*[\d.]+\s*MM\s*2|\bOPVC\b|\bOLFLEX\b|\bYSL|\bRZ1|\bNHX\b|\bTHW\b|\bN2X|^C\s*\//.test(s);
+  const esCable = RX_ES_CABLE.test(s);
   // Apantallado o sin pantalla: son cables DISTINTOS y nunca se pueden juntar (regla de Piero,
   // 16.09.2026, sobre el 004300300568: "es apantallado 7g1 y eso es distinto de uno de control que no
   // sea apantallado"). La pantalla no siempre se escribe con la palabra "apantallado": en la
@@ -6565,10 +6571,20 @@ function fmtMonedaCompras(n, symbol){
 // también reemplaza la sub-clasificación de VÁLVULA por amoniaco/freón (adivinada por palabras clave el
 // mismo 07.09.2026): ya no hace falta adivinar el tipo de válvula — el catálogo trae el tipo real
 // (bola, check, mariposa, solenoide, etc.) como Subfamilia, un dato real en vez de una inferencia.
+// Ronda 47 (16.09.2026), pedido de Piero sobre el 004200700010 (CABLE APANTALLADO OPVC-JZ-CY 7G1MM2):
+// "pero está en servicios de instalación, esto es un cable, no confundir esa categoría". El catálogo
+// maestro de Nisira lo tiene registrado con Familia 42 "SERVICIO DE INSTALACIÓN ELÉCTRICA" / Subfamilia
+// "DE CABLEADO ELÉCTRICO" — es un error de maestro: los otros 9 productos de esa subfamilia sí son
+// servicios (UM = SER), este es material físico comprado por metros. Por eso un producto que la misma
+// lógica de cables de firmaProducto reconoce como cable NUNCA puede quedar en una categoría de
+// servicios. Verificado contra las 15,515 descripciones reales de los 3 archivos: la regla mueve
+// exactamente 1 producto (este), ninguna otra categoría se toca.
 function categoriaGenericaFor(nombreFamilia, idProducto, descripcion){
   const raw = categoriaGenericaRawFor(nombreFamilia, idProducto, descripcion);
   const homologada = HOMOLOGACION_FAMILIA[raw] || raw;
-  return COMPACTACION_FAMILIA[homologada] || homologada;
+  const categoria = COMPACTACION_FAMILIA[homologada] || homologada;
+  if(categoria === 'SERVICIOS DE INSTALACIÓN Y FABRICACIÓN' && esCableDescripcion(descripcion)) return 'MATERIAL PARA INSTALACIÓN ELÉCTRICA';
+  return categoria;
 }
 // Resolución sin homologar (nombre real de Nisira o de la adivinanza por descripción) — categoriaGenericaFor
 // de arriba le aplica HOMOLOGACION_FAMILIA una sola vez al resultado final, así la recursión de backfill
