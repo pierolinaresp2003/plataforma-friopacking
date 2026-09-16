@@ -303,6 +303,8 @@
   .kdx-pedir-banner{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;border-radius:10px;padding:12px 16px;margin-bottom:14px;border:1.5px solid;}
   .kdx-pedir-banner .kdx-pedir-tag{font-size:15px;font-weight:800;}
   .kdx-pedir-banner .kdx-pedir-cant{font-size:26px;font-weight:800;line-height:1;}
+  .kdx-pedir-traslado{background:var(--green-bg);border-color:var(--brand-2);color:var(--brand-2-dark);}
+  .kdx-pedir-traslado .kdx-pedir-cant{font-size:20px;}
   .kdx-pedir-banner .kdx-pedir-sub{width:100%;font-size:11.5px;font-weight:600;opacity:.85;}
   .kdx-pedir-si{background:var(--red-bg);border-color:var(--red);color:var(--red);}
   .kdx-pedir-no{background:var(--green-bg);border-color:var(--green);color:var(--green);}
@@ -374,7 +376,7 @@
      filtro arriba / ahora ingresas dando click a esto de la izquierda"). */
   .pedir-kdx{border:1px solid var(--line);background:var(--card);color:var(--brand-ink);border-radius:7px;
     width:28px;height:26px;line-height:1;font-size:13px;cursor:pointer;padding:0;}
-  .pedir-kdx:hover{background:var(--brand-2-soft);border-color:var(--brand-2);}
+  .pedir-kdx:hover{background:var(--surface-2);border-color:var(--brand-2);}
   .pedir-tabla td.pedir-cant{background:var(--amber-bg);font-size:13.5px;white-space:nowrap;}
   .pedir-tabla td.pedir-cant b{color:var(--amber-ink);font-size:15px;}
   .pedir-cant-um{color:var(--muted);font-weight:700;font-size:11.5px;}
@@ -2628,7 +2630,21 @@ const AWG_A_MM2 = { '24':'0.25','22':'0.34','20':'0.5','18':'1','16':'1.5','14':
 function firmaProducto(desc){
   let s = sinAcentos(String(desc==null?'':desc)).toUpperCase();
   // ¿Es un cable? Se evalúa sobre el texto original, antes de recortar prefijos.
-  const esCable = /APANTALLAD|\bCABLE\b|CONDUCTOR|\bAWG\b|\d+\s*[GX]\s*[\d.]+\s*MM/.test(s);
+  // Detección de "esto es un cable". Se agregaron las familias que el archivo escribe SIN la palabra
+  // "cable" (16.09.2026): "OPVC-JZ 4G X 0.75 MM2" no traía ninguna de las señales anteriores —la X entre
+  // la G y la sección rompía el patrón— y quedaba fuera de todas las reglas de cable.
+  // El patrón numérico exige MM2 (sección de conductor): sin esa condición, "TEE RED. PP-R FUSIÓN PN 20
+  // 63X20 MM" se tomaba por cable. "C/" al inicio es como el archivo abrevia los cables (C/CONTROL,
+  // C/ALIMENTADOR-FUERZA, C/AMARILLO-TIERRA, C/ETHERNET).
+  const esCable = /APANTALLAD|\bCABLE\b|CONDUCTOR|\bAWG\b|\d+\s*[GX]\s*X?\s*[\d.]+\s*MM\s*2|\bOPVC\b|\bOLFLEX\b|\bYSL|\bRZ1|\bNHX\b|\bTHW\b|\bN2X|^C\s*\//.test(s);
+  // Apantallado o sin pantalla: son cables DISTINTOS y nunca se pueden juntar (regla de Piero,
+  // 16.09.2026, sobre el 004300300568: "es apantallado 7g1 y eso es distinto de uno de control que no
+  // sea apantallado"). La pantalla no siempre se escribe con la palabra "apantallado": en la
+  // nomenclatura OPVC/ÖLFLEX/YSLY el sufijo CY ES la pantalla (OPVC-JZ es sin pantalla, OPVC-JZ-CY es
+  // con pantalla; YSLY vs YSLCY). Como el CY se limpia junto con el resto del modelo, la pantalla se
+  // detecta ANTES y se vuelve a escribir como un token explícito, para que la distinción no dependa de
+  // qué palabras hayan sobrevivido a la limpieza.
+  const esApantallado = /APANTALLAD|\bCY\b|[A-Z]{2,}CY\b|-\s*CY\b/.test(s);
   s = s.replace(/²/g,'2').replace(/³/g,'3').replace(/[“”]/g,'"').replace(/[’′]/g,"'");
   s = s.replace(/''/g, '"');   // en el archivo real las pulgadas se escriben con 2 apóstrofes o con comilla
   // Medidas en pulgadas con fracción → UN solo token decimal. Es indispensable: al limpiar la "/" más
@@ -2661,11 +2677,14 @@ function firmaProducto(desc){
     // descripción no dice "instrumentación" es de control (regla de Piero, 16.09.2026: "si no define
     // que es de instrumentación entonces es control y tampoco sería igual"). Se normaliza a UN token
     // explícito para que la distinción quede en la firma en vez de depender de cómo lo escribieron.
-    if(/APANTALLAD/.test(s)){
+    if(esApantallado){
       const esInstrumentacion = /INSTRUMENTACION/.test(s);
       s = s.replace(/\bDE\s+INSTRUMENTACION\b/g, ' ').replace(/\bINSTRUMENTACION\b/g, ' ')
-           .replace(/\bDE\s+CONTROL\b/g, ' ').replace(/\bCONTROL\b/g, ' ');
-      s += esInstrumentacion ? ' INSTRUMENTACION' : ' CONTROL';
+           .replace(/\bDE\s+CONTROL\b/g, ' ').replace(/\bCONTROL\b/g, ' ')
+           .replace(/\bAPANTALLADO?S?\b/g, ' ');
+      s += ' APANTALLADO' + (esInstrumentacion ? ' INSTRUMENTACION' : ' CONTROL');
+    } else {
+      s += ' SINPANTALLA';
     }
   }
   FIRMA_PREFIJOS.forEach(rx=>{ s = s.replace(rx, ' '); });
@@ -4042,7 +4061,15 @@ function renderAlertas(){
   if(!alertasListenersBound){
     ['searchReposicion','filterReposicionEstado','mesesAbastecer'].forEach(id=>{
       const el = document.getElementById(id);
-      el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawAlertas);
+      el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', ()=>{
+        // Al buscar o cambiar el filtro se suelta el producto que se abrió con el botón 📈; si no, el
+        // gráfico de ese producto se quedaba pegado y no correspondía a lo que se acababa de buscar
+        // (16.09.2026, Piero: "cada vez que haga una nueva búsqueda, se debe borrar el gráfico
+        // residual que queda"). Los meses no lo sueltan: ahí se está ajustando la simulación del
+        // producto que ya está abierto.
+        if(id !== 'mesesAbastecer') kardexCodigoDirecto = null;
+        drawAlertas();
+      });
     });
     document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'inventario-almacen-general', e.currentTarget));
     document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-inventario-almacen-general', e.currentTarget));
@@ -4560,14 +4587,29 @@ function drawKardex(){
   // cantidad que el diente de sierra naranja. Cuando eso no coincide con la tabla de arriba (que sigue
   // sumando las otras sucursales, sin cambios), se avisa en la misma etiqueta en vez de dejar los dos
   // mensajes contradiciéndose en silencio.
-  const tablaDiceNoPedir = simulaPedirHoy && !(pedirRow && pedirRow.hayQuePedir);
-  const avisoSimulacion = tablaDiceNoPedir
-    ? ` · <b>Ojo:</b> en la tabla de arriba figura sin cantidad a pedir, porque ahí el stock se cuenta sumando las 3 sucursales y el tránsito (${fmt2(producto.stockRepo)} contra el ROP ${fmt2(producto.rop)}). Acá se mira solo ${escapeHtml(sucInfo.label)}.`
-    : '';
-  void cuandoSim; void avisoSimulacion; // ya no se muestran en la etiqueta (ver comentario abajo)
+  // La decisión de COMPRAR es de la empresa, no de una sucursal (16.09.2026, decisión de Piero). No se
+  // compra para Lima: si Lima está en 0 pero Trujillo tiene stock, lo que corresponde es un traslado.
+  // Por eso la etiqueta usa el mismo stock consolidado que la tabla de arriba — las 3 sucursales más el
+  // tránsito disponible, salvo en MTS, que no se trasladan — y así las dos dejan de contradecirse
+  // ("por qué abajo sale pedir 3 und? y arriba en 'a pedir' sale que no se pida").
+  // La CURVA del gráfico sigue siendo de la sucursal seleccionada: ahí se lee el movimiento real de esa
+  // sede, que es para lo que sirve el kardex.
+  const stockConsolidado = stockParaReposicion(producto);
+  const faltanteConsolidado = (producto.consumoMensual > 0 && mesesInput > 0)
+    ? (producto.consumoMensual * mesesInput) - stockConsolidado : 0;
+  const hayQueComprar = stockConsolidado <= producto.rop && faltanteConsolidado > 0;
+  // Stock que hay en OTRAS sedes y que podría trasladarse en vez de comprar.
+  const enOtrasSedes = ALMACEN_SEDES
+    .map(s=>({ key:s.toLowerCase(), label:s, cant: Number(producto[s.toLowerCase()]) || 0 }))
+    .filter(s=> s.key !== kardexSucursal && s.cant > 0);
+  const umTraslada = ALMACEN_UM_SIN_TRASLADO.indexOf((producto.unidad||'').trim().toUpperCase()) === -1;
+  const hayParaTrasladar = umTraslada && !hayQueComprar && stockSuc <= 0 && enOtrasSedes.length > 0;
+  void cuandoSim;
   const pedirBannerSvg = mesesInput <= 0
     ? `<div class="kdx-pedir-banner kdx-pedir-neutral">Escribe cuántos meses quieres cubrir arriba, en "Meses a abastecer", para saber si hay que pedir.</div>`
-    : (simulaPedirHoy
+    : (hayParaTrasladar
+        ? `<div class="kdx-pedir-banner kdx-pedir-traslado"><span class="kdx-pedir-tag">No hay que comprar</span><span class="kdx-pedir-cant">${enOtrasSedes.map(s=>fmt2(s.cant) + ' ' + um + ' en ' + escapeHtml(s.label)).join(' · ')}</span><span class="kdx-pedir-sub">Se puede trasladar en vez de generar una orden de compra.</span></div>`
+    : hayQueComprar
         // 15.09.2026, Piero (comentario en el artefacto): "quita esto" sobre la línea explicativa — la
         // etiqueta queda con lo esencial: si hay que pedir y cuánto. El detalle (cuándo se coloca, cuándo
         // llega, con qué stock se comparó) sigue estando en el gráfico y en el globo de cada punto.
