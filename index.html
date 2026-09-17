@@ -7134,21 +7134,30 @@ function proCKpisHtml(spec){
   return `
   <div style="height:310px;display:flex;gap:16px;">
     ${proCKpiCardHtml(proCSvgDoc(), 'ÓRDENES DE', 'COMPRA GENERADAS', spec.totalOC.toLocaleString('es-PE'), 'OC', '')}
-    ${proCKpiCardHtml(proCSvgReloj(), 'TIEMPO DE', 'EMISIÓN DE OC', emision[0], emision[1], 'Meta: ≤ 2 d.h.')}
-    ${proCKpiCardHtml(proCSvgCamion(), 'TIEMPO DE ENTREGA', 'DE OC EN LURÍN', entrega[0], entrega[1], 'Meta: ≤ plazo pactado')}
+    ${proCKpiCardHtml(proCSvgReloj(), 'TIEMPO DE', 'EMISIÓN DE OC', emision[0], emision[1], '')}
+    ${proCKpiCardHtml(proCSvgCamion(), 'TIEMPO DE ENTREGA', 'DE OC EN LURÍN', entrega[0], entrega[1], '')}
   </div>`;
 }
 function proCBloqueDobleHtml(titulo, alto, columnas){
   // columnas: [{icono, simbolo, pct, pie}] — 2 o 3 columnas separadas por una línea fina.
+  // 17.09.2026, Piero: "tanto los iconos de 'origen de compras' como de 'monto comprado' deben estar
+  // alineados". Antes cada columna centraba el grupo ícono+número, así que el ancho del número movía
+  // el ícono: con 100.0% la bandera quedaba a un lado y con 8.6% a otro, y los dos bloques no
+  // coincidían. Ahora el ícono vive en una casilla de ancho FIJO pegada al inicio de la columna, de
+  // modo que su posición no depende de las cifras y los bloques quedan a plomo entre sí.
+  const tres = columnas.length > 2;
+  const anchoIcono = tres ? 92 : 124;
+  const sep = tres ? 8 : 12;
   const cols = columnas.map((c,i)=>`
     ${i ? `<div style="width:2px;height:140px;background:#e4ecf4;flex-shrink:0;"></div>` : ''}
-    <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-      <div style="display:flex;align-items:center;gap:${columnas.length>2?8:12}px;">
-        ${c.icono ? `<div style="flex-shrink:0;display:flex;align-items:center;">${c.icono}</div>` : ''}
-        ${c.simbolo ? `<div style="font-size:${columnas.length>2?52:68}px;${PRO_C_NUM}color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;line-height:1;flex-shrink:0;">${c.simbolo}</div>` : ''}
-        <div style="font-size:${columnas.length>2?64:92}px;${PRO_C_NUM}color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;line-height:1;white-space:nowrap;">${c.pct}</div>
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding-left:${tres?14:26}px;">
+      <div style="display:flex;align-items:center;gap:${sep}px;">
+        <div style="width:${anchoIcono}px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+          ${c.icono || (c.simbolo ? `<span style="font-size:${tres?52:68}px;${PRO_C_NUM}color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;line-height:1;">${c.simbolo}</span>` : '')}
+        </div>
+        <div style="font-size:${tres?64:92}px;${PRO_C_NUM}color:${PRO_C_NAVY};font-family:Inter,Arial,sans-serif;line-height:1;white-space:nowrap;">${c.pct}</div>
       </div>
-      <div style="font-size:${columnas.length>2?30:36}px;color:${PRO_C_GRIS};font-family:Inter,Arial,sans-serif;margin-top:10px;white-space:nowrap;text-align:center;">${c.pie}</div>
+      ${c.pie ? `<div style="font-size:${tres?30:36}px;color:${PRO_C_GRIS};font-family:Inter,Arial,sans-serif;margin-top:10px;white-space:nowrap;margin-left:${anchoIcono+sep}px;">${c.pie}</div>` : ''}
     </div>`).join('');
   return `
   <div style="height:${alto}px;box-sizing:border-box;background:#fff;border-radius:22px;padding:22px 28px;display:flex;flex-direction:column;">
@@ -7160,9 +7169,10 @@ function proCOrigenHtml(spec){
   const total = spec.nacionalN + spec.importadoN;
   const pctNac = total ? spec.nacionalN/total*100 : 0;
   const pctImp = total ? spec.importadoN/total*100 : 0;
+  // 17.09.2026, Piero: "también quita lo de el detalle de cuántas oc son abajo de origen de compras".
   return proCBloqueDobleHtml('ORIGEN DE COMPRAS', 236, [
-    { icono: proCSvgBandera(112), pct: pctNac.toFixed(1)+'%', pie: spec.nacionalN + ' OC' },
-    { icono: proCSvgGlobo(100),   pct: pctImp.toFixed(1)+'%', pie: spec.importadoN + ' OC' },
+    { icono: proCSvgBandera(112), pct: pctNac.toFixed(1)+'%', pie: '' },
+    { icono: proCSvgGlobo(100),   pct: pctImp.toFixed(1)+'%', pie: '' },
   ]);
 }
 function proCMontoHtml(spec){
@@ -7170,16 +7180,23 @@ function proCMontoHtml(spec){
   // Solo las monedas con monto real (regla ya validada por Piero el 08.09.2026). El % reparte el
   // total NATIVO entre columnas — nunca se convierte la cifra, se muestra en su propia moneda.
   const cols = [
-    { simbolo:'S/',  monto:m.soles },
-    { simbolo:'US$', monto:m.dolares },
-    { simbolo:'€',   monto:m.euros },
+    { moneda:'soles',   monto:m.soles },
+    { moneda:'dolares', monto:m.dolares },
+    { moneda:'euros',   monto:m.euros },
   ].filter(c=>c.monto>0);
   if(!cols.length) return '';
   const suma = cols.reduce((a,c)=>a+c.monto,0) || 1;
+  // 17.09.2026, pedido de Piero: "en lugar de S/ igual la bandera de Perú, y en lugar de US$ que salga
+  // el mundo, así como está arriba en 'origen de compras'; y abajo ya no colocas el número de monto
+  // comprado". Los mismos 2 íconos que ORIGEN DE COMPRAS, y el pie queda vacío: la imagen muestra el
+  // reparto porcentual, no las cifras. El euro no tiene ícono equivalente, así que conserva su símbolo.
+  const chico = cols.length > 2;
   return proCBloqueDobleHtml('MONTO COMPRADO', 236, cols.map(c=>({
-    simbolo: c.simbolo,
+    icono: c.moneda==='soles' ? proCSvgBandera(chico?84:112)
+         : c.moneda==='dolares' ? proCSvgGlobo(chico?76:100) : '',
+    simbolo: c.moneda==='euros' ? '€' : '',
     pct: (c.monto/suma*100).toFixed(1)+'%',
-    pie: Math.round(c.monto).toLocaleString('es-PE'),
+    pie: '',
   })));
 }
 function proCCondicionHtml(spec){
