@@ -123,7 +123,8 @@
   .note b{color:var(--ink);}
   .note.warn{background:var(--amber-bg);color:var(--amber-ink);}
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
-  .toolbar input[type=search], .toolbar select{padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--ink);}
+  .toolbar input[type=search], .toolbar input[type=date], .toolbar select{padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--input-bg);color:var(--ink);}
+  .toolbar .rango-fechas{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--muted);}
   .toolbar input[type=search]{flex:1;min-width:180px;}
   .table-card{overflow-x:auto;padding:0;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -509,7 +510,12 @@
           <option value="11">Noviembre</option>
           <option value="12">Diciembre</option>
         </select>
-        <select id="filterProcesoSemana"><option value="all">Todas las semanas</option></select>
+        <!-- Rango libre de fechas (17.09.2026, pedido de Piero: "que en lugar de por semana me permita
+             filtrar desde cuando hasta cuando"). Reemplaza al selector de Semana de este módulo. Si hay
+             al menos una de las 2 fechas puesta, manda el rango y Año/Mes quedan de lado (mismo criterio
+             que tenía la Semana). El módulo de Gasto conserva su selector de semanas. -->
+        <span class="rango-fechas">Desde <input type="date" id="filterProcesoDesde"> Hasta <input type="date" id="filterProcesoHasta">
+          <button class="btn secondary" id="btnProcesoRangoClear" type="button" title="Quitar el rango de fechas">✕</button></span>
       </div>
 
       <!-- Filas 2 y 3: tarjetas KPI de los 5 indicadores -->
@@ -2129,6 +2135,7 @@ function processWorkbook(wb, filename){
     responsableSalida: findCol(headerRow, ["ResponsableGeneralSalida"]),
     codRequerimiento: findCol(headerRow, ["CodRequerimiento"]),
     codPedido: findCol(headerRow, ["CodPedido"]),
+    cantidadPedido: findCol(headerRow, ["Cantidad de pedido","CantidadPedido"]),
     // Columna agregada por Piero en Reporte Maestro.xlsx (02.09.2026, al final de la hoja): marca con
     // el texto "Regularización" las líneas que no deben contar en el cálculo del Indicador 4 (Tiempo de
     // Entrega de OC) — verificado contra el archivo real: header exacto "¿Es regularización?", valores
@@ -2348,6 +2355,12 @@ function processWorkbook(wb, filename){
         // RUC peruano real y Nisira les asigna un código que empieza con "EX" (pedido de Piero, 01.09.2026).
         origen: origenFor(col.rucProveedor!==-1 ? r[col.rucProveedor] : ""),
         responsablePedido: col.responsablePedido!==-1 ? (r[col.responsablePedido]||"").toString().trim() : "",
+        // EstadoPedido de Nisira (17.09.2026) — lo necesita el análisis de PEDIDOS PENDIENTES del
+        // reporte por comprador: una línea sin OC solo cuenta como pendiente si dice "Pendiente"
+        // (las "Archivado" se cancelaron y las "Atendido Total" se atendieron con stock de almacén).
+        estadoPedido: estadoPedidoAt,
+        cantidadPedido: (col.cantidadPedido!==-1 && r[col.cantidadPedido]!=null && !isNaN(Number(r[col.cantidadPedido])))
+          ? Number(r[col.cantidadPedido]) : null,
         usuarioCompras: col.usuarioCompras!==-1 ? (r[col.usuarioCompras]||"").toString().trim() : "",
         responsableSalida: col.responsableSalida!==-1 ? (r[col.responsableSalida]||"").toString().trim() : "",
         codRequerimiento: col.codRequerimiento!==-1 ? (r[col.codRequerimiento]||"").toString().trim() : "",
@@ -5519,6 +5532,24 @@ let trendZoom = { startIdx: null, endIdx: null };
 
 function getProcesoRows(){ return DATA.procesoRows || []; }
 
+// Rango libre Desde/Hasta del módulo de Tiempos del Proceso (17.09.2026). Devuelve null si no hay
+// ninguna de las 2 fechas puestas; con una sola, el otro extremo queda abierto. Las fechas del <input
+// type=date> vienen como 'YYYY-MM-DD' y se comparan en UTC a nivel de DÍA, igual que el resto de la
+// plataforma, para que no haya corrimientos por zona horaria.
+function rangoProcesoFechas(){
+  const dEl = document.getElementById('filterProcesoDesde'), hEl = document.getElementById('filterProcesoHasta');
+  const d = dEl ? dEl.value : '', h = hEl ? hEl.value : '';
+  if(!d && !h) return null;
+  const dia = (s)=>{ const p = s.split('-').map(Number); return Date.UTC(p[0], p[1]-1, p[2]); };
+  return { desde: d ? dia(d) : -Infinity, hasta: h ? dia(h) : Infinity };
+}
+// Una fila SIN la fecha que se está evaluando no se descarta — mismo comportamiento que tenía el
+// filtro de Semana (`if(r.fReq && ...)`).
+function enRangoProceso(f, rango){
+  if(!rango || !f) return true;
+  const t = Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate());
+  return t >= rango.desde && t <= rango.hasta;
+}
 function filteredProcesoRows(){
   const rows = getProcesoRows();
   const fProveedor = document.getElementById('filterProcesoProveedor').value;
@@ -5527,7 +5558,7 @@ function filteredProcesoRows(){
   const fOrigen = document.getElementById('filterProcesoOrigen').value;
   const fAnio = document.getElementById('filterProcesoAnio').value;
   const fMes = document.getElementById('filterProcesoMes').value;
-  const fSemana = document.getElementById('filterProcesoSemana').value;
+  const rango = rangoProcesoFechas();
   return rows.filter(r=>{
     if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
     if(fFamilia!=='all' && categoriaGenericaFor(r.familia, r.idProducto, r.producto) !== fFamilia) return false;
@@ -5539,8 +5570,8 @@ function filteredProcesoRows(){
     // Piero mostró un caso real con OC del 1-3 sep. que desaparecían del detalle del Indicador 2). Sin
     // Semana elegida, Año/Mes se siguen combinando entre sí como antes (ej. "todos los agostos de
     // cualquier año"). Ver misma corrección en filteredGastoRows/filteredAlertRows/filteredProcesoRowsByOrden.
-    if(fSemana!=='all'){
-      if(r.fReq && weekKeyFor(r.fReq)!==fSemana) return false;
+    if(rango){
+      if(!enRangoProceso(r.fReq, rango)) return false;
     } else {
       if(fAnio!=='all' && r.fReq && r.fReq.getUTCFullYear()!==Number(fAnio)) return false;
       if(fMes!=='all' && r.fReq && (r.fReq.getUTCMonth()+1)!==Number(fMes)) return false;
@@ -5565,15 +5596,15 @@ function matchesProcesoFiltrosOC(r){
   const fOrigen = document.getElementById('filterProcesoOrigen').value;
   const fAnio = document.getElementById('filterProcesoAnio').value;
   const fMes = document.getElementById('filterProcesoMes').value;
-  const fSemana = document.getElementById('filterProcesoSemana').value;
+  const rango = rangoProcesoFechas();
   if(fProveedor!=='all' && r.proveedor !== fProveedor) return false;
   if(fFamilia!=='all' && categoriaGenericaFor(r.familia, r.idProducto, r.producto) !== fFamilia) return false;
   if(fResp!=='all' && r.usuarioCompras !== fResp) return false;
   if(fOrigen!=='all' && r.origen !== fOrigen) return false;
   // Si hay una Semana elegida, manda ella sola sobre Año/Mes — misma corrección que filteredProcesoRows
   // (ver su comentario: una semana que cruza fin de mes no debe además filtrarse por Mes por separado).
-  if(fSemana!=='all'){
-    if(r.fOrden && weekKeyFor(r.fOrden)!==fSemana) return false;
+  if(rango){
+    if(!enRangoProceso(r.fOrden, rango)) return false;
   } else {
     if(fAnio!=='all' && r.fOrden && r.fOrden.getUTCFullYear()!==Number(fAnio)) return false;
     if(fMes!=='all' && r.fOrden && (r.fOrden.getUTCMonth()+1)!==Number(fMes)) return false;
@@ -5767,9 +5798,14 @@ function renderProceso(){
   document.getElementById('procesoDefNote').style.display = 'none';
 
   if(!procesoListenersBoundInner){
-    ['filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoOrigen','filterProcesoAnio','filterProcesoMes','filterProcesoSemana'].forEach(id=>{
+    ['filterProcesoProveedor','filterProcesoFamilia','filterProcesoResponsable','filterProcesoOrigen','filterProcesoAnio','filterProcesoMes','filterProcesoDesde','filterProcesoHasta'].forEach(id=>{
       const el = document.getElementById(id);
-      el.addEventListener(el.tagName==='SELECT' ? 'change' : 'input', drawProceso);
+      el.addEventListener(el.tagName==='SELECT' ? 'change' : 'change', drawProceso);
+    });
+    document.getElementById('btnProcesoRangoClear').addEventListener('click', ()=>{
+      document.getElementById('filterProcesoDesde').value = '';
+      document.getElementById('filterProcesoHasta').value = '';
+      drawProceso();
     });
     document.getElementById('filterProcesoArea').addEventListener('change', ()=>{
       const visible = visibleIndicators();
@@ -5793,9 +5829,6 @@ function renderProceso(){
 }
 
 function drawProceso(){
-  // Repuebla la Semana disponible según el Año/Mes elegidos justo antes de filtrar (02.09.2026) — así
-  // queda siempre en sincronía sin depender del orden de los listeners de Año/Mes vs. Semana.
-  populateSemanaSelect(document.getElementById('filterProcesoSemana'), document.getElementById('filterProcesoAnio').value, document.getElementById('filterProcesoMes').value);
   drawKpiCards();
   trendZoom = { startIdx: null, endIdx: null }; // cambiar de indicador/filtro reinicia cualquier zoom activo
   drawIndicatorTrend();
@@ -6406,13 +6439,20 @@ function ocCountForPeriodOverride(comprador, matchFn){
 function periodoAnteriorComparativo(comprador){
   const anioSel = document.getElementById('filterProcesoAnio').value;
   const mesSel = document.getElementById('filterProcesoMes').value;
-  const semanaSel = document.getElementById('filterProcesoSemana').value;
-  if(semanaSel !== 'all'){
-    const start = fromIsoDay(semanaSel);
-    const prevStart = new Date(start); prevStart.setUTCDate(prevStart.getUTCDate()-7);
-    const prevKey = weekKeyFor(prevStart);
-    const n = ocCountForPeriodOverride(comprador, d=>weekKeyFor(d)===prevKey);
-    return { label: 'vs. semana anterior', n };
+  // Con un rango Desde/Hasta puesto (17.09.2026), el "período anterior" es la ventana inmediatamente
+  // anterior del MISMO largo (ej. 07-17 set → 27 ago-06 set). Necesita los 2 extremos: con uno solo el
+  // rango es abierto y no hay un largo con el que retroceder, así que se omite la comparación.
+  const rango = rangoProcesoFechas();
+  if(rango){
+    if(!isFinite(rango.desde) || !isFinite(rango.hasta)) return null;
+    const DIA = 86400000;
+    const largo = rango.hasta - rango.desde + DIA;
+    const prevHasta = rango.desde - DIA, prevDesde = prevHasta - largo + DIA;
+    const n = ocCountForPeriodOverride(comprador, d=>{
+      const t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      return t >= prevDesde && t <= prevHasta;
+    });
+    return { label: 'vs. período anterior', n };
   }
   if(mesSel !== 'all' && anioSel !== 'all'){
     let mes = Number(mesSel), anio = Number(anioSel);
@@ -6425,8 +6465,24 @@ function periodoAnteriorComparativo(comprador){
 function procesoFilterDateLabel(){
   const anioSel = document.getElementById('filterProcesoAnio');
   const mesSel = document.getElementById('filterProcesoMes');
-  const semanaSel = document.getElementById('filterProcesoSemana');
-  if(semanaSel.value !== 'all') return semanaSel.options[semanaSel.selectedIndex].text;
+  // Rango Desde/Hasta (17.09.2026): "07 - 17 SET 2026" si los 2 días caen en el mismo mes y año;
+  // si no, se escribe el mes (y el año, si cambia) en los 2 extremos.
+  const rango = rangoProcesoFechas();
+  if(rango){
+    const MES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SET','OCT','NOV','DIC'];
+    const d = isFinite(rango.desde) ? new Date(rango.desde) : null;
+    const h = isFinite(rango.hasta) ? new Date(rango.hasta) : null;
+    const dd = (x)=> String(x.getUTCDate()).padStart(2,'0');
+    if(d && h){
+      if(d.getUTCFullYear()===h.getUTCFullYear() && d.getUTCMonth()===h.getUTCMonth())
+        return dd(d) + ' - ' + dd(h) + ' ' + MES[h.getUTCMonth()] + ' ' + h.getUTCFullYear();
+      if(d.getUTCFullYear()===h.getUTCFullYear())
+        return dd(d) + ' ' + MES[d.getUTCMonth()] + ' - ' + dd(h) + ' ' + MES[h.getUTCMonth()] + ' ' + h.getUTCFullYear();
+      return dd(d) + ' ' + MES[d.getUTCMonth()] + ' ' + d.getUTCFullYear() + ' - ' + dd(h) + ' ' + MES[h.getUTCMonth()] + ' ' + h.getUTCFullYear();
+    }
+    const u = d || h;
+    return (d ? 'DESDE ' : 'HASTA ') + dd(u) + ' ' + MES[u.getUTCMonth()] + ' ' + u.getUTCFullYear();
+  }
   if(mesSel.value !== 'all' && anioSel.value !== 'all') return mesSel.options[mesSel.selectedIndex].text + ' ' + anioSel.value;
   if(mesSel.value !== 'all') return mesSel.options[mesSel.selectedIndex].text + ' (todos los años)';
   if(anioSel.value !== 'all') return anioSel.value;
@@ -6731,15 +6787,92 @@ function descripcionFamiliaFor(productos){
 // Rango de fechas para la nota al pie del reporte — mismos filtros Año/Mes/Semana que
 // procesoFilterDateLabel() (que arma el texto de la pill de cabecera), pero acá se necesita un rango
 // dd/mm/yyyy concreto en vez de la etiqueta corta ("Semana 6 (31 Ago–6 Sep)").
+// ============================================================================
+// PEDIDOS PENDIENTES — tercera imagen del reporte por comprador (17.09.2026).
+// Se mide por LÍNEA de pedido (SKU), no por pedido: el mismo CodPedido puede tener una línea ya
+// atendida y otra sin OC, y contar por pedido escondía justamente lo que falta (Piero, 17.09.2026,
+// tras comparar con su lista real de Nisira: "ok, y si mejor lo analizas por linea de producto?").
+// Solo entran los pedidos que nacieron de un requerimiento (Reporte Maestro) — pedido suyo explícito.
+//
+// Una línea está PENDIENTE a una fecha de corte si:
+//   · ya existía a esa fecha (FechaPedido <= corte), y
+//   · si tiene OC → la OC se generó después del corte; si no tiene OC → EstadoPedido dice "Pendiente".
+// Ese último punto es la corrección clave: de las 1,114 líneas sin OC del archivo, solo 105 dicen
+// "Pendiente"; las demás están "Archivado" (canceladas) o "Atendido Total" (se atendieron con stock),
+// y contarlas inflaba el pendiente de cada comprador.
+//
+// Atribución por LÍNEA (no por pedido — dentro de un mismo CodPedido el ResponsablePedido cambia de
+// línea en línea): lo cerrado va al comprador que emitió la OC (UsuarioCompras) y lo que sigue
+// pendiente al responsable del pedido (ResponsablePedido).
+// ============================================================================
+// Líneas que Nisira sigue mostrando como "Pendiente" pero que el comprador ya cerró fuera del sistema
+// (Piero, 17.09.2026, revisadas una por una con Melissa y Carolina). Clave: CodPedido|IdProducto|
+// Cantidad de pedido. Mientras no se regularicen en Nisira hay que descontarlas acá; al regularizarse,
+// basta con borrar la línea de esta lista.
+const PEDIDOS_CERRADOS_MANUAL = new Set([
+  '0001-0015855|005000300010|2', '0001-0015939|005000200016|5', '0001-0016386|005000200018|2',
+  '0001-0016350|005000200015|1', '0001-0016384|007200500045|1',
+  '0001-0016178|001100100135|2', '0001-0016098|001901200007|9',
+  '0001-0015587|001900100033|8', '0001-0015587|001900100033|2', '0001-0015587|001900100033|3',
+  '0001-0015587|001900100033|4', '0001-0015589|004600300087|1',
+  '0001-0015569|001900100033|4', '0001-0015569|001900100033|2', '0001-0015569|001900100033|3',
+]);
+// ResponsablePedido viene como nombre ("Melissa Sihuairo") y UsuarioCompras como código ("MSIHUAIRO").
+// La regla de Nisira es inicial del nombre + apellido, así que se deriva sola; el sufijo "(solo paso)"
+// se ignora y los casos que no siguen la regla van en la tabla de excepciones.
+const RESP_PEDIDO_USUARIO = { 'MANUEL': 'MLUJAN' };
+function usuarioDeResponsablePedido(nombre){
+  const n = sinAcentos(String(nombre||'')).toUpperCase().replace(/\(.*?\)/g,'').trim();
+  if(!n) return '';
+  if(RESP_PEDIDO_USUARIO[n]) return RESP_PEDIDO_USUARIO[n];
+  const p = n.split(/\s+/).filter(Boolean);
+  return p.length >= 2 ? p[0].charAt(0) + p[p.length-1] : n;
+}
+function pendientesComprasFor(comprador, rango){
+  if(!rango || !isFinite(rango.desde) || !isFinite(rango.hasta)) return null;
+  const DIA = 86400000, D1 = rango.desde, D2 = rango.hasta;
+  const dia = (f)=> f ? Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate()) : null;
+  const cerradaManual = (r)=> PEDIDOS_CERRADOS_MANUAL.has(
+    (r.codPedido||'') + '|' + (r.idProducto||'').toString().trim() + '|' + (r.cantidadPedido==null?'':r.cantidadPedido));
+  const pendienteA = (r, corte)=>{
+    const fp = dia(r.fPedido);
+    if(fp == null || fp > corte) return false;
+    if(corte >= D1 && cerradaManual(r)) return false;
+    if(r.codOrden){ const fo = dia(r.fOrden); return fo == null || fo > corte; }
+    return r.estadoPedido === 'Pendiente';
+  };
+  const acc = { venian:0, entraron:0, cerro:0, siguen:0 };
+  for(const r of getProcesoRows()){
+    if(!r.codPedido) continue;
+    const antes = pendienteA(r, D1 - DIA);
+    const alCierre = pendienteA(r, D2);
+    const fp = dia(r.fPedido);
+    const entro = fp != null && fp >= D1 && fp <= D2;
+    if(!antes && !entro) continue;
+    // Lo cerrado va a quien emitió la OC; lo que sigue pendiente, al responsable del pedido. Una línea
+    // cerrada SIN OC (se atendió con stock, o el comprador la cerró fuera de Nisira) no tiene
+    // UsuarioCompras: esa también se le cuenta al responsable del pedido, que es quien la trabajó.
+    const uc = (r.usuarioCompras||'').trim();
+    const duenio = (!alCierre && uc && uc !== '#N/A') ? uc : usuarioDeResponsablePedido(r.responsablePedido);
+    if(comprador !== 'all' && duenio !== comprador) continue;
+    if(antes) acc.venian++; else if(entro) acc.entraron++;
+    if(alCierre) acc.siguen++; else acc.cerro++;
+  }
+  const total = acc.venian + acc.entraron;
+  if(!total) return null;
+  return { total, cerro: acc.cerro, siguen: acc.siguen, pct: Math.round(acc.cerro/total*100) };
+}
 function procesoFilterDateRangeFooter(){
   const anioSel = document.getElementById('filterProcesoAnio');
   const mesSel = document.getElementById('filterProcesoMes');
-  const semanaSel = document.getElementById('filterProcesoSemana');
   const fmt = (d)=> String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear();
-  if(semanaSel.value !== 'all'){
-    const start = fromIsoDay(semanaSel.value);
-    const end = new Date(start); end.setUTCDate(end.getUTCDate()+6);
-    return 'Período del ' + fmt(start) + ' al ' + fmt(end) + '.';
+  const rango = rangoProcesoFechas();
+  if(rango){
+    if(isFinite(rango.desde) && isFinite(rango.hasta))
+      return 'Período del ' + fmt(new Date(rango.desde)) + ' al ' + fmt(new Date(rango.hasta)) + '.';
+    return isFinite(rango.desde)
+      ? 'Período: desde el ' + fmt(new Date(rango.desde)) + '.'
+      : 'Período: hasta el ' + fmt(new Date(rango.hasta)) + '.';
   }
   if(mesSel.value !== 'all' && anioSel.value !== 'all'){
     const anio = Number(anioSel.value), mes = Number(mesSel.value);
@@ -6981,6 +7114,9 @@ function buildProImageComprasResponsable(){
     proyRows, proyTotales, proyPedTotal,
     entregadasN, vencidasN, enPlazoN,
     leveN, mediaN, criticaN,
+    // Tercera imagen: pendientes por SKU del período. Solo se calcula con un rango Desde/Hasta
+    // completo — sin los 2 extremos no hay un "inicio" ni un "cierre" del período que medir.
+    pendientes: pendientesComprasFor(comprador, rangoProcesoFechas()),
     dateLabel: procesoFilterDateLabel(),
     dateRangeFooter: procesoFilterDateRangeFooter(),
   };
@@ -7262,12 +7398,41 @@ function proCNivelAvisoHtml(spec){
     <div style="width:290px;flex-shrink:0;font-size:32px;color:#2c3a52;line-height:1.32;font-family:Inter,Arial,sans-serif;">Órdenes entregadas dentro del plazo programado.</div>
   </div>`;
 }
-// Las 2 imágenes. Lienzo de alto fijo — la proporción es la que WhatsApp muestra completa en el
-// preview del chat (2:3 la primera, 4:5 la segunda).
+// Tercera imagen — PEDIDOS PENDIENTES (17.09.2026). Mismo lienzo 2:3 de la primera. Lo importante va
+// grande: el % de cierre del período, el total de SKU que había que atender y los que siguen sin OC
+// (pedido de Piero: "coloca en grande por algun lado el % de cuántas se cerraron / que se vea lo
+// importante grande, es para analisis"). Solo se arma si hay un rango Desde/Hasta completo.
+function proCPendientesHtml(spec){
+  const p = spec.pendientes;
+  const color = p.pct >= 90 ? '#1a8f5e' : (p.pct >= 70 ? '#c98a12' : '#b3261e');
+  const fondo = p.pct >= 90 ? '#eef9f3' : (p.pct >= 70 ? '#fdf6e6' : '#fdf1ef');
+  const borde = p.pct >= 90 ? '#b9e4cd' : (p.pct >= 70 ? '#eed9a6' : '#f0c4bb');
+  const bloque = (numero, titulo, c, bg, bd)=> `
+  <div style="flex:1;box-sizing:border-box;background:${bg};border:4px solid ${bd};border-radius:22px;padding:22px;display:flex;align-items:center;justify-content:center;gap:34px;">
+    <div style="font-size:176px;${PRO_C_NUM}color:${c};line-height:1;">${numero}</div>
+    <div style="width:3px;height:160px;background:${bd};border-radius:2px;"></div>
+    <div style="max-width:430px;font-size:66px;${PRO_C_BOLD}color:${PRO_C_NAVY};line-height:1.12;">${titulo}</div>
+  </div>`;
+  return `
+    ${proCHeaderHtml(spec)}
+    <div style="height:120px;box-sizing:border-box;background:#fff;border-radius:22px;padding:18px 28px;display:flex;flex-direction:column;justify-content:center;">
+      <div style="font-size:44px;${PRO_C_BOLD}color:${PRO_C_NAVY};letter-spacing:.2px;">PEDIDOS PENDIENTES</div>
+      <div style="font-size:25px;color:${PRO_C_GRIS};margin-top:5px;">SKU · pedidos con requerimiento</div>
+    </div>
+    <div style="height:452px;box-sizing:border-box;background:${fondo};border:4px solid ${borde};border-radius:22px;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div style="font-size:54px;${PRO_C_BOLD}color:${PRO_C_GRIS};letter-spacing:.05em;">CERRADOS EN EL PERIODO</div>
+      <div style="font-size:236px;${PRO_C_NUM}color:${color};line-height:1;margin-top:8px;">${p.pct}%</div>
+      <div style="font-size:30px;color:${PRO_C_GRIS};margin-top:10px;">${p.cerro} de ${p.total} SKU</div>
+    </div>
+    ${bloque(p.total, 'SKU EN TOTAL', PRO_C_NAVY, '#fff', '#dbe6f0')}
+    ${bloque(p.siguen, 'SIGUEN PENDIENTES', p.siguen>0?'#b3261e':'#1a8f5e', p.siguen>0?'#fdf1ef':'#eef9f3', p.siguen>0?'#f0c4bb':'#b9e4cd')}`;
+}
+// Las imágenes. Lienzo de alto fijo — la proporción es la que WhatsApp muestra completa en el
+// preview del chat (2:3 la primera, 4:5 la segunda, 2:3 la tercera).
 function proComprasResponsablePartesHtml(spec){
   const lienzo = (w, h, bg, gap, padAbajo, contenido)=> `
   <div id="proImgInner" style="width:${w}px;height:${h}px;box-sizing:border-box;font-family:Inter,Arial,sans-serif;background:${bg};padding:20px 20px ${padAbajo}px;display:flex;flex-direction:column;gap:${gap}px;overflow:hidden;">${contenido}</div>`;
-  return [
+  const partes = [
     lienzo(1024, 1536, '#e9f3fd', 18, 44, `
       ${proCHeaderHtml(spec)}
       ${proCKpisHtml(spec)}
@@ -7276,6 +7441,8 @@ function proComprasResponsablePartesHtml(spec){
       ${proCCondicionHtml(spec)}`),
     lienzo(1080, 1350, '#ffffff', 22, 40, proCNivelAvisoHtml(spec)),
   ];
+  if(spec.pendientes) partes.push(lienzo(1024, 1536, '#e9f3fd', 18, 44, proCPendientesHtml(spec)));
+  return partes;
 }
 function downloadProComprasPartes(btn){
   const comprador = document.getElementById('filterProcesoResponsable').value;
