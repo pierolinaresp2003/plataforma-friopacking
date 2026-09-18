@@ -4114,13 +4114,13 @@ function renderAlertas(){
     });
     document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'inventario-almacen-general', e.currentTarget));
     document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-inventario-almacen-general', e.currentTarget));
-    // Imagen del Kardex del producto abierto (15.09.2026). Reusa downloadProImage: el buildFn devuelve el
-    // HTML ya armado y el renderFn solo lo deja pasar, porque este diseño no usa el esqueleto general.
-    document.getElementById('btnImgKardex').addEventListener('click', (e)=> downloadProImage(
-      buildKardexImageHtml,
-      'kardex-' + ((kardexUltimo && kardexUltimo.producto.codigo) || 'producto'),
+    // Imagen del Kardex del producto abierto (15.09.2026; desde el 18.09.2026 son 2 imágenes en un zip,
+    // con el mismo formato del reporte por comprador — ver kardexPartesHtml).
+    document.getElementById('btnImgKardex').addEventListener('click', (e)=> generarPartesEnZip(
       e.currentTarget,
-      html => html));
+      kardexPartesHtml(),
+      'kardex-' + ((kardexUltimo && kardexUltimo.producto.codigo) || 'producto') + '-' + new Date().toISOString().slice(0,10),
+      2));
     // Volver a la tabla de categorías desde el kardex (16.09.2026). Se limpia el producto directo y se
     // baja de nuevo a la tarjeta de "Cuánto pedir por categoría", que quedó tal cual estaba: no se toca
     // el buscador ni la categoría abierta.
@@ -6219,115 +6219,131 @@ function kardexConsumoPorMes(movs, nMeses){
   const ultimos = keys.slice(-nMeses);
   return ultimos.map(k=>({ mes:k, salidas: meses[k] }));
 }
-function buildKardexImageHtml(){
+// El kardex se exporta en 2 IMÁGENES con el mismo lenguaje del reporte por comprador (18.09.2026,
+// pedido de Piero: "puedes dividirla en 2? y que muestre cosas relevantes en grande, no que sea pura
+// data y ya / sigue el diseño que te di para otras imágenes de esta plataforma"). Mismo lienzo 2:3 de
+// 1024x1536 que WhatsApp muestra completo en el preview del chat, mismos colores, tipografías y
+// tarjetas blancas de bordes redondeados que proComprasResponsablePartesHtml.
+//   Imagen 1 — LA DECISIÓN: cuánto pedir, en grande, con el stock actual y el punto de reorden.
+//   Imagen 2 — LA EVIDENCIA: el gráfico del kardex y el consumo mes a mes que sostiene ese número.
+// La tabla de "últimos movimientos" salió del reporte: era justamente la parte de "pura data" que no
+// aporta a la decisión; sigue disponible en pantalla, dentro del kardex.
+function kardexHeaderHtml(d){
+  const p = d.producto;
+  return `
+  <div style="height:184px;box-sizing:border-box;background:#fff;border-radius:22px;padding:0 24px;display:flex;align-items:center;gap:20px;">
+    <img src="${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}" style="height:78px;flex-shrink:0;" alt="Grupo Friopacking">
+    <div style="width:3px;height:118px;background:#dbe6f0;border-radius:2px;flex-shrink:0;"></div>
+    <div style="flex:1;min-width:0;text-align:center;">
+      <div style="font-size:52px;${PRO_C_BOLD}color:${PRO_C_NAVY};letter-spacing:.2px;line-height:1;font-family:Inter,Arial,sans-serif;white-space:nowrap;">KARDEX DE PRODUCTO</div>
+      <div style="display:flex;gap:14px;margin-top:18px;justify-content:center;">
+        <div style="display:flex;align-items:center;gap:12px;background:${PRO_C_TEAL};color:#fff;font-size:33px;font-weight:800;padding:12px 28px;border-radius:38px;font-family:Inter,Arial,sans-serif;white-space:nowrap;letter-spacing:.4px;">${proCSvgCaja(32)}<span>${escapeHtml(p.codigo)}</span></div>
+        <div style="display:flex;align-items:center;gap:12px;background:#e8f3fd;color:${PRO_C_NAVY};font-size:33px;font-weight:700;padding:12px 28px;border-radius:38px;font-family:Inter,Arial,sans-serif;white-space:nowrap;">${proCSvgCalendario(32)}<span>${escapeHtml(new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'}).toUpperCase().replace('.',''))}</span></div>
+      </div>
+    </div>
+  </div>`;
+}
+// Tarjeta de título: nombre del producto (se achica solo si es largo) y la línea de contexto.
+function kardexTituloHtml(d, subtitulo){
+  const p = d.producto;
+  const nombre = ((p.descripcion||'').trim() || p.codigo).toUpperCase();
+  const fs = nombre.length > 90 ? 30 : (nombre.length > 60 ? 34 : (nombre.length > 38 ? 40 : 46));
+  return `
+  <div style="height:158px;box-sizing:border-box;background:#fff;border-radius:22px;padding:18px 28px;display:flex;flex-direction:column;justify-content:center;">
+    <div style="font-size:${fs}px;${PRO_C_BOLD}color:${PRO_C_NAVY};line-height:1.14;font-family:Inter,Arial,sans-serif;">${escapeHtml(nombre)}</div>
+    <div style="font-size:26px;color:${PRO_C_GRIS};margin-top:10px;font-family:Inter,Arial,sans-serif;">${subtitulo}</div>
+  </div>`;
+}
+function kardexPartesHtml(){
   const d = kardexUltimo;
-  if(!d) return '<div id="proImgInner"></div>';
+  if(!d) return ['<div id="proImgInner"></div>'];
   const p = d.producto;
   const um = (p.unidad||'').trim();
   const n2 = v => v==null ? '—' : Number(v).toLocaleString('es-PE', {maximumFractionDigits:2});
-  const svgVivo = document.querySelector('#kardexChart svg.kdx-svg');
-  const svgHtml = svgVivo ? svgParaImagen(svgVivo, 1400) : '';
-
-  const consumo = kardexConsumoPorMes(d.movsSuc, 12);
-  const maxMes = consumo.reduce((a,c)=>Math.max(a,c.salidas), 0) || 1;
-  const totalConsumo = consumo.reduce((a,c)=>a+c.salidas, 0);
-  const promedio = consumo.length ? totalConsumo/consumo.length : 0;
-  const nombreMes = k => {
-    const [a,m] = k.split('-');
-    return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'][Number(m)-1] + ' ' + a.slice(2);
-  };
-  const filasConsumo = consumo.length ? consumo.map(c=>`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
-      <div style="width:56px;font-size:12.5px;color:#5b6876;font-weight:600;">${nombreMes(c.mes)}</div>
-      <div style="flex:1;background:#eef1f5;border-radius:4px;height:14px;overflow:hidden;">
-        <div style="width:${Math.max(2, Math.round(c.salidas/maxMes*100))}%;height:100%;background:#2a9d8f;border-radius:4px;"></div>
-      </div>
-      <div style="width:60px;text-align:right;font-size:12.5px;font-weight:800;color:#0a1e64;">${n2(c.salidas)}</div>
-    </div>`).join('')
-    : '<div style="font-size:12.5px;color:#8b98a4;">Sin salidas registradas en esta sucursal.</div>';
-
-  // Últimos movimientos reales, que es lo que sostiene todo el cálculo.
-  const ultimos = d.movsSuc.map((m,i)=>({ m, saldo: d.saldoDespues[i] })).slice(-12).reverse();
-  const filasMovs = ultimos.length ? ultimos.map(x=>{
-    const esIng = x.m.q > 0;
-    const f = x.m.f.split('-');
-    return `<tr>
-      <td style="padding:7px 10px;font-size:12.5px;color:#31404f;border-bottom:1px solid #eef1f5;">${f[2]}/${f[1]}/${f[0]}</td>
-      <td style="padding:7px 10px;font-size:12px;font-weight:700;border-bottom:1px solid #eef1f5;color:${esIng?'#0ca30c':'#d03b3b'};">${esIng?'Ingreso':'Salida'}</td>
-      <td style="padding:7px 10px;font-size:12.5px;text-align:right;font-weight:700;border-bottom:1px solid #eef1f5;color:#31404f;">${esIng?'+':'−'}${n2(Math.abs(x.m.q))}</td>
-      <td style="padding:7px 10px;font-size:12.5px;text-align:right;font-weight:800;border-bottom:1px solid #eef1f5;color:#0a1e64;">${n2(x.saldo)}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="4" style="padding:12px;font-size:12.5px;color:#8b98a4;">Sin movimientos registrados en esta sucursal.</td></tr>';
-
-  const tile = (label, valor, nota, color) => `
-    <div style="flex:1;min-width:190px;background:#fff;border:1px solid #e2e8ee;border-radius:12px;padding:16px 18px;">
-      <div style="font-size:11px;font-weight:800;letter-spacing:.6px;color:#8b98a4;text-transform:uppercase;">${label}</div>
-      <div style="font-size:30px;font-weight:800;color:${color||'#0a1e64'};margin-top:6px;line-height:1.1;">${valor}</div>
-      <div style="font-size:11.5px;color:#5b6876;margin-top:5px;">${nota}</div>
-    </div>`;
-
+  const n0 = v => v==null ? '—' : Number(v).toLocaleString('es-PE', {maximumFractionDigits:0});
   const hayPedido = d.tieneProyeccion && d.pedido1;
-  const tiles = [
-    tile('Stock actual', `${n2(d.stockSuc)} <span style="font-size:15px;color:#8b98a4;">${escapeHtml(um)}</span>`, escapeHtml(d.sucLabel), null),
-    hayPedido
-      ? tile('Pedido simulado', `${n2(d.cantidadPedido)} <span style="font-size:15px;color:#8b98a4;">${escapeHtml(um)}</span>`, `${d.mesesInput} ${d.mesesInput===1?'mes':'meses'} de rotación`, '#e2960a')
-      : tile('Pedido simulado', 'No disponible', d.sucursal!=='lima' ? 'Solo con Lima San Pedro' : 'Falta Consumo Diario o Desvest', '#8b98a4'),
-    hayPedido
-      ? tile('Llegada simulada', d.pedido1.fLlega, d.tieneLead ? `Se coloca ${d.pedido1.hoy?'HOY':'el '+d.pedido1.fPedido} · ${n2(d.leadDias)} días de entrega${d.esImportado?' (importación)':''}` : 'Sin Lead Time en el Excel', null)
-      : tile('Llegada simulada', '—', 'Sin simulación', '#8b98a4'),
-    tile('Referencias', `${n2(p.rop)} <span style="font-size:15px;color:#8b98a4;">ROP</span>`, `Stock de seguridad ${n2(p.stockSeguridad)}${d.transitoCant>0 ? ` · en tránsito ${n2(d.transitoCant)} (llega ${d.fechaTransito})` : ''}`, null),
-  ].join('');
+  // Cifras grandes: el cuerpo se achica solo para que el número nunca se salga de su tarjeta.
+  const fit = (txt, ancho, max)=> Math.max(54, Math.min(max, Math.floor(ancho/(String(txt).length*0.60))));
 
-  const calculo = hayPedido
-    ? `Consumo diario ${n2(p.consumoDiario)} × ${d.cicloDias} días = <b>${n2(d.cantidadPedido)} ${escapeHtml(um)}</b> por pedido · se coloca al tocar el ${d.esImportado?'ROP de importación':'ROP'} ${n2(d.ropSim)}`
-    : 'Sin simulación de pedido para esta vista.';
-
-  const fecha = new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'numeric' }).toUpperCase().replace('.', '');
-  const subt = [p.codigo, d.sucLabel, d.esImportado ? 'Compra de importación' : 'Compra nacional', um]
-    .filter(Boolean).join('  |  ');
-  return `
-  <div id="proImgInner" style="width:1500px;font-family:Inter,Arial,sans-serif;background:#eef1f5;border-radius:18px;overflow:hidden;box-sizing:border-box;">
-    ${proHeaderHtml((p.descripcion||'').trim() || p.codigo, subt, fecha, '📦')}
-    <div style="padding:22px 40px 0;display:flex;gap:14px;flex-wrap:wrap;">${tiles}</div>
-    <div style="padding:22px 40px 0;">
-      <div style="font-size:13px;font-weight:800;letter-spacing:.5px;color:#0a1e64;text-transform:uppercase;margin-bottom:10px;">
-        Movimientos registrados <span style="color:#8b98a4;">→</span> simulación del próximo pedido
-      </div>
-      <div style="background:#fff;border:1px solid #e2e8ee;border-radius:14px;padding:16px 18px 10px;">
-        ${svgHtml}
-      </div>
+  const lienzo = (contenido)=> `
+  <div id="proImgInner" style="width:1024px;height:1536px;box-sizing:border-box;font-family:Inter,Arial,sans-serif;background:#e9f3fd;padding:20px 20px 44px;display:flex;flex-direction:column;gap:18px;overflow:hidden;">${contenido}</div>`;
+  // Mismo bloque "número grande | título" de la imagen de pedidos pendientes.
+  const bloque = (numero, unidad, titulo, pie, color, fondo, borde)=> {
+    const fs = fit(numero, 430, 150);
+    return `
+  <div style="flex:1;box-sizing:border-box;background:${fondo};border:4px solid ${borde};border-radius:22px;padding:22px;display:flex;align-items:center;justify-content:center;gap:30px;">
+    <div style="display:flex;align-items:baseline;gap:16px;">
+      <div style="font-size:${fs}px;${PRO_C_NUM}color:${color};line-height:1;">${numero}</div>
+      ${unidad ? `<div style="font-size:${Math.round(fs*0.32)}px;${PRO_C_BOLD}color:${PRO_C_GRIS};">${escapeHtml(unidad)}</div>` : ''}
     </div>
-    <div style="padding:22px 40px 0;display:flex;gap:14px;align-items:stretch;">
-      <div style="flex:1;background:#fff;border:1px solid #e2e8ee;border-radius:14px;padding:18px 20px;">
-        <div style="font-size:13px;font-weight:800;letter-spacing:.5px;color:#0a1e64;text-transform:uppercase;">Consumo por mes</div>
-        <div style="font-size:11.5px;color:#8b98a4;margin:4px 0 14px;">Salidas reales de ${escapeHtml(d.sucLabel)} · promedio ${n2(promedio)} ${escapeHtml(um)}/mes</div>
-        ${filasConsumo}
-      </div>
-      <div style="flex:1;background:#fff;border:1px solid #e2e8ee;border-radius:14px;padding:18px 20px;">
-        <div style="font-size:13px;font-weight:800;letter-spacing:.5px;color:#0a1e64;text-transform:uppercase;">Últimos movimientos</div>
-        <div style="font-size:11.5px;color:#8b98a4;margin:4px 0 10px;">Cada ingreso y salida con el saldo que dejó</div>
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr>
-            <th style="text-align:left;padding:6px 10px;font-size:10.5px;letter-spacing:.5px;color:#8b98a4;text-transform:uppercase;border-bottom:2px solid #e2e8ee;">Fecha</th>
-            <th style="text-align:left;padding:6px 10px;font-size:10.5px;letter-spacing:.5px;color:#8b98a4;text-transform:uppercase;border-bottom:2px solid #e2e8ee;">Tipo</th>
-            <th style="text-align:right;padding:6px 10px;font-size:10.5px;letter-spacing:.5px;color:#8b98a4;text-transform:uppercase;border-bottom:2px solid #e2e8ee;">Cantidad</th>
-            <th style="text-align:right;padding:6px 10px;font-size:10.5px;letter-spacing:.5px;color:#8b98a4;text-transform:uppercase;border-bottom:2px solid #e2e8ee;">Saldo</th>
-          </tr></thead>
-          <tbody>${filasMovs}</tbody>
-        </table>
-      </div>
-    </div>
-    <div style="padding:20px 40px 8px;">
-      <div style="background:#fff;border-left:4px solid #e2960a;border-radius:10px;padding:14px 18px;font-size:13.5px;color:#31404f;">
-        <b style="color:#0a1e64;">Cálculo del pedido:</b> ${calculo}
-      </div>
-    </div>
-    <div style="padding:6px 40px 26px;font-size:11px;color:#8b98a4;line-height:1.5;">
-      El histórico se reconstruye movimiento por movimiento desde el stock actual de ${escapeHtml(d.sucLabel)}; cada escalón es un ingreso o una salida real.
-      La simulación es una referencia de planificación, no una garantía de cobertura.
-      Fuente: ${escapeHtml((ALMACEN_DATA && ALMACEN_DATA.filename) || 'Reporte Almacen.xlsx')} — hojas Análisis Inventario, Ingresos y Movimientos.
+    <div style="width:3px;height:160px;background:${borde};border-radius:2px;"></div>
+    <div style="width:360px;">
+      <div style="font-size:56px;${PRO_C_BOLD}color:${PRO_C_NAVY};line-height:1.12;">${titulo}</div>
+      ${pie ? `<div style="font-size:27px;color:${PRO_C_GRIS};margin-top:10px;line-height:1.25;">${pie}</div>` : ''}
     </div>
   </div>`;
+  };
+
+  // ------------------------------------------------------------ IMAGEN 1: la decisión
+  const enReposicion = d.stockSuc <= d.ropSim;
+  const colorPedir = hayPedido ? '#c98a12' : '#1a8f5e';
+  const cant = hayPedido ? n0(d.cantidadPedido) : 'NO';
+  const fsCant = fit(cant, 820, 210);
+  const pieCant = hayPedido
+    ? `${d.mesesInput} ${d.mesesInput===1?'mes':'meses'} de rotación · llega el ${escapeHtml(d.pedido1.fLlega)}`
+    : (d.sucursal!=='lima' ? 'La simulación solo corre con Lima San Pedro' : 'Faltan Consumo Diario o Desvest en el Excel');
+  const subt1 = [escapeHtml(d.sucLabel), d.esImportado ? 'Compra de importación' : 'Compra nacional', escapeHtml(um)].filter(Boolean).join(' · ');
+  const img1 = lienzo(`
+    ${kardexHeaderHtml(d)}
+    ${kardexTituloHtml(d, subt1)}
+    <div style="height:430px;box-sizing:border-box;background:${hayPedido?'#fdf6e6':'#eef9f3'};border:4px solid ${hayPedido?'#eed9a6':'#b9e4cd'};border-radius:22px;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div style="font-size:54px;${PRO_C_BOLD}color:${PRO_C_GRIS};letter-spacing:.05em;">CUÁNTO PEDIR</div>
+      <div style="display:flex;align-items:baseline;gap:24px;margin-top:8px;">
+        <div style="font-size:${fsCant}px;${PRO_C_NUM}color:${colorPedir};line-height:1;">${cant}</div>
+        ${hayPedido && um ? `<div style="font-size:${Math.round(fsCant*0.30)}px;${PRO_C_BOLD}color:${PRO_C_GRIS};">${escapeHtml(um)}</div>` : ''}
+      </div>
+      <div style="font-size:30px;color:${PRO_C_GRIS};margin-top:12px;text-align:center;">${pieCant}</div>
+    </div>
+    ${bloque(n0(d.stockSuc), um, 'STOCK ACTUAL',
+      enReposicion ? 'Por debajo del punto de reorden' : 'Por encima del punto de reorden',
+      enReposicion ? '#b3261e' : '#1a8f5e', enReposicion ? '#fdf1ef' : '#eef9f3', enReposicion ? '#f0c4bb' : '#b9e4cd')}
+    ${bloque(n0(d.ropSim), um, 'PUNTO DE REORDEN',
+      `Stock de seguridad ${n0(p.stockSeguridad)}${d.transitoCant>0 ? ` · en tránsito ${n0(d.transitoCant)}` : ''}`,
+      PRO_C_NAVY, '#fff', '#dbe6f0')}`);
+
+  // ------------------------------------------------------------ IMAGEN 2: la evidencia
+  const svgVivo = document.querySelector('#kardexChart svg.kdx-svg');
+  const svgHtml = svgVivo ? svgParaImagen(svgVivo, 930) : '';
+  const consumo = kardexConsumoPorMes(d.movsSuc, 12);
+  const maxMes = consumo.reduce((a,c)=>Math.max(a,c.salidas), 0) || 1;
+  const promedio = consumo.length ? consumo.reduce((a,c)=>a+c.salidas,0)/consumo.length : 0;
+  const nombreMes = k => {
+    const a = k.split('-');
+    return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'][Number(a[1])-1] + ' ' + a[0].slice(2);
+  };
+  const filasConsumo = consumo.length ? consumo.map(c=>`
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:9px;">
+      <div style="width:120px;font-size:27px;font-weight:700;color:${PRO_C_GRIS};">${nombreMes(c.mes)}</div>
+      <div style="flex:1;background:#eef3f8;border-radius:7px;height:26px;overflow:hidden;">
+        <div style="width:${Math.max(2, Math.round(c.salidas/maxMes*100))}%;height:100%;background:${PRO_C_TEAL};border-radius:7px;"></div>
+      </div>
+      <div style="width:150px;text-align:right;font-size:29px;${PRO_C_NUM}color:${PRO_C_NAVY};">${n0(c.salidas)}</div>
+    </div>`).join('')
+    : `<div style="font-size:28px;color:${PRO_C_GRIS};">Sin salidas registradas en esta sucursal.</div>`;
+  const img2 = lienzo(`
+    ${kardexHeaderHtml(d)}
+    ${kardexTituloHtml(d, `Consumo diario ${n2(p.consumoDiario)} ${escapeHtml(um)} · promedio ${n0(promedio)} ${escapeHtml(um)}/mes`)}
+    <div style="height:560px;box-sizing:border-box;background:#fff;border-radius:22px;padding:20px 22px;display:flex;flex-direction:column;">
+      <div style="font-size:38px;${PRO_C_BOLD}color:${PRO_C_NAVY};">MOVIMIENTOS Y SIMULACIÓN</div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;">${svgHtml}</div>
+    </div>
+    <div style="flex:1;box-sizing:border-box;background:#fff;border-radius:22px;padding:20px 26px;display:flex;flex-direction:column;">
+      <div style="font-size:38px;${PRO_C_BOLD}color:${PRO_C_NAVY};">CONSUMO POR MES</div>
+      <div style="font-size:25px;color:${PRO_C_GRIS};margin:4px 0 14px;">Salidas reales de ${escapeHtml(d.sucLabel)}</div>
+      ${filasConsumo}
+    </div>`);
+
+  return [img1, img2];
 }
 async function downloadProImage(buildFn, filenamePrefix, btn, renderFn){
   // `renderFn` (04.09.2026, pedido de Piero: usar un diseño completamente distinto "tal cual" cuando se
@@ -7181,6 +7197,11 @@ function proCSvgBarras(s){
 function proCSvgPersona(t){
   const a = t || 26;
   return `<svg width="${a}" height="${a}" viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/></svg>`;
+}
+// Caja de almacén — chip del código de producto en la imagen del kardex (18.09.2026).
+function proCSvgCaja(t){
+  const a = t || 26;
+  return `<svg width="${a}" height="${a}" viewBox="0 0 24 24" fill="none"><path d="M12 2.6 21 7v10l-9 4.4L3 17V7z" fill="#fff" opacity=".22"/><path d="M12 2.6 21 7l-9 4.4L3 7z" fill="#fff"/><path d="M3 7v10l9 4.4V11.4z" fill="#fff" opacity=".7"/><path d="M21 7v10l-9 4.4V11.4z" fill="#fff" opacity=".45"/></svg>`;
 }
 function proCSvgCalendario(t){
   const a = t || 26;
