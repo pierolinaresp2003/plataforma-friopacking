@@ -541,6 +541,7 @@
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple>
       <button class="btn secondary icon-only" id="btnConnect" title="Conectar GitHub">🔑</button>
       <button class="btn secondary icon-only" id="btnPublish" disabled title="Primero carga tu Reporte Maestro.xlsx arriba.">☁</button>
+      <button class="btn secondary icon-only" id="btnAuto" type="button" title="Guardado automático">🔄</button>
       <button class="theme-toggle icon-only" id="btnTheme" type="button" title="Cambiar entre modo claro y oscuro">☀️</button>
     </div>
   </div>
@@ -1725,6 +1726,41 @@ function updateActionButtons(){
   const btn = document.getElementById('btnPublish');
   btn.disabled = !DATA;
   btn.title = DATA ? "" : "Primero carga tu Reporte Maestro.xlsx arriba.";
+  programarAutoGuardado();
+}
+
+// ---------- Guardado automático (22.09.2026) ----------
+// Piero: "hay alguna forma de que se guarde todo automáticamente sin que yo le
+// de al botón?". Cada publicación es un commit con ~1.5 MB al repo, así que no
+// se publica en cada clic: se espera a que la carga termine y recién ahí sube,
+// una sola vez. El botón ☁ sigue estando para publicar a mano cuando quieras.
+const AUTO_KEY = 'fp_platform_autosave';
+let autoTimer = null;
+
+function autoGuardadoActivo(){
+  try{ return localStorage.getItem(AUTO_KEY) !== '0'; }catch(err){ return true; }
+}
+function pintarBotonAuto(){
+  const b = document.getElementById('btnAuto');
+  if(!b) return;
+  const on = autoGuardadoActivo();
+  b.textContent = on ? '🔄' : '⏸';
+  b.style.opacity = on ? '1' : '.5';
+  b.title = on
+    ? 'Guardado automático activado — al cargar un archivo se publica solo. Clic para desactivar.'
+    : 'Guardado automático desactivado. Clic para activarlo.';
+}
+function programarAutoGuardado(){
+  if(!autoGuardadoActivo()) return;
+  if(!DATA || DATA.fromSnapshot) return;     // lo que se ve ya es lo publicado
+  if(!getGhToken()) return;                  // sin token no hay a dónde publicar
+  clearTimeout(autoTimer);
+  // Espera a que terminen de procesarse todos los archivos de la misma carga.
+  autoTimer = setTimeout(function(){
+    if(!autoGuardadoActivo() || !DATA || DATA.fromSnapshot) return;
+    showPublishBanner('Guardando automáticamente…', false);
+    publishSnapshot();
+  }, 8000);
 }
 
 function buildSnapshot(){
@@ -1745,7 +1781,9 @@ function buildSnapshot(){
       // snapshot pueda seguir filtrando/agrupando/haciendo drill-down sin volver a subir el Excel —
       // mismo criterio que Concentración de Gasto: publicar filas compactas, no agregados fijos.
       rows: (DATA.procesoRows||[]).map(r => ({
-        py: r.proyecto, pr: r.producto, ip: r.idProducto, fa: r.familia, pv: r.proveedor,
+        // ipy (22.09.2026): código del proyecto (PRY2026-00000XX). Sin esto, el módulo de
+        // Certificados agrupaba TODO en un solo "SIN PROYECTO" al abrir el link publicado.
+        py: r.proyecto, ipy: r.idProyecto, pr: r.producto, ip: r.idProducto, fa: r.familia, pv: r.proveedor,
         // rp ahora publica el responsable YA RESUELTO del Indicador 1 (JCENTENO, o el nombre real de
         // PedidoSinReq.xlsx para pedidos directos) — no la columna cruda de Reporte Maestro, que no es
         // confiable (aclaración de Piero, 01.09.2026). d3 y d6 no necesitan publicarse: son fijos
@@ -2014,7 +2052,7 @@ function loadFromSnapshot(snap){
     projectRows: [], // no se usa en modo snapshot (dormant, ver processWorkbook)
     proveedorOrders: [], // idem
     procesoRows: (snap.proceso && snap.proceso.rows) ? snap.proceso.rows.map(r => ({
-      proyecto: r.py, producto: r.pr, idProducto: r.ip, familia: r.fa, proveedor: r.pv,
+      proyecto: r.py, idProyecto: r.ipy || 'SIN PROYECTO', producto: r.pr, idProducto: r.ip, familia: r.fa, proveedor: r.pv,
       // Un snapshot publicado ANTES del 01.09.2026 (procesoSchemaVersion < 2) trae "rp" con el nombre
       // crudo de la columna ResponsablePedido de Reporte Maestro.xlsx (no confiable, ver buildSnapshot) —
       // se ignora ese valor viejo por completo en vez de mostrarlo como si fuera el responsable ya
@@ -2123,6 +2161,12 @@ function loadFromSnapshot(snap){
 
 document.getElementById('btnConnect').addEventListener('click', connectGithub);
 document.getElementById('btnPublish').addEventListener('click', publishSnapshot);
+document.getElementById('btnAuto').addEventListener('click', ()=>{
+  try{ localStorage.setItem(AUTO_KEY, autoGuardadoActivo() ? '0' : '1'); }catch(err){}
+  pintarBotonAuto();
+  if(autoGuardadoActivo()) programarAutoGuardado(); else clearTimeout(autoTimer);
+});
+pintarBotonAuto();
 
 function applyThemeLabel(){
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
