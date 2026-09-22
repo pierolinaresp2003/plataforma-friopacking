@@ -4431,6 +4431,10 @@ let kardexUltimo = null;
 // gráfico por esas 3 sucursales" (Ica/Lima San Pedro/Trujillo) — se guarda la sucursal elegida igual que
 // el zoom, y se reinicia a 'lima' cada vez que cambia el producto (ver esProductoNuevo más abajo).
 let kardexSucursal = 'lima';
+// Origen forzado para la SIMULACIÓN del kardex (22.09.2026, pedido de Piero: "necesito una opción
+// para cambiar entre si será nacional o importación porque cambia mucho la cantidad que se debe
+// pedir"). null = como lo detecta la plataforma por la última OC del producto.
+let kardexOrigen = null;
 const KARDEX_SUCURSALES = [
   { key:'ica', label:'Ica' },
   { key:'lima', label:'Lima San Pedro' },
@@ -4491,7 +4495,7 @@ function drawKardex(){
   // hay fecha de llegada en el Excel para proyectar cuándo "sube" el stock de la sucursal elegida con lo
   // que hay en las demás, así que en vez de inventar esa fecha se avisa en una nota bajo el gráfico (ver
   // transitoCaption más abajo). Al cambiar de producto se vuelve a 'lima' (la sucursal principal).
-  if(esProductoNuevo) kardexSucursal = 'lima';
+  if(esProductoNuevo){ kardexSucursal = 'lima'; kardexOrigen = null; }
   const sucInfo = KARDEX_SUCURSALES.find(s=>s.key===kardexSucursal) || KARDEX_SUCURSALES[1];
   const n = periods.length;
   const stockSuc = producto[kardexSucursal] != null ? producto[kardexSucursal]
@@ -4599,9 +4603,12 @@ function drawKardex(){
   // tomando la OC más reciente del producto. Solo si el producto no tiene ninguna OC en Reporte Maestro
   // —o si el maestro no está cargado— se cae a la regla anterior (la columna que tenga dato).
   const compras = comprasDeProducto(producto.codigos || [producto.codigo]);
-  const esImportado = compras.origen != null
+  const esImportadoAuto = compras.origen != null
     ? (compras.origen === 'importado')
     : (ltNacional == null && ltImportado != null);
+  // El usuario puede forzar el origen de la simulación con los botones de arriba; mientras no lo
+  // toque manda lo detectado.
+  const esImportado = kardexOrigen != null ? (kardexOrigen === 'importado') : esImportadoAuto;
   // Elegido el origen, se usa SU lead time; si justo ese viene vacío en el Excel se usa el otro, para no
   // quedarse sin simulación por un dato faltante (se avisa en la leyenda).
   const leadPreferido = esImportado ? ltImportado : ltNacional;
@@ -5203,6 +5210,18 @@ function drawKardex(){
     `<button type="button" class="kdx-suc-btn${s.key===kardexSucursal?' active':''}" data-suc="${s.key}">${escapeHtml(s.label)} <b>${fmt2(producto[s.key]||0)}</b></button>`
   ).join('')}</div>`;
 
+  // Origen de la simulación. Cambia el lead time y el ROP que la disparan, y con eso la cantidad a
+  // pedir — por eso se puede forzar a mano en vez de depender solo de la última OC.
+  const origenBtn = (key, etiqueta, lt)=>
+    `<button type="button" class="kdx-suc-btn${(kardexOrigen != null ? kardexOrigen===key : esImportadoAuto===(key==='importado'))?' active':''}" data-origen="${key}">${etiqueta}${lt != null ? ` <b>${fmt2(lt)} d</b>` : ''}</button>`;
+  const origenFilterSvg = `<div class="kdx-suc-filter"><span class="kdx-suc-label">Simulación:</span>` +
+    origenBtn('nacional', 'Nacional', ltNacional) +
+    origenBtn('importado', 'Importación', ltImportado) +
+    (kardexOrigen != null
+      ? `<button type="button" class="kdx-suc-btn" data-origen="auto" title="Volver a lo que dice la última orden de compra">↺ Automático</button>`
+      : `<span class="kdx-suc-label" style="opacity:.75;">según la última OC${origenPorOC ? '' : ' (sin OC: se usa el Lead Time que esté lleno)'}</span>`) +
+    `</div>`;
+
   // Debajo del gráfico: el cálculo en palabras (mismo criterio que Piero pidió varias veces — "¿cómo se
   // calcula esto?" — dejarlo escrito de una, no solo poder preguntarlo) y de dónde sale el dato.
   const quiebre = nivelAlLlegar.filter(v=>v<=0).length;
@@ -5245,7 +5264,7 @@ function drawKardex(){
   const fuenteCaption = `<div class="kdx-caption kdx-fuente">Fuente: ${escapeHtml(ALMACEN_DATA.filename||'Reporte Almacen.xlsx')} — hojas Ingresos y Movimientos, movimiento por movimiento (cada ingreso y cada salida de ${escapeHtml(sucInfo.label)} con su fecha exacta). El eje muestra las semanas solo como referencia de tiempo.</div>`;
 
   const chart = document.getElementById('kardexChart');
-  chart.innerHTML = `${pedirBannerSvg}${sucFilterSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
+  chart.innerHTML = `${pedirBannerSvg}${sucFilterSvg}${origenFilterSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
     <defs><clipPath id="kdxPlotClip"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect></clipPath></defs>
     ${gridSvg}
     <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
@@ -5280,7 +5299,15 @@ function drawKardex(){
     } : null,
   };
 
-  chart.querySelectorAll('.kdx-suc-btn').forEach(btn=>{
+  chart.querySelectorAll('[data-origen]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const o = btn.dataset.origen;
+      kardexOrigen = (o === 'auto') ? null : o;
+      drawKardex();
+    });
+  });
+
+  chart.querySelectorAll('.kdx-suc-btn[data-suc]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const suc = btn.dataset.suc;
       if(suc === kardexSucursal) return;
@@ -8362,7 +8389,7 @@ const CRT_DRIVE = {
 const CRT = {
   filas: [], proyectos: [], pry: '', q: '', filtro: 'todos',
   sel: new Set(), abiertos: new Set(), subidas: new Map(),
-  sug: [], sugIdx: -1, pendiente: null, listo: false,
+  sug: [], sugIdx: -1, pendiente: null, listo: false, firma: '',
   cargados: new Set(),   // proyectos cuyos documentos ya se consultaron a Drive
 };
 
@@ -8777,7 +8804,11 @@ function drawCertificados(){
     return;
   }
   nota.style.display = 'none';
-  if(!CRT.listo || !CRT.filas.length){ crtCargar(); CRT.listo = true; crtRefrescarPry(); }
+  // Se recarga cuando cambian los datos de abajo, no solo la primera vez (22.09.2026: Piero abría el link,
+  // el módulo se armaba con el snapshot publicado, luego subía los 4 Excel y Certificados seguía mostrando
+  // lo viejo — un solo proyecto "SIN PROYECTO" — porque el latch `listo` ya estaba en true).
+  const firma = [DATA.fromSnapshot ? 's' : 'x', DATA.filename || '', DATA.corte ? +DATA.corte : 0, getProcesoRows().length].join('|');
+  if(!CRT.listo || !CRT.filas.length || CRT.firma !== firma){ crtCargar(); CRT.listo = true; CRT.firma = firma; crtRefrescarPry(); }
   crtDibujar();
 }
 
