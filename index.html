@@ -523,7 +523,7 @@
       <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
     </div>
     <div class="navsub" data-sub="logistica" hidden>
-      <div class="navitem" data-section="alertas">📦 Inventario · Almacén General</div>
+      <div class="navitem" data-section="alertas">📦 Análisis de Inventario</div>
     </div>
     <div class="navmod" data-mod="certificados" data-section="certificados">
       <span class="ico">📄</span><span>Certificados</span>
@@ -4273,8 +4273,8 @@ function renderAlertas(){
         drawAlertas();
       });
     });
-    document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'inventario-almacen-general', e.currentTarget));
-    document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-inventario-almacen-general', e.currentTarget));
+    document.getElementById('btnImgAlertas').addEventListener('click', (e)=> downloadSectionImage('section-alertas', 'analisis-de-inventario', e.currentTarget));
+    document.getElementById('btnProImgAlertas').addEventListener('click', (e)=> downloadProImage(buildProImageAlertas, 'resumen-analisis-de-inventario', e.currentTarget));
     // Imagen del Kardex del producto abierto (15.09.2026; desde el 18.09.2026 son 2 imágenes en un zip,
     // con el mismo formato del reporte por comprador — ver kardexPartesHtml).
     document.getElementById('btnImgKardex').addEventListener('click', (e)=> generarPartesEnZip(
@@ -7908,7 +7908,7 @@ function buildProImageAlertas(){
     ? { tone:'alert', items:[ {value:repo.length.toLocaleString('es-PE'), label:'En reposición'}, {value:nSinLima.toLocaleString('es-PE'), label:'Sin stock en Lima'}, {value:all.length.toLocaleString('es-PE'), label:'En seguimiento'} ], action:'ACCIÓN: coordinar reposición del almacén central (Lima) para los productos listados.' }
     : { tone:'info', items:[ {value:'0', label:'Productos por debajo de su ROP'} ], action:'Todo el stock al día 🎉' };
   return {
-    title: 'INVENTARIO · ALMACÉN GENERAL',
+    title: 'ANÁLISIS DE INVENTARIO',
     subtitle: 'ESTADO DE REPOSICIÓN CONTRA EL PUNTO DE REORDEN',
     kpis,
     tables: [ table ],
@@ -8305,11 +8305,72 @@ function closeDrilldown(){
 // cubrir varias líneas de la misma OC). Los repetidos se reconocen por el
 // contenido del archivo (huella), no por su nombre.
 // ============================================================================
+// --------------------------------------------------------------------------
+// Conexión con Drive. Pega acá la URL de la aplicación web de Apps Script
+// (termina en /exec) y la misma clave que pusiste en el script. Con esto
+// vacío, el módulo sigue funcionando pero los archivos no salen del navegador.
+// --------------------------------------------------------------------------
+const CRT_DRIVE = {
+  url: 'https://script.google.com/macros/s/AKfycbwfzj89OjVf3tweTcln4EWHi08UYCmylrIcewQJeSHKRvc9ppihH578Y6gxaJyg8Fl6/exec',
+  clave: 'friopacking-2026',
+};
+
 const CRT = {
   filas: [], proyectos: [], pry: '', q: '', filtro: 'todos',
   sel: new Set(), abiertos: new Set(), subidas: new Map(),
   sug: [], sugIdx: -1, pendiente: null, listo: false,
+  cargados: new Set(),   // proyectos cuyos documentos ya se consultaron a Drive
 };
+
+/** Convierte el archivo a base64 para mandarlo en el JSON. */
+function crtBase64(file){
+  return new Promise(function(res, rej){
+    const r = new FileReader();
+    r.onload = function(){ res(String(r.result).split(',')[1]); };
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+/** Manda el archivo al Apps Script, que lo guarda en Drive y crea las carpetas. */
+async function crtGuardarEnDrive(file, tipo, destinos){
+  if(!CRT_DRIVE.url) return { ok:false, sinConexion:true };
+  const payload = {
+    clave: CRT_DRIVE.clave,
+    tipo: tipo,
+    archivo: { nombre:file.name, mime:file.type || 'application/pdf', datos: await crtBase64(file) },
+    destinos: destinos.map(function(f){
+      return { nroPry:f.idPry, nomPry:f.nomPry, req:f.req, codigo:f.codigo, producto:f.producto, oc:f.oc };
+    }),
+  };
+  // Sin encabezados propios: así el navegador no dispara el preflight que
+  // Apps Script no sabe responder.
+  const r = await fetch(CRT_DRIVE.url, { method:'POST', body: JSON.stringify(payload) });
+  return await r.json();
+}
+
+/** Trae de Drive los documentos que ya existen en un proyecto. */
+async function crtLeerDeDrive(pry){
+  if(!CRT_DRIVE.url || CRT.cargados.has(pry)) return;
+  CRT.cargados.add(pry);
+  try{
+    const u = CRT_DRIVE.url + '?clave=' + encodeURIComponent(CRT_DRIVE.clave) + '&pry=' + encodeURIComponent(pry);
+    const r = await fetch(u);
+    const d = await r.json();
+    if(!d.ok || !d.docs) return;
+    d.docs.forEach(function(doc){
+      CRT.filas.forEach(function(f){
+        if(f.idPry !== pry || f.req !== doc.req) return;
+        // codigo null = documento del requerimiento: vale para todos sus productos
+        if(doc.codigo && f.codigo !== doc.codigo) return;
+        f[doc.tipo === 'ficha' ? 'ficha' : 'cert'] = doc.url;
+      });
+    });
+    crtDibujar();
+  }catch(err){
+    console.warn('No se pudieron leer los documentos de Drive:', err);
+  }
+}
 
 function crtNorm(x){
   return String(x==null?'':x).toLowerCase()
@@ -8443,6 +8504,20 @@ async function crtRecibirArchivo(file){
   CRT.subidas.set(huella, reg);
   if(!tocados.length) return;
 
+  // Guardado real en Drive. Si no hay URL configurada, queda solo en pantalla.
+  const res = await crtGuardarEnDrive(file, tipo, tocados);
+  if(res && res.ok){
+    tocados.forEach(function(f){
+      f[tipo === 'ficha' ? 'ficha' : 'cert'] = res.url;
+      f[crtCampo(tipo)] = null;
+    });
+  }
+  const enDrive = res && res.ok
+    ? ' Guardado en Drive: <b>' + escapeHtml(res.ruta) + '</b>.' +
+      (res.reusado ? ' (ya estaba ahí, no se guardó otra copia)' : '')
+    : (res && res.sinConexion ? ' <i>Todavía sin conexión a Drive: queda solo en pantalla.</i>'
+                              : ' <b>No se pudo guardar en Drive:</b> ' + escapeHtml((res && res.error) || 'error de red') + '.');
+
   const repetido = yaEstaba.length
     ? ' <b>Es el mismo documento</b> que ya estaba en ' + escapeHtml(yaEstaba.slice(0,4).join(', ')) +
       (yaEstaba.length > 4 ? ' y ' + (yaEstaba.length-4) + ' más' : '') + ': no se guarda otra copia.'
@@ -8451,7 +8526,7 @@ async function crtRecibirArchivo(file){
   if(tocados.length > 1){
     CRT.sel.clear();
     crtMensaje('<b>' + escapeHtml(reg.nombre) + '</b> quedó como ' + crtNombreDoc(tipo) + ' de ' +
-      tocados.length + ' productos. El archivo se guarda una sola vez y se enlaza en todos.' + repetido);
+      tocados.length + ' productos.' + enDrive + repetido);
   } else {
     const f = tocados[0];
     const hermanos = CRT.filas.filter(x => x.oc === f.oc && x.req === f.req && !crtTiene(x, tipo));
@@ -8460,7 +8535,7 @@ async function crtRecibirArchivo(file){
       : '';
     crtMensaje('');
     f.nota = { html: '<b>' + escapeHtml(reg.nombre) + '</b> quedó como ' + crtNombreDoc(tipo) +
-      ' de este producto.' + repetido + boton };
+      ' de este producto.' + enDrive + repetido + boton };
   }
   crtDibujar();
 }
@@ -8548,6 +8623,7 @@ function crtVistaProyectos(cont){
   });
 }
 function crtVistaProyecto(cont){
+  crtLeerDeDrive(CRT.pry);
   const delPry = CRT.filas.filter(f => f.idPry === CRT.pry);
   const conChip = delPry.filter(crtPasaChip);
   const reqs = new Map();
@@ -8716,7 +8792,7 @@ document.getElementById('crtQuitarSel').addEventListener('click', ()=>{ CRT.sel.
 // el submenú del módulo (o data-section en el propio módulo si va solo).
 const MODULOS = {
   gerencial:    { nombre:'Gerencial',    secciones:{ proceso:'Indicadores de Logística', gasto:'Concentración de Gasto' } },
-  logistica:    { nombre:'Logística',    secciones:{ alertas:'Inventario · Almacén General' } },
+  logistica:    { nombre:'Logística',    secciones:{ alertas:'Análisis de Inventario' } },
   certificados: { nombre:'Certificados', secciones:{ certificados:'Certificados por Proyecto' } },
 };
 const MOD_DE_SECCION = {};
