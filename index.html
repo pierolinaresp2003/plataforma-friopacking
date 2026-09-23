@@ -8718,6 +8718,7 @@ const CRT = {
   filas: [], proyectos: [], pry: '', q: '', filtro: 'todos',
   sel: new Set(), abiertos: new Set(), subidas: new Map(),
   sug: [], sugIdx: -1, pendiente: null, listo: false, firma: '', pedAbierto: false,
+  leyendo: new Set(),    // proyectos cuya consulta a Drive está en curso
   cargados: new Set(),   // proyectos cuyos documentos ya se consultaron a Drive
 };
 
@@ -8749,25 +8750,54 @@ async function crtGuardarEnDrive(file, tipo, destinos){
 }
 
 /** Trae de Drive los documentos que ya existen en un proyecto. */
+/** Marca en las filas del proyecto los documentos que devolvió Drive. */
+function crtAplicarDocs(pry, docs){
+  docs.forEach(function(doc){
+    CRT.filas.forEach(function(f){
+      if(f.idPry !== pry || f.req !== doc.req) return;
+      // codigo null = documento del requerimiento: vale para todos sus productos
+      if(doc.codigo && f.codigo !== doc.codigo) return;
+      f[doc.tipo === 'ficha' ? 'ficha' : 'cert'] = doc.url;
+    });
+  });
+}
+
+// Copia de lo último que contestó Drive, por proyecto (23.09.2026, pedido de Piero: "no se actualiza
+// rápido el estado al encontrarlo en Drive"). Preguntarle a Drive toma unos segundos —el Apps Script
+// recorre carpeta por carpeta— y mientras tanto todo se veía sin certificado. Ahora al entrar se pinta
+// al instante lo de la visita anterior y la consulta real corre por detrás y corrige lo que haga falta.
+// Es solo un caché: Drive sigue siendo la verdad, y cada vez que se abre un proyecto se vuelve a
+// consultar. Vive en este navegador; si se borra, no se pierde nada.
+const CRT_CACHE = 'fp_crt_drive';
+function crtCacheLeer(){
+  try{ return JSON.parse(localStorage.getItem(CRT_CACHE) || '{}'); }catch(err){ return {}; }
+}
+function crtCacheGuardar(pry, docs){
+  try{
+    const c = crtCacheLeer();
+    c[pry] = { t: Date.now(), docs: docs };
+    localStorage.setItem(CRT_CACHE, JSON.stringify(c));
+  }catch(err){ /* sin espacio o modo incógnito: da igual, es solo un atajo */ }
+}
+
 async function crtLeerDeDrive(pry){
   if(!CRT_DRIVE.url || CRT.cargados.has(pry)) return;
   CRT.cargados.add(pry);
+  // 1) lo que se sabía de la última visita, al instante (sin repintar: esto corre antes del dibujo)
+  const previo = crtCacheLeer()[pry];
+  if(previo && previo.docs && previo.docs.length) crtAplicarDocs(pry, previo.docs);
+  // 2) y de fondo, lo que dice Drive ahora
+  CRT.leyendo.add(pry);
   try{
     const u = CRT_DRIVE.url + '?clave=' + encodeURIComponent(CRT_DRIVE.clave) + '&pry=' + encodeURIComponent(pry);
     const r = await fetch(u);
     const d = await r.json();
-    if(!d.ok || !d.docs) return;
-    d.docs.forEach(function(doc){
-      CRT.filas.forEach(function(f){
-        if(f.idPry !== pry || f.req !== doc.req) return;
-        // codigo null = documento del requerimiento: vale para todos sus productos
-        if(doc.codigo && f.codigo !== doc.codigo) return;
-        f[doc.tipo === 'ficha' ? 'ficha' : 'cert'] = doc.url;
-      });
-    });
-    crtDibujar();
+    if(d.ok && d.docs){ crtAplicarDocs(pry, d.docs); crtCacheGuardar(pry, d.docs); }
   }catch(err){
     console.warn('No se pudieron leer los documentos de Drive:', err);
+  }finally{
+    CRT.leyendo.delete(pry);
+    crtDibujar();
   }
 }
 
@@ -9163,6 +9193,7 @@ async function crtRecibirArchivo(file){
       f[tipo === 'ficha' ? 'ficha' : 'cert'] = res.url;
       f[crtCampo(tipo)] = null;
     });
+    reg.enDrive = true;   // para el resumen de arriba: este archivo sí quedó guardado
   }
   const enDrive = res && res.ok
     ? ' Guardado en Drive: <b>' + escapeHtml(res.ruta) + '</b>.' +
@@ -9181,29 +9212,10 @@ async function crtRecibirArchivo(file){
       tocados.length + ' productos.' + enDrive + repetido);
   } else {
     const f = tocados[0];
-    const hermanos = CRT.filas.filter(x => x.oc === f.oc && x.req === f.req && !crtTiene(x, tipo));
-    const boton = hermanos.length
-      ? `<button class="crt-btn-nota" data-crtaplicar="${escapeHtml(huella)}" data-tipo="${tipo}" data-clave="${escapeHtml(crtClave(f))}">Enlazarlo también a los otros ${hermanos.length} productos de la OC ${escapeHtml(f.oc)}</button>`
-      : '';
     crtMensaje('');
     f.nota = { html: '<b>' + escapeHtml(reg.nombre) + '</b> quedó como ' + crtNombreDoc(tipo) +
-      ' de este producto.' + enDrive + repetido + boton };
+      ' de este producto.' + enDrive + repetido };
   }
-  crtDibujar();
-}
-function crtAplicarAOC(huella, tipo, clave){
-  const reg = CRT.subidas.get(huella);
-  const base = CRT.filas.find(x => crtClave(x) === clave);
-  if(!reg || !base) return;
-  CRT.filas.filter(x => x.oc === base.oc && x.req === base.req && !crtTiene(x, tipo)).forEach(x=>{
-    x[crtCampo(tipo)] = { nombre: reg.nombre, huella };
-    reg.usos.push({ clave: crtClave(x), tipo });
-    x.nota = null;
-  });
-  const n = CRT.filas.filter(x => x.oc === base.oc && x.req === base.req &&
-    x[crtCampo(tipo)] && x[crtCampo(tipo)].huella === huella).length;
-  base.nota = { html: '<b>' + escapeHtml(reg.nombre) + '</b> quedó enlazado en ' + n +
-    ' productos de la OC ' + escapeHtml(base.oc) + '. El archivo está guardado una sola vez.' };
   crtDibujar();
 }
 function crtMensaje(html){
@@ -9239,7 +9251,14 @@ function crtDibujarResumen(){
   r.hidden = false;
   r.innerHTML = `<span>${CRT.subidas.size} ${CRT.subidas.size===1?'archivo cargado':'archivos cargados'} · ${enlaces} productos cubiertos</span>` +
     (reusados ? `<span style="color:var(--amber-ink);">${reusados} ${reusados===1?'archivo se reusó':'archivos se reusaron'} en más de un producto</span>` : '') +
-    `<span style="margin-left:auto;font-weight:500;">Por ahora los archivos quedan en el navegador</span>`;
+    // Antes acá decía siempre "por ahora los archivos quedan en el navegador", de cuando todavía no
+    // existía la conexión con Drive: confundía (23.09.2026, Piero: "¿se guardan automáticamente?").
+    (function(){
+      const sinDrive = [...CRT.subidas.values()].filter(x => !x.enDrive).length;
+      return sinDrive
+        ? `<span style="margin-left:auto;font-weight:700;color:var(--red);">⚠ ${sinDrive} ${sinDrive===1?'archivo quedó':'archivos quedaron'} solo en este navegador: no llegaron a Drive</span>`
+        : `<span style="margin-left:auto;font-weight:700;color:var(--green);">✔ Guardado en Drive automáticamente</span>`;
+    })();
 }
 function crtDibujar(){
   document.getElementById('crtLimpiar').hidden = !(CRT.pry || CRT.q || CRT.filtro !== 'todos');
@@ -9298,6 +9317,7 @@ function crtVistaProyecto(cont){
       <div><div class="id" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;font-weight:700;color:var(--brand-ink);">${escapeHtml(CRT.pry)}</div>
         <div class="nom">${escapeHtml(crtNombrePry(CRT.pry))}</div></div>
       <div class="der">
+        ${CRT.leyendo.has(CRT.pry) ? `<div class="crt-mini"><div class="t" style="text-transform:none;letter-spacing:0;">⟳ consultando Drive…</div></div>` : ''}
         <div class="crt-mini"><div class="v">${reqs.size}</div><div class="t">Requerim.</div></div>
         <div class="crt-mini"><div class="v">${delPry.length}</div><div class="t">Productos</div></div>
         <div class="crt-mini"><div class="v ok">${conCert}</div><div class="t">Con certificado</div></div>
@@ -9360,9 +9380,6 @@ function crtVistaProyecto(cont){
   if(ped) ped.addEventListener('toggle', ()=>{ CRT.pedAbierto = ped.open; });
   cont.querySelectorAll('[data-crtmailm]').forEach(b=>{
     b.addEventListener('click', ()=> crtCorreoYExcel(b.dataset.crtmailm));
-  });
-  cont.querySelectorAll('[data-crtaplicar]').forEach(b=>{
-    b.addEventListener('click', ()=> crtAplicarAOC(b.dataset.crtaplicar, b.dataset.tipo, b.dataset.clave));
   });
   cont.querySelectorAll('[data-crtfila]').forEach(c=>{
     c.addEventListener('change', ()=>{
