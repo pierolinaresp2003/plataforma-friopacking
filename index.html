@@ -8839,7 +8839,6 @@ function crtMailto(clave){
   prods.forEach(x => L.push('  \u00b7 ' + x.codigo + ' — ' + x.producto + '  ->  falta ' + falta(x)));
   L.push('');
   L.push('Agradeceremos enviarlos en respuesta a este correo.');
-  L.push('');
   L.push('Saludos cordiales,');
   L.push('Compras y Logística — Grupo Friopacking');
   const q = [];
@@ -8919,12 +8918,26 @@ function crtCorreoMasivo(g){
     '. De cada uno necesitamos el certificado de calidad y la ficha técnica; en el archivo se indica cuál falta en cada caso.');
   L.push('');
   L.push('Agradeceremos enviarnos los documentos en respuesta a este mismo correo.');
-  L.push('');
   L.push('Saludos cordiales,');
   L.push('Compras y Logística — Grupo Friopacking');
+  // Misma carta en HTML, con lo importante en negrita: es la que viaja en el .eml. El texto plano de
+  // arriba queda para "mailto:", que no admite formato.
+  const e = escapeHtml;
+  const par = (txt, ultimo) => '<p style="margin:0 0 ' + (ultimo ? '0' : '11pt') + ';">' + txt + '</p>';
+  const H = [];
+  H.push(par(contacto ? ('Estimado(a) ' + e(contacto) + ':') : 'Estimados:'));
+  H.push(par('Estamos cerrando la documentación de calidad del proyecto <b>' + e(pry) +
+    '</b> y nos falta la de varios de sus despachos.'));
+  H.push(par('Adjuntamos el detalle en Excel: <b>' + n + (n===1 ? ' producto' : ' productos') + '</b>' +
+    (nOc ? (' de <b>' + nOc + (nOc===1 ? ' orden de compra' : ' órdenes de compra') + '</b>') : '') +
+    '. De cada uno necesitamos el <b>certificado de calidad</b> y la <b>ficha técnica</b>; en el archivo se indica cuál falta en cada caso.'));
+  H.push(par('Agradeceremos enviarnos los documentos <b>en respuesta a este mismo correo</b>.'));
+  H.push(par('Saludos cordiales,<br>Compras y Logística — Grupo Friopacking', true));
   return {
     asunto: 'Documentación de calidad pendiente — ' + pry + ' — ' + g.filas.length + (g.filas.length===1?' producto':' productos'),
     cuerpo: L.join('\r\n'),
+    html: '<html><body><div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;color:#000000;">' +
+      H.join('') + '</div></body></html>',
     pry: pry,
   };
 }
@@ -8965,14 +8978,18 @@ function crtDescargarEml(clave){
     (function(){ const cc = crtCopias(g.filas, g.correo.to, g.correo.cc); return cc.length ? 'Cc: ' + cc.join(', ') : null; })(),
     'Subject: =?UTF-8?B?' + utf8ToBase64(c.asunto) + '?=',
     'X-Unsent: 1',
+    // Importancia alta (23.09.2026, pedido de Piero): las 3 cabeceras porque cada cliente mira una.
+    'Importance: High',
+    'X-Priority: 1 (Highest)',
+    'X-MSMail-Priority: High',
     'MIME-Version: 1.0',
     'Content-Type: multipart/mixed; boundary="' + b + '"',
     '',
     '--' + b,
-    'Content-Type: text/plain; charset="utf-8"',
+    'Content-Type: text/html; charset="utf-8"',
     'Content-Transfer-Encoding: base64',
     '',
-    cortar(utf8ToBase64(c.cuerpo)),
+    cortar(utf8ToBase64(c.html)),
     '--' + b,
     'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="' + nombreBase + '.xlsx"',
     'Content-Disposition: attachment; filename="' + nombreBase + '.xlsx"',
