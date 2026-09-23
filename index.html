@@ -476,8 +476,14 @@
   .crt-fila .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--brand-ink);font-weight:600;}
   .crt-fila .desc{font-size:13.5px;font-weight:600;color:var(--ink);}
   .crt-fila .sub{font-size:12px;color:var(--muted);line-height:1.45;}
-  .crt-ped{padding:14px 18px 12px;margin-bottom:12px;}
-  .crt-ped-tit{font-size:13px;font-weight:800;color:var(--ink);margin-bottom:2px;}
+  .crt-ped{padding:0;margin-bottom:12px;}
+  .crt-ped > summary{display:flex;align-items:center;gap:9px;padding:12px 18px;cursor:pointer;list-style:none;}
+  .crt-ped > summary::-webkit-details-marker{display:none;}
+  .crt-ped > summary .caret{flex:none;transition:transform .15s;color:var(--ink-soft);}
+  .crt-ped[open] > summary .caret{transform:rotate(90deg);}
+  .crt-ped > summary .cnt{margin-left:auto;font-size:12px;font-weight:600;color:var(--ink-soft);}
+  .crt-ped-cuerpo{padding:0 18px 14px;}
+  .crt-ped-tit{font-size:13px;font-weight:800;color:var(--ink);}
   .crt-ped-sub{font-size:12px;color:var(--ink-soft);margin-bottom:10px;line-height:1.5;}
   .crt-ped-lista{display:flex;flex-direction:column;gap:6px;max-height:330px;overflow:auto;}
   .crt-ped-fila{display:flex;align-items:center;gap:12px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);}
@@ -8661,7 +8667,7 @@ const CRT_DRIVE = {
 const CRT = {
   filas: [], proyectos: [], pry: '', q: '', filtro: 'todos',
   sel: new Set(), abiertos: new Set(), subidas: new Map(),
-  sug: [], sugIdx: -1, pendiente: null, listo: false, firma: '',
+  sug: [], sugIdx: -1, pendiente: null, listo: false, firma: '', pedAbierto: false,
   cargados: new Set(),   // proyectos cuyos documentos ya se consultaron a Drive
 };
 
@@ -8813,29 +8819,20 @@ const crtFaltaTexto = (f) => (!crtTiene(f,'cert') && !crtTiene(f,'ficha')) ? 'Ce
 /** Asunto y cuerpo del correo de un proveedor, agrupando sus productos por orden de compra. */
 function crtCorreoMasivo(g){
   const pry = (CRT.pry && CRT.pry !== 'SIN PROYECTO') ? (CRT.pry + ' — ' + crtNombrePry(CRT.pry)) : crtNombrePry(CRT.pry);
-  const porOc = new Map();
-  g.filas.forEach(function(f){
-    const p = crtProvDe(f) || {};
-    const oc = p.oc || '(sin orden de compra)';
-    if(!porOc.has(oc)) porOc.set(oc, { fecha:f.fecha, probable:!!p.probable, filas:[] });
-    porOc.get(oc).filas.push(f);
-  });
+  // Texto corto a propósito (23.09.2026, pedido de Piero: "no detalles todo lo que se pide, solo lo
+  // principal"): el detalle producto por producto va en el Excel adjunto, no en el cuerpo.
+  const n = g.filas.length, nOc = g.ocs.size;
   const L = [];
   const contacto = g.correo && g.correo.contacto;
   L.push(contacto ? ('Estimado(a) ' + contacto + ':') : 'Estimados:');
   L.push('');
-  L.push('Estamos cerrando la documentación de calidad del proyecto ' + pry + ' y nos falta la de los siguientes despachos suyos.');
+  L.push('Estamos cerrando la documentación de calidad del proyecto ' + pry + ' y nos falta la de varios de sus despachos.');
   L.push('');
-  porOc.forEach(function(d, oc){
-    L.push('OC ' + oc + (d.fecha ? ('  ·  ' + d.fecha) : '') + (d.probable ? '  (por confirmar)' : ''));
-    d.filas.forEach(function(f){
-      L.push('   \u00b7 ' + f.codigo + ' — ' + f.producto);
-      L.push('     Requerimiento ' + f.req + '  ·  falta: ' + crtFaltaTexto(f).toLowerCase() + (f.stock ? '  ·  entregado desde nuestro almacén' : ''));
-    });
-    L.push('');
-  });
-  L.push('Adjuntamos el mismo detalle en Excel (' + g.filas.length + (g.filas.length===1?' producto':' productos') + ').');
-  L.push('Agradeceremos enviarnos los documentos en respuesta a este correo.');
+  L.push('Adjuntamos el detalle en Excel: ' + n + (n===1 ? ' producto' : ' productos') +
+    (nOc ? (' de ' + nOc + (nOc===1 ? ' orden de compra' : ' órdenes de compra')) : '') +
+    '. De cada uno necesitamos el certificado de calidad y la ficha técnica; en el archivo se indica cuál falta en cada caso.');
+  L.push('');
+  L.push('Agradeceremos enviarnos los documentos en respuesta a este mismo correo.');
   L.push('');
   L.push('Saludos cordiales,');
   L.push('Compras y Logística — Grupo Friopacking');
@@ -8853,7 +8850,7 @@ function crtExcelPendientes(g){
     const p = crtProvDe(f) || {};
     filas.push([
       CRT.pry, crtNombrePry(CRT.pry), f.req, p.oc || '', f.fecha, f.codigo, f.producto,
-      g.nombre, f.stock ? (p.probable ? 'De stock (OC probable)' : 'De stock') : 'Compra directa',
+      g.nombre, f.stock ? 'Entregado de stock' : 'Compra directa',
       crtFaltaTexto(f),
     ]);
   });
@@ -9251,9 +9248,15 @@ function crtVistaProyecto(cont){
   // Un correo por proveedor con todo lo que le falta en ESTE proyecto (23.09.2026, pedido de Piero).
   const pend = crtPendientesPorProveedor();
   const conCorreo = pend.filter(g => g.correo && g.correo.to);
-  const panel = pend.length ? `<div class="card crt-ped">
-      <div class="crt-ped-tit">Pedir lo que falta — un solo correo por proveedor</div>
-      <div class="crt-ped-sub">Junta todos los requerimientos de este proyecto que le faltan a cada proveedor, agrupados por orden de compra, con el mismo detalle en un Excel adjunto.${
+  // Va plegado: es una alternativa al pedido de a uno, no lo primero que hay que ver (23.09.2026).
+  const panel = pend.length ? `<details class="card crt-ped"${CRT.pedAbierto ? ' open' : ''}>
+      <summary>
+        <svg class="caret" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+        <span class="crt-ped-tit">Pedir lo que falta — un solo correo por proveedor</span>
+        <span class="cnt">${conCorreo.length} ${conCorreo.length===1?'proveedor':'proveedores'} por contactar</span>
+      </summary>
+      <div class="crt-ped-cuerpo">
+      <div class="crt-ped-sub">Junta todos los requerimientos de este proyecto que le faltan a cada proveedor, con el detalle en un Excel adjunto.${
         conCorreo.length < pend.length ? ` <b>${pend.length - conCorreo.length}</b> ${pend.length - conCorreo.length===1?'proveedor no tiene':'proveedores no tienen'} correo en DB Proveedores.xlsx.` : ''}</div>
       <div class="crt-ped-lista">${pend.map(g=>`
         <div class="crt-ped-fila${g.correo && g.correo.to ? '' : ' sin'}">
@@ -9264,7 +9267,8 @@ function crtVistaProyecto(cont){
             <button class="crt-doc no lev" type="button" data-crtmailm="${escapeHtml(g.clave)}" title="Abre el correo en tu cliente y descarga el Excel aparte">Abrir sin adjunto</button>
           </div>` : ''}
         </div>`).join('')}</div>
-    </div>` : '';
+      </div>
+    </details>` : '';
 
   cont.innerHTML = cab + panel + (reqs.size ? [...reqs.entries()].map(([req,r])=>`
     <details class="card crt-req" data-crtreq="${escapeHtml(req)}"${CRT.abiertos.has(req)?' open':''}>
@@ -9293,6 +9297,8 @@ function crtVistaProyecto(cont){
       if(url) window.location.href = url;
     });
   });
+  const ped = cont.querySelector('details.crt-ped');
+  if(ped) ped.addEventListener('toggle', ()=>{ CRT.pedAbierto = ped.open; });
   cont.querySelectorAll('[data-crteml]').forEach(b=>{
     b.addEventListener('click', ()=> crtDescargarEml(b.dataset.crteml));
   });
