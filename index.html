@@ -8727,6 +8727,8 @@ const CRT = {
   sel: new Set(), abiertos: new Set(), subidas: new Map(),
   sug: [], sugIdx: -1, pendiente: null, listo: false, firma: '', pedAbierto: false,
   leyendo: false,        // true mientras Drive contesta
+  sinGlobal: false,      // true si el Apps Script no entiende la consulta de todos los proyectos
+  cargados: new Set(),   // proyectos ya consultados uno por uno (respaldo del script viejo)
 };
 
 /** Convierte el archivo a base64 para mandarlo en el JSON. */
@@ -8790,14 +8792,44 @@ function crtCacheGuardar(docs){
   catch(err){ /* sin espacio o modo incógnito: da igual, es solo un atajo */ }
 }
 
+async function crtPreguntarDrive(pry){
+  const u = CRT_DRIVE.url + '?clave=' + encodeURIComponent(CRT_DRIVE.clave) + '&pry=' + encodeURIComponent(pry);
+  const r = await fetch(u);
+  const d = await r.json();
+  return (d && d.ok && d.docs) ? d.docs : null;
+}
+
 async function crtLeerDeDrive(){
   if(!CRT_DRIVE.url || CRT.leyendo) return;
   CRT.leyendo = true;
   try{
-    const u = CRT_DRIVE.url + '?clave=' + encodeURIComponent(CRT_DRIVE.clave) + '&pry=*';
-    const r = await fetch(u);
-    const d = await r.json();
-    if(d.ok && d.docs){ crtAplicarDocs(d.docs); crtCacheGuardar(d.docs); }
+    const docs = await crtPreguntarDrive('*');
+    if(docs && docs.length){ crtAplicarDocs(docs); crtCacheGuardar(docs); CRT.sinGlobal = false; }
+    // Un Apps Script viejo no entiende "pry=*" y contesta vacío. En ese caso se vuelve al camino de
+    // antes: preguntar por el proyecto que se abra (23.09.2026). Así la plataforma funciona con
+    // cualquiera de las dos versiones del script, solo que con la vieja hay que esperar al entrar.
+    else CRT.sinGlobal = true;
+  }catch(err){
+    console.warn('No se pudieron leer los documentos de Drive:', err);
+  }finally{
+    CRT.leyendo = false;
+    crtDibujar();
+  }
+}
+
+/** Respaldo para el Apps Script viejo: consulta un proyecto al abrirlo. */
+async function crtLeerProyecto(pry){
+  if(!CRT_DRIVE.url || !CRT.sinGlobal || CRT.cargados.has(pry)) return;
+  CRT.cargados.add(pry);
+  CRT.leyendo = true;
+  try{
+    const docs = await crtPreguntarDrive(pry);
+    if(docs && docs.length){
+      docs.forEach(function(d){ d.pry = d.pry || pry; });
+      crtAplicarDocs(docs);
+      const previo = crtCacheLeer();
+      crtCacheGuardar((previo ? previo.docs : []).filter(function(d){ return d.pry !== pry; }).concat(docs));
+    }
   }catch(err){
     console.warn('No se pudieron leer los documentos de Drive:', err);
   }finally{
@@ -9300,6 +9332,7 @@ function crtVistaProyectos(cont){
   });
 }
 function crtVistaProyecto(cont){
+  crtLeerProyecto(CRT.pry);
   const delPry = CRT.filas.filter(f => f.idPry === CRT.pry);
   const conChip = delPry.filter(crtPasaChip);
   const reqs = new Map();
