@@ -8830,17 +8830,15 @@ function crtMailto(clave){
   L.push('');
   L.push('Solicitamos la documentación de calidad correspondiente al siguiente despacho:');
   L.push('');
-  L.push('Orden de compra: ' + d.oc + (d.probable ? ' (por confirmar)' : ''));
+  L.push('Orden de compra: ' + d.oc);
   L.push('Requerimiento:   ' + f.req);
   L.push('Proyecto:        ' + pry);
-  if(f.stock) L.push('Nota: el material se entregó desde nuestro almacén; según nuestro kardex corresponde a esa orden de compra.');
   L.push('');
   L.push(prods.length === 1 ? 'Producto:' : ('Productos (' + prods.length + '):'));
   prods.forEach(x => L.push('  \u00b7 ' + x.codigo + ' — ' + x.producto + '  ->  falta ' + falta(x)));
   L.push('');
   L.push('Agradeceremos enviarlos en respuesta a este correo.');
   L.push('Saludos cordiales,');
-  L.push('Compras y Logística — Grupo Friopacking');
   const q = [];
   const cc = crtCopias(prods, d.to, d.cc);
   if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
@@ -8919,7 +8917,6 @@ function crtCorreoMasivo(g){
   L.push('');
   L.push('Agradeceremos enviarnos los documentos en respuesta a este mismo correo.');
   L.push('Saludos cordiales,');
-  L.push('Compras y Logística — Grupo Friopacking');
   // Misma carta en HTML, con lo importante en negrita: es la que viaja en el .eml. El texto plano de
   // arriba queda para "mailto:", que no admite formato.
   const e = escapeHtml;
@@ -8932,7 +8929,7 @@ function crtCorreoMasivo(g){
     (nOc ? (' de <b>' + nOc + (nOc===1 ? ' orden de compra' : ' órdenes de compra') + '</b>') : '') +
     '. De cada uno necesitamos el <b>certificado de calidad</b> y la <b>ficha técnica</b>; en el archivo se indica cuál falta en cada caso.'));
   H.push(par('Agradeceremos enviarnos los documentos <b>en respuesta a este mismo correo</b>.'));
-  H.push(par('Saludos cordiales,<br>Compras y Logística — Grupo Friopacking', true));
+  H.push(par('Saludos cordiales,', true));
   return {
     asunto: 'Documentación de calidad pendiente — ' + pry + ' — ' + g.filas.length + (g.filas.length===1?' producto':' productos'),
     cuerpo: L.join('\r\n'),
