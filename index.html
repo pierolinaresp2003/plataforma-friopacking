@@ -8957,49 +8957,7 @@ function crtExcelPendientes(g){
   return XLSX.write(wb, { bookType:'xlsx', type:'base64' });
 }
 
-/**
- * Archivo .eml con el correo ya escrito y el Excel adjunto. Se descarga y al abrirlo el cliente de
- * correo lo muestra como borrador listo para enviar (cabecera X-Unsent). Es la única forma de dejar un
- * adjunto puesto desde el navegador: "mailto:" no admite adjuntos.
- */
-function crtDescargarEml(clave){
-  const g = crtPendientesPorProveedor().find(x => x.clave === clave);
-  if(!g || !g.correo || !g.correo.to) return;
-  const c = crtCorreoMasivo(g);
-  const nombreBase = 'Documentacion pendiente - ' + limpiarNombreArchivo(CRT.pry + ' - ' + g.nombre);
-  const xlsx = crtExcelPendientes(g);
-  const b = 'fp' + Date.now().toString(36);
-  const cortar = (t) => t.replace(/(.{76})/g, '$1\r\n');
-  const eml = [
-    'To: ' + g.correo.to,
-    (function(){ const cc = crtCopias(g.filas, g.correo.to, g.correo.cc); return cc.length ? 'Cc: ' + cc.join(', ') : null; })(),
-    'Subject: =?UTF-8?B?' + utf8ToBase64(c.asunto) + '?=',
-    'X-Unsent: 1',
-    // Importancia alta (23.09.2026, pedido de Piero): las 3 cabeceras porque cada cliente mira una.
-    'Importance: High',
-    'X-Priority: 1 (Highest)',
-    'X-MSMail-Priority: High',
-    'MIME-Version: 1.0',
-    'Content-Type: multipart/mixed; boundary="' + b + '"',
-    '',
-    '--' + b,
-    'Content-Type: text/html; charset="utf-8"',
-    'Content-Transfer-Encoding: base64',
-    '',
-    cortar(utf8ToBase64(c.html)),
-    '--' + b,
-    'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="' + nombreBase + '.xlsx"',
-    'Content-Disposition: attachment; filename="' + nombreBase + '.xlsx"',
-    'Content-Transfer-Encoding: base64',
-    '',
-    cortar(xlsx),
-    '--' + b + '--',
-    '',
-  ].filter(x => x !== null).join('\r\n');
-  descargarBlob(new Blob([eml], { type:'message/rfc822' }), nombreBase + '.eml');
-}
-
-/** Alternativa sin adjunto: abre el correo en el cliente y descarga el Excel aparte. */
+/** Abre el correo ya escrito en el cliente de correo y descarga aparte el Excel del detalle. */
 function crtCorreoYExcel(clave){
   const g = crtPendientesPorProveedor().find(x => x.clave === clave);
   if(!g || !g.correo || !g.correo.to) return;
@@ -9358,15 +9316,14 @@ function crtVistaProyecto(cont){
         <span class="cnt">${conCorreo.length} ${conCorreo.length===1?'proveedor':'proveedores'} por contactar</span>
       </summary>
       <div class="crt-ped-cuerpo">
-      <div class="crt-ped-sub">Junta todos los requerimientos de este proyecto que le faltan a cada proveedor, con el detalle en un Excel adjunto.${
+      <div class="crt-ped-sub">Junta todos los requerimientos de este proyecto que le faltan a cada proveedor. Abre el correo y descarga el Excel del detalle para que lo adjuntes.${
         conCorreo.length < pend.length ? ` <b>${pend.length - conCorreo.length}</b> ${pend.length - conCorreo.length===1?'proveedor no tiene':'proveedores no tienen'} correo en DB Proveedores.xlsx.` : ''}</div>
       <div class="crt-ped-lista">${pend.map(g=>`
         <div class="crt-ped-fila${g.correo && g.correo.to ? '' : ' sin'}">
           <div class="nom">${escapeHtml(g.nombre)}
             <span class="det">${g.filas.length} ${g.filas.length===1?'producto':'productos'} · ${g.reqs.size} ${g.reqs.size===1?'requerimiento':'requerimientos'} · ${g.ocs.size} ${g.ocs.size===1?'OC':'OC'}${g.correo && g.correo.to ? ' · ' + escapeHtml(g.correo.to) : ' · sin correo registrado'}</span></div>
           ${g.correo && g.correo.to ? `<div class="acc">
-            <button class="crt-doc no" type="button" data-crteml="${escapeHtml(g.clave)}" title="Descarga el correo ya escrito con el Excel adjunto; al abrirlo queda listo para enviar">✉ Correo con Excel</button>
-            <button class="crt-doc no lev" type="button" data-crtmailm="${escapeHtml(g.clave)}" title="Abre el correo en tu cliente y descarga el Excel aparte">Abrir sin adjunto</button>
+            <button class="crt-doc no lev" type="button" data-crtmailm="${escapeHtml(g.clave)}" title="Abre el correo ya escrito y descarga el Excel para adjuntarlo">✉ Generar correo</button>
           </div>` : ''}
         </div>`).join('')}</div>
       </div>
@@ -9401,9 +9358,6 @@ function crtVistaProyecto(cont){
   });
   const ped = cont.querySelector('details.crt-ped');
   if(ped) ped.addEventListener('toggle', ()=>{ CRT.pedAbierto = ped.open; });
-  cont.querySelectorAll('[data-crteml]').forEach(b=>{
-    b.addEventListener('click', ()=> crtDescargarEml(b.dataset.crteml));
-  });
   cont.querySelectorAll('[data-crtmailm]').forEach(b=>{
     b.addEventListener('click', ()=> crtCorreoYExcel(b.dataset.crtmailm));
   });
