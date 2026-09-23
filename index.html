@@ -476,6 +476,10 @@
   .crt-fila .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--brand-ink);font-weight:600;}
   .crt-fila .desc{font-size:13.5px;font-weight:600;color:var(--ink);}
   .crt-fila .sub{font-size:12px;color:var(--muted);line-height:1.45;}
+  .crt-stock{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--amber-ink);background:var(--amber-bg);border:1px solid var(--amber-br);border-radius:10px;padding:1px 8px;}
+  .crt-lote{display:block;margin-top:3px;font-size:11px;font-weight:600;color:var(--ink-soft);}
+  .crt-lote.sin{opacity:.7;font-style:italic;}
+  .crt-doc.si .her{font-weight:600;opacity:.8;}
   .crt-quien{display:inline-flex;align-items:center;gap:4px;margin-top:3px;font-size:11px;font-weight:700;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:1px 8px;}
   .crt-docs{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;}
   .crt-doc{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:12px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid transparent;text-decoration:none;white-space:nowrap;}
@@ -1891,6 +1895,9 @@ function buildSnapshot(){
       // Periodos del kardex (Ene 2025 en adelante), una sola vez para todo el módulo — no se repiten por
       // producto. null si el Excel publicado no tenía las hojas "Ingresos"/"Movimientos".
       kardexPeriods: ALMACEN_DATA.kardexPeriods || null,
+      // Trazabilidad de lotes ya resuelta (ver parseTrazaLotes): se publica el resultado, no las 43 mil
+      // transacciones que hicieron falta para calcularlo.
+      tz: ALMACEN_DATA.trazaLotes || null,
       // Redondeo a 2 decimales: son cantidades de almacén, no hace falta más, y recorta el JSON.
       rows: ALMACEN_DATA.rows.map(r => {
         const n = v => (v==null ? null : Math.round(v*100)/100);
@@ -3054,6 +3061,117 @@ function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candC
   }
   return { porCodigo, porCodigoPorSucursal, movs, minDate, maxDate };
 }
+// ==============================================================================================
+// Trazabilidad de lotes — de qué compra salió el material que se atendió con stock de almacén
+// (23.09.2026, pedido de Piero: "¿no podrías en base a las fechas y al kardex identificar de qué lote
+// viene? según la última oc por ejemplo"). Un requerimiento atendido desde almacén no tiene OC propia,
+// pero el certificado que le corresponde sí existe: es el de la compra que trajo ese material. Se
+// reconstruye por FIFO —lo primero que entró es lo primero que sale— sobre las hojas del Reporte
+// Almacen:
+//   "Stock Inicial …" → saldo de arranque, sin OC (es anterior a lo que registra el sistema)
+//   "Ingresos"        → cada entrada con su OCOMPRA y su proveedor
+//   "Movimientos"     → cada salida con el requerimiento que la pidió
+// Se lleva por producto Y sucursal: el stock de Ica no atiende un requerimiento de Lima. No se usa la
+// homologación de códigos a propósito — acá interesa el lote exacto, no el producto equivalente.
+// Devuelve { "requerimiento|código": [[oc, proveedor, cantidad], …] }, hasta 3 OC por línea y ordenadas
+// por cantidad. Lo que salió del saldo inicial no genera entrada: no hay OC que mostrar.
+function parseTrazaLotes(wb){
+  const hoja = (nombre, pistas)=>{
+    if(!nombre || !wb.Sheets[nombre]) return null;
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[nombre], {header:1, raw:true, defval:null});
+    for(let i=0; i<Math.min(10, rows.length); i++){
+      const strs = (rows[i]||[]).map(c => sinAcentos((c==null?"":c.toString()).trim().toLowerCase()));
+      if(pistas.every(h => strs.indexOf(sinAcentos(h.toLowerCase())) !== -1)) return { rows, hdr: rows[i], desde: i+1 };
+    }
+    return null;
+  };
+  const hIng = hoja(wb.SheetNames.find(n=>/ingres/i.test(n)), ['codigo','cantidad','fecha']);
+  const hMov = hoja(wb.SheetNames.find(n=>/movimient/i.test(n)), ['producto','cantidad','fecha salida']);
+  if(!hIng || !hMov) return null;
+  const num = v => (typeof v==='number' && isFinite(v)) ? v : ((v!=null && v!=='' && isFinite(Number(v))) ? Number(v) : 0);
+  const txt = v => v==null ? '' : v.toString().trim();
+  // En el almacén la orden viene como "OCO 0001-0007937"; en Reporte Maestro es "0001-0007937".
+  const limpiaOc = v => { const t = txt(v).replace(/^[A-Za-z]{2,4}\s+/, ''); return (!t || t === '-') ? null : t; };
+  const suc = (v) => (normalizeSucursalKardex(v) || 'lima');
+  const lotes = {};    // "código|sucursal" -> [{f, q, oc, pv}]
+  const salidas = {};  // "código|sucursal" -> [{f, q, req}]
+
+  // Saldo inicial: sin OC, pero hay que consumirlo igual — si no, el FIFO le atribuiría a las compras
+  // nuevas salidas que en realidad se sirvieron con lo que ya estaba en el almacén.
+  const hIni = hoja(wb.SheetNames.find(n=>/stock\s*inicial/i.test(n)), ['codigo','stock']);
+  if(hIni){
+    const iC = findCol(hIni.hdr, ["Codigo","Código","CodProducto","IdProducto"]);
+    const iQ = findCol(hIni.hdr, ["Stock","Cantidad"]);
+    const iS = findCol(hIni.hdr, ["Sucursal"]);
+    if(iC!==-1 && iQ!==-1) for(let r=hIni.desde; r<hIni.rows.length; r++){
+      const row = hIni.rows[r]; if(!row) continue;
+      const c = txt(row[iC]), q = num(row[iQ]);
+      if(!c || q<=0) continue;
+      const k = c + '|' + (iS!==-1 ? suc(row[iS]) : 'lima');
+      (lotes[k] = lotes[k] || []).push({ f:'', q:q, oc:null, pv:'' });
+    }
+  }
+
+  const iIC = findCol(hIng.hdr, ["Código","Codigo"]), iIQ = findCol(hIng.hdr, ["Cantidad"]),
+        iIF = findCol(hIng.hdr, ["Fecha"]), iIS = findCol(hIng.hdr, ["Sucursal"]),
+        iIO = findCol(hIng.hdr, ["OCompra","Orden de compra"]), iIP = findCol(hIng.hdr, ["ClieProv","Proveedor"]);
+  if(iIC===-1 || iIQ===-1 || iIF===-1 || iIO===-1) return null;
+  for(let r=hIng.desde; r<hIng.rows.length; r++){
+    const row = hIng.rows[r]; if(!row) continue;
+    const c = txt(row[iIC]), q = num(row[iIQ]), fv = row[iIF];
+    const f = (fv instanceof Date && !isNaN(fv.getTime())) ? isoDay(fv) : '';
+    if(!c || q<=0 || !f) continue;
+    const k = c + '|' + (iIS!==-1 ? suc(row[iIS]) : 'lima');
+    (lotes[k] = lotes[k] || []).push({ f:f, q:q, oc:limpiaOc(row[iIO]), pv: iIP!==-1 ? txt(row[iIP]) : '' });
+  }
+
+  const iMC = findCol(hMov.hdr, ["Producto"]), iMQ = findCol(hMov.hdr, ["Cantidad"]),
+        iMF = findCol(hMov.hdr, ["Fecha Salida","Fecha de Salida"]), iMS = findCol(hMov.hdr, ["Sucursal"]),
+        iMR = findCol(hMov.hdr, ["Requerimiento"]);
+  if(iMC===-1 || iMQ===-1 || iMF===-1 || iMR===-1) return null;
+  for(let r=hMov.desde; r<hMov.rows.length; r++){
+    const row = hMov.rows[r]; if(!row) continue;
+    const c = txt(row[iMC]), q = num(row[iMQ]), fv = row[iMF];
+    const f = (fv instanceof Date && !isNaN(fv.getTime())) ? isoDay(fv) : '';
+    if(!c || q<=0 || !f) continue;
+    const k = c + '|' + (iMS!==-1 ? suc(row[iMS]) : 'lima');
+    (salidas[k] = salidas[k] || []).push({ f:f, q:q, req: txt(row[iMR]) });
+  }
+
+  // FIFO por producto+sucursal: se recorren las salidas en orden y se van descontando de los lotes más
+  // viejos. Cada salida se queda con la OC del lote (o los lotes) que la cubrieron.
+  const acum = {};
+  const porFecha = (a,b)=> a.f < b.f ? -1 : a.f > b.f ? 1 : 0;
+  for(const k of Object.keys(salidas)){
+    const cod = k.slice(0, k.lastIndexOf('|'));
+    const pool = (lotes[k] || []).slice().sort(porFecha).map(l=>({ q:l.q, oc:l.oc, pv:l.pv }));
+    let i = 0;
+    for(const m of salidas[k].sort(porFecha)){
+      let falta = m.q;
+      while(falta > 1e-9 && i < pool.length){
+        const l = pool[i];
+        if(l.q <= 1e-9){ i++; continue; }
+        const usa = Math.min(falta, l.q);
+        l.q -= usa; falta -= usa;
+        if(m.req && l.oc){
+          const clave = m.req + '|' + cod;
+          const dest = acum[clave] = acum[clave] || {};
+          const e = dest[l.oc] = dest[l.oc] || { pv: l.pv, q: 0 };
+          e.q += usa;
+        }
+      }
+    }
+  }
+  const traza = {};
+  for(const clave of Object.keys(acum)){
+    const arr = Object.keys(acum[clave])
+      .map(oc => [oc, acum[clave][oc].pv, Math.round(acum[clave][oc].q*100)/100])
+      .sort((a,b)=> b[2] - a[2]).slice(0,3);
+    if(arr.length) traza[clave] = arr;
+  }
+  return traza;
+}
+
 function processAlmacen(wb, filename){
   let sheetName = wb.SheetNames.find(n => /an[áa]lisis.*inventario/i.test(n.trim()));
   if(!sheetName) sheetName = wb.SheetNames.find(n => /inventario|stock/i.test(n.trim()));
@@ -3282,8 +3400,13 @@ function processAlmacen(wb, filename){
     });
   }
 
+  // De qué compra salió lo que se entregó desde almacén (ver parseTrazaLotes). Alimenta el módulo de
+  // Certificados: los requerimientos sin OC propia igual tienen certificado, el de esa compra.
+  const trazaLotes = parseTrazaLotes(wb);
+
   ALMACEN_DATA = {
     rows: productos, sedes: ALMACEN_SEDES.filter(sd=>sedeIdx[sd]!==undefined),
+    trazaLotes,
     totalRows: dataRows.length, sinRop, excluidas, filename, sheetName,
     tieneReserva: col.reserva!==-1, tienePicking: col.picking!==-1,
     nCodigos: almacenRows.length,
@@ -8457,33 +8580,68 @@ function crtMarca(txt){
 const crtClave = (f) => f.req + '|' + f.codigo + '|' + f.oc;
 const crtCampo = (tipo) => tipo === 'cert' ? 'certArch' : 'fichaArch';
 const crtNombreDoc = (tipo) => tipo === 'cert' ? 'certificado' : 'ficha técnica';
-const crtTiene = (f, tipo) => !!(f[tipo === 'cert' ? 'cert' : 'ficha'] || f[crtCampo(tipo)]);
+const crtTiene = (f, tipo) => !!(f[tipo === 'cert' ? 'cert' : 'ficha'] || f[crtCampo(tipo)] || crtHeredado(f, tipo));
+/** Para una línea atendida de stock: el documento que ya tiene cargado la compra de la que vino. */
+function crtHeredado(f, tipo){
+  if(!f.stock || !f.lotes || !CRT.porOc) return null;
+  for(const l of f.lotes){
+    const src = CRT.porOc.get(l[0] + '|' + f.codigo);
+    if(!src) continue;
+    const url = tipo === 'cert' ? src.cert : src.ficha;
+    if(url) return { url:url, oc:l[0] };
+    const sub = src[crtCampo(tipo)];
+    if(sub) return { nombre: sub.nombre, oc:l[0] };
+  }
+  return null;
+}
 const crtEstado = (f) => !crtTiene(f,'cert') ? 'sincert' : (!crtTiene(f,'ficha') ? 'sinficha' : 'completos');
 const crtFecha = (d) => d ? String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear() : '';
 
 /** Una fila por (requerimiento, producto, OC) a partir del Reporte Maestro. */
 function crtCargar(){
+  // Trazabilidad de lotes (23.09.2026, ver parseTrazaLotes): de qué compra salió lo que se atendió con
+  // stock del almacén.
+  const traza = (ALMACEN_DATA && (ALMACEN_DATA.trazaLotes || ALMACEN_DATA.tz)) || null;
+  // Qué requerimiento+producto sí llegó a tener orden de compra: si la tiene, la línea sin OC del mismo
+  // producto es la parte ya cubierta por esa orden y se omite para no duplicar el producto en la lista.
+  const conOc = new Set();
+  for(const r of getProcesoRows()){
+    if((r.codOrden||'').trim()) conOc.add((r.codRequerimiento||'').trim() + '|' + (r.idProducto||'').trim());
+  }
   const vistos = new Set();
   CRT.filas = [];
   for(const r of getProcesoRows()){
     const oc = (r.codOrden||'').trim();
-    if(!oc) continue;
-    const k = (r.codRequerimiento||'') + '|' + (r.idProducto||'') + '|' + oc;
+    const req = (r.codRequerimiento||'').trim();
+    const cod = (r.idProducto||'').trim();
+    if(!req || !cod) continue;
+    // Sin OC = el requerimiento se atendió con stock del almacén (23.09.2026, pedido de Piero: "¿también
+    // consideras req que se atendieron del stock que se tenía?"). Se listan igual: ese material también
+    // tiene certificado, el de la compra que lo trajo al almacén.
+    if(!oc && conOc.has(req + '|' + cod)) continue;
+    const k = req + '|' + cod + '|' + oc;
     if(vistos.has(k)) continue;
     vistos.add(k);
+    const lotes = (!oc && traza) ? (traza[req + '|' + cod] || null) : null;
     CRT.filas.push({
-      req: (r.codRequerimiento||'').trim(),
+      req: req,
       idPry: r.idProyecto || 'SIN PROYECTO',
       nomPry: r.proyecto || '',
-      codigo: (r.idProducto||'').trim(),
+      codigo: cod,
       producto: r.producto || '',
       oc: oc,
-      fecha: crtFecha(r.fOrden),
+      stock: !oc,
+      lotes: lotes,
+      fecha: crtFecha(oc ? r.fOrden : (r.fSalida || r.fReq)),
       usuario: (r.usuarioCompras||'').trim(),
-      proveedor: (r.proveedor||'').trim(),
+      proveedor: oc ? (r.proveedor||'').trim() : (lotes ? lotes[0][1] : ''),
       cert: null, ficha: null,
     });
   }
+  // Índice OC+código -> línea de esa compra, para que una línea de stock pueda mostrar el certificado
+  // que ya está cargado en la orden de la que vino (ver crtHeredado).
+  CRT.porOc = new Map();
+  for(const f of CRT.filas) if(f.oc) CRT.porOc.set(f.oc + '|' + f.codigo, f);
   const m = new Map();
   for(const f of CRT.filas){
     if(!m.has(f.idPry)) m.set(f.idPry, { id:f.idPry, nombre:f.nomPry, n:0 });
@@ -8635,6 +8793,7 @@ const crtPasaChip = (f) => CRT.filtro === 'todos' || crtEstado(f) === CRT.filtro
 function crtPasaTexto(f){
   if(!CRT.q) return true;
   return [f.idPry, f.nomPry, f.req, f.codigo, f.producto, f.proveedor, f.oc, f.usuario]
+    .concat(f.lotes ? f.lotes.map(l=>l[0]) : [])
     .some(v => crtNorm(v).indexOf(CRT.q) !== -1);
 }
 const crtCobertura = (filas) => filas.length
@@ -8781,14 +8940,28 @@ function crtFila(f){
       const veces = reg ? reg.usos.length : 1;
       return `<span class="crt-doc sub" title="${escapeHtml(sub.nombre)}">📄 <span class="nm">${escapeHtml(sub.nombre)}</span>${veces>1?` · ${veces}`:''}</span>`;
     }
+    // Línea atendida de stock: si la compra de la que salió ese material ya tiene el documento, se
+    // muestra ese mismo — no hay que volver a subirlo.
+    const her = crtHeredado(f, tipo);
+    if(her){
+      const et = `📄 ${etiqueta} <span class="her">· de la OC ${escapeHtml(her.oc)}</span>`;
+      return her.url
+        ? `<a class="crt-doc si" href="${escapeHtml(her.url)}" target="_blank" rel="noopener" title="Documento de la orden de compra que trajo este material">${et}</a>`
+        : `<span class="crt-doc sub" title="${escapeHtml(her.nombre)}">${et}</span>`;
+    }
     return `<button class="crt-doc no${leve?' lev':''}" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}">⬆ Subir ${etiqueta.toLowerCase()}</button>`;
   };
   const mk = CRT.sel.has(clave);
   return `<div class="crt-fila${mk?' mk':''}">
     <input type="checkbox" class="crt-sel" data-crtfila="${escapeHtml(clave)}"${mk?' checked':''} aria-label="Seleccionar ${escapeHtml(f.codigo)}">
     <div><div class="cod">${crtMarca(f.codigo)}</div><div class="desc">${crtMarca(f.producto)}</div></div>
-    <div class="sub">${crtMarca(f.proveedor)}<br>OC ${crtMarca(f.oc)} · ${escapeHtml(f.fecha)}
-      ${f.usuario ? `<br><span class="crt-quien">👤 ${crtMarca(f.usuario)}</span>` : ''}</div>
+    <div class="sub">${crtMarca(f.proveedor)}<br>${f.stock
+      ? `<span class="crt-stock">📦 Atendido de stock</span>${escapeHtml(f.fecha) ? ' · ' + escapeHtml(f.fecha) : ''}` +
+        (f.lotes
+          ? `<span class="crt-lote">Vino de ${f.lotes.map(l=>'OC ' + escapeHtml(l[0])).join(' · ')}</span>`
+          : `<span class="crt-lote sin">No se pudo rastrear de qué compra vino</span>`)
+      : `OC ${crtMarca(f.oc)} · ${escapeHtml(f.fecha)}`}
+      ${f.usuario && !f.stock ? `<br><span class="crt-quien">👤 ${crtMarca(f.usuario)}</span>` : ''}</div>
     <div class="crt-docs">${doc('cert','Certificado',false)}${doc('ficha','Ficha técnica',true)}</div>
     ${f.nota ? `<div class="crt-nota">${f.nota.html}</div>` : ''}
   </div>`;
