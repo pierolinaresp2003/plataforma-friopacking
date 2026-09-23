@@ -3138,36 +3138,64 @@ function parseTrazaLotes(wb){
     (salidas[k] = salidas[k] || []).push({ f:f, q:q, req: txt(row[iMR]) });
   }
 
-  // FIFO por producto+sucursal: se recorren las salidas en orden y se van descontando de los lotes más
-  // viejos. Cada salida se queda con la OC del lote (o los lotes) que la cubrieron.
-  const acum = {};
+  // FIFO: se recorren las salidas en orden y se van descontando de los lotes más viejos. Cada salida se
+  // queda con la OC del lote (o los lotes) que la cubrieron. Se corre dos veces:
+  //   · por producto Y sucursal — es lo correcto, el stock de Ica no atiende un pedido de Lima;
+  //   · por producto solo, juntando las 3 sucursales — sirve de respaldo para lo que entró al almacén
+  //     SIN orden de compra, que casi siempre es una transferencia entre sedes: la compra existe, pero
+  //     está en el almacén de donde salió. Ese resultado se marca como probable, no como seguro.
+  // Cuando el lote que cubrió la salida no tiene OC se anota el motivo (@ini = venía del saldo de
+  // arranque, @tr = entró sin orden de compra), para poder decir por qué no hay certificado que mostrar.
   const porFecha = (a,b)=> a.f < b.f ? -1 : a.f > b.f ? 1 : 0;
-  for(const k of Object.keys(salidas)){
-    const cod = k.slice(0, k.lastIndexOf('|'));
-    const pool = (lotes[k] || []).slice().sort(porFecha).map(l=>({ q:l.q, oc:l.oc, pv:l.pv }));
-    let i = 0;
-    for(const m of salidas[k].sort(porFecha)){
-      let falta = m.q;
-      while(falta > 1e-9 && i < pool.length){
-        const l = pool[i];
-        if(l.q <= 1e-9){ i++; continue; }
-        const usa = Math.min(falta, l.q);
-        l.q -= usa; falta -= usa;
-        if(m.req && l.oc){
+  const correrFifo = (porSucursal)=>{
+    const acum = {};
+    const pools = {}, colas = {};
+    for(const k of Object.keys(lotes)){
+      const kk = porSucursal ? k : k.slice(0, k.lastIndexOf('|'));
+      (pools[kk] = pools[kk] || []).push.apply(pools[kk], lotes[k]);
+    }
+    for(const k of Object.keys(salidas)){
+      const kk = porSucursal ? k : k.slice(0, k.lastIndexOf('|'));
+      (colas[kk] = colas[kk] || []).push.apply(colas[kk], salidas[k]);
+    }
+    for(const kk of Object.keys(colas)){
+      const cod = porSucursal ? kk.slice(0, kk.lastIndexOf('|')) : kk;
+      const pool = (pools[kk] || []).slice().sort(porFecha).map(l=>({ q:l.q, oc:l.oc, pv:l.pv, ini:l.f==='' }));
+      let i = 0;
+      for(const m of colas[kk].slice().sort(porFecha)){
+        let falta = m.q;
+        while(falta > 1e-9 && i < pool.length){
+          const l = pool[i];
+          if(l.q <= 1e-9){ i++; continue; }
+          const usa = Math.min(falta, l.q);
+          l.q -= usa; falta -= usa;
+          if(!m.req) continue;
           const clave = m.req + '|' + cod;
+          const etiqueta = l.oc || (l.ini ? '@ini' : '@tr');
           const dest = acum[clave] = acum[clave] || {};
-          const e = dest[l.oc] = dest[l.oc] || { pv: l.pv, q: 0 };
+          const e = dest[etiqueta] = dest[etiqueta] || { pv: l.pv, q: 0 };
           e.q += usa;
         }
       }
     }
-  }
-  const traza = {};
-  for(const clave of Object.keys(acum)){
-    const arr = Object.keys(acum[clave])
-      .map(oc => [oc, acum[clave][oc].pv, Math.round(acum[clave][oc].q*100)/100])
+    return acum;
+  };
+  const porSuc = correrFifo(true), global = correrFifo(false);
+  const ordenar = (acum, clave, probable)=>{
+    const d = acum[clave]; if(!d) return null;
+    const ocs = Object.keys(d).filter(x => x.charAt(0) !== '@');
+    if(!ocs.length) return null;
+    return ocs.map(oc => [oc, d[oc].pv, Math.round(d[oc].q*100)/100].concat(probable ? [1] : []))
       .sort((a,b)=> b[2] - a[2]).slice(0,3);
-    if(arr.length) traza[clave] = arr;
+  };
+  const traza = {};
+  for(const clave of Object.keys(porSuc)){
+    const arr = ordenar(porSuc, clave, false) || ordenar(global, clave, true);
+    if(arr){ traza[clave] = arr; continue; }
+    // Sin OC por ningún lado: se guarda el motivo que pesó más, para explicarlo en pantalla.
+    const d = porSuc[clave];
+    const motivo = Object.keys(d).sort((a,b)=> d[b].q - d[a].q)[0];
+    traza[clave] = [[null, motivo, Math.round(d[motivo].q*100)/100]];
   }
   return traza;
 }
@@ -8582,6 +8610,12 @@ const crtCampo = (tipo) => tipo === 'cert' ? 'certArch' : 'fichaArch';
 const crtNombreDoc = (tipo) => tipo === 'cert' ? 'certificado' : 'ficha técnica';
 const crtTiene = (f, tipo) => !!(f[tipo === 'cert' ? 'cert' : 'ficha'] || f[crtCampo(tipo)] || crtHeredado(f, tipo));
 /** Para una línea atendida de stock: el documento que ya tiene cargado la compra de la que vino. */
+/** Por qué una línea atendida de stock no tiene una compra que mostrar. */
+function crtMotivoLote(f){
+  if(f.motivo === '@ini') return 'Salió del saldo que ya tenía el almacén al 01.01.2025 — es anterior a lo que registra el sistema';
+  if(f.motivo === '@tr')  return 'El material entró al almacén sin orden de compra (transferencia entre sedes o devolución)';
+  return 'No se pudo rastrear de qué compra vino: el kardex no tiene la salida de este requerimiento';
+}
 function crtHeredado(f, tipo){
   if(!f.stock || !f.lotes || !CRT.porOc) return null;
   for(const l of f.lotes){
@@ -8619,10 +8653,19 @@ function crtCargar(){
     // consideras req que se atendieron del stock que se tenía?"). Se listan igual: ese material también
     // tiene certificado, el de la compra que lo trajo al almacén.
     if(!oc && conOc.has(req + '|' + cod)) continue;
+    // …pero solo si de verdad salió del almacén. Una línea sin OC y sin fecha de salida es un
+    // requerimiento archivado o todavía en revisión: no se entregó nada, así que no hay documento que
+    // pedir y no tiene sentido contarla como "sin certificado" (23.09.2026).
+    if(!oc && !r.fSalida) continue;
     const k = req + '|' + cod + '|' + oc;
     if(vistos.has(k)) continue;
     vistos.add(k);
-    const lotes = (!oc && traza) ? (traza[req + '|' + cod] || null) : null;
+    const t = (!oc && traza) ? (traza[req + '|' + cod] || null) : null;
+    // [oc, proveedor, cantidad, probable?]. Si la primera entrada viene con oc en null, el FIFO sí
+    // encontró la salida pero el lote no tenía orden de compra: ahí "lotes" queda null y "motivo"
+    // explica por qué (ver crtMotivoLote).
+    const lotes = (t && t[0] && t[0][0]) ? t : null;
+    const motivo = (t && t[0] && !t[0][0]) ? t[0][1] : null;
     CRT.filas.push({
       req: req,
       idPry: r.idProyecto || 'SIN PROYECTO',
@@ -8632,6 +8675,7 @@ function crtCargar(){
       oc: oc,
       stock: !oc,
       lotes: lotes,
+      motivo: motivo,
       fecha: crtFecha(oc ? r.fOrden : (r.fSalida || r.fReq)),
       usuario: (r.usuarioCompras||'').trim(),
       proveedor: oc ? (r.proveedor||'').trim() : (lotes ? lotes[0][1] : ''),
@@ -8958,8 +9002,8 @@ function crtFila(f){
     <div class="sub">${crtMarca(f.proveedor)}<br>${f.stock
       ? `<span class="crt-stock">📦 Atendido de stock</span>${escapeHtml(f.fecha) ? ' · ' + escapeHtml(f.fecha) : ''}` +
         (f.lotes
-          ? `<span class="crt-lote">Vino de ${f.lotes.map(l=>'OC ' + escapeHtml(l[0])).join(' · ')}</span>`
-          : `<span class="crt-lote sin">No se pudo rastrear de qué compra vino</span>`)
+          ? `<span class="crt-lote">${f.lotes[0][3] ? 'Probablemente de ' : 'Vino de '}${f.lotes.map(l=>'OC ' + escapeHtml(l[0])).join(' · ')}${f.lotes[0][3] ? ' <span class="crt-lote sin">(llegó por transferencia entre sedes)</span>' : ''}</span>`
+          : `<span class="crt-lote sin">${escapeHtml(crtMotivoLote(f))}</span>`)
       : `OC ${crtMarca(f.oc)} · ${escapeHtml(f.fecha)}`}
       ${f.usuario && !f.stock ? `<br><span class="crt-quien">👤 ${crtMarca(f.usuario)}</span>` : ''}</div>
     <div class="crt-docs">${doc('cert','Certificado',false)}${doc('ficha','Ficha técnica',true)}</div>
