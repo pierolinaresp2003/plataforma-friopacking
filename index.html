@@ -8818,36 +8818,87 @@ function crtCorreoDe(f){
 function crtMailto(clave){
   const f = CRT.filas.find(x => crtClave(x) === clave);
   const d = f && crtCorreoDe(f);
-  if(!d) return null;
-  const falta = (x) => (!crtTiene(x,'cert') && !crtTiene(x,'ficha')) ? 'certificado de calidad y ficha técnica'
-    : (!crtTiene(x,'cert') ? 'certificado de calidad' : 'ficha técnica');
+  if(!d) return;
+  const e = escapeHtml;
+  const falta = (x) => (!crtTiene(x,'cert') && !crtTiene(x,'ficha')) ? 'Certificado y ficha técnica'
+    : (!crtTiene(x,'cert') ? 'Certificado' : 'Ficha técnica');
   const lista = CRT.filas.filter(x => x.req === f.req && (!crtTiene(x,'cert') || !crtTiene(x,'ficha')) &&
     ((crtProvDe(x) || {}).oc === d.oc));
   const prods = lista.length ? lista : [f];
   const pry = (f.idPry && f.idPry !== 'SIN PROYECTO') ? (f.idPry + ' — ' + f.nomPry) : f.nomPry;
-  const L = [];
-  L.push(d.contacto ? ('Estimado(a) ' + d.contacto + ':') : 'Estimados:');
-  L.push('');
-  L.push('Solicitamos la documentación de calidad correspondiente al siguiente despacho:');
-  L.push('');
-  L.push('Orden de compra: ' + d.oc + (d.probable ? ' (por confirmar)' : ''));
-  L.push('Requerimiento:   ' + f.req);
-  L.push('Proyecto:        ' + pry);
-  if(f.stock) L.push('Nota: el material se entregó desde nuestro almacén; según nuestro kardex corresponde a esa orden de compra.');
-  L.push('');
-  L.push(prods.length === 1 ? 'Producto:' : ('Productos (' + prods.length + '):'));
-  prods.forEach(x => L.push('  \u00b7 ' + x.codigo + ' — ' + x.producto + '  ->  falta ' + falta(x)));
-  L.push('');
-  L.push('Agradeceremos enviarlos en respuesta a este correo.');
-  L.push('Saludos cordiales,');
-  L.push('Compras y Logística — Grupo Friopacking');
-  const q = [];
-  const cc = crtCopias(prods, d.to, d.cc);
-  if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
-  q.push('subject=' + encodeURIComponent('Certificados de calidad — OC ' + d.oc + ' — ' + pry));
-  q.push('body=' + encodeURIComponent(L.join('\r\n')));
-  return 'mailto:' + d.to + '?' + q.join('&');
+
+  // Acá el detalle es corto (una sola orden de compra), así que va en una tabla dentro del cuerpo y no
+  // en un Excel adjunto como en el correo masivo.
+  const th = 'style="border:1px solid #c3d4f3;background:#e8eefb;padding:6pt 10pt;text-align:left;"';
+  const td = 'style="border:1px solid #c3d4f3;padding:6pt 10pt;"';
+  const tabla = '<table cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:10.5pt;margin:0 0 11pt;">' +
+    '<tr><th ' + th + '>Código</th><th ' + th + '>Producto</th><th ' + th + '>Falta</th></tr>' +
+    prods.map(function(x){
+      return '<tr><td ' + td + '><b>' + e(x.codigo) + '</b></td><td ' + td + '>' + e(x.producto) +
+        '</td><td ' + td + '><b>' + e(falta(x)) + '</b></td></tr>';
+    }).join('') + '</table>';
+
+  const H = [];
+  H.push(crtP(d.contacto ? ('Estimado(a) ' + e(d.contacto) + ':') : 'Estimados:'));
+  H.push(crtP('Solicitamos la documentación de calidad correspondiente al siguiente despacho:'));
+  H.push(crtP('<b>Proyecto:</b> ' + e(pry) + '<br><b>Orden de compra:</b> ' + e(d.oc || '—') +
+    '<br><b>Requerimiento:</b> ' + e(f.req)));
+  H.push(tabla);
+  if(f.stock) H.push(crtP('<i>El material se entregó desde nuestro almacén; según nuestro kardex corresponde a esa orden de compra.</i>'));
+  H.push(crtP('Agradeceremos enviarnos los documentos <b>en respuesta a este mismo correo</b>.'));
+  H.push(crtP('Saludos cordiales,<br>Compras y Logística — Grupo Friopacking', true));
+
+  crtArmarEml({
+    to: d.to,
+    cc: crtCopias(prods, d.to, d.cc),
+    asunto: 'Certificados de calidad — OC ' + (d.oc || f.req) + ' — ' + pry,
+    html: crtHtmlCorreo(H),
+    nombre: limpiarNombreArchivo('Certificados - OC ' + (d.oc || f.req) + ' - ' + pry),
+  });
 }
+
+/**
+ * Arma el .eml y lo descarga. Es la única forma de mandar un correo CON FORMATO (negritas, tablas),
+ * con adjunto y marcado como importante desde el navegador: "mailto:" solo admite texto pelado.
+ * Al abrirlo, el cliente lo muestra como borrador listo para enviar (cabecera X-Unsent).
+ */
+function crtArmarEml(o){
+  const b = 'fp' + Date.now().toString(36);
+  const cortar = (t) => t.replace(/(.{76})/g, '$1\r\n');
+  const cuerpo = [
+    '--' + b,
+    'Content-Type: text/html; charset="utf-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    cortar(utf8ToBase64(o.html)),
+  ];
+  if(o.adjunto) cuerpo.push(
+    '--' + b,
+    'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="' + o.adjunto.nombre + '"',
+    'Content-Disposition: attachment; filename="' + o.adjunto.nombre + '"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    cortar(o.adjunto.base64));
+  const eml = [
+    'To: ' + (o.to || ''),
+    (o.cc && o.cc.length) ? 'Cc: ' + o.cc.join(', ') : null,
+    'Subject: =?UTF-8?B?' + utf8ToBase64(o.asunto) + '?=',
+    'X-Unsent: 1',
+    // Importancia alta (23.09.2026, pedido de Piero): las 3 cabeceras porque cada cliente mira una.
+    'Importance: High',
+    'X-Priority: 1 (Highest)',
+    'X-MSMail-Priority: High',
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/mixed; boundary="' + b + '"',
+    '',
+  ].filter(x => x !== null).concat(cuerpo, ['--' + b + '--', '']).join('\r\n');
+  descargarBlob(new Blob([eml], { type:'message/rfc822' }), o.nombre + '.eml');
+}
+/** Envoltura HTML de los correos, con la tipografía que usa Outlook. */
+const crtHtmlCorreo = (partes) =>
+  '<html><body><div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;color:#000000;">' +
+  partes.join('') + '</div></body></html>';
+const crtP = (txt, ultimo) => '<p style="margin:0 0 ' + (ultimo ? '0' : '11pt') + ';">' + txt + '</p>';
 
 // Siempre en copia, pase lo que pase (23.09.2026, lista que dio Piero).
 const CRT_COPIA_FIJA = [
@@ -8923,21 +8974,19 @@ function crtCorreoMasivo(g){
   // Misma carta en HTML, con lo importante en negrita: es la que viaja en el .eml. El texto plano de
   // arriba queda para "mailto:", que no admite formato.
   const e = escapeHtml;
-  const par = (txt, ultimo) => '<p style="margin:0 0 ' + (ultimo ? '0' : '11pt') + ';">' + txt + '</p>';
   const H = [];
-  H.push(par(contacto ? ('Estimado(a) ' + e(contacto) + ':') : 'Estimados:'));
-  H.push(par('Estamos cerrando la documentación de calidad del proyecto <b>' + e(pry) +
+  H.push(crtP(contacto ? ('Estimado(a) ' + e(contacto) + ':') : 'Estimados:'));
+  H.push(crtP('Estamos cerrando la documentación de calidad del proyecto <b>' + e(pry) +
     '</b> y nos falta la de varios de sus despachos.'));
-  H.push(par('Adjuntamos el detalle en Excel: <b>' + n + (n===1 ? ' producto' : ' productos') + '</b>' +
+  H.push(crtP('Adjuntamos el detalle en Excel: <b>' + n + (n===1 ? ' producto' : ' productos') + '</b>' +
     (nOc ? (' de <b>' + nOc + (nOc===1 ? ' orden de compra' : ' órdenes de compra') + '</b>') : '') +
     '. De cada uno necesitamos el <b>certificado de calidad</b> y la <b>ficha técnica</b>; en el archivo se indica cuál falta en cada caso.'));
-  H.push(par('Agradeceremos enviarnos los documentos <b>en respuesta a este mismo correo</b>.'));
-  H.push(par('Saludos cordiales,<br>Compras y Logística — Grupo Friopacking', true));
+  H.push(crtP('Agradeceremos enviarnos los documentos <b>en respuesta a este mismo correo</b>.'));
+  H.push(crtP('Saludos cordiales,<br>Compras y Logística — Grupo Friopacking', true));
   return {
     asunto: 'Documentación de calidad pendiente — ' + pry + ' — ' + g.filas.length + (g.filas.length===1?' producto':' productos'),
     cuerpo: L.join('\r\n'),
-    html: '<html><body><div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;color:#000000;">' +
-      H.join('') + '</div></body></html>',
+    html: crtHtmlCorreo(H),
     pry: pry,
   };
 }
@@ -8970,36 +9019,14 @@ function crtDescargarEml(clave){
   if(!g || !g.correo || !g.correo.to) return;
   const c = crtCorreoMasivo(g);
   const nombreBase = 'Documentacion pendiente - ' + limpiarNombreArchivo(CRT.pry + ' - ' + g.nombre);
-  const xlsx = crtExcelPendientes(g);
-  const b = 'fp' + Date.now().toString(36);
-  const cortar = (t) => t.replace(/(.{76})/g, '$1\r\n');
-  const eml = [
-    'To: ' + g.correo.to,
-    (function(){ const cc = crtCopias(g.filas, g.correo.to, g.correo.cc); return cc.length ? 'Cc: ' + cc.join(', ') : null; })(),
-    'Subject: =?UTF-8?B?' + utf8ToBase64(c.asunto) + '?=',
-    'X-Unsent: 1',
-    // Importancia alta (23.09.2026, pedido de Piero): las 3 cabeceras porque cada cliente mira una.
-    'Importance: High',
-    'X-Priority: 1 (Highest)',
-    'X-MSMail-Priority: High',
-    'MIME-Version: 1.0',
-    'Content-Type: multipart/mixed; boundary="' + b + '"',
-    '',
-    '--' + b,
-    'Content-Type: text/html; charset="utf-8"',
-    'Content-Transfer-Encoding: base64',
-    '',
-    cortar(utf8ToBase64(c.html)),
-    '--' + b,
-    'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="' + nombreBase + '.xlsx"',
-    'Content-Disposition: attachment; filename="' + nombreBase + '.xlsx"',
-    'Content-Transfer-Encoding: base64',
-    '',
-    cortar(xlsx),
-    '--' + b + '--',
-    '',
-  ].filter(x => x !== null).join('\r\n');
-  descargarBlob(new Blob([eml], { type:'message/rfc822' }), nombreBase + '.eml');
+  crtArmarEml({
+    to: g.correo.to,
+    cc: crtCopias(g.filas, g.correo.to, g.correo.cc),
+    asunto: c.asunto,
+    html: c.html,
+    nombre: nombreBase,
+    adjunto: { nombre: nombreBase + '.xlsx', base64: crtExcelPendientes(g) },
+  });
 }
 
 /** Alternativa sin adjunto: abre el correo en el cliente y descarga el Excel aparte. */
@@ -9397,10 +9424,7 @@ function crtVistaProyecto(cont){
     b.addEventListener('click', ()=> crtPedirArchivo([b.dataset.crtsube], b.dataset.tipo));
   });
   cont.querySelectorAll('[data-crtmail]').forEach(b=>{
-    b.addEventListener('click', ()=>{
-      const url = crtMailto(b.dataset.crtmail);
-      if(url) window.location.href = url;
-    });
+    b.addEventListener('click', ()=> crtMailto(b.dataset.crtmail));
   });
   const ped = cont.querySelector('details.crt-ped');
   if(ped) ped.addEventListener('toggle', ()=>{ CRT.pedAbierto = ped.open; });
