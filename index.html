@@ -476,6 +476,15 @@
   .crt-fila .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--brand-ink);font-weight:600;}
   .crt-fila .desc{font-size:13.5px;font-weight:600;color:var(--ink);}
   .crt-fila .sub{font-size:12px;color:var(--muted);line-height:1.45;}
+  .crt-ped{padding:14px 18px 12px;margin-bottom:12px;}
+  .crt-ped-tit{font-size:13px;font-weight:800;color:var(--ink);margin-bottom:2px;}
+  .crt-ped-sub{font-size:12px;color:var(--ink-soft);margin-bottom:10px;line-height:1.5;}
+  .crt-ped-lista{display:flex;flex-direction:column;gap:6px;max-height:330px;overflow:auto;}
+  .crt-ped-fila{display:flex;align-items:center;gap:12px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);}
+  .crt-ped-fila.sin{opacity:.6;}
+  .crt-ped-fila .nom{font-size:12.5px;font-weight:700;color:var(--ink);min-width:0;flex:1;}
+  .crt-ped-fila .det{display:block;font-size:11.5px;font-weight:500;color:var(--ink-soft);margin-top:1px;}
+  .crt-ped-fila .acc{display:flex;gap:6px;flex:none;}
   .crt-mail{display:inline-flex;align-items:center;justify-content:center;width:32px;height:29px;border:1px solid var(--border);border-radius:7px;background:var(--surface-2);color:var(--ink-soft);font-size:14px;cursor:pointer;flex:none;}
   .crt-mail:hover{border-color:var(--brand-ink);color:var(--brand-ink);}
   .crt-stock{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--amber-ink);background:var(--amber-bg);border:1px solid var(--amber-br);border-radius:10px;padding:1px 8px;}
@@ -8778,6 +8787,141 @@ function crtMailto(clave){
   return 'mailto:' + d.to + '?' + q.join('&');
 }
 
+// ------------------------------------------------------------------ pedido masivo por proveedor
+// 23.09.2026, pedido de Piero: "el proveedor va a recibir varios correos separados de distintos
+// requerimientos… mejor un correo masivo por proveedor en base al proyecto". Se arma UN correo por
+// proveedor con todo lo que le falta en el proyecto abierto, agrupado por orden de compra, y con el
+// mismo detalle en un Excel adjunto.
+function crtPendientesPorProveedor(){
+  const grupos = new Map();
+  CRT.filas.forEach(function(f){
+    if(f.idPry !== CRT.pry) return;
+    if(crtTiene(f,'cert') && crtTiene(f,'ficha')) return;
+    const p = crtProvDe(f) || {};
+    const clave = p.ruc || ('sinruc|' + (f.proveedor || '(sin proveedor)'));
+    if(!grupos.has(clave)) grupos.set(clave, { ruc:p.ruc||'', nombre: p.nombre || f.proveedor || '(sin proveedor)', filas:[], ocs:new Set(), reqs:new Set() });
+    const g = grupos.get(clave);
+    g.filas.push(f); if(p.oc) g.ocs.add(p.oc); g.reqs.add(f.req);
+    if(!g.nombre || g.nombre === '(sin proveedor)') g.nombre = p.nombre || f.proveedor || g.nombre;
+  });
+  return [...grupos.entries()].map(([clave,g])=> Object.assign(g, { clave:clave, correo: g.ruc && PROVEEDOR_MAIL ? PROVEEDOR_MAIL[g.ruc] : null }))
+    .sort((a,b)=> b.filas.length - a.filas.length);
+}
+const crtFaltaTexto = (f) => (!crtTiene(f,'cert') && !crtTiene(f,'ficha')) ? 'Certificado y ficha técnica'
+  : (!crtTiene(f,'cert') ? 'Certificado' : 'Ficha técnica');
+
+/** Asunto y cuerpo del correo de un proveedor, agrupando sus productos por orden de compra. */
+function crtCorreoMasivo(g){
+  const pry = (CRT.pry && CRT.pry !== 'SIN PROYECTO') ? (CRT.pry + ' — ' + crtNombrePry(CRT.pry)) : crtNombrePry(CRT.pry);
+  const porOc = new Map();
+  g.filas.forEach(function(f){
+    const p = crtProvDe(f) || {};
+    const oc = p.oc || '(sin orden de compra)';
+    if(!porOc.has(oc)) porOc.set(oc, { fecha:f.fecha, probable:!!p.probable, filas:[] });
+    porOc.get(oc).filas.push(f);
+  });
+  const L = [];
+  const contacto = g.correo && g.correo.contacto;
+  L.push(contacto ? ('Estimado(a) ' + contacto + ':') : 'Estimados:');
+  L.push('');
+  L.push('Estamos cerrando la documentación de calidad del proyecto ' + pry + ' y nos falta la de los siguientes despachos suyos.');
+  L.push('');
+  porOc.forEach(function(d, oc){
+    L.push('OC ' + oc + (d.fecha ? ('  ·  ' + d.fecha) : '') + (d.probable ? '  (por confirmar)' : ''));
+    d.filas.forEach(function(f){
+      L.push('   \u00b7 ' + f.codigo + ' — ' + f.producto);
+      L.push('     Requerimiento ' + f.req + '  ·  falta: ' + crtFaltaTexto(f).toLowerCase() + (f.stock ? '  ·  entregado desde nuestro almacén' : ''));
+    });
+    L.push('');
+  });
+  L.push('Adjuntamos el mismo detalle en Excel (' + g.filas.length + (g.filas.length===1?' producto':' productos') + ').');
+  L.push('Agradeceremos enviarnos los documentos en respuesta a este correo.');
+  L.push('');
+  L.push('Saludos cordiales,');
+  L.push('Compras y Logística — Grupo Friopacking');
+  return {
+    asunto: 'Documentación de calidad pendiente — ' + pry + ' — ' + g.filas.length + (g.filas.length===1?' producto':' productos'),
+    cuerpo: L.join('\r\n'),
+    pry: pry,
+  };
+}
+
+/** El mismo detalle como libro de Excel, en base64. */
+function crtExcelPendientes(g){
+  const filas = [['Proyecto','Cliente','Requerimiento','Orden de compra','Fecha OC','Código','Producto','Proveedor','Origen','Falta']];
+  g.filas.forEach(function(f){
+    const p = crtProvDe(f) || {};
+    filas.push([
+      CRT.pry, crtNombrePry(CRT.pry), f.req, p.oc || '', f.fecha, f.codigo, f.producto,
+      g.nombre, f.stock ? (p.probable ? 'De stock (OC probable)' : 'De stock') : 'Compra directa',
+      crtFaltaTexto(f),
+    ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(filas);
+  ws['!cols'] = [{wch:18},{wch:30},{wch:16},{wch:17},{wch:12},{wch:15},{wch:52},{wch:32},{wch:20},{wch:24}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pendientes');
+  return XLSX.write(wb, { bookType:'xlsx', type:'base64' });
+}
+
+/**
+ * Archivo .eml con el correo ya escrito y el Excel adjunto. Se descarga y al abrirlo el cliente de
+ * correo lo muestra como borrador listo para enviar (cabecera X-Unsent). Es la única forma de dejar un
+ * adjunto puesto desde el navegador: "mailto:" no admite adjuntos.
+ */
+function crtDescargarEml(clave){
+  const g = crtPendientesPorProveedor().find(x => x.clave === clave);
+  if(!g || !g.correo || !g.correo.to) return;
+  const c = crtCorreoMasivo(g);
+  const nombreBase = 'Documentacion pendiente - ' + limpiarNombreArchivo(CRT.pry + ' - ' + g.nombre);
+  const xlsx = crtExcelPendientes(g);
+  const b = 'fp' + Date.now().toString(36);
+  const cortar = (t) => t.replace(/(.{76})/g, '$1\r\n');
+  const eml = [
+    'To: ' + g.correo.to,
+    (g.correo.cc && g.correo.cc.length) ? 'Cc: ' + g.correo.cc.join(', ') : null,
+    'Subject: =?UTF-8?B?' + utf8ToBase64(c.asunto) + '?=',
+    'X-Unsent: 1',
+    'MIME-Version: 1.0',
+    'Content-Type: multipart/mixed; boundary="' + b + '"',
+    '',
+    '--' + b,
+    'Content-Type: text/plain; charset="utf-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    cortar(utf8ToBase64(c.cuerpo)),
+    '--' + b,
+    'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet; name="' + nombreBase + '.xlsx"',
+    'Content-Disposition: attachment; filename="' + nombreBase + '.xlsx"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    cortar(xlsx),
+    '--' + b + '--',
+    '',
+  ].filter(x => x !== null).join('\r\n');
+  descargarBlob(new Blob([eml], { type:'message/rfc822' }), nombreBase + '.eml');
+}
+
+/** Alternativa sin adjunto: abre el correo en el cliente y descarga el Excel aparte. */
+function crtCorreoYExcel(clave){
+  const g = crtPendientesPorProveedor().find(x => x.clave === clave);
+  if(!g || !g.correo || !g.correo.to) return;
+  const c = crtCorreoMasivo(g);
+  const nombreBase = 'Documentacion pendiente - ' + limpiarNombreArchivo(CRT.pry + ' - ' + g.nombre);
+  const bin = atob(crtExcelPendientes(g));
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  descargarBlob(new Blob([bytes], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombreBase + '.xlsx');
+  const q = [];
+  if(g.correo.cc && g.correo.cc.length) q.push('cc=' + encodeURIComponent(g.correo.cc.join(',')));
+  q.push('subject=' + encodeURIComponent(c.asunto));
+  q.push('body=' + encodeURIComponent(c.cuerpo));
+  window.location.href = 'mailto:' + g.correo.to + '?' + q.join('&');
+}
+function limpiarNombreArchivo(t){
+  return String(t||'').replace(/[\/\\:*?"<>|]/g,'-').replace(/\s+/g,' ').trim().slice(0,90);
+}
+
 /** Por qué una línea atendida de stock no tiene una compra que mostrar. */
 function crtMotivoLote(f){
   if(f.motivo === '@ini')   return 'Salió del saldo que ya tenía el almacén al 01.01.2025 — es anterior a lo que registra el sistema';
@@ -9104,7 +9248,25 @@ function crtVistaProyecto(cont){
       </div>
     </div>`;
 
-  cont.innerHTML = cab + (reqs.size ? [...reqs.entries()].map(([req,r])=>`
+  // Un correo por proveedor con todo lo que le falta en ESTE proyecto (23.09.2026, pedido de Piero).
+  const pend = crtPendientesPorProveedor();
+  const conCorreo = pend.filter(g => g.correo && g.correo.to);
+  const panel = pend.length ? `<div class="card crt-ped">
+      <div class="crt-ped-tit">Pedir lo que falta — un solo correo por proveedor</div>
+      <div class="crt-ped-sub">Junta todos los requerimientos de este proyecto que le faltan a cada proveedor, agrupados por orden de compra, con el mismo detalle en un Excel adjunto.${
+        conCorreo.length < pend.length ? ` <b>${pend.length - conCorreo.length}</b> ${pend.length - conCorreo.length===1?'proveedor no tiene':'proveedores no tienen'} correo en DB Proveedores.xlsx.` : ''}</div>
+      <div class="crt-ped-lista">${pend.map(g=>`
+        <div class="crt-ped-fila${g.correo && g.correo.to ? '' : ' sin'}">
+          <div class="nom">${escapeHtml(g.nombre)}
+            <span class="det">${g.filas.length} ${g.filas.length===1?'producto':'productos'} · ${g.reqs.size} ${g.reqs.size===1?'requerimiento':'requerimientos'} · ${g.ocs.size} ${g.ocs.size===1?'OC':'OC'}${g.correo && g.correo.to ? ' · ' + escapeHtml(g.correo.to) : ' · sin correo registrado'}</span></div>
+          ${g.correo && g.correo.to ? `<div class="acc">
+            <button class="crt-doc no" type="button" data-crteml="${escapeHtml(g.clave)}" title="Descarga el correo ya escrito con el Excel adjunto; al abrirlo queda listo para enviar">✉ Correo con Excel</button>
+            <button class="crt-doc no lev" type="button" data-crtmailm="${escapeHtml(g.clave)}" title="Abre el correo en tu cliente y descarga el Excel aparte">Abrir sin adjunto</button>
+          </div>` : ''}
+        </div>`).join('')}</div>
+    </div>` : '';
+
+  cont.innerHTML = cab + panel + (reqs.size ? [...reqs.entries()].map(([req,r])=>`
     <details class="card crt-req" data-crtreq="${escapeHtml(req)}"${CRT.abiertos.has(req)?' open':''}>
       <summary>
         <svg class="caret" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
@@ -9130,6 +9292,12 @@ function crtVistaProyecto(cont){
       const url = crtMailto(b.dataset.crtmail);
       if(url) window.location.href = url;
     });
+  });
+  cont.querySelectorAll('[data-crteml]').forEach(b=>{
+    b.addEventListener('click', ()=> crtDescargarEml(b.dataset.crteml));
+  });
+  cont.querySelectorAll('[data-crtmailm]').forEach(b=>{
+    b.addEventListener('click', ()=> crtCorreoYExcel(b.dataset.crtmailm));
   });
   cont.querySelectorAll('[data-crtaplicar]').forEach(b=>{
     b.addEventListener('click', ()=> crtAplicarAOC(b.dataset.crtaplicar, b.dataset.tipo, b.dataset.clave));
