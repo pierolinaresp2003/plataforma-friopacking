@@ -476,6 +476,8 @@
   .crt-fila .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--brand-ink);font-weight:600;}
   .crt-fila .desc{font-size:13.5px;font-weight:600;color:var(--ink);}
   .crt-fila .sub{font-size:12px;color:var(--muted);line-height:1.45;}
+  .crt-mail{display:inline-flex;align-items:center;justify-content:center;width:32px;height:29px;border:1px solid var(--border);border-radius:7px;background:var(--surface-2);color:var(--ink-soft);font-size:14px;cursor:pointer;flex:none;}
+  .crt-mail:hover{border-color:var(--brand-ink);color:var(--brand-ink);}
   .crt-stock{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--amber-ink);background:var(--amber-bg);border:1px solid var(--amber-br);border-radius:10px;padding:1px 8px;}
   .crt-lote{display:block;margin-top:3px;font-size:11px;font-weight:600;color:var(--ink-soft);}
   .crt-lote.sin{opacity:.7;font-style:italic;}
@@ -541,7 +543,7 @@
   <div class="topbar">
     <div class="topbar-crumb">Plataforma de Reportes / <strong>Grupo Friopacking</strong></div>
     <div class="topbar-actions">
-      <label class="btn primary icon-only" for="fileInput" title="Cargar archivos (hasta 4)">📂</label>
+      <label class="btn primary icon-only" for="fileInput" title="Cargar archivos (hasta 5)">📂</label>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple>
       <button class="btn secondary icon-only" id="btnConnect" title="Conectar GitHub">🔑</button>
       <button class="btn secondary icon-only" id="btnPublish" disabled title="Primero carga tu Reporte Maestro.xlsx arriba.">☁</button>
@@ -565,6 +567,7 @@
       <li data-key="consulta"><span class="ic">⬜</span> Consulta.xlsx — no cargado</li>
       <li data-key="pedidosinreq"><span class="ic">⬜</span> PedidoSinReq.xlsx — no cargado</li>
       <li data-key="almacen"><span class="ic">⬜</span> Reporte Almacen.xlsx — no cargado</li>
+      <li data-key="proveedores"><span class="ic">⬜</span> DB Proveedores.xlsx — no cargado</li>
     </ul>
     <p id="status" style="margin-top:8px;">Ningún archivo cargado todavía.</p>
   </div>
@@ -1775,6 +1778,9 @@ function buildSnapshot(){
     // snapshot viejo (sin este campo, o con procesoSchemaVersion < 2) tiene "rp" con nombres crudos del
     // Excel — loadFromSnapshot lo detecta y NO los muestra como si fueran el responsable resuelto.
     procesoSchemaVersion: 2,
+    // Libreta de correos de proveedores (23.09.2026): va en el snapshot para que el botón de "pedir el
+    // certificado" también funcione en el link publicado, sin tener que cargar el Excel.
+    proveedores: PROVEEDOR_MAIL || null,
     filename: DATA.filename,
     corte: DATA.corte ? DATA.corte.toISOString() : null,
     excluded: DATA.excluded,
@@ -1788,6 +1794,8 @@ function buildSnapshot(){
         // ipy (22.09.2026): código del proyecto (PRY2026-00000XX). Sin esto, el módulo de
         // Certificados agrupaba TODO en un solo "SIN PROYECTO" al abrir el link publicado.
         py: r.proyecto, ipy: r.idProyecto, pr: r.producto, ip: r.idProducto, fa: r.familia, pv: r.proveedor,
+        // rc (23.09.2026): RUC del proveedor, para enlazar con los correos de DB Proveedores.xlsx.
+        rc: r.rucProveedor,
         // rp ahora publica el responsable YA RESUELTO del Indicador 1 (JCENTENO, o el nombre real de
         // PedidoSinReq.xlsx para pedidos directos) — no la columna cruda de Reporte Maestro, que no es
         // confiable (aclaración de Piero, 01.09.2026). d3 y d6 no necesitan publicarse: son fijos
@@ -2044,6 +2052,7 @@ async function loadPublishedSnapshot(manual){
 }
 
 function loadFromSnapshot(snap){
+  if(snap.proveedores) PROVEEDOR_MAIL = snap.proveedores;
   const isLegacyProcesoSnapshot = !(snap.procesoSchemaVersion >= 2);
   if(isLegacyProcesoSnapshot && snap.proceso && snap.proceso.rows && snap.proceso.rows.length){
     console.warn('Snapshot publicado con un formato antiguo de "proceso" (sin procesoSchemaVersion >= 2) — se ignoró el campo "rp" heredado de cada fila y se usó JCENTENO por defecto para el Indicador 1. Vuelve a publicar ("Guardar y compartir") con el archivo actual para actualizar el link.');
@@ -2060,6 +2069,7 @@ function loadFromSnapshot(snap){
     proveedorOrders: [], // idem
     procesoRows: (snap.proceso && snap.proceso.rows) ? snap.proceso.rows.map(r => ({
       proyecto: r.py, idProyecto: r.ipy || 'SIN PROYECTO', producto: r.pr, idProducto: r.ip, familia: r.fa, proveedor: r.pv,
+      rucProveedor: r.rc || "",
       // Un snapshot publicado ANTES del 01.09.2026 (procesoSchemaVersion < 2) trae "rp" con el nombre
       // crudo de la columna ResponsablePedido de Reporte Maestro.xlsx (no confiable, ver buildSnapshot) —
       // se ignora ese valor viejo por completo en vez de mostrarlo como si fuera el responsable ya
@@ -2214,6 +2224,11 @@ const FILE_SIGNATURES = [
   { key: 'consulta', label: 'Consulta.xlsx', match: (name, sheets) => /consulta/i.test(name) || sheets.some(s=>s.trim().toLowerCase()==='consulta') },
   { key: 'almacen', label: 'Reporte Almacen.xlsx', match: (name, sheets) => /almac[ée]n/i.test(name) || /inventario/i.test(name) || sheets.some(s=>/inventario/i.test(s)) || sheets.some(s=>/almac[ée]n/i.test(s)) || sheets.some(s=>/stock/i.test(s)) },
   { key: 'pedidosinreq', label: 'PedidoSinReq.xlsx', match: (name, sheets) => /pedido.?sin.?req/i.test(name) || /sinreq/i.test(name) || sheets.some(s=>/pedido.?sin.?req/i.test(s)) },
+  // DB Proveedores.xlsx (23.09.2026): correos de cada proveedor, para poder pedirles el certificado o la
+  // ficha técnica desde el módulo de Certificados. Dos hojas: "Data" (volcado de Nisira) y "Proveedores"
+  // (la lista curada, con persona de contacto) — esta última manda cuando las dos traen el mismo RUC.
+  { key: 'proveedores', label: 'DB Proveedores.xlsx', match: (name, sheets) => /db.?proveedores/i.test(name) ||
+      (sheets.some(s=>/^proveedores$/i.test(s.trim())) && sheets.some(s=>/^data$/i.test(s.trim()))) },
 ];
 const fileState = {}; // key -> { icon, text, cls }
 // Último lote de archivos que pasó por el input (08.09.2026) — [{name, key, error}]. Sirve para que un
@@ -2241,7 +2256,7 @@ function renderFileList(){
 }
 
 document.getElementById('fileInput').addEventListener('change', async function(e){
-  const files = Array.from(e.target.files || []).slice(0, 4);
+  const files = Array.from(e.target.files || []).slice(0, 5);
   if(!files.length) return;
   setStatus("Leyendo " + files.length + " archivo(s)...");
   let maestroOk = false, maestroSeen = false, readError = null;
@@ -2263,7 +2278,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     }
   }
   lastLoadFiles = parsed.map(p => ({ name: p.file.name, key: p.sig ? p.sig.key : null, error: p.error || null }));
-  const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3 };
+  const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3, proveedores: 4 };
   parsed.sort((a,b) => (PROC_ORDER[a.sig && a.sig.key] ?? 9) - (PROC_ORDER[b.sig && b.sig.key] ?? 9));
   for(const { file, wb, sig } of parsed){
     if(sig && sig.key === 'maestro'){
@@ -2283,6 +2298,9 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     } else if(sig && sig.key === 'pedidosinreq'){
       const res = processPedidoSinReq(wb, file.name);
       setFileState('pedidosinreq', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+    } else if(sig && sig.key === 'proveedores'){
+      const res = processProveedores(wb, file.name);
+      setFileState('proveedores', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
     } else if(sig && sig.key === 'almacen'){
       // 08.09.2026: antes se reconocía el archivo pero no se procesaba ("queda en memoria... no tiene
       // indicador armado") — ahora alimenta Alertas de Reposición (ver processAlmacen).
@@ -2563,6 +2581,9 @@ function processWorkbook(wb, filename){
         idProducto: col.idProducto!==-1 ? (r[col.idProducto]||"").toString() : "",
         familia: col.familia!==-1 ? ((r[col.familia]||"").toString().trim() || "Sin familia") : "Sin familia",
         proveedor: col.proveedor!==-1 ? (r[col.proveedor]||"").toString().trim() : "",
+        // RUC (23.09.2026): es la llave contra DB Proveedores.xlsx para saber a qué correo pedirle el
+        // certificado o la ficha técnica.
+        rucProveedor: col.rucProveedor!==-1 ? (r[col.rucProveedor]||"").toString().trim() : "",
         // Origen (nacional/importado): según RUC del proveedor — los proveedores importados no tienen
         // RUC peruano real y Nisira les asigna un código que empieza con "EX" (pedido de Piero, 01.09.2026).
         origen: origenFor(col.rucProveedor!==-1 ? r[col.rucProveedor] : ""),
@@ -3233,6 +3254,62 @@ function parseTrazaLotes(wb){
     }
   });
   return traza;
+}
+
+// ==============================================================================================
+// DB Proveedores.xlsx — a quién escribirle cuando falta el certificado o la ficha técnica
+// (23.09.2026, pedido de Piero). Se indexa por RUC, que es lo que trae Reporte Maestro en cada OC.
+// Si el campo de correo tiene varias direcciones (";", "," o "/"), la primera va como destinatario y
+// las demás en copia.
+let PROVEEDOR_MAIL = null;
+function partirCorreos(txt){
+  return String(txt || '').split(/[;,\/]+/).map(x=>x.trim())
+    .filter(x => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
+}
+function processProveedores(wb, filename){
+  const s = v => v==null ? '' : v.toString().trim();
+  const mapa = {};
+  const hojaData = wb.SheetNames.find(n=>/^data$/i.test(n.trim()));
+  const hojaProv = wb.SheetNames.find(n=>/^proveedores$/i.test(n.trim()));
+  const leer = (nombre, campos)=>{
+    if(!nombre || !wb.Sheets[nombre]) return 0;
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[nombre], {header:1, raw:true, defval:null});
+    let hdr = -1;
+    for(let i=0; i<Math.min(8, rows.length); i++){
+      const strs = (rows[i]||[]).map(c => sinAcentos(s(c).toLowerCase()));
+      if(campos.ruc.some(h=>strs.indexOf(h.toLowerCase())!==-1) && campos.mail.some(h=>strs.indexOf(h.toLowerCase())!==-1)){ hdr = i; break; }
+    }
+    if(hdr === -1) return 0;
+    const iR = findCol(rows[hdr], campos.ruc), iM = findCol(rows[hdr], campos.mail),
+          iN = findCol(rows[hdr], campos.nom), iC = campos.cont ? findCol(rows[hdr], campos.cont) : -1;
+    let n = 0;
+    for(let r=hdr+1; r<rows.length; r++){
+      const row = rows[r]; if(!row) continue;
+      const ruc = s(row[iR]); if(!ruc) continue;
+      const correos = partirCorreos(row[iM]);
+      const contacto = iC!==-1 ? s(row[iC]) : '';
+      if(!correos.length && !contacto) continue;
+      const prev = mapa[ruc] || {};
+      mapa[ruc] = {
+        to: correos[0] || prev.to || '',
+        cc: correos.length > 1 ? correos.slice(1) : (prev.cc || []),
+        contacto: contacto || prev.contacto || '',
+        nombre: (iN!==-1 ? s(row[iN]) : '') || prev.nombre || '',
+      };
+      if(mapa[ruc].to) n++;
+    }
+    return n;
+  };
+  // La hoja curada va DESPUÉS para que su dato pise al volcado crudo cuando el RUC está en las dos.
+  leer(hojaData, { ruc:["RUC"], mail:["E_MAIL","EMAIL","Correo"], nom:["PROVEEDOR","NOMBRE_COMERCIAL"] });
+  leer(hojaProv, { ruc:["RUC"], mail:["Email","E_MAIL","Correo"], nom:["Nombre"], cont:["Contacto"] });
+  const con = Object.keys(mapa).filter(k=>mapa[k].to).length;
+  PROVEEDOR_MAIL = con ? mapa : null;
+  if(CRT) CRT.listo = false;
+  if(DATA) drawCertificados();
+  return con
+    ? { ok:true, message: con + " proveedores con correo." }
+    : { ok:false, message: "no encontré columnas de RUC y correo en este archivo." };
 }
 
 function processAlmacen(wb, filename){
@@ -8645,6 +8722,62 @@ const crtCampo = (tipo) => tipo === 'cert' ? 'certArch' : 'fichaArch';
 const crtNombreDoc = (tipo) => tipo === 'cert' ? 'certificado' : 'ficha técnica';
 const crtTiene = (f, tipo) => !!(f[tipo === 'cert' ? 'cert' : 'ficha'] || f[crtCampo(tipo)] || crtHeredado(f, tipo));
 /** Para una línea atendida de stock: el documento que ya tiene cargado la compra de la que vino. */
+/** A qué proveedor y a qué OC corresponde pedirle el documento de esta línea. */
+function crtProvDe(f){
+  if(f.oc) return { ruc:f.ruc, oc:f.oc, nombre:f.proveedor, probable:false };
+  if(!f.lotes) return null;
+  for(const l of f.lotes){
+    const src = CRT.porOc ? CRT.porOc.get(l[0] + '|' + f.codigo) : null;
+    if(src && src.ruc) return { ruc:src.ruc, oc:l[0], nombre:src.proveedor, probable:!!l[3] };
+  }
+  return { ruc:'', oc:f.lotes[0][0], nombre:f.lotes[0][1], probable:!!f.lotes[0][3] };
+}
+/** Datos de correo del proveedor de esta línea, o null si no hay a quién escribirle. */
+function crtCorreoDe(f){
+  const p = crtProvDe(f);
+  if(!p || !p.ruc || !PROVEEDOR_MAIL) return null;
+  const d = PROVEEDOR_MAIL[p.ruc];
+  return (d && d.to) ? { to:d.to, cc:d.cc || [], contacto:d.contacto || '', oc:p.oc, probable:p.probable } : null;
+}
+/**
+ * Correo listo para enviar pidiendo lo que falta (23.09.2026, pedido de Piero). Va dirigido al
+ * proveedor, con sus otros correos en copia, y cubre TODOS los productos de esa misma OC dentro del
+ * requerimiento a los que todavía les falta algo — así no sale un correo por línea.
+ */
+function crtMailto(clave){
+  const f = CRT.filas.find(x => crtClave(x) === clave);
+  const d = f && crtCorreoDe(f);
+  if(!d) return null;
+  const falta = (x) => (!crtTiene(x,'cert') && !crtTiene(x,'ficha')) ? 'certificado de calidad y ficha técnica'
+    : (!crtTiene(x,'cert') ? 'certificado de calidad' : 'ficha técnica');
+  const lista = CRT.filas.filter(x => x.req === f.req && (!crtTiene(x,'cert') || !crtTiene(x,'ficha')) &&
+    ((crtProvDe(x) || {}).oc === d.oc));
+  const prods = lista.length ? lista : [f];
+  const pry = (f.idPry && f.idPry !== 'SIN PROYECTO') ? (f.idPry + ' — ' + f.nomPry) : f.nomPry;
+  const L = [];
+  L.push(d.contacto ? ('Estimado(a) ' + d.contacto + ':') : 'Estimados:');
+  L.push('');
+  L.push('Solicitamos la documentación de calidad correspondiente al siguiente despacho:');
+  L.push('');
+  L.push('Orden de compra: ' + d.oc + (d.probable ? ' (por confirmar)' : ''));
+  L.push('Requerimiento:   ' + f.req);
+  L.push('Proyecto:        ' + pry);
+  if(f.stock) L.push('Nota: el material se entregó desde nuestro almacén; según nuestro kardex corresponde a esa orden de compra.');
+  L.push('');
+  L.push(prods.length === 1 ? 'Producto:' : ('Productos (' + prods.length + '):'));
+  prods.forEach(x => L.push('  \u00b7 ' + x.codigo + ' — ' + x.producto + '  ->  falta ' + falta(x)));
+  L.push('');
+  L.push('Agradeceremos enviarlos en respuesta a este correo.');
+  L.push('');
+  L.push('Saludos cordiales,');
+  L.push('Compras y Logística — Grupo Friopacking');
+  const q = [];
+  if(d.cc.length) q.push('cc=' + encodeURIComponent(d.cc.join(',')));
+  q.push('subject=' + encodeURIComponent('Certificados de calidad — OC ' + d.oc + ' — ' + pry));
+  q.push('body=' + encodeURIComponent(L.join('\r\n')));
+  return 'mailto:' + d.to + '?' + q.join('&');
+}
+
 /** Por qué una línea atendida de stock no tiene una compra que mostrar. */
 function crtMotivoLote(f){
   if(f.motivo === '@ini')   return 'Salió del saldo que ya tenía el almacén al 01.01.2025 — es anterior a lo que registra el sistema';
@@ -8722,6 +8855,7 @@ function crtCargar(){
       motivo: motivo,
       fecha: crtFecha(oc ? r.fOrden : (r.fSalida || r.fReq)),
       usuario: (r.usuarioCompras||'').trim(),
+      ruc: (r.rucProveedor||'').trim(),
       proveedor: oc ? (r.proveedor||'').trim() : (lotes ? lotes[0][1] : ''),
       cert: null, ficha: null,
     });
@@ -8991,6 +9125,12 @@ function crtVistaProyecto(cont){
   cont.querySelectorAll('[data-crtsube]').forEach(b=>{
     b.addEventListener('click', ()=> crtPedirArchivo([b.dataset.crtsube], b.dataset.tipo));
   });
+  cont.querySelectorAll('[data-crtmail]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const url = crtMailto(b.dataset.crtmail);
+      if(url) window.location.href = url;
+    });
+  });
   cont.querySelectorAll('[data-crtaplicar]').forEach(b=>{
     b.addEventListener('click', ()=> crtAplicarAOC(b.dataset.crtaplicar, b.dataset.tipo, b.dataset.clave));
   });
@@ -9050,7 +9190,9 @@ function crtFila(f){
           : `<span class="crt-lote sin">${escapeHtml(crtMotivoLote(f))}</span>`)
       : `OC ${crtMarca(f.oc)} · ${escapeHtml(f.fecha)}`}
       ${f.usuario && !f.stock ? `<br><span class="crt-quien">👤 ${crtMarca(f.usuario)}</span>` : ''}</div>
-    <div class="crt-docs">${doc('cert','Certificado',false)}${doc('ficha','Ficha técnica',true)}</div>
+    <div class="crt-docs">${doc('cert','Certificado',false)}${doc('ficha','Ficha técnica',true)}${
+      (!crtTiene(f,'cert') || !crtTiene(f,'ficha')) && crtCorreoDe(f)
+        ? `<button class="crt-mail" type="button" data-crtmail="${escapeHtml(clave)}" title="Pedirle al proveedor lo que falta por correo">✉</button>` : ''}</div>
     ${f.nota ? `<div class="crt-nota">${f.nota.html}</div>` : ''}
   </div>`;
 }
