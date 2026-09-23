@@ -8718,8 +8718,7 @@ const CRT = {
   filas: [], proyectos: [], pry: '', q: '', filtro: 'todos',
   sel: new Set(), abiertos: new Set(), subidas: new Map(),
   sug: [], sugIdx: -1, pendiente: null, listo: false, firma: '', pedAbierto: false,
-  leyendo: new Set(),    // proyectos cuya consulta a Drive está en curso
-  cargados: new Set(),   // proyectos cuyos documentos ya se consultaron a Drive
+  leyendo: false,        // true mientras Drive contesta
 };
 
 /** Convierte el archivo a base64 para mandarlo en el JSON. */
@@ -8750,11 +8749,16 @@ async function crtGuardarEnDrive(file, tipo, destinos){
 }
 
 /** Trae de Drive los documentos que ya existen en un proyecto. */
-/** Marca en las filas del proyecto los documentos que devolvió Drive. */
-function crtAplicarDocs(pry, docs){
+/** Marca en las filas los documentos que devolvió Drive. */
+function crtAplicarDocs(docs){
+  const porReq = new Map();
+  CRT.filas.forEach(function(f){
+    if(!porReq.has(f.req)) porReq.set(f.req, []);
+    porReq.get(f.req).push(f);
+  });
   docs.forEach(function(doc){
-    CRT.filas.forEach(function(f){
-      if(f.idPry !== pry || f.req !== doc.req) return;
+    (porReq.get(doc.req) || []).forEach(function(f){
+      if(doc.pry && f.idPry !== doc.pry) return;
       // codigo null = documento del requerimiento: vale para todos sus productos
       if(doc.codigo && f.codigo !== doc.codigo) return;
       f[doc.tipo === 'ficha' ? 'ficha' : 'cert'] = doc.url;
@@ -8762,41 +8766,34 @@ function crtAplicarDocs(pry, docs){
   });
 }
 
-// Copia de lo último que contestó Drive, por proyecto (23.09.2026, pedido de Piero: "no se actualiza
-// rápido el estado al encontrarlo en Drive"). Preguntarle a Drive toma unos segundos —el Apps Script
-// recorre carpeta por carpeta— y mientras tanto todo se veía sin certificado. Ahora al entrar se pinta
-// al instante lo de la visita anterior y la consulta real corre por detrás y corrige lo que haga falta.
-// Es solo un caché: Drive sigue siendo la verdad, y cada vez que se abre un proyecto se vuelve a
-// consultar. Vive en este navegador; si se borra, no se pierde nada.
+// Copia de lo último que contestó Drive (23.09.2026, pedido de Piero: "tarda en actualizar el estado
+// al encontrarlo en Drive"). Dos cosas lo hacían lento: la consulta arrancaba recién al entrar a un
+// proyecto —así que siempre se esperaba— y era una por proyecto. Ahora se pide TODO de una sola vez al
+// abrir el módulo, mientras se mira la lista, y entrar a un proyecto ya no espera nada. Lo que contestó
+// la última vez queda guardado en este navegador y se pinta al instante mientras llega la respuesta
+// nueva. Es solo un atajo: Drive sigue siendo la verdad y se vuelve a consultar en cada apertura.
 const CRT_CACHE = 'fp_crt_drive';
 function crtCacheLeer(){
-  try{ return JSON.parse(localStorage.getItem(CRT_CACHE) || '{}'); }catch(err){ return {}; }
+  try{ const c = JSON.parse(localStorage.getItem(CRT_CACHE) || 'null'); return (c && c.docs) ? c : null; }
+  catch(err){ return null; }
 }
-function crtCacheGuardar(pry, docs){
-  try{
-    const c = crtCacheLeer();
-    c[pry] = { t: Date.now(), docs: docs };
-    localStorage.setItem(CRT_CACHE, JSON.stringify(c));
-  }catch(err){ /* sin espacio o modo incógnito: da igual, es solo un atajo */ }
+function crtCacheGuardar(docs){
+  try{ localStorage.setItem(CRT_CACHE, JSON.stringify({ t: Date.now(), docs: docs })); }
+  catch(err){ /* sin espacio o modo incógnito: da igual, es solo un atajo */ }
 }
 
-async function crtLeerDeDrive(pry){
-  if(!CRT_DRIVE.url || CRT.cargados.has(pry)) return;
-  CRT.cargados.add(pry);
-  // 1) lo que se sabía de la última visita, al instante (sin repintar: esto corre antes del dibujo)
-  const previo = crtCacheLeer()[pry];
-  if(previo && previo.docs && previo.docs.length) crtAplicarDocs(pry, previo.docs);
-  // 2) y de fondo, lo que dice Drive ahora
-  CRT.leyendo.add(pry);
+async function crtLeerDeDrive(){
+  if(!CRT_DRIVE.url || CRT.leyendo) return;
+  CRT.leyendo = true;
   try{
-    const u = CRT_DRIVE.url + '?clave=' + encodeURIComponent(CRT_DRIVE.clave) + '&pry=' + encodeURIComponent(pry);
+    const u = CRT_DRIVE.url + '?clave=' + encodeURIComponent(CRT_DRIVE.clave) + '&pry=*';
     const r = await fetch(u);
     const d = await r.json();
-    if(d.ok && d.docs){ crtAplicarDocs(pry, d.docs); crtCacheGuardar(pry, d.docs); }
+    if(d.ok && d.docs){ crtAplicarDocs(d.docs); crtCacheGuardar(d.docs); }
   }catch(err){
     console.warn('No se pudieron leer los documentos de Drive:', err);
   }finally{
-    CRT.leyendo.delete(pry);
+    CRT.leyendo = false;
     crtDibujar();
   }
 }
@@ -9295,7 +9292,6 @@ function crtVistaProyectos(cont){
   });
 }
 function crtVistaProyecto(cont){
-  crtLeerDeDrive(CRT.pry);
   const delPry = CRT.filas.filter(f => f.idPry === CRT.pry);
   const conChip = delPry.filter(crtPasaChip);
   const reqs = new Map();
@@ -9317,7 +9313,7 @@ function crtVistaProyecto(cont){
       <div><div class="id" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;font-weight:700;color:var(--brand-ink);">${escapeHtml(CRT.pry)}</div>
         <div class="nom">${escapeHtml(crtNombrePry(CRT.pry))}</div></div>
       <div class="der">
-        ${CRT.leyendo.has(CRT.pry) ? `<div class="crt-mini"><div class="t" style="text-transform:none;letter-spacing:0;">⟳ consultando Drive…</div></div>` : ''}
+        ${CRT.leyendo ? `<div class="crt-mini"><div class="t" style="text-transform:none;letter-spacing:0;">⟳ consultando Drive…</div></div>` : ''}
         <div class="crt-mini"><div class="v">${reqs.size}</div><div class="t">Requerim.</div></div>
         <div class="crt-mini"><div class="v">${delPry.length}</div><div class="t">Productos</div></div>
         <div class="crt-mini"><div class="v ok">${conCert}</div><div class="t">Con certificado</div></div>
@@ -9458,7 +9454,13 @@ function drawCertificados(){
   // el módulo se armaba con el snapshot publicado, luego subía los 4 Excel y Certificados seguía mostrando
   // lo viejo — un solo proyecto "SIN PROYECTO" — porque el latch `listo` ya estaba en true).
   const firma = [DATA.fromSnapshot ? 's' : 'x', DATA.filename || '', DATA.corte ? +DATA.corte : 0, getProcesoRows().length].join('|');
-  if(!CRT.listo || !CRT.filas.length || CRT.firma !== firma){ crtCargar(); CRT.listo = true; CRT.firma = firma; crtRefrescarPry(); }
+  if(!CRT.listo || !CRT.filas.length || CRT.firma !== firma){
+    crtCargar(); CRT.listo = true; CRT.firma = firma; crtRefrescarPry();
+    // Lo que Drive contestó la última vez, ya pintado; y de fondo se pide lo de ahora.
+    const previo = crtCacheLeer();
+    if(previo) crtAplicarDocs(previo.docs);
+    crtLeerDeDrive();
+  }
   crtDibujar();
 }
 
