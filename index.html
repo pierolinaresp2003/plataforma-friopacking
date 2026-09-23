@@ -558,7 +558,7 @@
   <div class="topbar">
     <div class="topbar-crumb">Plataforma de Reportes / <strong>Grupo Friopacking</strong></div>
     <div class="topbar-actions">
-      <label class="btn primary icon-only" for="fileInput" title="Cargar archivos (hasta 5)">📂</label>
+      <label class="btn primary icon-only" for="fileInput" title="Cargar archivos (hasta 6)">📂</label>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple>
       <button class="btn secondary icon-only" id="btnConnect" title="Conectar GitHub">🔑</button>
       <button class="btn secondary icon-only" id="btnPublish" disabled title="Primero carga tu Reporte Maestro.xlsx arriba.">☁</button>
@@ -583,6 +583,7 @@
       <li data-key="pedidosinreq"><span class="ic">⬜</span> PedidoSinReq.xlsx — no cargado</li>
       <li data-key="almacen"><span class="ic">⬜</span> Reporte Almacen.xlsx — no cargado</li>
       <li data-key="proveedores"><span class="ic">⬜</span> DB Proveedores.xlsx — no cargado</li>
+      <li data-key="supervisores"><span class="ic">⬜</span> DB Supervisores.xlsx — no cargado</li>
     </ul>
     <p id="status" style="margin-top:8px;">Ningún archivo cargado todavía.</p>
   </div>
@@ -1796,6 +1797,7 @@ function buildSnapshot(){
     // Libreta de correos de proveedores (23.09.2026): va en el snapshot para que el botón de "pedir el
     // certificado" también funcione en el link publicado, sin tener que cargar el Excel.
     proveedores: PROVEEDOR_MAIL || null,
+    supervisores: SUPERVISOR_MAIL || null,
     filename: DATA.filename,
     corte: DATA.corte ? DATA.corte.toISOString() : null,
     excluded: DATA.excluded,
@@ -1816,7 +1818,7 @@ function buildSnapshot(){
         // confiable (aclaración de Piero, 01.09.2026). d3 y d6 no necesitan publicarse: son fijos
         // (MLUJAN / KALBUJAR), responsableLabel() los resuelve igual con o sin snapshot.
         rp: r.responsableD1, uc: r.usuarioCompras, rs: r.responsableSalida, og: r.origen,
-        cr: r.codRequerimiento, cp: r.codPedido, co: r.codOrden, cm: r.camino,
+        cr: r.codRequerimiento, cp: r.codPedido, co: r.codOrden, cm: r.camino, rr: r.responsableReq,
         fr: isoDay(r.fReq), fp: isoDay(r.fPedido), fo: isoDay(r.fOrden), fb: isoDay(r.fAprob),
         fc: isoDay(r.fRecep), fs: isoDay(r.fSalida), fx: isoDay(r.fCompromiso),
         d1: r.d1, d2: r.d2, d3: r.d3, d4: r.d4, d6: r.d6, d4c: r.d4cumple,
@@ -2068,6 +2070,7 @@ async function loadPublishedSnapshot(manual){
 
 function loadFromSnapshot(snap){
   if(snap.proveedores) PROVEEDOR_MAIL = snap.proveedores;
+  if(snap.supervisores) SUPERVISOR_MAIL = snap.supervisores;
   const isLegacyProcesoSnapshot = !(snap.procesoSchemaVersion >= 2);
   if(isLegacyProcesoSnapshot && snap.proceso && snap.proceso.rows && snap.proceso.rows.length){
     console.warn('Snapshot publicado con un formato antiguo de "proceso" (sin procesoSchemaVersion >= 2) — se ignoró el campo "rp" heredado de cada fila y se usó JCENTENO por defecto para el Indicador 1. Vuelve a publicar ("Guardar y compartir") con el archivo actual para actualizar el link.');
@@ -2084,7 +2087,7 @@ function loadFromSnapshot(snap){
     proveedorOrders: [], // idem
     procesoRows: (snap.proceso && snap.proceso.rows) ? snap.proceso.rows.map(r => ({
       proyecto: r.py, idProyecto: r.ipy || 'SIN PROYECTO', producto: r.pr, idProducto: r.ip, familia: r.fa, proveedor: r.pv,
-      rucProveedor: r.rc || "",
+      rucProveedor: r.rc || "", responsableReq: r.rr || "",
       // Un snapshot publicado ANTES del 01.09.2026 (procesoSchemaVersion < 2) trae "rp" con el nombre
       // crudo de la columna ResponsablePedido de Reporte Maestro.xlsx (no confiable, ver buildSnapshot) —
       // se ignora ese valor viejo por completo en vez de mostrarlo como si fuera el responsable ya
@@ -2244,6 +2247,9 @@ const FILE_SIGNATURES = [
   // (la lista curada, con persona de contacto) — esta última manda cuando las dos traen el mismo RUC.
   { key: 'proveedores', label: 'DB Proveedores.xlsx', match: (name, sheets) => /db.?proveedores/i.test(name) ||
       (sheets.some(s=>/^proveedores$/i.test(s.trim())) && sheets.some(s=>/^data$/i.test(s.trim()))) },
+  // DB Supervisores.xlsx (23.09.2026): correo de quien pidió cada requerimiento, para ponerlo en copia.
+  { key: 'supervisores', label: 'DB Supervisores.xlsx', match: (name, sheets) => /db.?supervisor/i.test(name) ||
+      sheets.some(s=>/^supervisores$/i.test(s.trim())) },
 ];
 const fileState = {}; // key -> { icon, text, cls }
 // Último lote de archivos que pasó por el input (08.09.2026) — [{name, key, error}]. Sirve para que un
@@ -2271,7 +2277,7 @@ function renderFileList(){
 }
 
 document.getElementById('fileInput').addEventListener('change', async function(e){
-  const files = Array.from(e.target.files || []).slice(0, 5);
+  const files = Array.from(e.target.files || []).slice(0, 6);
   if(!files.length) return;
   setStatus("Leyendo " + files.length + " archivo(s)...");
   let maestroOk = false, maestroSeen = false, readError = null;
@@ -2293,7 +2299,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     }
   }
   lastLoadFiles = parsed.map(p => ({ name: p.file.name, key: p.sig ? p.sig.key : null, error: p.error || null }));
-  const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3, proveedores: 4 };
+  const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3, proveedores: 4, supervisores: 5 };
   parsed.sort((a,b) => (PROC_ORDER[a.sig && a.sig.key] ?? 9) - (PROC_ORDER[b.sig && b.sig.key] ?? 9));
   for(const { file, wb, sig } of parsed){
     if(sig && sig.key === 'maestro'){
@@ -2313,6 +2319,9 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     } else if(sig && sig.key === 'pedidosinreq'){
       const res = processPedidoSinReq(wb, file.name);
       setFileState('pedidosinreq', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+    } else if(sig && sig.key === 'supervisores'){
+      const res = processSupervisores(wb, file.name);
+      setFileState('supervisores', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
     } else if(sig && sig.key === 'proveedores'){
       const res = processProveedores(wb, file.name);
       setFileState('proveedores', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
@@ -2373,6 +2382,8 @@ function processWorkbook(wb, filename){
     motivoDescr: findCol(headerRow, ["MotivoDescr"]),
     fechaPedido: findCol(headerRow, ["FechaPedido"]),
     responsablePedido: findCol(headerRow, ["ResponsablePedido"]),
+    // Quien pidió el requerimiento (23.09.2026): va en copia en los correos a proveedores.
+    nombreResponsable: findCol(headerRow, ["NombreResponsable"]),
     usuarioCompras: findCol(headerRow, ["UsuarioCompras"]),
     responsableSalida: findCol(headerRow, ["ResponsableGeneralSalida"]),
     codRequerimiento: findCol(headerRow, ["CodRequerimiento"]),
@@ -2603,6 +2614,7 @@ function processWorkbook(wb, filename){
         // RUC peruano real y Nisira les asigna un código que empieza con "EX" (pedido de Piero, 01.09.2026).
         origen: origenFor(col.rucProveedor!==-1 ? r[col.rucProveedor] : ""),
         responsablePedido: col.responsablePedido!==-1 ? (r[col.responsablePedido]||"").toString().trim() : "",
+        responsableReq: col.nombreResponsable!==-1 ? (r[col.nombreResponsable]||"").toString().trim() : "",
         // EstadoPedido de Nisira (17.09.2026) — lo necesita el análisis de PEDIDOS PENDIENTES del
         // reporte por comprador: una línea sin OC solo cuenta como pendiente si dice "Pendiente"
         // (las "Archivado" se cancelaron y las "Atendido Total" se atendieron con stock de almacén).
@@ -2683,6 +2695,8 @@ function processPedidoSinReq(wb, filename){
   const col = {
     codPedido: findCol(headerRow, ["CodPedido"]),
     responsablePedido: findCol(headerRow, ["ResponsablePedido"]),
+    // Quien pidió el requerimiento (23.09.2026): va en copia en los correos a proveedores.
+    nombreResponsable: findCol(headerRow, ["NombreResponsable"]),
     // Columnas adicionales (04.09.2026 ronda 37) para armar PEDIDO_SIN_REQ_ROWS — OC completas de
     // "pedidos directos" que Reporte Maestro.xlsx nunca trae (ver comentario junto a PEDIDO_SIN_REQ_ROWS
     // arriba). Verificado contra el archivo real de Piero: trae exactamente las mismas columnas de OC
@@ -3325,6 +3339,39 @@ function processProveedores(wb, filename){
   return con
     ? { ok:true, message: con + " proveedores con correo." }
     : { ok:false, message: "no encontré columnas de RUC y correo en este archivo." };
+}
+
+// DB Supervisores.xlsx (23.09.2026, pedido de Piero): a quién de la casa hay que poner en copia. Se
+// indexa por nombre normalizado (sin tildes y con las palabras ordenadas) porque Nisira y esta base no
+// siempre escriben el nombre en el mismo orden.
+let SUPERVISOR_MAIL = null;
+function claveNombre(txt){
+  return sinAcentos(String(txt||'').toUpperCase()).replace(/[^A-Z\s]/g,' ').split(/\s+/)
+    .filter(Boolean).sort().join(' ');
+}
+function processSupervisores(wb, filename){
+  const s = v => v==null ? '' : v.toString().trim();
+  const hoja = wb.SheetNames.find(n=>/supervisor/i.test(n)) || wb.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], {header:1, raw:true, defval:null});
+  let hdr = -1;
+  for(let i=0; i<Math.min(8, rows.length); i++){
+    const strs = (rows[i]||[]).map(c => sinAcentos(s(c).toLowerCase()));
+    if(strs.indexOf('nombre') !== -1 && (strs.indexOf('correo') !== -1 || strs.indexOf('email') !== -1)){ hdr = i; break; }
+  }
+  if(hdr === -1){ SUPERVISOR_MAIL = null; return { ok:false, message:"no encontré las columnas Nombre y Correo." }; }
+  const iN = findCol(rows[hdr], ["Nombre"]), iC = findCol(rows[hdr], ["Correo","Email","E_MAIL"]);
+  const mapa = {};
+  for(let r=hdr+1; r<rows.length; r++){
+    const row = rows[r]; if(!row) continue;
+    const nom = s(row[iN]), correos = partirCorreos(row[iC]);
+    if(!nom || !correos.length) continue;
+    mapa[claveNombre(nom)] = correos[0];
+  }
+  const n = Object.keys(mapa).length;
+  SUPERVISOR_MAIL = n ? mapa : null;
+  if(DATA) drawCertificados();
+  return n ? { ok:true, message: n + " supervisores con correo." }
+           : { ok:false, message: "no encontré nombres con correo en este archivo." };
 }
 
 function processAlmacen(wb, filename){
@@ -8787,10 +8834,36 @@ function crtMailto(clave){
   L.push('Saludos cordiales,');
   L.push('Compras y Logística — Grupo Friopacking');
   const q = [];
-  if(d.cc.length) q.push('cc=' + encodeURIComponent(d.cc.join(',')));
+  const cc = crtCopias(prods, d.to, d.cc);
+  if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
   q.push('subject=' + encodeURIComponent('Certificados de calidad — OC ' + d.oc + ' — ' + pry));
   q.push('body=' + encodeURIComponent(L.join('\r\n')));
   return 'mailto:' + d.to + '?' + q.join('&');
+}
+
+// Siempre en copia, pase lo que pase (23.09.2026, lista que dio Piero).
+const CRT_COPIA_FIJA = [
+  'msihuairo@friopacking.pe', 'ccheca@friopacking.pe', 'plinares@friopacking.pe',
+  'mlujan@grupofriopacking.pe', 'jaltamirano@friopacking.pe', 'jpomez@friopacking.pe',
+  'kalbujar@grupofriopacking.pe',
+];
+/**
+ * Copias del correo: los demás correos del proveedor, el supervisor que pidió cada requerimiento
+ * (DB Supervisores.xlsx) y la lista fija de Compras y Logística. Sin repetidos y sin el destinatario.
+ */
+function crtCopias(filas, correoProv, otrosDelProveedor){
+  const vistos = new Set(), cc = [];
+  const sumar = (m)=>{
+    const e = String(m||'').trim();
+    if(!e) return;
+    const k = e.toLowerCase();
+    if(k === String(correoProv||'').toLowerCase() || vistos.has(k)) return;
+    vistos.add(k); cc.push(e);
+  };
+  (otrosDelProveedor || []).forEach(sumar);
+  if(SUPERVISOR_MAIL) filas.forEach(f => { const m = SUPERVISOR_MAIL[claveNombre(f.supervisor)]; if(m) sumar(m); });
+  CRT_COPIA_FIJA.forEach(sumar);
+  return cc;
 }
 
 // ------------------------------------------------------------------ pedido masivo por proveedor
@@ -8876,7 +8949,7 @@ function crtDescargarEml(clave){
   const cortar = (t) => t.replace(/(.{76})/g, '$1\r\n');
   const eml = [
     'To: ' + g.correo.to,
-    (g.correo.cc && g.correo.cc.length) ? 'Cc: ' + g.correo.cc.join(', ') : null,
+    (function(){ const cc = crtCopias(g.filas, g.correo.to, g.correo.cc); return cc.length ? 'Cc: ' + cc.join(', ') : null; })(),
     'Subject: =?UTF-8?B?' + utf8ToBase64(c.asunto) + '?=',
     'X-Unsent: 1',
     'MIME-Version: 1.0',
@@ -8910,7 +8983,8 @@ function crtCorreoYExcel(clave){
   for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
   descargarBlob(new Blob([bytes], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombreBase + '.xlsx');
   const q = [];
-  if(g.correo.cc && g.correo.cc.length) q.push('cc=' + encodeURIComponent(g.correo.cc.join(',')));
+  const cc = crtCopias(g.filas, g.correo.to, g.correo.cc);
+  if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
   q.push('subject=' + encodeURIComponent(c.asunto));
   q.push('body=' + encodeURIComponent(c.cuerpo));
   window.location.href = 'mailto:' + g.correo.to + '?' + q.join('&');
@@ -8996,6 +9070,7 @@ function crtCargar(){
       motivo: motivo,
       fecha: crtFecha(oc ? r.fOrden : (r.fSalida || r.fReq)),
       usuario: (r.usuarioCompras||'').trim(),
+      supervisor: (r.responsableReq||'').trim(),
       ruc: (r.rucProveedor||'').trim(),
       proveedor: oc ? (r.proveedor||'').trim() : (lotes ? lotes[0][1] : ''),
       cert: null, ficha: null,
