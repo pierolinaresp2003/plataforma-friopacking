@@ -761,15 +761,18 @@
       </div>
 
       <div class="toolbar">
-        <select id="filterProcesoProveedor"><option value="all">Todos los proveedores</option></select>
-        <select id="filterProcesoFamilia"><option value="all">Todas las familias</option></select>
+        <!-- Proveedor, Familia y Área se quitaron de la vista (24.09.2026, pedido de Piero). Siguen en
+             el DOM, ocultos y fijos en "all", para que todo lo que los consulta (filtros del módulo,
+             tendencia, detalle y la imagen de resumen) siga funcionando sin tocar una sola función. -->
+        <select id="filterProcesoProveedor" style="display:none;"><option value="all">Todos los proveedores</option></select>
+        <select id="filterProcesoFamilia" style="display:none;"><option value="all">Todas las familias</option></select>
         <select id="filterProcesoResponsable"><option value="all">Todos (responsable de compra)</option></select>
         <select id="filterProcesoOrigen">
           <option value="all">Origen: todos</option>
           <option value="nacional">Origen: Nacional</option>
           <option value="importado">Origen: Importado</option>
         </select>
-        <select id="filterProcesoArea">
+        <select id="filterProcesoArea" style="display:none;">
           <option value="all">Área: todos</option>
           <option value="almacen">Área: Almacén</option>
           <option value="compras">Área: Compras</option>
@@ -5122,6 +5125,19 @@ function drawKardex(){
   // regla vigente en todo el reporte) — esto es solo el disparador de la simulación, y cuando difiere se
   // dibuja aparte como línea naranja para que se vea de dónde sale.
   const ropSim = (esImportado && producto.ropImp != null && producto.ropImp > 0) ? producto.ropImp : producto.rop;
+  // 24.09.2026, pedido de Piero: "en el gráfico debes colocar el ROP y el SS que corresponde si es
+  // nacional o importado, y la simulación en base a lo que se elija". Antes el gráfico dibujaba siempre
+  // el ROP y el stock de seguridad NACIONALES y, cuando el producto era importado, agregaba una segunda
+  // línea naranja con el ROP de importación — dos líneas para lo mismo y contradiciendo a las tarjetas.
+  // Ahora hay una sola línea de cada uno, la del origen elegido arriba, y las etiquetas dicen cuál es.
+  const segSim = (esImportado && producto.stockSeguridadImp != null && producto.stockSeguridadImp > 0)
+    ? producto.stockSeguridadImp : producto.stockSeguridad;
+  // De qué columna del Excel salió realmente cada valor: si el producto es importado pero esa columna
+  // viene vacía se usa la nacional, y en ese caso la etiqueta tiene que decir "nacional", no mentir.
+  const ropEsImp = esImportado && producto.ropImp != null && producto.ropImp > 0;
+  const segEsImp = esImportado && producto.stockSeguridadImp != null && producto.stockSeguridadImp > 0;
+  const etiqRop = ropEsImp ? ' importación' : ' nacional';
+  const etiqSeg = segEsImp ? ' importación' : ' nacional';
 
   const projPeriods = [], projMean = [], projUpper = [], projLower = [], projDias = [];
   // pedidos: cada uno con el día en que se COLOCA (cruce del ROP) y el día en que LLEGA (LT días después).
@@ -5420,8 +5436,8 @@ function drawKardex(){
   histSerie.forEach(pt=>{ if(pt.idx >= visDesde-1 && pt.idx <= visHasta+1){ allVals.push(pt.v); allVals.push(pt.antes); } });
   idxView.forEach(i=>{ if(i>=n) allVals.push(projMean[i-n]); });
   allVals.push(stockSuc);
-  if(producto.rop!=null) allVals.push(producto.rop);
-  if(producto.stockSeguridad!=null) allVals.push(producto.stockSeguridad);
+  if(ropSim!=null) allVals.push(ropSim);
+  if(segSim!=null) allVals.push(segSim);
   if(!allVals.length) allVals.push(1);
   // 14.09.2026, comentario de Piero: "podrias colocar más números en el eje y?" — más líneas de grilla
   // (antes 5) para que se puedan leer más valores intermedios sin tener que calcularlos a ojo.
@@ -5468,21 +5484,21 @@ function drawKardex(){
     gridSvg += `<line class="kdx-grid" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"></line><text x="${padL-8}" y="${y+3}" text-anchor="end">${fmtEje(v)}</text>`;
   }
   let refSvg = '';
-  const yRop = producto.rop!=null ? yFor(producto.rop) : null;
-  const ySeg = producto.stockSeguridad!=null ? yFor(producto.stockSeguridad) : null;
+  const yRop = ropSim!=null ? yFor(ropSim) : null;
+  const ySeg = segSim!=null ? yFor(segSim) : null;
   // Halo blanco detrás del texto (paint-order:stroke): la última línea de datos suele caer justo en esta
   // zona (es la más reciente y la que motiva mirar el kardex), así que sin esto la etiqueta se mezclaba
   // con el punto/línea de stock. Con el halo se lee igual encima de cualquier cosa.
   const refLabelStyle = color => `fill:${color};paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round;`;
   if(yRop!=null){
-    refSvg += `<line class="kdx-rop" x1="${padL}" y1="${yRop}" x2="${W-padR}" y2="${yRop}"></line><text class="kdx-ref-label" style="${refLabelStyle('var(--red)')}" x="${W-padR}" y="${yRop-4}" text-anchor="end">ROP ${fmt2(producto.rop)}</text>`;
+    refSvg += `<line class="kdx-rop" x1="${padL}" y1="${yRop}" x2="${W-padR}" y2="${yRop}"></line><text class="kdx-ref-label" style="${refLabelStyle('var(--red)')}" x="${W-padR}" y="${yRop-4}" text-anchor="end">ROP${etiqRop} ${fmt2(ropSim)}</text>`;
   }
   if(ySeg!=null){
     // El ROP y el stock de seguridad suelen quedar muy cerca (el ROP es stock de seguridad + consumo del
     // lead time) — si sus líneas están a menos de 14px, la etiqueta de "Stock seguridad" se aleja un poco
     // más de la del ROP para que no se encimen una sobre la otra.
     const yLabel = (yRop!=null && Math.abs(ySeg-yRop) < 14) ? yRop+14 : ySeg+12;
-    refSvg += `<line class="kdx-seg" x1="${padL}" y1="${ySeg}" x2="${W-padR}" y2="${ySeg}"></line><text class="kdx-ref-label" style="${refLabelStyle('var(--seg-c)')}" x="${W-padR}" y="${yLabel}" text-anchor="end">Stock seguridad ${fmt2(producto.stockSeguridad)}</text>`;
+    refSvg += `<line class="kdx-seg" x1="${padL}" y1="${ySeg}" x2="${W-padR}" y2="${ySeg}"></line><text class="kdx-ref-label" style="${refLabelStyle('var(--seg-c)')}" x="${W-padR}" y="${yLabel}" text-anchor="end">Stock seguridad${etiqSeg} ${fmt2(segSim)}</text>`;
   }
 
   // Paso a paso (14.09.2026, pedido de Piero: "no podrías hacerlo algo así como la imagen... en tu
@@ -5606,15 +5622,8 @@ function drawKardex(){
       // no se pierde: el punto de la propia curva de esa semana lleva ahora la cantidad y las fechas, y se
       // ve al hacer clic encima (ver dotsSvg más abajo).
     });
-    // ROP de importación: solo se dibuja cuando es distinto del ROP nacional que ya está en rojo — así se
-    // ve de dónde sale el disparador de la simulación sin duplicar una línea encima de la otra.
-    if(ropSim !== producto.rop && ropSim > 0){
-      const yRopSim = yFor(ropSim);
-      if(yRopSim >= padT && yRopSim <= padT+plotH){
-        pedidosSvg += `<line class="kdx-rop-sim" x1="${padL}" y1="${yRopSim.toFixed(1)}" x2="${W-padR}" y2="${yRopSim.toFixed(1)}"></line>`
-          + `<text class="kdx-ref-label" style="${refLabelStyle('var(--amber)')}" x="${padL+4}" y="${(yRopSim-4).toFixed(1)}">ROP importación ${fmt2(ropSim)}</text>`;
-      }
-    }
+    // La línea naranja aparte con el "ROP de importación" se quitó el 24.09.2026: ahora la línea roja de
+    // arriba YA es la del origen elegido, así que esta segunda línea era la misma dibujada dos veces.
   }
 
   // Las fechas del eje se colocan con xForGlobal (la misma escala que todo lo demás) y no cada N
@@ -5669,8 +5678,8 @@ function drawKardex(){
   }).join('');
 
   const legendSvg = `<div class="kdx-legend"><span class="lg-item"><span class="lg-swatch"></span>Stock estimado (histórico)</span>`
-    + (producto.rop!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--red);"></span>ROP</span>` : '')
-    + (producto.stockSeguridad!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-c);"></span>Stock de seguridad</span>` : '')
+    + (ropSim!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--red);"></span>ROP${etiqRop}</span>` : '')
+    + (segSim!=null ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--seg-c);"></span>Stock de seguridad${etiqSeg}</span>` : '')
     + (tieneProyeccion && transitoCant>0 ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--brand-2-dark);"></span>Llega el stock en tránsito (${fmt2(transitoCant)} ${escapeHtml(producto.unidad||'')}${hayTransitoComprometido ? ` de ${fmt2(transitoExcel)}: ${fmt2(transitoComprometido)} ya tienen requerimiento` : ''})</span>` : '')
     + (tieneProyeccion && transitoCant===0 && hayTransitoComprometido ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--muted);"></span>El tránsito (${fmt2(transitoExcel)} ${escapeHtml(producto.unidad||'')}) ya tiene requerimiento: no entra como stock</span>` : '')
     + (tieneProyeccion ? `<span class="lg-item"><span class="lg-swatch dashed" style="color:var(--amber);"></span>Simulación: pedido de ${mesesInput} ${mesesInput===1?'mes':'meses'} ${tieneLead ? `con ${fmt2(leadDias)} días de entrega (${esImportado?'importación':'nacional'})` : 'sin tiempo de entrega en el Excel'} </span>`
@@ -5688,11 +5697,8 @@ function drawKardex(){
   // Las tarjetas muestran el ROP y el stock de seguridad del ORIGEN real del producto (16.09.2026): en un
   // producto que solo se importa, los de la columna nacional vienen en 0.1 y contradecían al gráfico, que
   // ya dibujaba los de importación.
-  const segSim = (esImportado && producto.stockSeguridadImp != null && producto.stockSeguridadImp > 0)
-    ? producto.stockSeguridadImp : producto.stockSeguridad;
-  const etiqImp = esImportado && ropSim !== producto.rop ? ' de importación' : '';
-  const kpiRop = ropSim!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP${etiqImp}</div><div class="value">${fmt2(ropSim)}</div></div>` : '';
-  const kpiSeg = segSim!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad${etiqImp}</div><div class="value">${fmt2(segSim)}</div></div>` : '';
+  const kpiRop = ropSim!=null ? `<div class="card kpi kdx-kpi"><div class="label">ROP${etiqRop}</div><div class="value">${fmt2(ropSim)}</div></div>` : '';
+  const kpiSeg = segSim!=null ? `<div class="card kpi kdx-kpi"><div class="label">Stock de seguridad${etiqSeg}</div><div class="value">${fmt2(segSim)}</div></div>` : '';
   // La 4ª tarjeta ("Pedir (simulado)") se eliminó el 15.09.2026 al simplificar: cuándo pedir, cuánto y
   // cuándo llega ya están arriba, en la etiqueta grande (ver pedirBannerSvg). Quedan las 3 tarjetas de
   // referencia — stock, ROP y stock de seguridad — que son contra lo que se lee el gráfico.
