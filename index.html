@@ -443,6 +443,24 @@
   .navsub .navitem.externo .fuera{margin-left:auto;opacity:.55;}
   .navsub .navitem.externo:hover .fuera{opacity:1;}
 
+
+  /* ---------- Logística → Requerimientos (24.09.2026) ---------- */
+  .rq-tabla{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .rq-tabla th{background:var(--th-bg);color:var(--ink-soft);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.02em;padding:9px 10px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:2;}
+  .rq-tabla td{padding:9px 10px;border-top:1px solid var(--border);white-space:nowrap;}
+  .rq-tabla td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .rq-tabla td.desc{white-space:normal;min-width:260px;}
+  .rq-tabla tr:hover td{background:var(--row-hover);}
+  .rq-tabla .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;color:var(--brand-ink);}
+  .rq-est{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;background:var(--surface-2);color:var(--ink-soft);}
+  .rq-est.ok{background:var(--green-bg);color:var(--green);}
+  .rq-est.camino{background:var(--amber-bg);color:var(--amber-ink);}
+  .rq-est.espera{background:var(--red-bg);color:var(--red);}
+  .rq-est.fuera{opacity:.65;}
+  .rq-mix{font-size:11px;color:var(--muted);}
+  .rq-scroll{max-height:620px;overflow:auto;padding:0;}
+  .rq-mas{padding:14px;text-align:center;}
+
   /* ---------- Módulo Certificados ---------- */
   .crt-barra{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
   .crt-pry{position:relative;flex:1 1 320px;min-width:0;max-width:480px;}
@@ -556,16 +574,6 @@
   .crt-menu a:hover,.crt-menu button:hover{background:var(--surface-2);}
   .crt-menu .sube{margin-top:3px;padding-top:9px;border-top:1px solid var(--border);border-radius:0;color:var(--brand-ink);}
 
-  /* ---------- Compras → Pendientes por Comprador (24.09.2026) ---------- */
-  .cmp-fila{cursor:pointer;}
-  .cmp-fila.abierta td{background:var(--surface-2);}
-  .cmp-fila td.num{text-align:right;font-variant-numeric:tabular-nums;}
-  #section-compradores th.num{text-align:right;}
-  .cmp-det td{padding:0;background:var(--surface-3);}
-  .cmp-det-caja{max-height:340px;overflow:auto;padding:4px 14px 12px;}
-  .cmp-det-caja th{background:transparent;position:static;font-size:10.5px;}
-  .cmp-det-caja td{font-size:12.5px;white-space:nowrap;}
-  .cmp-det-caja td.num{text-align:right;font-variant-numeric:tabular-nums;}
   .crt-nota{grid-column:1/-1;margin-top:7px;padding:9px 12px;border-radius:7px;font-size:12px;line-height:1.5;background:var(--surface-2);color:var(--ink-soft);border:1px solid var(--border);}
   .crt-nota b{color:var(--ink);}
   .crt-btn-nota{display:block;margin-top:7px;font:inherit;font-size:12px;font-weight:700;color:#08281f;background:var(--brand-2);border:0;border-radius:6px;padding:6px 11px;cursor:pointer;}
@@ -671,6 +679,7 @@
     </div>
     <div class="navsub" data-sub="logistica" hidden>
       <div class="navitem" data-section="alertas">📦 Análisis de Inventario</div>
+      <div class="navitem" data-section="requerimientos">⚡ Requerimientos</div>
     </div>
     <!-- Compras: por ahora su único contenido es el link a la otra plataforma (24.09.2026,
          pedido de Piero: "el módulo que diga Compras y abajo Plataforma Compras"). -->
@@ -679,7 +688,6 @@
       <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
     </div>
     <div class="navsub" data-sub="compras" hidden>
-      <div class="navitem" data-section="compradores">🧾 Pendientes por Comprador</div>
       <div class="navitem externo" data-url="https://melissa2026714.github.io/dashboard-friopacking/compras.html" title="Se abre en una pestaña nueva">
         <span>📊 Plataforma Compras</span><svg class="fuera" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v7H3V3h7"/></svg>
       </div>
@@ -1008,6 +1016,39 @@
          ahí. Lo único que no viene del Maestro son los documentos: hoy se
          cargan a mano desde acá; cuando esté el Apps Script, el archivo se
          guardará en su carpeta de Drive y el link entrará solo. -->
+
+    <!-- Logística → Requerimientos (24.09.2026, pedido de Piero: traer a la plataforma la idea de la
+         pestaña "Requerimientos" del dashboard de Almacén). Solo consulta: lista, filtra y exporta lo
+         que ya dice Reporte Maestro.xlsx. No decide picking ni despacho — eso vive en el sistema de
+         Almacén y aquí se mostraría desactualizado. -->
+    <div id="section-requerimientos" class="section">
+      <div class="note" id="rqNota" style="display:none;"></div>
+
+      <div class="toolbar">
+        <input type="search" id="rqBuscar" placeholder="Buscar por requerimiento, código, producto, proyecto, proveedor o responsable…">
+        <select id="rqProyecto"><option value="all">Proyecto: todos</option></select>
+        <select id="rqEstado"><option value="all">Estado: todos</option></select>
+        <select id="rqResponsable"><option value="all">Responsable: todos</option></select>
+        <select id="rqFamilia"><option value="all">Familia: todas</option></select>
+        <select id="rqOrigen">
+          <option value="all">Origen: todos</option>
+          <option value="nacional">Origen: Nacional</option>
+          <option value="importado">Origen: Importado</option>
+        </select>
+        <button class="crt-limpiar" id="rqLimpiar" type="button" hidden>&times; Limpiar filtros</button>
+        <button class="btn secondary" id="rqExportar" type="button">&#11015; Exportar</button>
+      </div>
+
+      <div class="kpi-grid" id="rqKpis"></div>
+
+      <div class="tabs" id="rqVistaTabs">
+        <div class="tab active" data-rqv="grupo">&#128203; Agrupado por requerimiento</div>
+        <div class="tab" data-rqv="item">&#128230; Por ítem</div>
+      </div>
+
+      <div id="rqVista"></div>
+    </div><!-- /section-requerimientos -->
+
     <div id="section-certificados" class="section">
       <div class="note" id="crtNota" style="display:none;"></div>
 
@@ -1051,31 +1092,6 @@
       </p>
     </div><!-- /section-certificados -->
 
-    <!-- Compras → Pendientes por Comprador (24.09.2026). No guarda nada: tanto el pendiente de hoy
-         como el resumen de cada día se reconstruyen de las fechas del Reporte Maestro. -->
-    <div id="section-compradores" class="section">
-      <div class="note" id="cmpNota" style="display:none;"></div>
-
-      <div class="toolbar" style="margin-bottom:12px;">
-        <button class="crt-chip" data-cmpv="hoy" aria-pressed="true">Pendientes hoy</button>
-        <button class="crt-chip" data-cmpv="diario" aria-pressed="false">Resumen diario</button>
-        <select id="cmpDias" hidden>
-          <option value="15">Últimos 15 días</option>
-          <option value="30" selected>Últimos 30 días</option>
-          <option value="90">Últimos 90 días</option>
-        </select>
-        <span class="crt-conteo" id="cmpConteo"></span>
-      </div>
-
-      <div id="cmpVista"></div>
-
-      <p style="margin-top:16px;font-size:11.5px;color:var(--muted);line-height:1.6;max-width:80ch;">
-        <b>Pendiente</b> = línea de pedido que todavía no tiene orden de compra y que Nisira sigue marcando
-        como «Pendiente» (las «Archivado» se cancelaron y las «Atendido Total» salieron de stock). Se cuenta
-        por línea de producto, no por pedido. Lo pendiente se le atribuye al responsable del pedido y lo ya
-        cerrado al comprador que emitió la OC — la misma regla del reporte por comprador.
-      </p>
-    </div><!-- /section-compradores -->
 
   </div>
 
@@ -2029,6 +2045,17 @@ function buildSnapshot(){
         tp: a.tipo, py: a.proyecto, pr: a.producto, ip: a.idProducto, pv: a.proveedor, og: a.origen,
         cr: a.codRequerimiento, cp: a.codPedido, rp: a.responsable, fd: isoDay(a.fDesde),
       })),
+      // Módulo Logística → Requerimientos (24.09.2026). Mismo criterio que el resto: filas compactas
+      // con claves cortas, para que el link publicado muestre lo mismo sin volver a subir el Excel.
+      req: (DATA.reqRows||[]).map(r => ({
+        f: isoDay(r.fReq), n: r.codRequerimiento, rs: r.responsable, ipy: r.idProyecto, py: r.proyecto,
+        e: r.estado, fa: r.familia, ip: r.idProducto, pr: r.producto, u: r.unidad, q: r.cantidad,
+        og: r.origen, pv: r.proveedor,
+        cp: r.codPedido, fp: isoDay(r.fPedido), rp: r.responsablePedido,
+        co: r.codOrden, uc: r.usuarioCompras,
+        fo: isoDay(r.fOrden), fb: isoDay(r.fAprob), fx: isoDay(r.fCompromiso), fc: isoDay(r.fRecep),
+        qr: r.cantRecep, fs: isoDay(r.fSalida), g: r.guia,
+      })),
       // Pedidos directos de PedidoSinReq.xlsx (04.09.2026 ronda 37) — OC que Reporte Maestro.xlsx nunca
       // trae (ver PEDIDO_SIN_REQ_ROWS). Se publican aparte para que el Reporte de Compras por responsable
       // las siga mostrando en el link público sin que cada persona tenga que volver a cargar ese Excel.
@@ -2295,6 +2322,19 @@ function loadFromSnapshot(snap){
       // vuelva a publicar con el Excel actual).
       moneda: r.mn || null, montoNativo: (r.mo!=null ? r.mo : null), condiciones: r.cd || "",
       etd: fromIsoDay(r.et), fEntregaReal: fromIsoDay(r.fe),
+    })) : [],
+    // Requerimientos (24.09.2026): ausente en snapshots viejos — el módulo avisa que hay que
+    // volver a publicar, en vez de mostrar una lista vacía como si no hubiera requerimientos.
+    reqRows: (snap.proceso && snap.proceso.req) ? snap.proceso.req.map(r => ({
+      fReq: fromIsoDay(r.f), codRequerimiento: r.n || '', responsable: r.rs || '',
+      idProyecto: r.ipy || 'SIN PROYECTO', proyecto: r.py || 'SIN PROYECTO (compra de almacén)',
+      estado: r.e || '(sin estado)', familia: r.fa || 'Sin familia', idProducto: r.ip || '',
+      producto: r.pr || '(sin descripción)', unidad: r.u || '', cantidad: (r.q!=null ? r.q : null),
+      origen: r.og || 'nacional', proveedor: r.pv || '',
+      codPedido: r.cp || '', fPedido: fromIsoDay(r.fp), responsablePedido: r.rp || '',
+      codOrden: r.co || '', usuarioCompras: r.uc || '',
+      fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb), fCompromiso: fromIsoDay(r.fx), fRecep: fromIsoDay(r.fc),
+      cantRecep: (r.qr!=null ? r.qr : null), fSalida: fromIsoDay(r.fs), guia: r.g || '',
     })) : [],
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
     // ese caso, simplemente no se muestran alertas hasta que se vuelva a publicar con el archivo actual.
@@ -2592,6 +2632,11 @@ function processWorkbook(wb, filename){
     condiciones: findCol(headerRow, ["Condiciones"]),
     etd: findCol(headerRow, ["ETD"]),
     fEntregaReal: findCol(headerRow, ["F. Entrega Real","F Entrega Real"]),
+    // Columnas que solo necesita el módulo de Requerimientos (24.09.2026).
+    unidadMedida: findCol(headerRow, ["UnidadMedida","Unidad de Medida","Unidad"]),
+    cantidadReq: findCol(headerRow, ["CantidadRequerimiento","Cantidad de requerimiento"]),
+    cantRecepcion: findCol(headerRow, ["CantRecepcion","Cantidad Recepcion","Cantidad de recepción"]),
+    guiaAlmacen: findCol(headerRow, ["GUIA (ALMACÉN)","GUIA (ALMACEN)","Guia Almacen"]),
   };
 
   const dataRows = rows.slice(headerRowIdx+1);
@@ -2688,6 +2733,7 @@ function processWorkbook(wb, filename){
   // procesoRows. Los días hábiles transcurridos se calculan en pantalla contra la fecha de HOY (no se
   // guardan aquí), para que la alerta se mantenga vigente día a día sin tener que recargar el archivo.
   const alertRows = [];
+  const reqRows = [];      // módulo Logística → Requerimientos (24.09.2026)
   if(hasFechaRequerimientoCol){
     for(const r of dataRows){
       if(!r || r.every(c => c==null || c==="")) continue;
@@ -2784,6 +2830,34 @@ function processWorkbook(wb, filename){
       // no hay uno guardado — así una familia real, la vea antes o después, siempre queda disponible.
       if(idProductoAt && familiaAt!=='Sin familia' && !FAMILIA_BY_PRODUCTO[idProductoAt]) FAMILIA_BY_PRODUCTO[idProductoAt] = familiaAt;
 
+      // ---------------------------------------------------------------------------------
+      // Dataset del módulo Logística → Requerimientos (24.09.2026, pedido de Piero: llevar a la
+      // plataforma la idea de la pestaña "Requerimientos" del dashboard de Almacén). Va ANTES del
+      // "continue" de abajo a propósito: ese descarte deja fuera justo las líneas que todavía no
+      // tienen pedido ni salida —las que están "En revisión de Almacén"—, que son las que más
+      // interesa ver acá. Es un dataset aparte y liviano: no toca nada de Tiempos del Proceso.
+      const numOrNull = (v)=> (v!=null && v!=='' && !isNaN(Number(v))) ? Number(v) : null;
+      const txt = (i)=> i!==-1 ? (r[i]||"").toString().trim() : "";
+      reqRows.push({
+        fReq, codRequerimiento: col.codRequerimiento!==-1 ? txt(col.codRequerimiento) : "",
+        responsable: txt(col.nombreResponsable),
+        idProyecto: txt(col.idProyecto) || "SIN PROYECTO",
+        proyecto: txt(col.nombreProyecto) || "SIN PROYECTO (compra de almacén)",
+        estado: estadoReqAt || "(sin estado)",
+        familia: familiaAt,
+        idProducto: idProductoAt,
+        producto: txt(col.producto) || "(sin descripción)",
+        unidad: txt(col.unidadMedida),
+        cantidad: numOrNull(col.cantidadReq!==-1 ? r[col.cantidadReq] : null),
+        origen: origenFor(col.rucProveedor!==-1 ? r[col.rucProveedor] : ""),
+        proveedor: txt(col.proveedor),
+        codPedido: codPedidoAt, fPedido, responsablePedido: txt(col.responsablePedido),
+        codOrden: codOrdenAt, usuarioCompras: txt(col.usuarioCompras),
+        fOrden, fAprob, fCompromiso, fRecep,
+        cantRecep: numOrNull(col.cantRecepcion!==-1 ? r[col.cantRecepcion] : null),
+        fSalida, guia: txt(col.guiaAlmacen),
+      });
+
       if(d1==null && d2==null && d3==null && d4==null && d6==null) continue; // nada calculable
 
       procesoRows.push({
@@ -2839,7 +2913,7 @@ function processWorkbook(wb, filename){
     }
   }
 
-  DATA = { fromSnapshot: false, orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol, proveedorOrders: allOrders, procesoRows, alertRows, hasFechaRequerimientoCol };
+  DATA = { fromSnapshot: false, orders, corte, excluded, totalRows, filename, projectRows, hasFechaSalidaCol, proveedorOrders: allOrders, procesoRows, alertRows, reqRows, hasFechaRequerimientoCol };
   document.getElementById('publishBanner').style.display = 'none';
   updateActionButtons();
   populateProcesoFilters();
@@ -9775,185 +9849,248 @@ function crtFila(f){
 }
 
 
-// ============================================================================
-// Compras → Pendientes por Comprador (24.09.2026, pedido de Piero: "por comprador cuántos pendientes
-// tiene a día de hoy" + "un histórico de lo que se hizo cada día").
-// No guarda nada en ninguna parte: el pendiente de hoy y el resumen de cada día se reconstruyen de las
-// fechas del Reporte Maestro, así que el histórico aparece solo con cargar el archivo y no se puede
-// desincronizar. Toda la aritmética sale de pendienteLineaA / pendientesComprasPorDuenio, la regla que
-// ya se validó con Piero el 17.09.2026 para el reporte por comprador.
-// ============================================================================
-const CMP = { vista:'hoy', dias:30, abierto:'' };
-const CMP_META = 2;   // días hábiles de Pedido → OC: la meta del Indicador 2
 
-const cmpDiaDe = (f)=> f ? Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate()) : null;
-function cmpHoy(){ const h = new Date(); return Date.UTC(h.getUTCFullYear(), h.getUTCMonth(), h.getUTCDate()); }
-const cmpQuien = (u)=> (u || '').trim() || '(sin asignar)';
-function cmpFechaLarga(ms){
-  const d = new Date(ms);
-  const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
-  const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  return DIAS[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MES[d.getUTCMonth()];
+// ============================================================================
+// Logística → Requerimientos (24.09.2026, pedido de Piero). Trae a la plataforma la idea de la pestaña
+// "Requerimientos" del dashboard de Almacén: la lista completa de lo que se pidió, con sus filtros, en
+// dos vistas (agrupada por requerimiento y abierta por ítem) y exportable.
+// Es de CONSULTA: sale todo de Reporte Maestro.xlsx. Las decisiones de Almacén —a quién se le asigna el
+// picking, la validación— viven en el sistema de Almacén y acá se verían desactualizadas, así que no se
+// replican.
+// ============================================================================
+const RQ = { vista:'grupo', q:'', tope:200 };
+const RQ_PASO = 200;
+
+function getReqRows(){ return (DATA && DATA.reqRows) || []; }
+const rqVal = (id)=> (document.getElementById(id) || {}).value || 'all';
+const rqFecha = (d)=> d ? fmtDate(d) : '—';
+const rqNum = (v)=> v==null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
+const rqTxt = (t)=> (t==null || t==='') ? '—' : escapeHtml(String(t));
+
+/** Semáforo del estado: dónde está parado el requerimiento. */
+function rqClaseEstado(e){
+  const n = sinAcentos(String(e||'')).toLowerCase();
+  if(n.indexOf('archivado') === 0) return 'fuera';
+  if(n.indexOf('recibido en obra') !== -1) return 'ok';
+  if(n.indexOf('enviado a obra') !== -1) return 'ok';
+  if(n.indexOf('pedido') !== -1) return 'camino';
+  return 'espera';
 }
 
-/** Las líneas de pedido que siguen pendientes hoy, agrupadas por el comprador al que le tocan. */
-function cmpPendientesHoy(){
-  const hoy = cmpHoy(), ref = new Date(hoy), m = new Map();
-  for(const r of getProcesoRows()){
-    if(!r.codPedido) continue;
-    if(!pendienteLineaA(r, hoy, -Infinity)) continue;
-    const k = cmpQuien(usuarioDeResponsablePedido(r.responsablePedido));
-    if(!m.has(k)) m.set(k, { comprador:k, filas:[], pedidos:new Set(), viejo:0, tarde:0 });
+function rqFiltradas(){
+  const q = RQ.q, fPry = rqVal('rqProyecto'), fEst = rqVal('rqEstado');
+  const fResp = rqVal('rqResponsable'), fFam = rqVal('rqFamilia'), fOri = rqVal('rqOrigen');
+  return getReqRows().filter(function(r){
+    if(fPry !== 'all' && r.idProyecto !== fPry) return false;
+    if(fEst !== 'all' && r.estado !== fEst) return false;
+    if(fResp !== 'all' && r.responsable !== fResp) return false;
+    if(fFam !== 'all' && r.familia !== fFam) return false;
+    if(fOri !== 'all' && r.origen !== fOri) return false;
+    if(!q) return true;
+    return crtNorm(r.codRequerimiento).indexOf(q) !== -1
+        || crtNorm(r.idProducto).indexOf(q) !== -1
+        || crtNorm(r.producto).indexOf(q) !== -1
+        || crtNorm(r.proveedor).indexOf(q) !== -1
+        || crtNorm(r.codOrden).indexOf(q) !== -1
+        || crtNorm(r.codPedido).indexOf(q) !== -1
+        || crtNorm(r.proyecto).indexOf(q) !== -1
+        || crtNorm(r.responsable).indexOf(q) !== -1;
+  });
+}
+
+/** Une las líneas de un mismo requerimiento en una sola fila. */
+function rqAgrupar(filas){
+  const m = new Map();
+  filas.forEach(function(r){
+    const k = r.codRequerimiento || '(sin número)';
+    if(!m.has(k)) m.set(k, { req:k, fReq:r.fReq, responsable:r.responsable, idProyecto:r.idProyecto,
+      proyecto:r.proyecto, items:0, cantidad:0, conOc:0, atendidos:0, estados:new Set() });
     const g = m.get(k);
-    const dh = busdayCount(r.fPedido, ref);
-    g.filas.push({ r, dh }); g.pedidos.add(r.codPedido);
-    if(dh != null){ if(dh > g.viejo) g.viejo = dh; if(dh > CMP_META) g.tarde++; }
-  }
-  return [...m.values()].sort((a,b)=> b.filas.length - a.filas.length);
+    g.items++; g.cantidad += (r.cantidad || 0);
+    if(r.codOrden) g.conOc++;
+    if(r.fSalida) g.atendidos++;
+    g.estados.add(r.estado);
+    if(!g.fReq || (r.fReq && r.fReq < g.fReq)) g.fReq = r.fReq;
+  });
+  return [...m.values()].sort(function(a,b){ return (b.fReq||0) - (a.fReq||0) || (a.req < b.req ? 1 : -1); });
 }
 
-/** Un renglón por día: qué entró, qué se cerró y con cuánto se quedó cada comprador. */
-function cmpResumenDiario(dias){
-  const hoy = cmpHoy(), DIA = 86400000;
-  // Las OC emitidas cada día, en una sola pasada (es el "qué hice hoy" más directo del comprador).
-  const ocPorDia = new Map();
-  for(const r of getProcesoRows()){
-    if(!r.codOrden || !r.fOrden) continue;
-    const d = cmpDiaDe(r.fOrden);
-    if(d == null || d > hoy || d <= hoy - dias*DIA) continue;
-    if(!ocPorDia.has(d)) ocPorDia.set(d, new Map());
-    const porQuien = ocPorDia.get(d), k = cmpQuien(r.usuarioCompras);
-    if(!porQuien.has(k)) porQuien.set(k, new Set());
-    porQuien.get(k).add(r.codOrden);
-  }
-  const out = [];
-  for(let i = 0; i < dias; i++){
-    const d = hoy - i*DIA;
-    const mapa = pendientesComprasPorDuenio({ desde:d, hasta:d }, true);
-    const oc = ocPorDia.get(d) || new Map();
-    const quienes = new Set([...mapa.keys(), ...oc.keys()]);
-    const filas = [];
-    let entraron = 0, cerro = 0, siguen = 0, ocN = 0;
-    quienes.forEach(function(k){
-      const v = mapa.get(k) || { venian:0, entraron:0, cerro:0, siguen:0 };
-      const n = oc.has(k) ? oc.get(k).size : 0;
-      entraron += v.entraron; cerro += v.cerro; siguen += v.siguen; ocN += n;
-      if(v.entraron || v.cerro || n) filas.push({ comprador:k, oc:n, entraron:v.entraron, cerro:v.cerro, siguen:v.siguen });
-    });
-    out.push({ dia:d, oc:ocN, entraron, cerro, siguen,
-      filas: filas.sort((a,b)=> (b.oc + b.cerro) - (a.oc + a.cerro)) });
-  }
-  return out;
-}
-
-function drawCompradores(){
-  const nota = document.getElementById('cmpNota');
-  const cont = document.getElementById('cmpVista');
-  const sel = document.getElementById('cmpDias');
-  const conteo = document.getElementById('cmpConteo');
-  document.querySelectorAll('[data-cmpv]').forEach(b=> b.setAttribute('aria-pressed', String(b.dataset.cmpv === CMP.vista)));
-  sel.hidden = CMP.vista !== 'diario';
-  if(!getProcesoRows().length){
+function drawRequerimientos(){
+  const nota = document.getElementById('rqNota');
+  const cont = document.getElementById('rqVista');
+  if(!getReqRows().length){
     nota.style.display = '';
-    nota.innerHTML = '<b>Carga primero el Reporte Maestro</b> para ver los pendientes por comprador.';
-    cont.innerHTML = ''; conteo.textContent = '';
+    nota.innerHTML = (DATA && DATA.fromSnapshot)
+      ? '<b>Este link se publicó antes de que existiera el módulo de Requerimientos.</b> Vuelve a publicar con el botón ☁ (o carga el Reporte Maestro) para verlo.'
+      : '<b>Carga primero el Reporte Maestro</b> para ver los requerimientos.';
+    cont.innerHTML = ''; document.getElementById('rqKpis').innerHTML = '';
     return;
   }
   nota.style.display = 'none';
-  CMP.vista === 'diario' ? cmpVistaDiario(cont, conteo) : cmpVistaHoy(cont, conteo);
+  rqLlenarFiltros();
+  document.querySelectorAll('[data-rqv]').forEach(function(t){ t.classList.toggle('active', t.dataset.rqv === RQ.vista); });
+
+  const filas = rqFiltradas();
+  const reqs = new Set(filas.map(function(r){ return r.codRequerimiento; }));
+  const resp = new Set(filas.map(function(r){ return r.responsable; }).filter(Boolean));
+  const prys = new Set(filas.map(function(r){ return r.idProyecto; }).filter(Boolean));
+  const cant = filas.reduce(function(a,r){ return a + (r.cantidad || 0); }, 0);
+  const hayFiltro = RQ.q || ['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].some(function(id){ return rqVal(id) !== 'all'; });
+  document.getElementById('rqLimpiar').hidden = !hayFiltro;
+  document.getElementById('rqKpis').innerHTML = `
+    <div class="card kpi"><div class="label">Requerimientos</div><div class="value">${reqs.size.toLocaleString('es-PE')}</div><div class="sub">${hayFiltro ? 'con los filtros puestos' : 'en total'}</div></div>
+    <div class="card kpi"><div class="label">Líneas de producto</div><div class="value">${filas.length.toLocaleString('es-PE')}</div><div class="sub">${prys.size} ${prys.size===1?'proyecto':'proyectos'}</div></div>
+    <div class="card kpi"><div class="label">Responsables</div><div class="value">${resp.size}</div><div class="sub">pidieron material</div></div>
+    <div class="card kpi"><div class="label">Cantidad pedida</div><div class="value">${rqNum(Math.round(cant*100)/100)}</div><div class="sub">unidades</div></div>`;
+
+  RQ.vista === 'item' ? rqVistaItem(cont, filas) : rqVistaGrupo(cont, filas);
 }
 
-function cmpVistaHoy(cont, conteo){
-  const grupos = cmpPendientesHoy();
-  const lineas = grupos.reduce((a,g)=> a + g.filas.length, 0);
-  const pedidos = grupos.reduce((a,g)=> a + g.pedidos.size, 0);
-  const tarde = grupos.reduce((a,g)=> a + g.tarde, 0);
-  const viejo = grupos.reduce((a,g)=> Math.max(a, g.viejo), 0);
-  conteo.textContent = 'Al ' + cmpFechaLarga(cmpHoy());
-  if(!grupos.length){
-    cont.innerHTML = '<div class="card empty">Ningún comprador tiene pedidos pendientes por generar a OC.</div>';
-    return;
-  }
-  const kpis = `<div class="kpi-grid">
-    <div class="card kpi"><div class="label">Pendientes por generar OC</div><div class="value">${lineas}</div><div class="sub">líneas de producto</div></div>
-    <div class="card kpi"><div class="label">Pedidos distintos</div><div class="value">${pedidos}</div><div class="sub">de ${grupos.length} ${grupos.length===1?'comprador':'compradores'}</div></div>
-    <div class="card kpi${tarde?' alert-card':''}"><div class="label">Pasados de la meta</div><div class="value${tarde?' alert-n':''}">${tarde}</div><div class="sub">más de ${CMP_META} d.h. esperando</div></div>
-    <div class="card kpi"><div class="label">El más antiguo</div><div class="value">${viejo}</div><div class="sub">días hábiles</div></div>
-  </div>`;
-  const filas = grupos.map(g=>{
-    const abierto = CMP.abierto === g.comprador;
-    const det = abierto ? `<tr class="cmp-det"><td colspan="5"><div class="cmp-det-caja">${cmpDetalleHtml(g)}</div></td></tr>` : '';
-    return `<tr class="cmp-fila${abierto?' abierta':''}" data-cmpq="${escapeHtml(g.comprador)}">
-      <td><b>${escapeHtml(g.comprador)}</b></td>
-      <td class="num">${g.filas.length}</td>
-      <td class="num">${g.pedidos.size}</td>
-      <td class="num">${g.viejo}</td>
-      <td class="num">${g.tarde ? `<span class="pill warn">${g.tarde}</span>` : `<span class="pill ok">0</span>`}</td>
-    </tr>` + det;
+function rqVistaGrupo(cont, filas){
+  const g = rqAgrupar(filas);
+  const ver = g.slice(0, RQ.tope);
+  const cuerpo = ver.map(function(x){
+    const est = [...x.estados];
+    const etiqueta = est.length === 1
+      ? `<span class="rq-est ${rqClaseEstado(est[0])}">${escapeHtml(est[0])}</span>`
+      : `<span class="rq-est camino">Mixto</span> <span class="rq-mix">${est.length} estados</span>`;
+    return `<tr>
+      <td>${rqFecha(x.fReq)}</td>
+      <td><span class="cod">${escapeHtml(x.req)}</span></td>
+      <td>${rqTxt(x.responsable)}</td>
+      <td><span class="cod">${escapeHtml(x.idProyecto)}</span></td>
+      <td class="desc">${rqTxt(x.proyecto)}</td>
+      <td class="num">${x.items}</td>
+      <td>${etiqueta}</td>
+      <td class="num">${rqNum(Math.round(x.cantidad*100)/100)}</td>
+      <td class="num">${x.conOc}</td>
+      <td class="num">${x.atendidos}</td>
+    </tr>`;
   }).join('');
-  cont.innerHTML = kpis + `<div class="card table-card"><table>
-    <thead><tr><th>Comprador</th><th class="num">Líneas pendientes</th><th class="num">Pedidos</th><th class="num">Más antiguo (d.h.)</th><th class="num">Pasados de meta</th></tr></thead>
-    <tbody>${filas}</tbody></table></div>`;
-  cont.querySelectorAll('[data-cmpq]').forEach(tr=>{
-    tr.addEventListener('click', ()=>{
-      CMP.abierto = (CMP.abierto === tr.dataset.cmpq) ? '' : tr.dataset.cmpq;
-      drawCompradores();
-    });
-  });
+  cont.innerHTML = `<div class="card table-card rq-scroll"><table class="rq-tabla">
+      <thead><tr><th>F. Req.</th><th>N° Req.</th><th>Responsable</th><th>Id Proyecto</th><th>Proyecto</th>
+        <th class="num">Ítems</th><th>Estado</th><th class="num">Cant. total</th><th class="num">Con OC</th><th class="num">Despachados</th></tr></thead>
+      <tbody>${cuerpo || '<tr><td colspan="10" style="text-align:center;padding:26px;color:var(--muted);">Ningún requerimiento calza con esos filtros.</td></tr>'}</tbody>
+    </table></div>` + rqMasHtml(ver.length, g.length, 'requerimientos');
+  rqEngancharMas();
 }
 
-function cmpDetalleHtml(g){
-  const filas = g.filas.slice().sort((a,b)=> (b.dh||0) - (a.dh||0)).map(x=>`
-    <tr>
-      <td>${escapeHtml(x.r.codPedido)}</td>
-      <td>${x.r.fPedido ? fmtDate(x.r.fPedido) : ''}</td>
-      <td class="num">${x.dh == null ? '' : x.dh}</td>
-      <td>${escapeHtml(x.r.codRequerimiento||'')}</td>
-      <td>${escapeHtml(x.r.producto||'')}</td>
-      <td>${escapeHtml(x.r.proyecto||'')}</td>
-    </tr>`).join('');
-  return `<table><thead><tr><th>Pedido</th><th>Fecha</th><th class="num">d.h.</th><th>Requerimiento</th><th>Producto</th><th>Proyecto</th></tr></thead>
-    <tbody>${filas}</tbody></table>`;
-}
-
-function cmpVistaDiario(cont, conteo){
-  const dias = cmpResumenDiario(CMP.dias).filter(d=> d.oc || d.entraron || d.cerro);
-  conteo.textContent = dias.length + (dias.length===1 ? ' día con movimiento' : ' días con movimiento');
-  if(!dias.length){
-    cont.innerHTML = '<div class="card empty">No hay movimiento de pedidos en el período elegido.</div>';
-    return;
-  }
-  const filas = dias.map(d=>{
-    const abierto = CMP.abierto === String(d.dia);
-    const det = abierto ? `<tr class="cmp-det"><td colspan="5"><div class="cmp-det-caja"><table>
-      <thead><tr><th>Comprador</th><th class="num">OC emitidas</th><th class="num">Pedidos nuevos</th><th class="num">Cerró</th><th class="num">Le quedaron</th></tr></thead>
-      <tbody>${d.filas.map(f=>`<tr><td><b>${escapeHtml(f.comprador)}</b></td><td class="num">${f.oc||''}</td><td class="num">${f.entraron||''}</td><td class="num">${f.cerro||''}</td><td class="num">${f.siguen||''}</td></tr>`).join('')}</tbody>
-      </table></div></td></tr>` : '';
-    return `<tr class="cmp-fila${abierto?' abierta':''}" data-cmpd="${d.dia}">
-      <td><b>${cmpFechaLarga(d.dia)}</b></td>
-      <td class="num">${d.oc || ''}</td>
-      <td class="num">${d.entraron || ''}</td>
-      <td class="num">${d.cerro ? `<span class="pill ok">${d.cerro}</span>` : ''}</td>
-      <td class="num">${d.siguen}</td>
-    </tr>` + det;
+function rqVistaItem(cont, filas){
+  const orden = filas.slice().sort(function(a,b){ return (b.fReq||0) - (a.fReq||0); });
+  const ver = orden.slice(0, RQ.tope);
+  const cuerpo = ver.map(function(r){
+    return `<tr>
+      <td>${rqFecha(r.fReq)}</td>
+      <td><span class="cod">${escapeHtml(r.codRequerimiento)}</span></td>
+      <td>${rqTxt(r.responsable)}</td>
+      <td class="desc">${rqTxt(r.proyecto)}</td>
+      <td><span class="rq-est ${rqClaseEstado(r.estado)}">${escapeHtml(r.estado)}</span></td>
+      <td>${r.origen === 'importado' ? 'Importado' : 'Nacional'}</td>
+      <td><span class="cod">${escapeHtml(r.idProducto)}</span></td>
+      <td class="desc">${rqTxt(r.producto)}</td>
+      <td class="num">${rqNum(r.cantidad)}</td>
+      <td>${rqTxt(r.unidad)}</td>
+      <td>${rqTxt(r.codPedido)}</td>
+      <td>${rqFecha(r.fPedido)}</td>
+      <td>${rqTxt(r.codOrden)}</td>
+      <td>${rqTxt(r.usuarioCompras)}</td>
+      <td class="desc">${rqTxt(r.proveedor)}</td>
+      <td>${rqFecha(r.fOrden)}</td>
+      <td>${rqFecha(r.fAprob)}</td>
+      <td>${rqFecha(r.fCompromiso)}</td>
+      <td class="num">${rqNum(r.cantRecep)}</td>
+      <td>${rqFecha(r.fRecep)}</td>
+      <td>${rqFecha(r.fSalida)}</td>
+      <td>${rqTxt(r.guia)}</td>
+    </tr>`;
   }).join('');
-  cont.innerHTML = `<div class="card table-card"><table>
-    <thead><tr><th>Día</th><th class="num">OC emitidas</th><th class="num">Pedidos nuevos</th><th class="num">Se cerraron</th><th class="num">Quedaron pendientes</th></tr></thead>
-    <tbody>${filas}</tbody></table></div>`;
-  cont.querySelectorAll('[data-cmpd]').forEach(tr=>{
-    tr.addEventListener('click', ()=>{
-      CMP.abierto = (CMP.abierto === tr.dataset.cmpd) ? '' : tr.dataset.cmpd;
-      drawCompradores();
-    });
-  });
+  cont.innerHTML = `<div class="card table-card rq-scroll"><table class="rq-tabla">
+      <thead><tr><th>Fecha</th><th>N° Req.</th><th>Responsable</th><th>Proyecto</th><th>Estado</th><th>Origen</th>
+        <th>Código</th><th>Descripción</th><th class="num">Cant.</th><th>UM</th>
+        <th>N° Pedido</th><th>F. Pedido</th><th>N° OC</th><th>Usuario Compras</th><th>Proveedor</th>
+        <th>F. Emisión</th><th>F. Aprobación</th><th>F. Entrega</th><th class="num">Cant. recep.</th><th>F. Recepción</th>
+        <th>F. Salida</th><th>Guía</th></tr></thead>
+      <tbody>${cuerpo || '<tr><td colspan="22" style="text-align:center;padding:26px;color:var(--muted);">Ninguna línea calza con esos filtros.</td></tr>'}</tbody>
+    </table></div>` + rqMasHtml(ver.length, orden.length, 'líneas');
+  rqEngancharMas();
 }
 
-document.querySelectorAll('[data-cmpv]').forEach(b=>{
-  b.addEventListener('click', ()=>{ CMP.vista = b.dataset.cmpv; CMP.abierto = ''; drawCompradores(); });
+function rqMasHtml(mostradas, total, que){
+  if(mostradas >= total) return total ? `<div class="rq-mas" style="color:var(--muted);font-size:12.5px;">${total.toLocaleString('es-PE')} ${que} · todo a la vista</div>` : '';
+  return `<div class="rq-mas"><button class="btn secondary" type="button" id="rqMas">Ver ${Math.min(RQ_PASO, total-mostradas)} más · ${mostradas.toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} ${que}</button></div>`;
+}
+function rqEngancharMas(){
+  const b = document.getElementById('rqMas');
+  if(b) b.addEventListener('click', function(){ RQ.tope += RQ_PASO; drawRequerimientos(); });
+}
+
+/** Los desplegables se llenan con lo que trae el archivo, conservando lo ya elegido. */
+function rqLlenarFiltros(){
+  const rows = getReqRows();
+  const llenar = (id, valores, etiqueta)=>{
+    const sel = document.getElementById(id);
+    if(!sel || sel.dataset.listo === String(rows.length)) return;
+    const actual = sel.value;
+    const unicos = [...new Set(valores.filter(Boolean))].sort(function(a,b){ return a.localeCompare(b, 'es'); });
+    sel.innerHTML = `<option value="all">${etiqueta}</option>` + unicos.map(function(v){
+      return `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`; }).join('');
+    if(unicos.indexOf(actual) !== -1) sel.value = actual;
+    sel.dataset.listo = String(rows.length);
+  };
+  // El proyecto se elige por código pero se lee con su nombre.
+  const selP = document.getElementById('rqProyecto');
+  if(selP && selP.dataset.listo !== String(rows.length)){
+    const actual = selP.value;
+    const m = new Map();
+    rows.forEach(function(r){ if(!m.has(r.idProyecto)) m.set(r.idProyecto, r.proyecto); });
+    const lista = [...m.entries()].sort(function(a,b){ return String(a[1]).localeCompare(String(b[1]), 'es'); });
+    selP.innerHTML = '<option value="all">Proyecto: todos</option>' + lista.map(function(e){
+      return `<option value="${escapeHtml(e[0])}">${escapeHtml(e[0])} · ${escapeHtml(e[1])}</option>`; }).join('');
+    if([...m.keys()].indexOf(actual) !== -1) selP.value = actual;
+    selP.dataset.listo = String(rows.length);
+  }
+  llenar('rqEstado', rows.map(function(r){ return r.estado; }), 'Estado: todos');
+  llenar('rqResponsable', rows.map(function(r){ return r.responsable; }), 'Responsable: todos');
+  llenar('rqFamilia', rows.map(function(r){ return r.familia; }), 'Familia: todas');
+}
+
+function rqExportar(){
+  const filas = rqFiltradas();
+  if(!filas.length) return;
+  const aoa = [['F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Origen',
+    'Código','Descripción','Cantidad','UM','Familia','N° Pedido','F. Pedido','Resp. Pedido','N° OC','Usuario Compras',
+    'Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada','Cant. recepcionada','F. Recepción','F. Salida','Guía']];
+  const f = (d)=> d ? fmtDate(d) : '';
+  filas.forEach(function(r){
+    aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, r.proyecto, r.estado,
+      r.origen === 'importado' ? 'Importado' : 'Nacional', r.idProducto, r.producto,
+      r.cantidad==null?'':r.cantidad, r.unidad, r.familia, r.codPedido, f(r.fPedido), r.responsablePedido,
+      r.codOrden, r.usuarioCompras, r.proveedor, f(r.fOrden), f(r.fAprob), f(r.fCompromiso),
+      r.cantRecep==null?'':r.cantRecep, f(r.fRecep), f(r.fSalida), r.guia]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:12},{wch:15},{wch:24},{wch:17},{wch:32},{wch:24},{wch:11},{wch:15},{wch:50},{wch:11},
+    {wch:8},{wch:26},{wch:15},{wch:12},{wch:22},{wch:15},{wch:16},{wch:32},{wch:12},{wch:13},{wch:14},{wch:14},{wch:12},{wch:12},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Requerimientos');
+  XLSX.writeFile(wb, 'Requerimientos - Grupo Friopacking.xlsx');
+}
+
+document.querySelectorAll('[data-rqv]').forEach(function(t){
+  t.addEventListener('click', function(){ RQ.vista = t.dataset.rqv; RQ.tope = RQ_PASO; drawRequerimientos(); });
 });
-document.getElementById('cmpDias').addEventListener('change', (e)=>{
-  CMP.dias = Number(e.target.value) || 30; CMP.abierto = ''; drawCompradores();
+['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].forEach(function(id){
+  document.getElementById(id).addEventListener('change', function(){ RQ.tope = RQ_PASO; drawRequerimientos(); });
 });
+document.getElementById('rqBuscar').addEventListener('input', function(e){
+  RQ.q = crtNorm(e.target.value.trim()); RQ.tope = RQ_PASO; drawRequerimientos();
+});
+document.getElementById('rqLimpiar').addEventListener('click', function(){
+  document.getElementById('rqBuscar').value = ''; RQ.q = '';
+  ['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].forEach(function(id){ document.getElementById(id).value = 'all'; });
+  RQ.tope = RQ_PASO; drawRequerimientos();
+});
+document.getElementById('rqExportar').addEventListener('click', rqExportar);
 
 // ---------------------------------------------------------------- arranque
 function drawCertificados(){
@@ -10038,8 +10175,7 @@ document.getElementById('crtQuitarSel').addEventListener('click', ()=>{ CRT.sel.
 // el submenú del módulo (o data-section en el propio módulo si va solo).
 const MODULOS = {
   gerencial:    { nombre:'Gerencial',    secciones:{ proceso:'Indicadores de Logística', gasto:'Concentración de Gasto' } },
-  logistica:    { nombre:'Logística',    secciones:{ alertas:'Análisis de Inventario' } },
-  compras:      { nombre:'Compras',      secciones:{ compradores:'Pendientes por Comprador' } },
+  logistica:    { nombre:'Logística',    secciones:{ alertas:'Análisis de Inventario', requerimientos:'Requerimientos' } },
   certificados: { nombre:'Certificados', secciones:{ certificados:'Certificados por Proyecto' } },
 };
 const MOD_DE_SECCION = {};
@@ -10091,7 +10227,7 @@ function irASeccion(seccion){
 
   if(bloqueado){ const c = document.getElementById('gerClave'); if(c){ c.value = ''; c.focus(); } return; }
   if(seccion === 'certificados') drawCertificados();
-  if(seccion === 'compradores') drawCompradores();
+  if(seccion === 'requerimientos') drawRequerimientos();
 }
 
 document.getElementById('gerForm').addEventListener('submit', (e)=>{
