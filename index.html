@@ -541,6 +541,16 @@
   /* "＋": súbele otro documento del mismo tipo al producto (24.09.2026). */
   .crt-doc.mas{background:var(--surface-2);color:var(--ink-soft);cursor:pointer;padding:5px 8px;font-size:13px;line-height:1;}
   .crt-doc.mas:hover{border-color:var(--brand-ink);color:var(--brand-ink);}
+  /* Todos los documentos de un tipo en un botón; el clic despliega la lista (24.09.2026). */
+  .crt-grupo{position:relative;display:inline-flex;}
+  .crt-grupo .crt-doc.si{cursor:pointer;}
+  .crt-doc .n{margin-left:6px;padding:0 6px;border-radius:9px;background:rgba(0,0,0,.10);font-size:11px;}
+  html[data-theme="dark"] .crt-doc .n{background:rgba(255,255,255,.16);}
+  .crt-menu{position:absolute;z-index:30;top:calc(100% + 5px);right:0;min-width:250px;max-width:360px;padding:5px;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:9px;box-shadow:0 10px 26px rgba(20,30,45,.18);display:flex;flex-direction:column;gap:2px;}
+  .crt-menu[hidden]{display:none;}
+  .crt-menu a,.crt-menu button{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;font-weight:600;padding:7px 9px;border:0;border-radius:6px;background:none;color:var(--ink);text-decoration:none;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .crt-menu a:hover,.crt-menu button:hover{background:var(--surface-2);}
+  .crt-menu .sube{margin-top:3px;padding-top:9px;border-top:1px solid var(--border);border-radius:0;color:var(--brand-ink);}
   .crt-nota{grid-column:1/-1;margin-top:7px;padding:9px 12px;border-radius:7px;font-size:12px;line-height:1.5;background:var(--surface-2);color:var(--ink-soft);border:1px solid var(--border);}
   .crt-nota b{color:var(--ink);}
   .crt-btn-nota{display:block;margin-top:7px;font:inherit;font-size:12px;font-weight:700;color:#08281f;background:var(--brand-2);border:0;border-radius:6px;padding:6px 11px;cursor:pointer;}
@@ -607,6 +617,7 @@
     .crt-fila{grid-template-columns:20px minmax(0,1fr);gap:6px 10px;}
     .crt-fila > .sub,.crt-fila > .crt-docs{grid-column:2;}
     .crt-docs{justify-content:flex-start;}
+    .crt-menu{left:0;right:auto;min-width:0;max-width:calc(100vw - 72px);}
     .crt-doc.sub{max-width:100%;}
     .crt-req > summary{padding:11px 14px;}
     .crt-req .rd{margin-left:0;width:100%;}
@@ -9563,6 +9574,15 @@ function crtVistaProyecto(cont){
   cont.querySelectorAll('[data-crtsube]').forEach(b=>{
     b.addEventListener('click', ()=> crtPedirArchivo([b.dataset.crtsube], b.dataset.tipo));
   });
+  cont.querySelectorAll('[data-crtver]').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const menu = b.nextElementSibling;
+      const abrir = menu.hidden;
+      crtCerrarMenus();
+      menu.hidden = !abrir;
+    });
+  });
   cont.querySelectorAll('[data-crtmail]').forEach(b=>{
     b.addEventListener('click', ()=>{
       const url = crtMailto(b.dataset.crtmail);
@@ -9609,8 +9629,14 @@ function crtFila(f){
   const mas = (tipo, etiqueta) => `<button class="crt-doc mas" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}" title="Agregar otro ${etiqueta.toLowerCase()} a este producto">＋</button>`;
   const doc = (tipo, etiqueta, leve)=>{
     const lista = crtDocs(f, tipo);
-    if(lista.length) return lista.map((d,i)=>
-      `<a class="crt-doc si" href="${escapeHtml(d.url)}" target="_blank" rel="noopener" title="${escapeHtml(d.nombre || etiqueta)}">📄 ${etiqueta}${lista.length>1 ? ' ' + (i+1) : ''}</a>`).join('') + mas(tipo, etiqueta);
+    // Un producto puede tener varios documentos del mismo tipo: van todos en un solo botón y el clic
+    // despliega cuáles son (24.09.2026, pedido de Piero). Así la fila no crece con cada archivo.
+    if(lista.length) return `<span class="crt-grupo">
+      <button class="crt-doc si" type="button" data-crtver="${escapeHtml(clave)}" data-tipo="${tipo}" title="Ver ${lista.length===1 ? 'el documento' : 'los ' + lista.length + ' documentos'}">📄 ${etiqueta}${lista.length>1 ? `<span class="n">${lista.length}</span>` : ''}</button>
+      <div class="crt-menu" hidden>${lista.map((d,i)=>
+        `<a href="${escapeHtml(d.url)}" target="_blank" rel="noopener" title="${escapeHtml(d.nombre || etiqueta)}">📄 ${escapeHtml(d.nombre || (etiqueta + ' ' + (i+1)))}</a>`).join('')}
+        <button class="sube" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}">⬆ Subir ${tipo === 'cert' ? 'otro certificado' : 'otra ficha técnica'}</button>
+      </div></span>`;
     const sub = f[crtCampo(tipo)];
     if(sub){
       const reg = CRT.subidas.get(sub.huella);
@@ -9671,6 +9697,10 @@ function drawCertificados(){
 }
 
 document.getElementById('crtQ').addEventListener('input', (e)=>{ CRT.q = crtNorm(e.target.value.trim()); crtDibujar(); });
+function crtCerrarMenus(){
+  document.querySelectorAll('.crt-menu').forEach(function(m){ m.hidden = true; });
+}
+document.addEventListener('click', crtCerrarMenus);
 document.querySelectorAll('.crt-chip').forEach(b=>{
   b.addEventListener('click', ()=>{
     CRT.filtro = b.dataset.cf;
