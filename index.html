@@ -439,6 +439,9 @@
   .navmod.abierto .chev{transform:rotate(90deg);}
   .navsub{display:flex;flex-direction:column;gap:2px;padding:4px 0 2px 12px;margin-left:15px;border-left:1px solid rgba(255,255,255,.16);}
   .navsub .navitem{font-size:12.5px;font-weight:600;padding:9px 12px;}
+  .navsub .navitem.externo{display:flex;align-items:center;gap:8px;}
+  .navsub .navitem.externo .fuera{margin-left:auto;opacity:.55;}
+  .navsub .navitem.externo:hover .fuera{opacity:1;}
 
   /* ---------- Módulo Certificados ---------- */
   .crt-barra{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
@@ -535,6 +538,9 @@
   .crt-doc.no{background:var(--red-bg);color:var(--red);cursor:pointer;}
   .crt-doc.no.lev{background:var(--amber-bg);color:var(--amber-ink);}
   .crt-doc.no:hover{border-color:currentColor;}
+  /* "＋": súbele otro documento del mismo tipo al producto (24.09.2026). */
+  .crt-doc.mas{background:var(--surface-2);color:var(--ink-soft);cursor:pointer;padding:5px 8px;font-size:13px;line-height:1;}
+  .crt-doc.mas:hover{border-color:var(--brand-ink);color:var(--brand-ink);}
   .crt-nota{grid-column:1/-1;margin-top:7px;padding:9px 12px;border-radius:7px;font-size:12px;line-height:1.5;background:var(--surface-2);color:var(--ink-soft);border:1px solid var(--border);}
   .crt-nota b{color:var(--ink);}
   .crt-btn-nota{display:block;margin-top:7px;font:inherit;font-size:12px;font-weight:700;color:#08281f;background:var(--brand-2);border:0;border-radius:6px;padding:6px 11px;cursor:pointer;}
@@ -640,9 +646,16 @@
     <div class="navsub" data-sub="logistica" hidden>
       <div class="navitem" data-section="alertas">📦 Análisis de Inventario</div>
     </div>
-    <div class="navmod externo" data-url="https://melissa2026714.github.io/dashboard-friopacking/compras.html" title="Se abre en una pestaña nueva">
-      <span class="ico">🛒</span><span>Plataforma Compras</span>
-      <svg class="fuera" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6"/></svg>
+    <!-- Compras: por ahora su único contenido es el link a la otra plataforma (24.09.2026,
+         pedido de Piero: "el módulo que diga Compras y abajo Plataforma Compras"). -->
+    <div class="navmod" data-mod="compras">
+      <span class="ico">🛒</span><span>Compras</span>
+      <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
+    </div>
+    <div class="navsub" data-sub="compras" hidden>
+      <div class="navitem externo" data-url="https://melissa2026714.github.io/dashboard-friopacking/compras.html" title="Se abre en una pestaña nueva">
+        <span>📊 Plataforma Compras</span><svg class="fuera" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v7H3V3h7"/></svg>
+      </div>
     </div>
     <div class="navmod" data-mod="certificados" data-section="certificados">
       <span class="ico">📄</span><span>Certificados</span>
@@ -8873,9 +8886,30 @@ function crtAplicarDocs(docs){
       if(doc.pry && f.idPry !== doc.pry) return;
       // codigo null = documento del requerimiento: vale para todos sus productos
       if(doc.codigo && f.codigo !== doc.codigo) return;
-      f[doc.tipo === 'ficha' ? 'ficha' : 'cert'] = doc.url;
+      crtSumarDoc(f, doc.tipo, doc.url, doc.nombre);
     });
   });
+}
+
+// Un producto puede tener más de un documento del mismo tipo (24.09.2026, pedido de Piero: "puede
+// tener 3 certificados de calidad"). Drive ya los guardaba todos —cada archivo entra con su nombre—,
+// era la pantalla la que se quedaba solo con el último. Ahora se acumulan en f.certs / f.fichas y
+// f.cert / f.ficha sigue apuntando al primero, que es lo que miran el % de cobertura, los correos y
+// la herencia por lote.
+const crtLista = (tipo) => tipo === 'ficha' ? 'fichas' : 'certs';
+const crtDocs = (f, tipo) => f[crtLista(tipo)] || [];
+function crtSumarDoc(f, tipo, url, nombre){
+  if(!url) return;
+  const campo = crtLista(tipo);
+  if(!f[campo]) f[campo] = [];
+  if(f[campo].some(function(d){ return d.url === url; })) return;   // el mismo archivo, ya está
+  f[campo].push({ url: url, nombre: nombre || '' });
+  const principal = tipo === 'ficha' ? 'ficha' : 'cert';
+  if(!f[principal]) f[principal] = f[campo][0].url;
+}
+/** Antes de aplicar lo que Drive acaba de contestar: así un documento borrado allá desaparece acá. */
+function crtVaciarDocs(){
+  CRT.filas.forEach(function(f){ f.certs = null; f.fichas = null; f.cert = null; f.ficha = null; });
 }
 
 // Copia de lo último que contestó Drive (23.09.2026, pedido de Piero: "tarda en actualizar el estado
@@ -8925,7 +8959,7 @@ async function crtLeerDeDrive(){
   CRT.leyendo = true;
   try{
     const docs = await crtPreguntarDrive('*');
-    if(docs && docs.length){ crtAplicarDocs(docs); crtCacheGuardar(docs); CRT.sinGlobal = false; }
+    if(docs && docs.length){ crtVaciarDocs(); crtAplicarDocs(docs); crtCacheGuardar(docs); CRT.sinGlobal = false; }
     // Un Apps Script viejo no entiende "pry=*" y contesta vacío. En ese caso se vuelve al camino de
     // antes: preguntar por el proyecto que se abra (23.09.2026). Así la plataforma funciona con
     // cualquiera de las dos versiones del script, solo que con la vieja hay que esperar al entrar.
@@ -9348,7 +9382,7 @@ async function crtRecibirArchivo(file){
   const res = await crtGuardarEnDrive(file, tipo, tocados);
   if(res && res.ok){
     tocados.forEach(function(f){
-      f[tipo === 'ficha' ? 'ficha' : 'cert'] = res.url;
+      crtSumarDoc(f, tipo, res.url, res.nombre || reg.nombre);
       f[crtCampo(tipo)] = null;
     });
     reg.enDrive = true;   // para el resumen de arriba: este archivo sí quedó guardado
@@ -9571,14 +9605,17 @@ function crtVistaProyecto(cont){
 }
 function crtFila(f){
   const clave = crtClave(f);
+  // Botón chico para sumarle otro documento del mismo tipo a un producto que ya tiene uno.
+  const mas = (tipo, etiqueta) => `<button class="crt-doc mas" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}" title="Agregar otro ${etiqueta.toLowerCase()} a este producto">＋</button>`;
   const doc = (tipo, etiqueta, leve)=>{
-    const url = tipo === 'cert' ? f.cert : f.ficha;
-    if(url) return `<a class="crt-doc si" href="${escapeHtml(url)}" target="_blank" rel="noopener">📄 ${etiqueta}</a>`;
+    const lista = crtDocs(f, tipo);
+    if(lista.length) return lista.map((d,i)=>
+      `<a class="crt-doc si" href="${escapeHtml(d.url)}" target="_blank" rel="noopener" title="${escapeHtml(d.nombre || etiqueta)}">📄 ${etiqueta}${lista.length>1 ? ' ' + (i+1) : ''}</a>`).join('') + mas(tipo, etiqueta);
     const sub = f[crtCampo(tipo)];
     if(sub){
       const reg = CRT.subidas.get(sub.huella);
       const veces = reg ? reg.usos.length : 1;
-      return `<span class="crt-doc sub" title="${escapeHtml(sub.nombre)}">📄 <span class="nm">${escapeHtml(sub.nombre)}</span>${veces>1?` · ${veces}`:''}</span>`;
+      return `<span class="crt-doc sub" title="${escapeHtml(sub.nombre)}">📄 <span class="nm">${escapeHtml(sub.nombre)}</span>${veces>1?` · ${veces}`:''}</span>` + mas(tipo, etiqueta);
     }
     // Línea atendida de stock: si la compra de la que salió ese material ya tiene el documento, se
     // muestra ese mismo — no hay que volver a subirlo.
@@ -9760,6 +9797,10 @@ document.getElementById('gerForm').addEventListener('submit', (e)=>{
 document.querySelectorAll('.navitem[data-section]').forEach(item=>{
   item.addEventListener('click', ()=> irASeccion(item.dataset.section));
 });
+// Ítem de submenú que no es una sección de esta plataforma sino un link a otra (24.09.2026).
+document.querySelectorAll('.navitem[data-url]').forEach(item=>{
+  item.addEventListener('click', ()=> window.open(item.dataset.url, '_blank', 'noopener'));
+});
 document.querySelectorAll('.navmod').forEach(mod=>{
   mod.addEventListener('click', ()=>{
     // Link a otra plataforma: se abre aparte y no cambia nada de esta.
@@ -9767,11 +9808,11 @@ document.querySelectorAll('.navmod').forEach(mod=>{
     // Módulo de un solo reporte: entra directo.
     if(mod.dataset.section){ irASeccion(mod.dataset.section); return; }
     const sub = document.querySelector('.navsub[data-sub="'+mod.dataset.mod+'"]');
-    if(mod.classList.contains('active')){
-      // Ya estás dentro: el clic solo pliega o despliega sus reportes.
+    const activo = sub.querySelector('.navitem.active[data-section]') || sub.querySelector('.navitem[data-section]');
+    // Módulo sin reportes propios (solo links): el clic únicamente pliega o despliega.
+    if(!activo || mod.classList.contains('active')){
       sub.hidden = !(mod.classList.toggle('abierto'));
     } else {
-      const activo = sub.querySelector('.navitem.active') || sub.querySelector('.navitem');
       irASeccion(activo.dataset.section);
     }
   });
