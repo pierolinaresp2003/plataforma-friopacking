@@ -455,6 +455,7 @@
   .rq-est{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;background:var(--surface-2);color:var(--ink-soft);}
   .rq-est.ok{background:var(--green-bg);color:var(--green);}
   .rq-est.camino{background:var(--amber-bg);color:var(--amber-ink);}
+  .rq-est.recibido{background:var(--azul-bg);color:var(--brand-ink);}
   .rq-est.espera{background:var(--red-bg);color:var(--red);}
   .rq-est.fuera{opacity:.65;}
   .rq-mix{font-size:11px;color:var(--muted);}
@@ -2052,9 +2053,9 @@ function buildSnapshot(){
         e: r.estado, fa: r.familia, ip: r.idProducto, pr: r.producto, u: r.unidad, q: r.cantidad,
         og: r.origen, pv: r.proveedor,
         cp: r.codPedido, fp: isoDay(r.fPedido), rp: r.responsablePedido,
-        co: r.codOrden, uc: r.usuarioCompras,
+        ep: r.estadoPedido, co: r.codOrden, uc: r.usuarioCompras,
         fo: isoDay(r.fOrden), fb: isoDay(r.fAprob), fx: isoDay(r.fCompromiso), fc: isoDay(r.fRecep),
-        qr: r.cantRecep, fs: isoDay(r.fSalida), g: r.guia,
+        qo: r.cantOrden, qr: r.cantRecep, fs: isoDay(r.fSalida), g: r.guia,
       })),
       // Pedidos directos de PedidoSinReq.xlsx (04.09.2026 ronda 37) — OC que Reporte Maestro.xlsx nunca
       // trae (ver PEDIDO_SIN_REQ_ROWS). Se publican aparte para que el Reporte de Compras por responsable
@@ -2332,9 +2333,10 @@ function loadFromSnapshot(snap){
       producto: r.pr || '(sin descripción)', unidad: r.u || '', cantidad: (r.q!=null ? r.q : null),
       origen: r.og || 'nacional', proveedor: r.pv || '',
       codPedido: r.cp || '', fPedido: fromIsoDay(r.fp), responsablePedido: r.rp || '',
-      codOrden: r.co || '', usuarioCompras: r.uc || '',
+      estadoPedido: r.ep || '', codOrden: r.co || '', usuarioCompras: r.uc || '',
       fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb), fCompromiso: fromIsoDay(r.fx), fRecep: fromIsoDay(r.fc),
-      cantRecep: (r.qr!=null ? r.qr : null), fSalida: fromIsoDay(r.fs), guia: r.g || '',
+      cantOrden: (r.qo!=null ? r.qo : null), cantRecep: (r.qr!=null ? r.qr : null),
+      fSalida: fromIsoDay(r.fs), guia: r.g || '',
     })) : [],
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
     // ese caso, simplemente no se muestran alertas hasta que se vuelva a publicar con el archivo actual.
@@ -2852,8 +2854,10 @@ function processWorkbook(wb, filename){
         origen: origenFor(col.rucProveedor!==-1 ? r[col.rucProveedor] : ""),
         proveedor: txt(col.proveedor),
         codPedido: codPedidoAt, fPedido, responsablePedido: txt(col.responsablePedido),
+        estadoPedido: estadoPedidoAt,
         codOrden: codOrdenAt, usuarioCompras: txt(col.usuarioCompras),
         fOrden, fAprob, fCompromiso, fRecep,
+        cantOrden: numOrNull(col.cantidadOrden!==-1 ? r[col.cantidadOrden] : null),
         cantRecep: numOrNull(col.cantRecepcion!==-1 ? r[col.cantRecepcion] : null),
         fSalida, guia: txt(col.guiaAlmacen),
       });
@@ -9858,7 +9862,7 @@ function crtFila(f){
 // picking, la validación— viven en el sistema de Almacén y acá se verían desactualizadas, así que no se
 // replican.
 // ============================================================================
-const RQ = { vista:'grupo', q:'', tope:200 };
+const RQ = { vista:'grupo', q:'', tope:200, preparado:-1 };
 const RQ_PASO = 200;
 
 function getReqRows(){ return (DATA && DATA.reqRows) || []; }
@@ -9867,13 +9871,53 @@ const rqFecha = (d)=> d ? fmtDate(d) : '—';
 const rqNum = (v)=> v==null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
 const rqTxt = (t)=> (t==null || t==='') ? '—' : escapeHtml(String(t));
 
-/** Semáforo del estado: dónde está parado el requerimiento. */
+// El EstadoRequerimiento que trae Nisira se queda congelado en "Enviado a pedido" aunque la OC ya
+// exista, ya haya llegado al almacén o ya se haya despachado (24.09.2026, Piero: "los estados están
+// mal"). Acá se recalcula línea por línea con la misma escalera que usa el dashboard de Almacén, que
+// mira lo que realmente pasó —salida, OC, recepción— y no la etiqueta guardada:
+//   1. ¿ya salió del almacén? → Enviado a Obra (por Pedido si hubo OC, por Picking directo si salió de stock)
+//   2. ¿tiene OC? → si ya llegó material: Recibido (total o parcial) en Almacén; si no: cuenta con OC
+//   3. ¿tiene pedido sin OC? → Archivado si el pedido se canceló, si no Pedido pendiente
+//   4. si nada de lo anterior → lo que diga el Excel ("En revisión de Almacén" se muestra "En Revisión")
+function rqEstadoReal(r){
+  const arch = (t)=> String(t||'').trim().toLowerCase() === 'archivado';
+  if(r.fSalida || r.guia) return r.codOrden ? 'Enviado a Obra — Pedido' : 'Enviado a Obra — Picking directo';
+  if(r.codOrden){
+    const recibido = (r.cantRecep != null && r.cantRecep > 0) || !!r.fRecep;
+    if(recibido){
+      const completo = (r.cantOrden != null && r.cantOrden > 0 && r.cantRecep != null && r.cantRecep >= r.cantOrden);
+      return completo ? 'Recibido en Almacén — Pedido' : 'Recibido Parcial en Almacén — Pedido';
+    }
+    return 'Enviado a pedido — cuenta con OC';
+  }
+  if(r.codPedido) return (arch(r.estadoPedido) || arch(r.estado)) ? 'Archivado' : 'Pedido pendiente';
+  if(arch(r.estado)) return 'Archivado';
+  return /revisi/.test(sinAcentos(String(r.estado||'')).toLowerCase()) ? 'En Revisión' : (r.estado || '—');
+}
+
+/** Se calcula una sola vez por archivo cargado y queda guardado en la fila. */
+function rqPreparar(){
+  const rows = getReqRows();
+  if(!rows.length || RQ.preparado === rows.length) return;
+  // Un mismo requerimiento+producto puede venir en dos líneas: la que ya tiene OC y la que todavía
+  // no. Se deja solo la de la OC, igual que en Certificados — si no, el producto sale dos veces con
+  // estados que se contradicen ("Pedido pendiente" y "cuenta con OC" a la vez).
+  const conOc = new Set();
+  rows.forEach(function(r){ if(r.codOrden) conOc.add(r.codRequerimiento + '|' + r.idProducto); });
+  rows.forEach(function(r){
+    r.omitir = !r.codOrden && conOc.has(r.codRequerimiento + '|' + r.idProducto);
+    r.estadoCalc = rqEstadoReal(r);
+  });
+  RQ.preparado = rows.length;
+}
+
+/** Semáforo del estado ya recalculado. */
 function rqClaseEstado(e){
   const n = sinAcentos(String(e||'')).toLowerCase();
-  if(n.indexOf('archivado') === 0) return 'fuera';
-  if(n.indexOf('recibido en obra') !== -1) return 'ok';
-  if(n.indexOf('enviado a obra') !== -1) return 'ok';
-  if(n.indexOf('pedido') !== -1) return 'camino';
+  if(n.indexOf('archivado') !== -1) return 'fuera';
+  if(n.indexOf('enviado a obra') !== -1 || n.indexOf('recibido en obra') !== -1) return 'ok';
+  if(n.indexOf('recibido') !== -1) return 'recibido';
+  if(n.indexOf('cuenta con oc') !== -1) return 'camino';
   return 'espera';
 }
 
@@ -9881,8 +9925,9 @@ function rqFiltradas(){
   const q = RQ.q, fPry = rqVal('rqProyecto'), fEst = rqVal('rqEstado');
   const fResp = rqVal('rqResponsable'), fFam = rqVal('rqFamilia'), fOri = rqVal('rqOrigen');
   return getReqRows().filter(function(r){
+    if(r.omitir) return false;
     if(fPry !== 'all' && r.idProyecto !== fPry) return false;
-    if(fEst !== 'all' && r.estado !== fEst) return false;
+    if(fEst !== 'all' && r.estadoCalc !== fEst) return false;
     if(fResp !== 'all' && r.responsable !== fResp) return false;
     if(fFam !== 'all' && r.familia !== fFam) return false;
     if(fOri !== 'all' && r.origen !== fOri) return false;
@@ -9909,7 +9954,7 @@ function rqAgrupar(filas){
     g.items++; g.cantidad += (r.cantidad || 0);
     if(r.codOrden) g.conOc++;
     if(r.fSalida) g.atendidos++;
-    g.estados.add(r.estado);
+    g.estados.add(r.estadoCalc);
     if(!g.fReq || (r.fReq && r.fReq < g.fReq)) g.fReq = r.fReq;
   });
   return [...m.values()].sort(function(a,b){ return (b.fReq||0) - (a.fReq||0) || (a.req < b.req ? 1 : -1); });
@@ -9927,6 +9972,7 @@ function drawRequerimientos(){
     return;
   }
   nota.style.display = 'none';
+  rqPreparar();
   rqLlenarFiltros();
   document.querySelectorAll('[data-rqv]').forEach(function(t){ t.classList.toggle('active', t.dataset.rqv === RQ.vista); });
 
@@ -9984,7 +10030,7 @@ function rqVistaItem(cont, filas){
       <td><span class="cod">${escapeHtml(r.codRequerimiento)}</span></td>
       <td>${rqTxt(r.responsable)}</td>
       <td class="desc">${rqTxt(r.proyecto)}</td>
-      <td><span class="rq-est ${rqClaseEstado(r.estado)}">${escapeHtml(r.estado)}</span></td>
+      <td><span class="rq-est ${rqClaseEstado(r.estadoCalc)}" title="Estado en Nisira: ${escapeHtml(r.estado)}">${escapeHtml(r.estadoCalc)}</span></td>
       <td>${r.origen === 'importado' ? 'Importado' : 'Nacional'}</td>
       <td><span class="cod">${escapeHtml(r.idProducto)}</span></td>
       <td class="desc">${rqTxt(r.producto)}</td>
@@ -10049,7 +10095,7 @@ function rqLlenarFiltros(){
     if([...m.keys()].indexOf(actual) !== -1) selP.value = actual;
     selP.dataset.listo = String(rows.length);
   }
-  llenar('rqEstado', rows.map(function(r){ return r.estado; }), 'Estado: todos');
+  llenar('rqEstado', rows.map(function(r){ return r.estadoCalc; }), 'Estado: todos');
   llenar('rqResponsable', rows.map(function(r){ return r.responsable; }), 'Responsable: todos');
   llenar('rqFamilia', rows.map(function(r){ return r.familia; }), 'Familia: todas');
 }
@@ -10057,19 +10103,19 @@ function rqLlenarFiltros(){
 function rqExportar(){
   const filas = rqFiltradas();
   if(!filas.length) return;
-  const aoa = [['F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Origen',
+  const aoa = [['F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Estado en Nisira','Origen',
     'Código','Descripción','Cantidad','UM','Familia','N° Pedido','F. Pedido','Resp. Pedido','N° OC','Usuario Compras',
     'Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada','Cant. recepcionada','F. Recepción','F. Salida','Guía']];
   const f = (d)=> d ? fmtDate(d) : '';
   filas.forEach(function(r){
-    aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, r.proyecto, r.estado,
+    aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, r.proyecto, r.estadoCalc, r.estado,
       r.origen === 'importado' ? 'Importado' : 'Nacional', r.idProducto, r.producto,
       r.cantidad==null?'':r.cantidad, r.unidad, r.familia, r.codPedido, f(r.fPedido), r.responsablePedido,
       r.codOrden, r.usuarioCompras, r.proveedor, f(r.fOrden), f(r.fAprob), f(r.fCompromiso),
       r.cantRecep==null?'':r.cantRecep, f(r.fRecep), f(r.fSalida), r.guia]);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:12},{wch:15},{wch:24},{wch:17},{wch:32},{wch:24},{wch:11},{wch:15},{wch:50},{wch:11},
+  ws['!cols'] = [{wch:12},{wch:15},{wch:24},{wch:17},{wch:32},{wch:32},{wch:22},{wch:11},{wch:15},{wch:50},{wch:11},
     {wch:8},{wch:26},{wch:15},{wch:12},{wch:22},{wch:15},{wch:16},{wch:32},{wch:12},{wch:13},{wch:14},{wch:14},{wch:12},{wch:12},{wch:16}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Requerimientos');
