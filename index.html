@@ -551,6 +551,17 @@
   .crt-menu a,.crt-menu button{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;font-weight:600;padding:7px 9px;border:0;border-radius:6px;background:none;color:var(--ink);text-decoration:none;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .crt-menu a:hover,.crt-menu button:hover{background:var(--surface-2);}
   .crt-menu .sube{margin-top:3px;padding-top:9px;border-top:1px solid var(--border);border-radius:0;color:var(--brand-ink);}
+
+  /* ---------- Compras → Pendientes por Comprador (24.09.2026) ---------- */
+  .cmp-fila{cursor:pointer;}
+  .cmp-fila.abierta td{background:var(--surface-2);}
+  .cmp-fila td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  #section-compradores th.num{text-align:right;}
+  .cmp-det td{padding:0;background:var(--surface-3);}
+  .cmp-det-caja{max-height:340px;overflow:auto;padding:4px 14px 12px;}
+  .cmp-det-caja th{background:transparent;position:static;font-size:10.5px;}
+  .cmp-det-caja td{font-size:12.5px;white-space:nowrap;}
+  .cmp-det-caja td.num{text-align:right;font-variant-numeric:tabular-nums;}
   .crt-nota{grid-column:1/-1;margin-top:7px;padding:9px 12px;border-radius:7px;font-size:12px;line-height:1.5;background:var(--surface-2);color:var(--ink-soft);border:1px solid var(--border);}
   .crt-nota b{color:var(--ink);}
   .crt-btn-nota{display:block;margin-top:7px;font:inherit;font-size:12px;font-weight:700;color:#08281f;background:var(--brand-2);border:0;border-radius:6px;padding:6px 11px;cursor:pointer;}
@@ -664,6 +675,7 @@
       <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
     </div>
     <div class="navsub" data-sub="compras" hidden>
+      <div class="navitem" data-section="compradores">🧾 Pendientes por Comprador</div>
       <div class="navitem externo" data-url="https://melissa2026714.github.io/dashboard-friopacking/compras.html" title="Se abre en una pestaña nueva">
         <span>📊 Plataforma Compras</span><svg class="fuera" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v7H3V3h7"/></svg>
       </div>
@@ -1025,6 +1037,32 @@
         Un mismo certificado puede cubrir varios productos: se guarda una sola vez y queda enlazado en todos.
       </p>
     </div><!-- /section-certificados -->
+
+    <!-- Compras → Pendientes por Comprador (24.09.2026). No guarda nada: tanto el pendiente de hoy
+         como el resumen de cada día se reconstruyen de las fechas del Reporte Maestro. -->
+    <div id="section-compradores" class="section">
+      <div class="note" id="cmpNota" style="display:none;"></div>
+
+      <div class="toolbar" style="margin-bottom:12px;">
+        <button class="crt-chip" data-cmpv="hoy" aria-pressed="true">Pendientes hoy</button>
+        <button class="crt-chip" data-cmpv="diario" aria-pressed="false">Resumen diario</button>
+        <select id="cmpDias" hidden>
+          <option value="15">Últimos 15 días</option>
+          <option value="30" selected>Últimos 30 días</option>
+          <option value="90">Últimos 90 días</option>
+        </select>
+        <span class="crt-conteo" id="cmpConteo"></span>
+      </div>
+
+      <div id="cmpVista"></div>
+
+      <p style="margin-top:16px;font-size:11.5px;color:var(--muted);line-height:1.6;max-width:80ch;">
+        <b>Pendiente</b> = línea de pedido que todavía no tiene orden de compra y que Nisira sigue marcando
+        como «Pendiente» (las «Archivado» se cancelaron y las «Atendido Total» salieron de stock). Se cuenta
+        por línea de producto, no por pedido. Lo pendiente se le atribuye al responsable del pedido y lo ya
+        cerrado al comprador que emitió la OC — la misma regla del reporte por comprador.
+      </p>
+    </div><!-- /section-compradores -->
 
   </div>
 
@@ -7538,24 +7576,37 @@ function usuarioDeResponsablePedido(nombre){
   const p = n.split(/\s+/).filter(Boolean);
   return p.length >= 2 ? p[0].charAt(0) + p[p.length-1] : n;
 }
-function pendientesComprasFor(comprador, rango){
-  if(!rango || !isFinite(rango.desde) || !isFinite(rango.hasta)) return null;
-  const DIA = 86400000, D1 = rango.desde, D2 = rango.hasta;
-  const dia = (f)=> f ? Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate()) : null;
-  const cerradaManual = (r)=> PEDIDOS_CERRADOS_MANUAL.has(
+// El predicado quedó afuera para poder reutilizarlo tal cual en el submódulo "Pendientes por
+// Comprador" (24.09.2026): misma regla, un solo lugar donde corregirla. `desdeManual` es la fecha a
+// partir de la cual aplican los cierres manuales de la lista de arriba.
+function pedidoCerradoManual(r){
+  return PEDIDOS_CERRADOS_MANUAL.has(
     (r.codPedido||'') + '|' + (r.idProducto||'').toString().trim() + '|' + (r.cantidadPedido==null?'':r.cantidadPedido));
-  const pendienteA = (r, corte)=>{
-    const fp = dia(r.fPedido);
-    if(fp == null || fp > corte) return false;
-    if(corte >= D1 && cerradaManual(r)) return false;
-    if(r.codOrden){ const fo = dia(r.fOrden); return fo == null || fo > corte; }
-    return r.estadoPedido === 'Pendiente';
-  };
-  const acc = { venian:0, entraron:0, cerro:0, siguen:0 };
+}
+function pendienteLineaA(r, corte, desdeManual){
+  const dia = (f)=> f ? Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate()) : null;
+  const fp = dia(r.fPedido);
+  if(fp == null || fp > corte) return false;
+  if(corte >= desdeManual && pedidoCerradoManual(r)) return false;
+  if(r.codOrden){ const fo = dia(r.fOrden); return fo == null || fo > corte; }
+  return r.estadoPedido === 'Pendiente';
+}
+// Mismo recorrido, pero abierto por comprador: lo necesita el resumen diario del submódulo
+// "Pendientes por Comprador" (24.09.2026). pendientesComprasFor() ahora suma sobre este mapa, así que
+// el reporte por comprador y el submódulo cuentan exactamente lo mismo.
+// `manualUniforme` es para el resumen día por día: los cierres manuales de PEDIDOS_CERRADOS_MANUAL no
+// tienen fecha, así que con la regla del reporte por período (aplican solo desde el inicio del período)
+// cada día que se mire por separado los cuenta otra vez como "se cerró hoy". Con la bandera en true
+// esas líneas simplemente nunca están pendientes, y el "cerró" del día queda limpio (24.09.2026).
+function pendientesComprasPorDuenio(rango, manualUniforme){
+  const DIA = 86400000, D1 = rango.desde, D2 = rango.hasta;
+  const desdeManual = manualUniforme ? -Infinity : D1;
+  const dia = (f)=> f ? Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate()) : null;
+  const m = new Map();
   for(const r of getProcesoRows()){
     if(!r.codPedido) continue;
-    const antes = pendienteA(r, D1 - DIA);
-    const alCierre = pendienteA(r, D2);
+    const antes = pendienteLineaA(r, D1 - DIA, desdeManual);
+    const alCierre = pendienteLineaA(r, D2, desdeManual);
     const fp = dia(r.fPedido);
     const entro = fp != null && fp >= D1 && fp <= D2;
     if(!antes && !entro) continue;
@@ -7564,10 +7615,20 @@ function pendientesComprasFor(comprador, rango){
     // UsuarioCompras: esa también se le cuenta al responsable del pedido, que es quien la trabajó.
     const uc = (r.usuarioCompras||'').trim();
     const duenio = (!alCierre && uc && uc !== '#N/A') ? uc : usuarioDeResponsablePedido(r.responsablePedido);
-    if(comprador !== 'all' && duenio !== comprador) continue;
-    if(antes) acc.venian++; else if(entro) acc.entraron++;
-    if(alCierre) acc.siguen++; else acc.cerro++;
+    if(!m.has(duenio)) m.set(duenio, { venian:0, entraron:0, cerro:0, siguen:0 });
+    const a = m.get(duenio);
+    if(antes) a.venian++; else if(entro) a.entraron++;
+    if(alCierre) a.siguen++; else a.cerro++;
   }
+  return m;
+}
+function pendientesComprasFor(comprador, rango){
+  if(!rango || !isFinite(rango.desde) || !isFinite(rango.hasta)) return null;
+  const acc = { venian:0, entraron:0, cerro:0, siguen:0 };
+  pendientesComprasPorDuenio(rango).forEach(function(v, duenio){
+    if(comprador !== 'all' && duenio !== comprador) return;
+    acc.venian += v.venian; acc.entraron += v.entraron; acc.cerro += v.cerro; acc.siguen += v.siguen;
+  });
   const total = acc.venian + acc.entraron;
   if(!total) return null;
   return { total, cerro: acc.cerro, siguen: acc.siguen, pct: Math.round(acc.cerro/total*100) };
@@ -9672,6 +9733,187 @@ function crtFila(f){
   </div>`;
 }
 
+
+// ============================================================================
+// Compras → Pendientes por Comprador (24.09.2026, pedido de Piero: "por comprador cuántos pendientes
+// tiene a día de hoy" + "un histórico de lo que se hizo cada día").
+// No guarda nada en ninguna parte: el pendiente de hoy y el resumen de cada día se reconstruyen de las
+// fechas del Reporte Maestro, así que el histórico aparece solo con cargar el archivo y no se puede
+// desincronizar. Toda la aritmética sale de pendienteLineaA / pendientesComprasPorDuenio, la regla que
+// ya se validó con Piero el 17.09.2026 para el reporte por comprador.
+// ============================================================================
+const CMP = { vista:'hoy', dias:30, abierto:'' };
+const CMP_META = 2;   // días hábiles de Pedido → OC: la meta del Indicador 2
+
+const cmpDiaDe = (f)=> f ? Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate()) : null;
+function cmpHoy(){ const h = new Date(); return Date.UTC(h.getUTCFullYear(), h.getUTCMonth(), h.getUTCDate()); }
+const cmpQuien = (u)=> (u || '').trim() || '(sin asignar)';
+function cmpFechaLarga(ms){
+  const d = new Date(ms);
+  const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return DIAS[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' + MES[d.getUTCMonth()];
+}
+
+/** Las líneas de pedido que siguen pendientes hoy, agrupadas por el comprador al que le tocan. */
+function cmpPendientesHoy(){
+  const hoy = cmpHoy(), ref = new Date(hoy), m = new Map();
+  for(const r of getProcesoRows()){
+    if(!r.codPedido) continue;
+    if(!pendienteLineaA(r, hoy, -Infinity)) continue;
+    const k = cmpQuien(usuarioDeResponsablePedido(r.responsablePedido));
+    if(!m.has(k)) m.set(k, { comprador:k, filas:[], pedidos:new Set(), viejo:0, tarde:0 });
+    const g = m.get(k);
+    const dh = busdayCount(r.fPedido, ref);
+    g.filas.push({ r, dh }); g.pedidos.add(r.codPedido);
+    if(dh != null){ if(dh > g.viejo) g.viejo = dh; if(dh > CMP_META) g.tarde++; }
+  }
+  return [...m.values()].sort((a,b)=> b.filas.length - a.filas.length);
+}
+
+/** Un renglón por día: qué entró, qué se cerró y con cuánto se quedó cada comprador. */
+function cmpResumenDiario(dias){
+  const hoy = cmpHoy(), DIA = 86400000;
+  // Las OC emitidas cada día, en una sola pasada (es el "qué hice hoy" más directo del comprador).
+  const ocPorDia = new Map();
+  for(const r of getProcesoRows()){
+    if(!r.codOrden || !r.fOrden) continue;
+    const d = cmpDiaDe(r.fOrden);
+    if(d == null || d > hoy || d <= hoy - dias*DIA) continue;
+    if(!ocPorDia.has(d)) ocPorDia.set(d, new Map());
+    const porQuien = ocPorDia.get(d), k = cmpQuien(r.usuarioCompras);
+    if(!porQuien.has(k)) porQuien.set(k, new Set());
+    porQuien.get(k).add(r.codOrden);
+  }
+  const out = [];
+  for(let i = 0; i < dias; i++){
+    const d = hoy - i*DIA;
+    const mapa = pendientesComprasPorDuenio({ desde:d, hasta:d }, true);
+    const oc = ocPorDia.get(d) || new Map();
+    const quienes = new Set([...mapa.keys(), ...oc.keys()]);
+    const filas = [];
+    let entraron = 0, cerro = 0, siguen = 0, ocN = 0;
+    quienes.forEach(function(k){
+      const v = mapa.get(k) || { venian:0, entraron:0, cerro:0, siguen:0 };
+      const n = oc.has(k) ? oc.get(k).size : 0;
+      entraron += v.entraron; cerro += v.cerro; siguen += v.siguen; ocN += n;
+      if(v.entraron || v.cerro || n) filas.push({ comprador:k, oc:n, entraron:v.entraron, cerro:v.cerro, siguen:v.siguen });
+    });
+    out.push({ dia:d, oc:ocN, entraron, cerro, siguen,
+      filas: filas.sort((a,b)=> (b.oc + b.cerro) - (a.oc + a.cerro)) });
+  }
+  return out;
+}
+
+function drawCompradores(){
+  const nota = document.getElementById('cmpNota');
+  const cont = document.getElementById('cmpVista');
+  const sel = document.getElementById('cmpDias');
+  const conteo = document.getElementById('cmpConteo');
+  document.querySelectorAll('[data-cmpv]').forEach(b=> b.setAttribute('aria-pressed', String(b.dataset.cmpv === CMP.vista)));
+  sel.hidden = CMP.vista !== 'diario';
+  if(!getProcesoRows().length){
+    nota.style.display = '';
+    nota.innerHTML = '<b>Carga primero el Reporte Maestro</b> para ver los pendientes por comprador.';
+    cont.innerHTML = ''; conteo.textContent = '';
+    return;
+  }
+  nota.style.display = 'none';
+  CMP.vista === 'diario' ? cmpVistaDiario(cont, conteo) : cmpVistaHoy(cont, conteo);
+}
+
+function cmpVistaHoy(cont, conteo){
+  const grupos = cmpPendientesHoy();
+  const lineas = grupos.reduce((a,g)=> a + g.filas.length, 0);
+  const pedidos = grupos.reduce((a,g)=> a + g.pedidos.size, 0);
+  const tarde = grupos.reduce((a,g)=> a + g.tarde, 0);
+  const viejo = grupos.reduce((a,g)=> Math.max(a, g.viejo), 0);
+  conteo.textContent = 'Al ' + cmpFechaLarga(cmpHoy());
+  if(!grupos.length){
+    cont.innerHTML = '<div class="card empty">Ningún comprador tiene pedidos pendientes por generar a OC.</div>';
+    return;
+  }
+  const kpis = `<div class="kpi-grid">
+    <div class="card kpi"><div class="label">Pendientes por generar OC</div><div class="value">${lineas}</div><div class="sub">líneas de producto</div></div>
+    <div class="card kpi"><div class="label">Pedidos distintos</div><div class="value">${pedidos}</div><div class="sub">de ${grupos.length} ${grupos.length===1?'comprador':'compradores'}</div></div>
+    <div class="card kpi${tarde?' alert-card':''}"><div class="label">Pasados de la meta</div><div class="value${tarde?' alert-n':''}">${tarde}</div><div class="sub">más de ${CMP_META} d.h. esperando</div></div>
+    <div class="card kpi"><div class="label">El más antiguo</div><div class="value">${viejo}</div><div class="sub">días hábiles</div></div>
+  </div>`;
+  const filas = grupos.map(g=>{
+    const abierto = CMP.abierto === g.comprador;
+    const det = abierto ? `<tr class="cmp-det"><td colspan="5"><div class="cmp-det-caja">${cmpDetalleHtml(g)}</div></td></tr>` : '';
+    return `<tr class="cmp-fila${abierto?' abierta':''}" data-cmpq="${escapeHtml(g.comprador)}">
+      <td><b>${escapeHtml(g.comprador)}</b></td>
+      <td class="num">${g.filas.length}</td>
+      <td class="num">${g.pedidos.size}</td>
+      <td class="num">${g.viejo}</td>
+      <td class="num">${g.tarde ? `<span class="pill warn">${g.tarde}</span>` : `<span class="pill ok">0</span>`}</td>
+    </tr>` + det;
+  }).join('');
+  cont.innerHTML = kpis + `<div class="card table-card"><table>
+    <thead><tr><th>Comprador</th><th class="num">Líneas pendientes</th><th class="num">Pedidos</th><th class="num">Más antiguo (d.h.)</th><th class="num">Pasados de meta</th></tr></thead>
+    <tbody>${filas}</tbody></table></div>`;
+  cont.querySelectorAll('[data-cmpq]').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      CMP.abierto = (CMP.abierto === tr.dataset.cmpq) ? '' : tr.dataset.cmpq;
+      drawCompradores();
+    });
+  });
+}
+
+function cmpDetalleHtml(g){
+  const filas = g.filas.slice().sort((a,b)=> (b.dh||0) - (a.dh||0)).map(x=>`
+    <tr>
+      <td>${escapeHtml(x.r.codPedido)}</td>
+      <td>${x.r.fPedido ? fmtDate(x.r.fPedido) : ''}</td>
+      <td class="num">${x.dh == null ? '' : x.dh}</td>
+      <td>${escapeHtml(x.r.codRequerimiento||'')}</td>
+      <td>${escapeHtml(x.r.producto||'')}</td>
+      <td>${escapeHtml(x.r.proyecto||'')}</td>
+    </tr>`).join('');
+  return `<table><thead><tr><th>Pedido</th><th>Fecha</th><th class="num">d.h.</th><th>Requerimiento</th><th>Producto</th><th>Proyecto</th></tr></thead>
+    <tbody>${filas}</tbody></table>`;
+}
+
+function cmpVistaDiario(cont, conteo){
+  const dias = cmpResumenDiario(CMP.dias).filter(d=> d.oc || d.entraron || d.cerro);
+  conteo.textContent = dias.length + (dias.length===1 ? ' día con movimiento' : ' días con movimiento');
+  if(!dias.length){
+    cont.innerHTML = '<div class="card empty">No hay movimiento de pedidos en el período elegido.</div>';
+    return;
+  }
+  const filas = dias.map(d=>{
+    const abierto = CMP.abierto === String(d.dia);
+    const det = abierto ? `<tr class="cmp-det"><td colspan="5"><div class="cmp-det-caja"><table>
+      <thead><tr><th>Comprador</th><th class="num">OC emitidas</th><th class="num">Pedidos nuevos</th><th class="num">Cerró</th><th class="num">Le quedaron</th></tr></thead>
+      <tbody>${d.filas.map(f=>`<tr><td><b>${escapeHtml(f.comprador)}</b></td><td class="num">${f.oc||''}</td><td class="num">${f.entraron||''}</td><td class="num">${f.cerro||''}</td><td class="num">${f.siguen||''}</td></tr>`).join('')}</tbody>
+      </table></div></td></tr>` : '';
+    return `<tr class="cmp-fila${abierto?' abierta':''}" data-cmpd="${d.dia}">
+      <td><b>${cmpFechaLarga(d.dia)}</b></td>
+      <td class="num">${d.oc || ''}</td>
+      <td class="num">${d.entraron || ''}</td>
+      <td class="num">${d.cerro ? `<span class="pill ok">${d.cerro}</span>` : ''}</td>
+      <td class="num">${d.siguen}</td>
+    </tr>` + det;
+  }).join('');
+  cont.innerHTML = `<div class="card table-card"><table>
+    <thead><tr><th>Día</th><th class="num">OC emitidas</th><th class="num">Pedidos nuevos</th><th class="num">Se cerraron</th><th class="num">Quedaron pendientes</th></tr></thead>
+    <tbody>${filas}</tbody></table></div>`;
+  cont.querySelectorAll('[data-cmpd]').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      CMP.abierto = (CMP.abierto === tr.dataset.cmpd) ? '' : tr.dataset.cmpd;
+      drawCompradores();
+    });
+  });
+}
+
+document.querySelectorAll('[data-cmpv]').forEach(b=>{
+  b.addEventListener('click', ()=>{ CMP.vista = b.dataset.cmpv; CMP.abierto = ''; drawCompradores(); });
+});
+document.getElementById('cmpDias').addEventListener('change', (e)=>{
+  CMP.dias = Number(e.target.value) || 30; CMP.abierto = ''; drawCompradores();
+});
+
 // ---------------------------------------------------------------- arranque
 function drawCertificados(){
   const nota = document.getElementById('crtNota');
@@ -9756,6 +9998,7 @@ document.getElementById('crtQuitarSel').addEventListener('click', ()=>{ CRT.sel.
 const MODULOS = {
   gerencial:    { nombre:'Gerencial',    secciones:{ proceso:'Indicadores de Logística', gasto:'Concentración de Gasto' } },
   logistica:    { nombre:'Logística',    secciones:{ alertas:'Análisis de Inventario' } },
+  compras:      { nombre:'Compras',      secciones:{ compradores:'Pendientes por Comprador' } },
   certificados: { nombre:'Certificados', secciones:{ certificados:'Certificados por Proyecto' } },
 };
 const MOD_DE_SECCION = {};
@@ -9807,6 +10050,7 @@ function irASeccion(seccion){
 
   if(bloqueado){ const c = document.getElementById('gerClave'); if(c){ c.value = ''; c.focus(); } return; }
   if(seccion === 'certificados') drawCertificados();
+  if(seccion === 'compradores') drawCompradores();
 }
 
 document.getElementById('gerForm').addEventListener('submit', (e)=>{
