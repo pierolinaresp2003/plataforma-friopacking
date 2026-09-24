@@ -483,6 +483,7 @@
   .crt-drive-estado{text-transform:none;letter-spacing:0;color:var(--brand-ink);}
   .crt-drive-btn{font:inherit;font-size:11.5px;font-weight:700;color:var(--brand-ink);background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:6px 11px;cursor:pointer;white-space:nowrap;}
   .crt-drive-btn:hover{border-color:var(--brand-ink);}
+  .crt-cargando{display:flex;align-items:center;gap:9px;font-size:13px;}
   .crt-req{margin-bottom:8px;}
   .crt-req > summary{list-style:none;cursor:pointer;padding:11px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
   .crt-req > summary::-webkit-details-marker{display:none;}
@@ -9624,6 +9625,10 @@ function crtVistaProyecto(cont){
     </div>`;
 
   // Un correo por proveedor con todo lo que le falta en ESTE proyecto (23.09.2026, pedido de Piero).
+  const cargandoDrive = (CRT.leyendo || CRT.leyendoPry)
+    ? `<div class="note warn crt-cargando">⟳ <b>Consultando Drive…</b> todavía no se sabe qué documentos tiene este proyecto: lo que abajo aparece en rojo puede estar ya subido.</div>`
+    : '';
+
   const pend = crtPendientesPorProveedor();
   const conCorreo = pend.filter(g => g.correo && g.correo.to);
   // Va plegado: es una alternativa al pedido de a uno, no lo primero que hay que ver (23.09.2026).
@@ -9648,7 +9653,7 @@ function crtVistaProyecto(cont){
       </div>
     </details>` : '';
 
-  cont.innerHTML = cab + panel + (reqs.size ? [...reqs.entries()].map(([req,r])=>`
+  cont.innerHTML = cab + cargandoDrive + panel + (reqs.size ? [...reqs.entries()].map(([req,r])=>`
     <details class="card crt-req" data-crtreq="${escapeHtml(req)}"${CRT.abiertos.has(req)?' open':''}>
       <summary>
         <svg class="caret" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
