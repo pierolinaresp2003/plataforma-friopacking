@@ -480,6 +480,9 @@
   .crt-mini .v{font-size:19px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;}
   .crt-mini .v.ok{color:var(--green);} .crt-mini .v.mal{color:var(--red);}
   .crt-mini .t{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .crt-drive-estado{text-transform:none;letter-spacing:0;color:var(--brand-ink);}
+  .crt-drive-btn{font:inherit;font-size:11.5px;font-weight:700;color:var(--brand-ink);background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:6px 11px;cursor:pointer;white-space:nowrap;}
+  .crt-drive-btn:hover{border-color:var(--brand-ink);}
   .crt-req{margin-bottom:8px;}
   .crt-req > summary{list-style:none;cursor:pointer;padding:11px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
   .crt-req > summary::-webkit-details-marker{display:none;}
@@ -8919,7 +8922,8 @@ const CRT = {
   filas: [], proyectos: [], pry: '', q: '', filtro: 'todos',
   sel: new Set(), abiertos: new Set(), subidas: new Map(),
   sug: [], sugIdx: -1, pendiente: null, listo: false, firma: '', pedAbierto: false,
-  leyendo: false,        // true mientras Drive contesta
+  leyendo: false,        // true mientras Drive contesta la consulta global
+  leyendoPry: false,     // true mientras contesta la del proyecto abierto
   sinGlobal: false,      // true si el Apps Script no entiende la consulta de todos los proyectos
   cargados: new Set(),   // proyectos ya consultados uno por uno (respaldo del script viejo)
 };
@@ -9051,12 +9055,21 @@ async function crtLeerDeDrive(){
 }
 
 /** Respaldo para el Apps Script viejo: consulta un proyecto al abrirlo. */
-async function crtLeerProyecto(pry){
-  if(!CRT_DRIVE.url || !CRT.sinGlobal || CRT.cargados.has(pry)) return;
+// 24.09.2026: antes esta consulta SOLO salía si la global ya había contestado vacío (CRT.sinGlobal), o
+// sea que había que esperar a que terminara una consulta inútil para recién empezar la que sirve —
+// entre las dos, más de 10 segundos con el proyecto en pantalla mostrando todo en rojo (Piero: "subí
+// documentos y de nuevo no se actualizan"). Ahora el proyecto que se abre se pide SIEMPRE y en paralelo
+// con la global: con el Apps Script viejo es la única que trae algo, y con el nuevo simplemente llega
+// dos veces lo mismo, que no molesta. `forzar` la repite aunque ya se haya pedido (botón ↻).
+async function crtLeerProyecto(pry, forzar){
+  if(!CRT_DRIVE.url || !pry) return;
+  if(!forzar && CRT.cargados.has(pry)) return;
   CRT.cargados.add(pry);
-  CRT.leyendo = true;
+  CRT.leyendoPry = true;
+  if(forzar) crtDibujar();
   try{
     const docs = await crtPreguntarDrive(pry);
+    if(forzar) crtVaciarDocsDe(pry);
     if(docs && docs.length){
       docs.forEach(function(d){ d.pry = d.pry || pry; });
       crtAplicarDocs(docs);
@@ -9066,9 +9079,16 @@ async function crtLeerProyecto(pry){
   }catch(err){
     console.warn('No se pudieron leer los documentos de Drive:', err);
   }finally{
-    CRT.leyendo = false;
+    CRT.leyendoPry = false;
     crtDibujar();
   }
+}
+/** Borra lo que se sabía de UN proyecto, para que un ↻ refleje también lo que se quitó de Drive. */
+function crtVaciarDocsDe(pry){
+  CRT.filas.forEach(function(f){
+    if(f.idPry !== pry) return;
+    f.certs = null; f.fichas = null; f.cert = null; f.ficha = null;
+  });
 }
 
 function crtNorm(x){
@@ -9587,7 +9607,9 @@ function crtVistaProyecto(cont){
       <div><div class="id" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;font-weight:700;color:var(--brand-ink);">${escapeHtml(CRT.pry)}</div>
         <div class="nom">${escapeHtml(crtNombrePry(CRT.pry))}</div></div>
       <div class="der">
-        ${CRT.leyendo ? `<div class="crt-mini"><div class="t" style="text-transform:none;letter-spacing:0;">⟳ consultando Drive…</div></div>` : ''}
+        ${(CRT.leyendo || CRT.leyendoPry)
+          ? `<div class="crt-mini"><div class="t crt-drive-estado">⟳ consultando Drive…</div></div>`
+          : `<div class="crt-mini"><button type="button" class="crt-drive-btn" id="crtRecargar" title="Volver a preguntarle a Drive qué documentos tiene este proyecto">↻ Actualizar desde Drive</button></div>`}
         <div class="crt-mini"><div class="v">${reqs.size}</div><div class="t">Requerim.</div></div>
         <div class="crt-mini"><div class="v">${delPry.length}</div><div class="t">Productos</div></div>
         <div class="crt-mini"><div class="v ok">${conCert}</div><div class="t">Con certificado</div></div>
@@ -9635,6 +9657,8 @@ function crtVistaProyecto(cont){
   document.getElementById('crtVolver').addEventListener('click', ()=>{
     CRT.pry = ''; CRT.abiertos.clear(); crtRefrescarPry(); crtDibujar();
   });
+  const recargar = document.getElementById('crtRecargar');
+  if(recargar) recargar.addEventListener('click', ()=> crtLeerProyecto(CRT.pry, true));
   cont.querySelectorAll('details.crt-req').forEach(d=>{
     d.addEventListener('toggle', ()=> d.open ? CRT.abiertos.add(d.dataset.crtreq) : CRT.abiertos.delete(d.dataset.crtreq));
   });
