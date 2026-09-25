@@ -458,7 +458,14 @@
   .rq-est.recibido{background:var(--azul-bg);color:var(--brand-ink);}
   .rq-est.espera{background:var(--red-bg);color:var(--red);}
   .rq-est.fuera{opacity:.65;}
-  .rq-mix{font-size:11px;color:var(--muted);}
+  .rq-mix{display:block;font-size:10px;color:var(--amber-ink);font-weight:700;margin-top:3px;white-space:nowrap;}
+  .rq-via{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+  .rq-via.dir{background:var(--green-bg);color:var(--green);}
+  .rq-via.ped{background:var(--surface-2);color:var(--ink-soft);}
+  .rq-q{display:inline-block;font-weight:700;}
+  .rq-q.ok{color:var(--green);}
+  .rq-q.parcial{color:var(--amber-ink);}
+  .rq-q small{display:block;font-weight:600;font-size:10px;opacity:.9;white-space:nowrap;}
   .rq-scroll{max-height:620px;overflow:auto;padding:0;}
   .rq-mas{padding:14px;text-align:center;}
   .rq-tabla thead th{top:0;}
@@ -2058,7 +2065,7 @@ function buildSnapshot(){
         f: isoDay(r.fReq), n: r.codRequerimiento, rs: r.responsable, ipy: r.idProyecto, py: r.proyecto,
         e: r.estado, fa: r.familia, ip: r.idProducto, pr: r.producto, u: r.unidad, q: r.cantidad,
         og: r.origen, pv: r.proveedor,
-        cp: r.codPedido, fp: isoDay(r.fPedido), rp: r.responsablePedido,
+        cp: r.codPedido, fp: isoDay(r.fPedido), rp: r.responsablePedido, qp: r.cantPedido,
         ep: r.estadoPedido, co: r.codOrden, uc: r.usuarioCompras,
         fo: isoDay(r.fOrden), fb: isoDay(r.fAprob), fx: isoDay(r.fCompromiso), fc: isoDay(r.fRecep),
         qo: r.cantOrden, qr: r.cantRecep, g: r.guia, fx2: r.factura,
@@ -2341,6 +2348,7 @@ function loadFromSnapshot(snap){
       producto: r.pr || '(sin descripción)', unidad: r.u || '', cantidad: (r.q!=null ? r.q : null),
       origen: r.og || 'nacional', proveedor: r.pv || '',
       codPedido: r.cp || '', fPedido: fromIsoDay(r.fp), responsablePedido: r.rp || '',
+      cantPedido: (r.qp!=null ? r.qp : null),
       estadoPedido: r.ep || '', codOrden: r.co || '', usuarioCompras: r.uc || '',
       fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb), fCompromiso: fromIsoDay(r.fx), fRecep: fromIsoDay(r.fc),
       cantOrden: (r.qo!=null ? r.qo : null), cantRecep: (r.qr!=null ? r.qr : null),
@@ -2647,6 +2655,7 @@ function processWorkbook(wb, filename){
     // Columnas que solo necesita el módulo de Requerimientos (24.09.2026).
     unidadMedida: findCol(headerRow, ["UnidadMedida","Unidad de Medida","Unidad"]),
     cantidadReq: findCol(headerRow, ["CantidadRequerimiento","Cantidad de requerimiento"]),
+    cantidadPedido: findCol(headerRow, ["Cantidad de pedido","CantidadPedido"]),
     cantRecepcion: findCol(headerRow, ["CantRecepcion","Cantidad Recepcion","Cantidad de recepción"]),
     guiaAlmacen: findCol(headerRow, ["GUIA (ALMACÉN)","GUIA (ALMACEN)","Guia Almacen"]),
     facturaProv: findCol(headerRow, ["REGISTRO FACTURA PROVISIÓN","REGISTRO FACTURA PROVISION"]),
@@ -2872,6 +2881,11 @@ function processWorkbook(wb, filename){
         origen: origenFor(col.rucProveedor!==-1 ? r[col.rucProveedor] : ""),
         proveedor: txt(col.proveedor),
         codPedido: codPedidoAt, fPedido, responsablePedido: txt(col.responsablePedido),
+        // Lo que se pasó a Compras. Es la referencia contra la que se compara lo que llegó al
+        // almacén (25.09.2026, Piero: "verifica el color de las cantidades en base a lo que se
+        // pasó a pedido y cuánto llegó"). No siempre coincide con la cantidad del requerimiento:
+        // un req de 300 puede pasarse a pedido en dos tandas.
+        cantPedido: numOrNull(col.cantidadPedido!==-1 ? r[col.cantidadPedido] : null),
         estadoPedido: estadoPedidoAt,
         codOrden: codOrdenAt, usuarioCompras: txt(col.usuarioCompras),
         fOrden, fAprob, fCompromiso, fRecep,
@@ -9901,29 +9915,39 @@ const rqTxt = (t)=> (t==null || t==='') ? '—' : escapeHtml(String(t));
 // exista, ya haya llegado al almacén o ya se haya despachado (24.09.2026, Piero: "los estados están
 // mal"). Acá se recalcula línea por línea con la misma escalera que usa el dashboard de Almacén, que
 // mira lo que realmente pasó —salida, OC, recepción— y no la etiqueta guardada:
-//   1. ¿ya salió del almacén? → Enviado a Obra (por Pedido si hubo OC, por Picking directo si salió de stock)
-//   2. ¿tiene OC? → si ya llegó material: Recibido (total o parcial) en Almacén; si no: cuenta con OC
-//   3. ¿tiene pedido sin OC? → Archivado si el pedido se canceló, si no Pedido pendiente
-//   4. si nada de lo anterior → lo que diga el Excel ("En revisión de Almacén" se muestra "En Revisión")
+//   1. ¿ya la recibieron en obra? → Recibido en Obra
+//   2. ¿ya salió del almacén?     → Enviado a Obra
+//   3. ¿tiene OC? → si ya llegó material: Recibido en Almacén; si no: cuenta con OC
+//   4. ¿tiene pedido sin OC? → Archivado si el pedido se canceló, si no Pedido pendiente
+//   5. si nada de lo anterior → lo que diga el Excel ("En revisión de Almacén" se muestra "En Revisión")
+// El estado dice DÓNDE está la línea, nada más: si llegó completa o a medias lo dice el color de la
+// cantidad, no el texto (25.09.2026, pedido de Piero). Por eso ya no hay "— Pedido" ni "Parcial".
 function rqEstadoReal(r){
   const arch = (t)=> String(t||'').trim().toLowerCase() === 'archivado';
+  if(r.fObra || (r.cantObra != null && r.cantObra > 0)) return 'Recibido en Obra';
   // Lo único que prueba que el material SALIÓ del almacén es FechaSalida (25.09.2026, Piero: "no estás
   // considerando la fecha de salida que está en la data"). La columna GUIA (ALMACÉN) trae la guía del
   // PROVEEDOR —GRR/FAC/DUI, el documento con el que la mercadería LLEGÓ—, así que contarla como salida
   // daba por despachadas 1,234 líneas que en realidad estaban recibidas en almacén esperando despacho.
   // Va donde corresponde: como prueba de recepción, igual que en el dashboard de Almacén.
-  if(r.fSalida) return r.codOrden ? 'Enviado a Obra — Pedido' : 'Enviado a Obra — Picking directo';
+  if(r.fSalida) return 'Enviado a Obra';
   if(r.codOrden){
     const recibido = (r.cantRecep != null && r.cantRecep > 0) || !!r.fRecep || !!r.guia;
-    if(recibido){
-      const completo = (r.cantOrden != null && r.cantOrden > 0 && r.cantRecep != null && r.cantRecep >= r.cantOrden);
-      return completo ? 'Recibido en Almacén — Pedido' : 'Recibido Parcial en Almacén — Pedido';
-    }
-    return 'Enviado a pedido — cuenta con OC';
+    return recibido ? 'Recibido en Almacén' : 'Enviado a pedido — cuenta con OC';
   }
   if(r.codPedido) return (arch(r.estadoPedido) || arch(r.estado)) ? 'Archivado' : 'Pedido pendiente';
   if(arch(r.estado)) return 'Archivado';
   return /revisi/.test(sinAcentos(String(r.estado||'')).toLowerCase()) ? 'En Revisión' : (r.estado || '—');
+}
+
+// Por dónde se atendió la línea: "Directo" si el material salió del stock del almacén sin pasar por
+// una OC, "Pedido" si pasó por Compras. Un mismo requerimiento+producto puede tener las dos cosas
+// —una parte se despacha de stock y el resto se compra— y Nisira las trae como filas separadas
+// (25.09.2026, pedido de Piero: "diferencies eso y lo coloques").
+function rqViaReal(r){
+  if(r.codOrden) return 'Pedido';
+  if(r.fSalida) return 'Directo';
+  return r.codPedido ? 'Pedido' : '';
 }
 
 /** Se calcula una sola vez por archivo cargado y queda guardado en la fila. */
@@ -9933,13 +9957,46 @@ function rqPreparar(){
   // Un mismo requerimiento+producto puede venir en dos líneas: la que ya tiene OC y la que todavía
   // no. Se deja solo la de la OC, igual que en Certificados — si no, el producto sale dos veces con
   // estados que se contradicen ("Pedido pendiente" y "cuenta con OC" a la vez).
-  const conOc = new Set();
-  rows.forEach(function(r){ if(r.codOrden) conOc.add(r.codRequerimiento + '|' + r.idProducto); });
+  // OJO: la línea sin OC que SÍ tiene salida no es un duplicado, es la parte que se despachó directo
+  // de stock; esa se conserva y se marca como mixta (25.09.2026).
+  const conOc = new Set(), conTraza = new Set(), vias = {}, viasReq = {};
   rows.forEach(function(r){
-    r.omitir = !r.codOrden && conOc.has(r.codRequerimiento + '|' + r.idProducto);
+    const k = r.codRequerimiento + '|' + r.idProducto;
+    if(r.codOrden) conOc.add(k);
+    if(r.codOrden || r.codPedido || r.fSalida) conTraza.add(k);
+  });
+  rows.forEach(function(r){
+    const k = r.codRequerimiento + '|' + r.idProducto;
+    // Se descarta la línea sin OC cuando el mismo producto ya aparece con OC, y la línea totalmente
+    // vacía (sin pedido, sin OC y sin salida) cuando ese producto ya aparece con algo de trazabilidad.
+    r.omitir = (!r.codOrden && !r.fSalida && conOc.has(k))
+            || (!r.codOrden && !r.codPedido && !r.fSalida && conTraza.has(k));
     r.estadoCalc = rqEstadoReal(r);
+    r.via = rqViaReal(r);
+    if(!r.omitir && r.via){
+      (vias[k] = vias[k] || {})[r.via] = 1;
+      (viasReq[r.codRequerimiento] = viasReq[r.codRequerimiento] || {})[r.via] = 1;
+    }
+  });
+  rows.forEach(function(r){
+    // mixtoReq: el requerimiento se atendió en parte de stock y en parte comprando (lo más común:
+    // unos ítems salen directo y otros pasan a pedido). mixtoItem: es el MISMO producto el que se
+    // partió en dos, una parte de stock y otra con OC.
+    const v = vias[r.codRequerimiento + '|' + r.idProducto], vr = viasReq[r.codRequerimiento];
+    r.mixtoItem = !!(v && v.Directo && v.Pedido);
+    r.mixtoReq = !!(vr && vr.Directo && vr.Pedido);
   });
   RQ.preparado = rows.length;
+}
+
+/** Semáforo de una cantidad contra su referencia: verde si llegó/salió todo, ámbar con lo que falta. */
+function rqCant(v, ref){
+  if(v == null) return '—';
+  const txt = rqNum(v);
+  if(ref == null || !(ref > 0)) return txt;
+  const falta = Math.round((ref - v) * 100) / 100;
+  if(falta <= 0) return '<span class="rq-q ok">' + txt + '</span>';
+  return '<span class="rq-q parcial">' + txt + '<small>falta ' + rqNum(falta) + '</small></span>';
 }
 
 /** Semáforo del estado ya recalculado. */
@@ -10015,12 +10072,16 @@ function rqVistaItem(cont, filas){
       <td>${rqTxt(r.responsable)}</td>
       <td class="desc">${rqTxt(r.proyecto)}</td>
       <td><span class="rq-est ${rqClaseEstado(r.estadoCalc)}" title="Estado en Nisira: ${escapeHtml(r.estado)}">${escapeHtml(r.estadoCalc)}</span></td>
+      <td>${r.via ? `<span class="rq-via ${r.via === 'Directo' ? 'dir' : 'ped'}">${r.via}</span>` : '—'}
+        ${r.mixtoItem ? '<span class="rq-mix" title="De este mismo producto, una parte salió del stock del almacén y la otra se compró con OC.">este ítem: directo + pedido</span>'
+          : (r.mixtoReq ? '<span class="rq-mix" title="En este requerimiento unos ítems salieron del stock del almacén y otros se compraron con OC.">req. mixto: directo + pedido</span>' : '')}</td>
       <td><span class="cod">${escapeHtml(r.idProducto)}</span></td>
       <td class="desc">${rqTxt(r.producto)}</td>
       <td class="num">${rqNum(r.cantidad)}</td>
       <td>${rqTxt(r.unidad)}</td>
       <td class="g">${rqTxt(r.codPedido)}</td>
       <td>${rqFecha(r.fPedido)}</td>
+      <td class="num">${rqNum(r.cantPedido)}</td>
       <td>${rqTxt(r.responsablePedido)}</td>
       <td class="g">${rqTxt(r.codOrden)}</td>
       <td>${r.origen === 'importado' ? 'Importado' : 'Nacional'}</td>
@@ -10029,14 +10090,14 @@ function rqVistaItem(cont, filas){
       <td>${rqFecha(r.fOrden)}</td>
       <td>${rqFecha(r.fAprob)}</td>
       <td>${rqFecha(r.fCompromiso)}</td>
-      <td class="num g">${rqNum(r.cantRecep)}</td>
+      <td class="num g">${rqCant(r.cantRecep, r.cantPedido != null ? r.cantPedido : r.cantOrden)}</td>
       <td>${rqFecha(r.fRecep)}</td>
       <td>${rqTxt(r.guia)}</td>
       <td>${rqTxt(r.factura)}</td>
-      <td class="num g">${rqNum(r.cantSalida)}</td>
+      <td class="num g">${rqCant(r.cantSalida, r.cantidad)}</td>
       <td>${rqFecha(r.fSalida)}</td>
       <td>${rqTxt(r.docSalida)}</td>
-      <td class="num g">${rqNum(r.cantObra)}</td>
+      <td class="num g">${rqCant(r.cantObra, r.cantSalida)}</td>
       <td>${rqFecha(r.fObra)}</td>
       <td>${rqTxt(r.docObra)}</td>
     </tr>`;
@@ -10046,17 +10107,17 @@ function rqVistaItem(cont, filas){
   cont.innerHTML = `<div class="card table-card rq-scroll"><table class="rq-tabla">
       <thead>
         <tr class="rq-grupos">
-          <th colspan="9" class="t1">1 · Requerimiento</th>
-          <th colspan="3" class="t2">2 · Pedido a Compras</th>
+          <th colspan="10" class="t1">1 · Requerimiento</th>
+          <th colspan="4" class="t2">2 · Pedido a Compras</th>
           <th colspan="7" class="t3">3 · Orden de compra</th>
           <th colspan="4" class="t4">4 · Recepción en almacén</th>
           <th colspan="3" class="t5">5 · Salida del almacén</th>
           <th colspan="3" class="t6">6 · Recepción en obra</th>
         </tr>
         <tr>
-          <th>F. Req.</th><th>N° Req.</th><th>Responsable</th><th>Proyecto</th><th>Estado</th>
+          <th>F. Req.</th><th>N° Req.</th><th>Responsable</th><th>Proyecto</th><th>Estado</th><th>Vía</th>
           <th>Código</th><th>Descripción</th><th class="num">Cant.</th><th>UM</th>
-          <th>N° Pedido</th><th>F. Pedido</th><th>Resp. Pedido</th>
+          <th>N° Pedido</th><th>F. Pedido</th><th class="num">Cant. pedida</th><th>Resp. Pedido</th>
           <th>N° OC</th><th>Origen</th><th>Usuario Compras</th><th>Proveedor</th>
           <th>F. Emisión</th><th>F. Aprobación</th><th>F. Entrega</th>
           <th class="num">Cant. recep.</th><th>F. Recepción</th><th>Guía Proveedor</th><th>Factura</th>
@@ -10064,7 +10125,7 @@ function rqVistaItem(cont, filas){
           <th class="num">Cant. recibida</th><th>F. Recep. obra</th><th>Guía obra</th>
         </tr>
       </thead>
-      <tbody>${cuerpo || '<tr><td colspan="29" style="text-align:center;padding:26px;color:var(--muted);">Ninguna línea calza con esos filtros.</td></tr>'}</tbody>
+      <tbody>${cuerpo || '<tr><td colspan="31" style="text-align:center;padding:26px;color:var(--muted);">Ninguna línea calza con esos filtros.</td></tr>'}</tbody>
     </table></div>` + rqMasHtml(ver.length, orden.length, 'líneas');
   rqEngancharMas();
 }
@@ -10113,8 +10174,8 @@ function rqExportar(){
   if(!filas.length) return;
   const aoa = [[
     'F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Estado en Nisira',
-    'Código','Descripción','Cantidad','UM','Familia',
-    'N° Pedido','F. Pedido','Resp. Pedido',
+    'Vía','¿Mixto?','Código','Descripción','Cantidad','UM','Familia',
+    'N° Pedido','F. Pedido','Cant. pedida','Resp. Pedido',
     'N° OC','Origen','Usuario Compras','Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada',
     'Cant. recepcionada','F. Recepción almacén','Guía Proveedor','Factura',
     'Cant. salida','F. Salida almacén','Guía de salida',
@@ -10123,8 +10184,9 @@ function rqExportar(){
   const n = (v)=> v==null ? '' : v;
   filas.forEach(function(r){
     aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, r.proyecto, r.estadoCalc, r.estado,
+      r.via, r.mixtoItem ? 'Sí — el mismo ítem: directo + pedido' : (r.mixtoReq ? 'Sí — requerimiento mixto: directo + pedido' : ''),
       r.idProducto, r.producto, n(r.cantidad), r.unidad, r.familia,
-      r.codPedido, f(r.fPedido), r.responsablePedido,
+      r.codPedido, f(r.fPedido), n(r.cantPedido), r.responsablePedido,
       r.codOrden, r.origen === 'importado' ? 'Importado' : 'Nacional', r.usuarioCompras, r.proveedor,
       f(r.fOrden), f(r.fAprob), f(r.fCompromiso),
       n(r.cantRecep), f(r.fRecep), r.guia, r.factura,
@@ -10133,8 +10195,8 @@ function rqExportar(){
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{wch:12},{wch:15},{wch:24},{wch:17},{wch:32},{wch:32},{wch:22},
-    {wch:15},{wch:50},{wch:11},{wch:8},{wch:26},
-    {wch:15},{wch:12},{wch:22},
+    {wch:10},{wch:28},{wch:15},{wch:50},{wch:11},{wch:8},{wch:26},
+    {wch:15},{wch:12},{wch:13},{wch:22},
     {wch:15},{wch:11},{wch:16},{wch:32},{wch:12},{wch:14},{wch:15},
     {wch:14},{wch:15},{wch:18},{wch:18},
     {wch:12},{wch:14},{wch:18},
