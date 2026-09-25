@@ -469,11 +469,14 @@
   .rq-pop .extra div{display:flex;justify-content:space-between;gap:10px;font-size:12px;}
   .rq-pop .extra span{color:var(--muted);}
   .rq-pop .extra b{color:var(--ink);font-weight:700;}
-  .rq-pop .pie{margin-top:11px;padding-top:9px;border-top:1px solid var(--border);display:flex;
-    justify-content:space-between;align-items:center;gap:10px;font-size:11.5px;color:var(--muted);}
-  .rq-pop .chip{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;}
-  .rq-pop .chip.repo{background:var(--red-bg);color:var(--red);}
-  .rq-pop .chip.ok{background:var(--green-bg);color:var(--green);}
+  .rq-pop .alt{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
+  .rq-pop .alt-tit{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:7px;}
+  .rq-pop .alt-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;}
+  .rq-pop .alt-fila + .alt-fila{border-top:1px dashed var(--border);}
+  .rq-pop .alt-cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;color:var(--brand-ink);}
+  .rq-pop .alt-nums{display:flex;gap:10px;font-size:11px;color:var(--muted);white-space:nowrap;}
+  .rq-pop .alt-nums b{color:var(--ink);font-weight:800;font-size:12.5px;}
   .rq-pop .cerrar{position:absolute;top:8px;right:10px;border:none;background:none;cursor:pointer;
     font-size:17px;line-height:1;color:var(--muted);}
   .rq-pop .aviso{color:var(--muted);line-height:1.45;}
@@ -2215,6 +2218,9 @@ function buildSnapshot(){
         const na = arr => arr ? arr.map(n) : undefined;
         return {
           c: r.codigo, cs: (r.nCodigos>1 ? r.codigos : undefined), d: r.descripcion, u: r.unidad,
+          // Desglose por código de un producto homologado: [código, ica, lima, trujillo, tránsito].
+          // Solo cuando hay más de un código — si no, el producto ya es el código.
+          ms: (r.nCodigos>1 && r.miembros) ? r.miembros.map(m=>[m.codigo, n(m.ica), n(m.lima), n(m.trujillo), n(m.transito)]) : undefined,
           i: n(r.ica), l: n(r.lima), t: n(r.trujillo), tr: n(r.transito),
           rv: n(r.reserva), pk: n(r.picking), rp: n(r.rop), eq: n(r.eoq),
           cm: n(r.consumoMensual), cb: n(r.cobertura), sg: n(r.stockSeguridad),
@@ -2467,6 +2473,9 @@ function loadFromSnapshot(snap){
     rows: snap.almacen.rows.map(r => conEstadoRepo({
       codigo: r.c, codigos: (r.cs || [r.c]), nCodigos: (r.cs ? r.cs.length : 1),
       descripcion: r.d || "", unidad: r.u || "",
+      // Desglose por código (25.09.2026). Un snapshot publicado antes no lo trae: queda undefined y
+      // el panel de stock muestra solo el total homologado, sin listar los gemelos.
+      miembros: r.ms ? r.ms.map(m=>({ codigo:m[0], ica:m[1]||0, lima:m[2]||0, trujillo:m[3]||0, transito:m[4]||0 })) : undefined,
       ica: r.i||0, lima: r.l||0, trujillo: r.t||0, transito: r.tr||0,
       reserva: r.rv||0, picking: r.pk||0, rop: r.rp||0,
       eoq: (r.eq!=null?r.eq:null), consumoMensual: (r.cm!=null?r.cm:null), cobertura: (r.cb!=null?r.cb:null),
@@ -3872,6 +3881,11 @@ function processAlmacen(wb, filename){
           picking = sum('picking'), rop = sum('rop');
     return conEstadoRepo(Object.assign({}, pri, {
       codigos: g.map(x=>x.codigo).sort(), nCodigos: g.length,
+      // Stock de cada código por separado, además del total homologado: el módulo de Requerimientos
+      // muestra el del código exacto que se pidió y lista los gemelos aparte, como alternativa, sin
+      // sumarlos (25.09.2026, pedido de Piero).
+      miembros: g.map(function(x){ return { codigo:x.codigo, descripcion:x.descripcion,
+        ica:x.ica||0, lima:x.lima||0, trujillo:x.trujillo||0, transito:x.transito||0 }; }),
       ica: sum('ica'), lima, trujillo: sum('trujillo'), transito, reserva, picking, rop,
       eoq: g.some(x=>x.eoq!=null) ? sum('eoq') : null,
       consumoMensual: g.some(x=>x.consumoMensual!=null) ? sum('consumoMensual') : null,
@@ -10337,23 +10351,29 @@ function rqAbrirStock(btn){
         ? 'Este código no está en la hoja "Análisis Inventario" del Reporte Almacén: solo aparecen ahí los productos con punto de reorden definido.'
         : 'Carga <b>Reporte Almacen.xlsx</b> para ver el stock por sede.'}</div>`;
   } else {
+    // El stock que se muestra arriba es el DEL CÓDIGO QUE SE PIDIÓ, no la suma del grupo homologado
+    // (25.09.2026, Piero: "si hay códigos homologados que tengan stock debe salir tal cual el
+    // desglose con alternativa, mas no sumarse"). Los gemelos con stock van listados abajo aparte.
+    const yo = (p.miembros || []).filter(function(m){ return m.codigo === cod; })[0] || p;
+    const otros = (p.miembros || []).filter(function(m){
+      return m.codigo !== cod && ((m.lima||0) + (m.trujillo||0) + (m.ica||0) + (m.transito||0)) > 0;
+    });
     const sede = (etq, v)=> `<div class="sede${(v||0) ? '' : ' cero'}"><b>${etq}</b><i>${num(v)}</i></div>`;
-    const disp = (p.lima || 0) + transitoDisponible(p) - (p.reserva || 0) - (p.picking || 0);
-    const repo = p.estado === 'reposicion';
     pop.innerHTML = `<button class="cerrar" type="button" aria-label="Cerrar">&times;</button>
-      <h5>${escapeHtml(p.codigo)}${p.nCodigos > 1 ? ' <span style="font-family:inherit;color:var(--muted);font-weight:600;">+' + (p.nCodigos-1) + ' código' + (p.nCodigos > 2 ? 's' : '') + ' homologado' + (p.nCodigos > 2 ? 's' : '') + '</span>' : ''}</h5>
-      <div class="desc">${escapeHtml(p.descripcion || '')}${p.unidad ? ' · <b>' + escapeHtml(p.unidad) + '</b>' : ''}</div>
-      <div class="sedes">${sede('LIMA', p.lima)}${sede('TRUJILLO', p.trujillo)}${sede('ICA', p.ica)}</div>
-      <div class="extra">
-        <div><span>En tránsito</span><b>${num(p.transito)}</b></div>
-        <div><span>Reserva / picking</span><b>${num(p.reserva)} / ${num(p.picking)}</b></div>
-        <div><span>Stock disponible en Lima</span><b>${num(Math.round(disp*100)/100)}</b></div>
-        <div><span>Punto de reorden (ROP)</span><b>${p.rop != null ? num(p.rop) : '—'}</b></div>
-      </div>
-      <div class="pie">
-        <span>Foto del Reporte Almacén</span>
-        <span class="chip ${repo ? 'repo' : 'ok'}">${repo ? 'REPOSICIÓN' : 'OK'}</span>
-      </div>`;
+      <h5>${escapeHtml(cod)}</h5>
+      <div class="desc">${escapeHtml(yo.descripcion || p.descripcion || '')}${p.unidad ? ' · <b>' + escapeHtml(p.unidad) + '</b>' : ''}</div>
+      <div class="sedes">${sede('LIMA', yo.lima)}${sede('TRUJILLO', yo.trujillo)}${sede('ICA', yo.ica)}</div>
+      <div class="extra"><div><span>En tránsito</span><b>${num(yo.transito)}</b></div></div>
+      ${(!p.miembros && p.nCodigos > 1) ? `<div class="alt"><div class="aviso" style="font-size:11.5px;">Este link se publicó antes del desglose por código: lo de arriba es la <b>suma de ${p.nCodigos} códigos</b> que significan lo mismo. Vuelve a publicar con ☁ para separarlos.</div></div>` : ''}
+      ${otros.length ? `<div class="alt">
+        <div class="alt-tit">Mismo material, otro código &mdash; ${otros.length === 1 ? 'alternativa' : 'alternativas'} con stock</div>
+        ${otros.map(function(m){
+          return `<div class="alt-fila">
+            <div class="alt-cod">${escapeHtml(m.codigo)}</div>
+            <div class="alt-nums"><span>Lima <b>${num(m.lima)}</b></span><span>Truj. <b>${num(m.trujillo)}</b></span><span>Ica <b>${num(m.ica)}</b></span></div>
+          </div>`;
+        }).join('')}
+      </div>` : ''}`;
   }
   document.body.appendChild(pop);
   // Se ancla debajo del código y se corrige si se sale de la pantalla.
