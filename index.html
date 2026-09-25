@@ -512,7 +512,44 @@
   .rq-hero input{flex:1;min-width:0;border:none;outline:none;background:transparent;padding:13px 0;
     font:700 26px/1.2 Inter,Arial,sans-serif;color:#0f1b2d;letter-spacing:.3px;}
   .rq-hero input::placeholder{font-weight:600;color:#8695a8;letter-spacing:0;}
+  /* ---- Requerimientos en el celular: tarjetas por ítem (25.09.2026) ---- */
+  .rq-filtros-btn{display:none;}
+  .rqm{display:flex;flex-direction:column;gap:10px;}
+  .rqm-cab{background:linear-gradient(135deg,var(--brand) 0%,#123a9e 100%);color:#fff;border-radius:14px;padding:14px 16px;}
+  .rqm-cab-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .rqm-cab .rqm-num{font-size:17px;color:#fff;}
+  .rqm-fecha{font-size:12.5px;font-weight:600;opacity:.8;white-space:nowrap;}
+  .rqm-pry{margin-top:4px;font-size:13.5px;font-weight:700;line-height:1.3;}
+  .rqm-resp{margin-top:3px;font-size:12px;opacity:.82;}
+  .rqm-resp b{font-weight:700;}
+  .rqm-num{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:800;color:var(--brand-ink);}
+  .rqm-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;}
+  .rqm-req{font-size:11.5px;color:var(--muted);margin-bottom:6px;line-height:1.35;}
+  .rqm-req .rqm-num{font-size:12px;}
+  .rqm-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .rqm-top .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;font-weight:800;color:var(--brand-ink);}
+  .rqm-desc{margin-top:4px;font-size:13px;line-height:1.35;color:var(--ink);}
+  .rqm-ruta{margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .rqm-ptos{display:flex;align-items:center;}
+  .rqm-pto{display:block;width:13px;height:13px;border-radius:50%;background:var(--surface-2);border:2px solid var(--border);box-sizing:border-box;}
+  .rqm-pto.ok{background:var(--green);border-color:var(--green);}
+  .rqm-lin{display:block;width:14px;height:3px;background:var(--border);}
+  .rqm-lin.ok{background:var(--green);}
+  .rqm-cants{margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+  .rqm-cants > div{background:var(--surface-2);border-radius:9px;padding:6px 4px;text-align:center;min-width:0;}
+  .rqm-cants > div > span{display:block;font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .rqm-cants b{display:block;font-size:15px;font-weight:800;color:var(--ink);margin-top:1px;}
+  .rqm-cants b .rq-q{font-size:15px;}
+  .rqm-cants b small{font-size:10px;font-weight:700;letter-spacing:0;text-transform:none;}
+  .rqm-cants em{display:block;font-style:normal;font-size:9.5px;color:var(--muted);}
+  .rqm-docs{margin-top:9px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;line-height:1.55;color:var(--ink-soft);
+    font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word;}
   @media (max-width:760px){
+    .rq-filtros-btn{display:inline-flex;}
+    .rq-barra select,.rq-barra .crt-limpiar{display:none;}
+    .rq-barra.abierto select{display:block;width:100%;}
+    .rq-barra.abierto .crt-limpiar:not([hidden]){display:inline-flex;}
+    .rq-pop{width:calc(100vw - 24px);max-width:360px;}
     .rq-hero{flex-direction:column;align-items:stretch;gap:10px;padding:14px;}
     .rq-hero-rotulo b{font-size:17px;} .rq-hero-rotulo span{font-size:11px;}
     .rq-hero-caja{padding:2px 14px;gap:9px;}
@@ -761,8 +798,9 @@
       <div class="navitem" data-section="alertas">📦 Análisis de Inventario</div>
       <div class="navitem" data-section="requerimientos">⚡ Requerimientos</div>
     </div>
-    <!-- Compras: por ahora su único contenido es el link a la otra plataforma (24.09.2026,
-         pedido de Piero: "el módulo que diga Compras y abajo Plataforma Compras"). -->
+    <!-- Compras: el link a la otra plataforma y, debajo, Certificados (25.09.2026, pedido de Piero:
+         "añade el módulo de certificados dentro de compras, debajo de plataforma compras").
+         Antes Certificados era un módulo aparte en la barra. -->
     <div class="navmod" data-mod="compras">
       <span class="ico">🛒</span><span>Compras</span>
       <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
@@ -771,15 +809,7 @@
       <div class="navitem externo" data-url="https://melissa2026714.github.io/dashboard-friopacking/compras.html" title="Se abre en una pestaña nueva">
         <span>📊 Plataforma Compras</span><svg class="fuera" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v7H3V3h7"/></svg>
       </div>
-    </div>
-    <!-- Certificados pasa a ser un módulo desplegable como los demás (24.09.2026, pedido de Piero):
-         su reporte cuelga del módulo en vez de entrar directo al hacer clic en el nombre. -->
-    <div class="navmod" data-mod="certificados">
-      <span class="ico">📄</span><span>Certificados</span>
-      <svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
-    </div>
-    <div class="navsub" data-sub="certificados" hidden>
-      <div class="navitem" data-section="certificados">📄 Certificados por Proyecto</div>
+      <div class="navitem" data-section="certificados">📄 Certificados</div>
     </div>
   </nav>
   <div class="sidebar-foot">Grupo Friopacking<br>Logística</div>
@@ -1115,7 +1145,10 @@
         </div>
       </div>
 
-      <div class="toolbar">
+      <div class="toolbar rq-barra" id="rqBarra">
+        <!-- En el celular los 5 filtros ocupaban media pantalla antes del primer resultado: ahí se
+             pliegan detrás de este botón (solo se ve en pantallas chicas). -->
+        <button class="btn secondary rq-filtros-btn" id="rqFiltrosBtn" type="button">&#9881; Filtros</button>
         <select id="rqProyecto"><option value="all">Proyecto: todos</option></select>
         <select id="rqEstado"><option value="all">Estado: todos</option></select>
         <select id="rqResponsable"><option value="all">Responsable: todos</option></select>
@@ -10175,7 +10208,62 @@ function drawRequerimientos(){
   rqVistaItem(cont, filas);
 }
 
+// En el celular la tabla de 31 columnas medía 3,600 px dentro de una pantalla de 360: solo se veían
+// fecha, N° y responsable repetidos. Ahí se dibuja una tarjeta por ítem (25.09.2026).
+const RQ_MOVIL = window.matchMedia ? window.matchMedia('(max-width: 760px)') : { matches:false };
+
+function rqVistaTarjetas(cont, filas){
+  const orden = filas.slice().sort(function(a,b){ return (b.fReq||0) - (a.fReq||0); });
+  const ver = orden.slice(0, RQ.tope);
+  const reqs = [...new Set(orden.map(function(r){ return r.codRequerimiento; }))];
+  const unSoloReq = reqs.length === 1;
+  const n = (v)=> v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
+
+  // Cabecera del requerimiento, una sola vez, cuando todo lo que se ve es del mismo req.
+  const r0 = orden[0];
+  const cab = unSoloReq ? `<div class="rqm-cab">
+      <div class="rqm-cab-top"><span class="rqm-num">${escapeHtml(r0.codRequerimiento)}</span><span class="rqm-fecha">${rqFecha(r0.fReq)}</span></div>
+      <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>
+      <div class="rqm-resp">Pidió <b>${rqTxt(r0.responsable)}</b> · ${orden.length} ítem${orden.length === 1 ? '' : 's'}</div>
+    </div>` : '';
+
+  const tarjetas = ver.map(function(r){
+    const puntos = RQ_PASOS.map(function(p, j){
+      const ok = p.ok(r);
+      return (j ? `<i class="rqm-lin${ok ? ' ok' : ''}"></i>` : '') + `<i class="rqm-pto${ok ? ' ok' : ''}"></i>`;
+    }).join('');
+    const refRecep = r.cantPedido != null ? r.cantPedido : r.cantOrden;
+    const docs = [
+      r.codOrden ? 'OC ' + escapeHtml(r.codOrden) : '',
+      r.docSalida ? 'Salida ' + escapeHtml(r.docSalida) + (r.fSalida ? ' · ' + rqFecha(r.fSalida) : '') : '',
+      r.docObra ? 'Obra ' + escapeHtml(r.docObra) + (r.fObra ? ' · ' + rqFecha(r.fObra) : '') : '',
+    ].filter(Boolean);
+    return `<div class="rqm-card">
+      ${unSoloReq ? '' : `<div class="rqm-req"><span class="rqm-num">${escapeHtml(r.codRequerimiento)}</span> · ${rqFecha(r.fReq)} · ${rqTxt(r.proyecto)}</div>`}
+      <div class="rqm-top">
+        <button type="button" class="cod rq-cod" data-rqstock="${escapeHtml(r.idProducto)}" data-rqreq="${escapeHtml(r.codRequerimiento)}">${escapeHtml(r.idProducto)}</button>
+        <span class="rq-est ${rqClaseEstado(r.estadoCalc)}">${escapeHtml(r.estadoCalc)}</span>
+      </div>
+      <div class="rqm-desc">${rqTxt(r.producto)}</div>
+      <div class="rqm-ruta"><div class="rqm-ptos">${puntos}</div>
+        ${r.via ? `<span class="rq-via ${r.via === 'Directo' ? 'dir' : 'ped'}">${r.via}</span>` : ''}
+      </div>
+      <div class="rqm-cants">
+        <div><span>Pidió</span><b>${n(r.cantidad)}</b><em>${rqTxt(r.unidad)}</em></div>
+        <div><span>Llegó</span><b>${rqCant(r.cantRecep, refRecep)}</b></div>
+        <div><span>Salió</span><b>${rqCant(r.cantSalida, r.cantidad)}</b></div>
+        <div><span>En obra</span><b>${rqCant(r.cantObra, r.cantSalida)}</b></div>
+      </div>
+      ${docs.length ? `<div class="rqm-docs">${docs.join('<br>')}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  cont.innerHTML = `<div class="rqm">${cab}${tarjetas}</div>` + rqMasHtml(ver.length, orden.length, 'ítems');
+  rqEngancharMas();
+}
+
 function rqVistaItem(cont, filas){
+  if(RQ_MOVIL.matches) return rqVistaTarjetas(cont, filas);
   const orden = filas.slice().sort(function(a,b){ return (b.fReq||0) - (a.fReq||0); });
   const ver = orden.slice(0, RQ.tope);
   const cuerpo = ver.map(function(r){
@@ -10661,6 +10749,17 @@ function descargarRqImagen(btn){
 }
 
 document.getElementById('rqExportar').addEventListener('click', rqExportar);
+(function(){
+  const redibujar = function(){
+    const sec = document.getElementById('section-requerimientos');
+    if(sec && sec.classList.contains('active')) drawRequerimientos();
+  };
+  if(RQ_MOVIL.addEventListener) RQ_MOVIL.addEventListener('change', redibujar);
+  else if(RQ_MOVIL.addListener) RQ_MOVIL.addListener(redibujar);
+  document.getElementById('rqFiltrosBtn').addEventListener('click', function(){
+    document.getElementById('rqBarra').classList.toggle('abierto');
+  });
+})();
 document.getElementById('rqImagen').addEventListener('click', function(){ descargarRqImagen(this); });
 
 // ---------------------------------------------------------------- arranque
@@ -10747,7 +10846,7 @@ document.getElementById('crtQuitarSel').addEventListener('click', ()=>{ CRT.sel.
 const MODULOS = {
   gerencial:    { nombre:'Gerencial',    secciones:{ proceso:'Indicadores de Logística', gasto:'Concentración de Gasto' } },
   logistica:    { nombre:'Logística',    secciones:{ alertas:'Análisis de Inventario', requerimientos:'Requerimientos' } },
-  certificados: { nombre:'Certificados', secciones:{ certificados:'Certificados por Proyecto' } },
+  compras:      { nombre:'Compras',      secciones:{ certificados:'Certificados' } },
 };
 const MOD_DE_SECCION = {};
 for(const [mod, cfg] of Object.entries(MODULOS))
