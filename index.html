@@ -9902,7 +9902,7 @@ function crtFila(f){
 // picking, la validación— viven en el sistema de Almacén y acá se verían desactualizadas, así que no se
 // replican.
 // ============================================================================
-const RQ = { q:'', tope:200, preparado:-1 };
+const RQ = { q:'', tope:200, preparado:-1, filas:[] };
 const RQ_PASO = 200;
 
 function getReqRows(){ return (DATA && DATA.reqRows) || []; }
@@ -9954,28 +9954,18 @@ function rqViaReal(r){
 function rqPreparar(){
   const rows = getReqRows();
   if(!rows.length || RQ.preparado === rows.length) return;
-  // Un mismo requerimiento+producto puede venir en dos líneas: la que ya tiene OC y la que todavía
-  // no. Se deja solo la de la OC, igual que en Certificados — si no, el producto sale dos veces con
-  // estados que se contradicen ("Pedido pendiente" y "cuenta con OC" a la vez).
-  // OJO: la línea sin OC que SÍ tiene salida no es un duplicado, es la parte que se despachó directo
-  // de stock; esa se conserva y se marca como mixta (25.09.2026).
-  const conOc = new Set(), conTraza = new Set(), vias = {};
-  rows.forEach(function(r){
-    const k = r.codRequerimiento + '|' + r.idProducto;
-    if(r.codOrden) conOc.add(k);
-    if(r.codOrden || r.codPedido || r.fSalida) conTraza.add(k);
-  });
-  rows.forEach(function(r){
-    const k = r.codRequerimiento + '|' + r.idProducto;
-    // Se descarta la línea sin OC cuando el mismo producto ya aparece con OC, y la línea totalmente
-    // vacía (sin pedido, sin OC y sin salida) cuando ese producto ya aparece con algo de trazabilidad.
-    r.omitir = (!r.codOrden && !r.fSalida && conOc.has(k))
-            || (!r.codOrden && !r.codPedido && !r.fSalida && conTraza.has(k));
-    r.estadoCalc = rqEstadoReal(r);
+  // Cada fila del Reporte Maestro es un ÍTEM del requerimiento, no un duplicado: el mismo producto
+  // puede aparecer varias veces porque se pidió en dos tandas (25.09.2026, Piero mostró el
+  // "Seguimiento de Requerimiento Interno" del 0023138: 8 ítems en Nisira = 8 filas en el Excel).
+  // Por eso acá no se descarta ni se fusiona nada; solo se reparte la salida y se calcula el estado.
+  RQ.filas = rqRepartirSalida(rows);
+  const vias = {};
+  RQ.filas.forEach(function(r){
     r.via = rqViaReal(r);
-    if(!r.omitir && r.via) (vias[k] = vias[k] || {})[r.via] = 1;
+    r.estadoCalc = rqEstadoReal(r);
+    if(r.via) (vias[r.codRequerimiento + '|' + r.idProducto] = vias[r.codRequerimiento + '|' + r.idProducto] || {})[r.via] = 1;
   });
-  rows.forEach(function(r){
+  RQ.filas.forEach(function(r){
     // Solo se marca cuando es el MISMO ítem el que se partió: una parte salió del stock del almacén
     // y la otra se compró con OC. Que el requerimiento tenga unos ítems directos y otros por pedido
     // no se marca — eso ya lo dice la columna Vía línea por línea (25.09.2026, aclaración de Piero).
@@ -9983,6 +9973,48 @@ function rqPreparar(){
     r.mixtoItem = !!(v && v.Directo && v.Pedido);
   });
   RQ.preparado = rows.length;
+}
+
+// Cuando el mismo producto se pidió en varios ítems del requerimiento, Nisira cuelga la SALIDA
+// COMPLETA de uno solo de ellos y deja los demás en blanco (25.09.2026, Piero: "el total de salida
+// está en una sola línea y no en las que se repitan distribuido según lo que pidieron"). Eso hacía
+// que el semáforo comparara los 69 despachados contra los 48 de UN ítem y lo diera por completo,
+// escondiendo que faltaban 18 — y dejaba los otros ítems como si nunca se hubieran atendido.
+// Acá se reparte igual que la pantalla "Seguimiento de Requerimiento Interno": ítem por ítem, cada
+// uno toma hasta lo que pidió (su cantidad pedida, o la requerida si nunca pasó por Compras) y el
+// sobrante cae en el último. Los ítems con OC se reparten aparte de los que salieron de stock, para
+// no mezclar lo que se compró con lo que ya estaba en almacén.
+function rqRepartirSalida(rows){
+  const copias = rows.map(function(r){ return Object.assign({}, r); });
+  const grupos = new Map();
+  copias.forEach(function(r){
+    const k = r.codRequerimiento + '|' + r.idProducto + '|' + (r.codOrden ? 'oc' : 'stock');
+    if(!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(r);
+  });
+  const red = (v)=> Math.round(v * 100) / 100;
+  grupos.forEach(function(g){
+    if(g.length < 2) return;
+    ['Salida','Obra'].forEach(function(que){
+      const campo = 'cant' + que;
+      const conDato = g.filter(function(r){ return r[campo] != null && r[campo] > 0; });
+      if(conDato.length !== 1) return;   // 0 = no hay nada que repartir; 2+ = Nisira ya lo repartió
+      const fuente = conDato[0];
+      let resto = fuente[campo];
+      g.forEach(function(r, i){
+        const tope = que === 'Obra' ? r.cantSalida
+                   : (r.cantPedido != null ? r.cantPedido : r.cantidad);
+        const parte = (i === g.length - 1 || tope == null) ? resto : Math.min(resto, tope);
+        r[campo] = parte > 0 ? red(parte) : null;
+        resto = red(resto - (parte > 0 ? parte : 0));
+        if(r[campo] != null && r !== fuente){
+          if(!r['f' + que]) r['f' + que] = fuente['f' + que];
+          if(!r['doc' + que]) r['doc' + que] = fuente['doc' + que];
+        }
+      });
+    });
+  });
+  return copias;
 }
 
 /** Semáforo de una cantidad contra su referencia: verde si llegó/salió todo, ámbar con lo que falta. */
@@ -10008,8 +10040,7 @@ function rqClaseEstado(e){
 function rqFiltradas(){
   const q = RQ.q, fPry = rqVal('rqProyecto'), fEst = rqVal('rqEstado');
   const fResp = rqVal('rqResponsable'), fFam = rqVal('rqFamilia'), fOri = rqVal('rqOrigen');
-  return getReqRows().filter(function(r){
-    if(r.omitir) return false;
+  return RQ.filas.filter(function(r){
     if(fPry !== 'all' && r.idProyecto !== fPry) return false;
     if(fEst !== 'all' && r.estadoCalc !== fEst) return false;
     if(fResp !== 'all' && r.responsable !== fResp) return false;
@@ -10136,7 +10167,7 @@ function rqEngancharMas(){
 
 /** Los desplegables se llenan con lo que trae el archivo, conservando lo ya elegido. */
 function rqLlenarFiltros(){
-  const rows = getReqRows();
+  const rows = RQ.filas;
   const llenar = (id, valores, etiqueta)=>{
     const sel = document.getElementById(id);
     if(!sel || sel.dataset.listo === String(rows.length)) return;
