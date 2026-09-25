@@ -470,13 +470,6 @@
   .rq-pop .extra span{color:var(--muted);}
   .rq-pop .extra b{color:var(--ink);font-weight:700;}
   .rq-pop .alt{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
-  .rq-pop .alt-tit{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
-    color:var(--muted);margin-bottom:7px;}
-  .rq-pop .alt-fila{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;}
-  .rq-pop .alt-fila + .alt-fila{border-top:1px dashed var(--border);}
-  .rq-pop .alt-cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;color:var(--brand-ink);}
-  .rq-pop .alt-nums{display:flex;gap:10px;font-size:11px;color:var(--muted);white-space:nowrap;}
-  .rq-pop .alt-nums b{color:var(--ink);font-weight:800;font-size:12.5px;}
   .rq-pop .cerrar{position:absolute;top:8px;right:10px;border:none;background:none;cursor:pointer;
     font-size:17px;line-height:1;color:var(--muted);}
   .rq-pop .aviso{color:var(--muted);line-height:1.45;}
@@ -10351,29 +10344,18 @@ function rqAbrirStock(btn){
         ? 'Este código no está en la hoja "Análisis Inventario" del Reporte Almacén: solo aparecen ahí los productos con punto de reorden definido.'
         : 'Carga <b>Reporte Almacen.xlsx</b> para ver el stock por sede.'}</div>`;
   } else {
-    // El stock que se muestra arriba es el DEL CÓDIGO QUE SE PIDIÓ, no la suma del grupo homologado
-    // (25.09.2026, Piero: "si hay códigos homologados que tengan stock debe salir tal cual el
-    // desglose con alternativa, mas no sumarse"). Los gemelos con stock van listados abajo aparte.
+    // El stock es el DEL CÓDIGO QUE SE PIDIÓ, sin homologar: acá no se suman ni se listan los
+    // códigos gemelos (25.09.2026, Piero: "solo pon el stock que corresponda a cada código").
+    // La homologación sigue viva donde sí corresponde — Análisis de Inventario, para decidir
+    // reposición—, pero en trazabilidad se responde por el código que pidió la obra.
     const yo = (p.miembros || []).filter(function(m){ return m.codigo === cod; })[0] || p;
-    const otros = (p.miembros || []).filter(function(m){
-      return m.codigo !== cod && ((m.lima||0) + (m.trujillo||0) + (m.ica||0) + (m.transito||0)) > 0;
-    });
     const sede = (etq, v)=> `<div class="sede${(v||0) ? '' : ' cero'}"><b>${etq}</b><i>${num(v)}</i></div>`;
     pop.innerHTML = `<button class="cerrar" type="button" aria-label="Cerrar">&times;</button>
       <h5>${escapeHtml(cod)}</h5>
       <div class="desc">${escapeHtml(yo.descripcion || p.descripcion || '')}${p.unidad ? ' · <b>' + escapeHtml(p.unidad) + '</b>' : ''}</div>
       <div class="sedes">${sede('LIMA', yo.lima)}${sede('TRUJILLO', yo.trujillo)}${sede('ICA', yo.ica)}</div>
       <div class="extra"><div><span>En tránsito</span><b>${num(yo.transito)}</b></div></div>
-      ${(!p.miembros && p.nCodigos > 1) ? `<div class="alt"><div class="aviso" style="font-size:11.5px;">Este link se publicó antes del desglose por código: lo de arriba es la <b>suma de ${p.nCodigos} códigos</b> que significan lo mismo. Vuelve a publicar con ☁ para separarlos.</div></div>` : ''}
-      ${otros.length ? `<div class="alt">
-        <div class="alt-tit">Mismo material, otro código &mdash; ${otros.length === 1 ? 'alternativa' : 'alternativas'} con stock</div>
-        ${otros.map(function(m){
-          return `<div class="alt-fila">
-            <div class="alt-cod">${escapeHtml(m.codigo)}</div>
-            <div class="alt-nums"><span>Lima <b>${num(m.lima)}</b></span><span>Truj. <b>${num(m.trujillo)}</b></span><span>Ica <b>${num(m.ica)}</b></span></div>
-          </div>`;
-        }).join('')}
-      </div>` : ''}`;
+      ${(!p.miembros && p.nCodigos > 1) ? `<div class="alt"><div class="aviso" style="font-size:11.5px;">Este link se publicó antes del desglose por código: lo de arriba suma ${p.nCodigos} códigos. Vuelve a publicar con ☁.</div></div>` : ''}`;
   }
   document.body.appendChild(pop);
   // Se ancla debajo del código y se corrige si se sale de la pantalla.
