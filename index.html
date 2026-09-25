@@ -458,6 +458,22 @@
   .rq-est.recibido{background:var(--azul-bg);color:var(--brand-ink);}
   .rq-est.espera{background:var(--red-bg);color:var(--red);}
   .rq-est.fuera{opacity:.65;}
+  .rq-hero{display:flex;align-items:center;gap:14px;background:var(--surface);border:2px solid var(--border);
+    border-radius:16px;padding:6px 20px;margin-bottom:14px;transition:border-color .15s,box-shadow .15s;}
+  .rq-hero:focus-within{border-color:var(--brand);box-shadow:0 0 0 4px var(--azul-bg);}
+  .rq-hero-lupa{font-size:26px;line-height:1;opacity:.55;flex-shrink:0;}
+  .rq-hero input{flex:1;min-width:0;border:none;outline:none;background:transparent;padding:14px 0;
+    font:700 26px/1.2 Inter,Arial,sans-serif;color:var(--ink);letter-spacing:.3px;}
+  .rq-hero input::placeholder{font-weight:600;color:var(--muted);letter-spacing:0;}
+  .rq-vacio{text-align:center;padding:60px 24px;color:var(--muted);}
+  .rq-vacio .ico{font-size:56px;line-height:1;opacity:.35;}
+  .rq-vacio b{display:block;margin-top:16px;font-size:19px;color:var(--ink);}
+  .rq-vacio span{display:block;margin-top:8px;font-size:14px;}
+  @media (max-width:760px){
+    .rq-hero{padding:4px 14px;gap:10px;}
+    .rq-hero input{font-size:19px;padding:12px 0;}
+    .rq-hero-lupa{font-size:20px;}
+  }
   .rq-mix{display:block;font-size:10px;color:var(--amber-ink);font-weight:700;margin-top:3px;white-space:nowrap;}
   .rq-via{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
   .rq-via.dir{background:var(--green-bg);color:var(--green);}
@@ -1043,8 +1059,15 @@
     <div id="section-requerimientos" class="section">
       <div class="note" id="rqNota" style="display:none;"></div>
 
+      <!-- El buscador va grande y arriba de todo: este módulo se consulta por número de
+           requerimiento, no se navega (25.09.2026, pedido de Piero). La tabla no se dibuja hasta
+           que hay algo escrito acá. -->
+      <div class="rq-hero">
+        <span class="rq-hero-lupa" aria-hidden="true">&#128269;</span>
+        <input type="search" id="rqBuscar" placeholder="Escribe el N° de requerimiento…">
+      </div>
+
       <div class="toolbar">
-        <input type="search" id="rqBuscar" placeholder="Buscar por requerimiento, código, producto, proyecto, proveedor o responsable…">
         <select id="rqProyecto"><option value="all">Proyecto: todos</option></select>
         <select id="rqEstado"><option value="all">Estado: todos</option></select>
         <select id="rqResponsable"><option value="all">Responsable: todos</option></select>
@@ -1056,9 +1079,8 @@
         </select>
         <button class="crt-limpiar" id="rqLimpiar" type="button" hidden>&times; Limpiar filtros</button>
         <button class="btn secondary" id="rqExportar" type="button">&#11015; Exportar</button>
+        <button class="btn secondary" id="rqImagen" type="button">&#128247; Imagen para WhatsApp</button>
       </div>
-
-      <div class="kpi-grid" id="rqKpis"></div>
 
       <div id="rqVista"></div>
     </div><!-- /section-requerimientos -->
@@ -8542,7 +8564,11 @@ async function generarPartesEnZip(btn, partes, base, escala){
       const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
       imagenes.push({ nombre: base + '-' + (i+1) + '-de-' + partes.length + '.png', blob });
     }
-    if(typeof JSZip !== 'undefined'){
+    // Una sola imagen no se mete en un zip: el zip solo estorba para mandarla por WhatsApp
+    // (25.09.2026). Con 2 o más se sigue armando el zip como antes.
+    if(imagenes.length === 1){
+      descargarBlob(imagenes[0].blob, base + '.png');
+    } else if(typeof JSZip !== 'undefined'){
       btn.textContent = '⏳ Armando el zip...';
       const zip = new JSZip();
       for(const img of imagenes) zip.file(img.nombre, img.blob);
@@ -10066,26 +10092,32 @@ function drawRequerimientos(){
     nota.innerHTML = (DATA && DATA.fromSnapshot)
       ? '<b>Este link se publicó antes de que existiera el módulo de Requerimientos.</b> Vuelve a publicar con el botón ☁ (o carga el Reporte Maestro) para verlo.'
       : '<b>Carga primero el Reporte Maestro</b> para ver los requerimientos.';
-    cont.innerHTML = ''; document.getElementById('rqKpis').innerHTML = '';
+    cont.innerHTML = '';
     return;
   }
   nota.style.display = 'none';
   rqPreparar();
   rqLlenarFiltros();
 
-  const filas = rqFiltradas();
-  const reqs = new Set(filas.map(function(r){ return r.codRequerimiento; }));
-  const resp = new Set(filas.map(function(r){ return r.responsable; }).filter(Boolean));
-  const prys = new Set(filas.map(function(r){ return r.idProyecto; }).filter(Boolean));
-  const cant = filas.reduce(function(a,r){ return a + (r.cantidad || 0); }, 0);
   const hayFiltro = RQ.q || ['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].some(function(id){ return rqVal(id) !== 'all'; });
   document.getElementById('rqLimpiar').hidden = !hayFiltro;
-  document.getElementById('rqKpis').innerHTML = `
-    <div class="card kpi"><div class="label">Requerimientos</div><div class="value">${reqs.size.toLocaleString('es-PE')}</div><div class="sub">${hayFiltro ? 'con los filtros puestos' : 'en total'}</div></div>
-    <div class="card kpi"><div class="label">Líneas de producto</div><div class="value">${filas.length.toLocaleString('es-PE')}</div><div class="sub">${prys.size} ${prys.size===1?'proyecto':'proyectos'}</div></div>
-    <div class="card kpi"><div class="label">Responsables</div><div class="value">${resp.size}</div><div class="sub">pidieron material</div></div>
-    <div class="card kpi"><div class="label">Cantidad pedida</div><div class="value">${rqNum(Math.round(cant*100)/100)}</div><div class="sub">unidades</div></div>`;
-
+  // Sin búsqueda no se dibuja nada: el módulo se consulta por número de requerimiento, volcar las
+  // 14,000 líneas de golpe no le sirve a nadie (25.09.2026, pedido de Piero).
+  const filas = RQ.q ? rqFiltradas() : [];
+  const hayQue = !!RQ.q;
+  ['rqExportar','rqImagen'].forEach(function(id){
+    const b = document.getElementById(id);
+    if(b) b.disabled = !filas.length;
+  });
+  if(!hayQue){
+    cont.innerHTML = `<div class="card"><div class="rq-vacio">
+      <div class="ico">&#128269;</div>
+      <b>Escribe un N° de requerimiento arriba</b>
+      <span>Acepta el número completo (0001-0023138) o solo el correlativo (23138).
+        También busca por código de producto, proyecto, proveedor o responsable.</span>
+    </div></div>`;
+    return;
+  }
   rqVistaItem(cont, filas);
 }
 
@@ -10243,7 +10275,158 @@ document.getElementById('rqLimpiar').addEventListener('click', function(){
   ['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].forEach(function(id){ document.getElementById(id).value = 'all'; });
   RQ.tope = RQ_PASO; drawRequerimientos();
 });
+// ---------------------------------------------------------- imagen para WhatsApp (25.09.2026)
+// Resumen del requerimiento que se está consultando, en el mismo lienzo 1080x1350 y con la misma
+// paleta que el resto de infografías de la plataforma (ver plantilla: azul marino #0a1e64,
+// turquesa #1f9aa8, negrita reforzada con text-shadow, 40 px de margen abajo para que la hora de
+// WhatsApp no tape la última fila). Se reutiliza generarPartesEnZip con una sola parte y escala 1,
+// para que el PNG salga exactamente a 1080x1350.
+const RQ_IMG_TRAMOS = [
+  { estado:'Recibido en Obra',                 corto:'Recibido en obra',    color:'#15803d', bg:'#dcfce7' },
+  { estado:'Enviado a Obra',                   corto:'Enviado a obra',      color:'#1f9aa8', bg:'#d7f2f5' },
+  { estado:'Recibido en Almacén',              corto:'En almacén',          color:'#0a1e64', bg:'#dce7ff' },
+  { estado:'Enviado a pedido — cuenta con OC', corto:'Con OC, en camino',   color:'#b45309', bg:'#fef0d6' },
+  { estado:'Pedido pendiente',                 corto:'Pedido pendiente',    color:'#be123c', bg:'#ffe0e6' },
+  { estado:'En Revisión',                      corto:'En revisión',         color:'#7b8a99', bg:'#e8edf2' },
+];
+
+function buildRqImagenSpec(){
+  const filas = rqFiltradas();
+  if(!filas.length) return null;
+  const reqs = [...new Set(filas.map(function(r){ return r.codRequerimiento; }))];
+  const tramos = RQ_IMG_TRAMOS.map(function(t){
+    return { corto:t.corto, color:t.color, bg:t.bg, n: filas.filter(function(r){ return r.estadoCalc === t.estado; }).length };
+  }).filter(function(t){ return t.n > 0; });
+  const otros = filas.length - tramos.reduce(function(a,t){ return a + t.n; }, 0);
+  if(otros > 0) tramos.push({ corto:'Otros', color:'#7b8a99', bg:'#e8edf2', n:otros });
+  const enObra = filas.filter(function(r){ return r.estadoCalc === 'Recibido en Obra' || r.estadoCalc === 'Enviado a Obra'; }).length;
+  const pedido = filas.reduce(function(a,r){ return a + (r.cantidad || 0); }, 0);
+  const salido = filas.reduce(function(a,r){ return a + (r.cantSalida || 0); }, 0);
+  return {
+    titulo: reqs.length === 1 ? 'ESTADO DEL REQUERIMIENTO' : 'ESTADO DE LOS REQUERIMIENTOS',
+    chip: reqs.length === 1 ? reqs[0] : (reqs.length + ' REQUERIMIENTOS'),
+    fecha: new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' }),
+    proyecto: [...new Set(filas.map(function(r){ return r.proyecto; }).filter(Boolean))],
+    responsable: [...new Set(filas.map(function(r){ return r.responsable; }).filter(Boolean))],
+    fReq: filas.map(function(r){ return r.fReq; }).filter(Boolean).sort(function(a,b){ return a-b; })[0] || null,
+    items: filas.length, enObra: enObra, pendientes: filas.length - enObra,
+    avance: pedido > 0 ? Math.round(salido / pedido * 100) : 0,
+    pedido: Math.round(pedido*100)/100, salido: Math.round(salido*100)/100,
+    falta: Math.max(0, Math.round((pedido - salido)*100)/100),
+    tramos: tramos,
+    detalle: filas.slice().sort(function(a,b){ return String(a.idProducto).localeCompare(String(b.idProducto)); }),
+  };
+}
+
+function rqImagenPartesHtml(spec){
+  const N = PRO_C_NAVY, T = PRO_C_TEAL, G = PRO_C_GRIS;
+  const n = (v)=> v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
+  const corta = (t, max)=> { t = String(t || ''); return t.length > max ? t.slice(0, max-1) + '…' : t; };
+  const linea = (etq, val)=> `<div style="display:flex;gap:10px;align-items:baseline;min-width:0;">
+      <div style="font-size:24px;font-weight:700;color:${G};flex-shrink:0;">${etq}</div>
+      <div style="font-size:28px;${PRO_C_BOLD}color:${N};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(val)}</div>
+    </div>`;
+
+  const barras = spec.tramos.map(function(t){
+    const pct = Math.round(t.n / spec.items * 100);
+    return `<div style="display:flex;align-items:center;gap:14px;">
+      <div style="width:330px;font-size:27px;font-weight:800;color:${N};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.corto}</div>
+      <div style="flex:1;height:34px;background:#e6edf5;border-radius:17px;overflow:hidden;">
+        <div style="width:${Math.max(pct,3)}%;height:34px;background:${t.color};border-radius:17px;"></div>
+      </div>
+      <div style="width:165px;text-align:right;font-size:30px;${PRO_C_NUM}color:${t.color};white-space:nowrap;">${t.n}<span style="font-size:20px;font-weight:700;text-shadow:none;color:${G};letter-spacing:0;"> ítem${t.n===1?'':'s'}</span></div>
+    </div>`;
+  }).join('');
+
+  const TOPE = Math.max(3, 7 - spec.tramos.length);
+  const ver = spec.detalle.slice(0, TOPE);
+  const filas = ver.map(function(r, i){
+    const t = RQ_IMG_TRAMOS.filter(function(x){ return x.estado === r.estadoCalc; })[0] || { color:G, bg:'#e8edf2', corto:r.estadoCalc };
+    const falta = (r.cantidad != null && r.cantSalida != null) ? Math.round((r.cantidad - r.cantSalida)*100)/100 : null;
+    return `<div style="height:62px;box-sizing:border-box;display:flex;align-items:center;gap:12px;${i ? 'border-top:1px solid #e6edf5;' : ''}">
+      <div style="width:320px;min-width:0;">
+        <div style="font-size:22px;${PRO_C_BOLD}color:${N};letter-spacing:.3px;">${escapeHtml(r.idProducto)}</div>
+        <div style="font-size:18px;font-weight:600;color:${G};line-height:1.2;white-space:nowrap;">${escapeHtml(corta(r.producto, 30))}</div>
+      </div>
+      <div style="flex:1;text-align:center;"><span style="display:inline-block;background:${t.bg};color:${t.color};font-size:20px;font-weight:800;padding:7px 16px;border-radius:22px;white-space:nowrap;">${t.corto}</span></div>
+      <div style="width:120px;text-align:right;font-size:26px;${PRO_C_NUM}color:${N};">${n(r.cantidad)}</div>
+      <div style="width:170px;text-align:right;">
+        <div style="font-size:26px;${PRO_C_NUM}color:${r.cantSalida == null ? G : (falta != null && falta > 0 ? '#b45309' : '#15803d')};">${n(r.cantSalida)}</div>
+        ${falta != null && falta > 0 ? `<div style="font-size:18px;font-weight:800;color:#b45309;">falta ${n(falta)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const contenido = `
+  <div style="height:170px;box-sizing:border-box;background:#fff;border-radius:22px;padding:0 24px;display:flex;align-items:center;gap:20px;">
+    <img src="${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}" style="height:74px;flex-shrink:0;" alt="Grupo Friopacking">
+    <div style="width:3px;height:110px;background:#dbe6f0;border-radius:2px;flex-shrink:0;"></div>
+    <div style="flex:1;min-width:0;text-align:center;">
+      <div style="font-size:44px;${PRO_C_BOLD}color:${N};line-height:1;white-space:nowrap;">${spec.titulo}</div>
+      <div style="display:flex;gap:12px;margin-top:16px;justify-content:center;">
+        <div style="background:${T};color:#fff;font-size:30px;font-weight:800;padding:10px 26px;border-radius:34px;white-space:nowrap;letter-spacing:.4px;">${escapeHtml(spec.chip)}</div>
+        <div style="background:#e8f3fd;color:${N};font-size:30px;font-weight:700;padding:10px 26px;border-radius:34px;white-space:nowrap;">${escapeHtml(spec.fecha)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#fff;border-radius:20px;padding:18px 26px;display:flex;flex-direction:column;gap:8px;">
+    ${linea('Proyecto', spec.proyecto.length === 1 ? spec.proyecto[0] : spec.proyecto.length + ' proyectos')}
+    ${linea('Pidió', spec.responsable.length === 1 ? spec.responsable[0] : spec.responsable.length + ' responsables')}
+  </div>
+
+  <div style="background:#fff;border-radius:20px;padding:24px 26px;display:flex;align-items:center;gap:26px;">
+    <div style="text-align:center;flex-shrink:0;width:280px;">
+      <div style="font-size:132px;${PRO_C_NUM}color:${spec.avance >= 100 ? '#15803d' : T};line-height:1;">${spec.avance}<span style="font-size:64px;">%</span></div>
+      <div style="font-size:25px;font-weight:800;color:${G};letter-spacing:.06em;margin-top:2px;">DESPACHADO</div>
+    </div>
+    <div style="width:3px;height:150px;background:#dbe6f0;border-radius:2px;flex-shrink:0;"></div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <div style="font-size:26px;font-weight:800;color:${G};">Ítems del requerimiento</div>
+        <div style="font-size:44px;${PRO_C_NUM}color:${N};">${spec.items}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <div style="font-size:26px;font-weight:800;color:${G};">Ya salieron a obra</div>
+        <div style="font-size:44px;${PRO_C_NUM}color:#15803d;">${spec.enObra}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <div style="font-size:26px;font-weight:800;color:${G};">Falta despachar</div>
+        <div style="font-size:44px;${PRO_C_NUM}color:${spec.falta ? '#b45309' : '#15803d'};">${n(spec.falta)}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#fff;border-radius:20px;padding:22px 26px;display:flex;flex-direction:column;gap:14px;">
+    <div style="font-size:30px;${PRO_C_BOLD}color:${N};letter-spacing:.04em;">EN QUÉ TRAMO ESTÁ CADA ÍTEM</div>
+    ${barras}
+  </div>
+
+  <div style="background:#fff;border-radius:20px;padding:22px 26px;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:12px;padding-bottom:10px;border-bottom:3px solid #dbe6f0;">
+      <div style="width:320px;font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">PRODUCTO</div>
+      <div style="flex:1;text-align:center;font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">ESTADO</div>
+      <div style="width:120px;text-align:right;font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">PIDIÓ</div>
+      <div style="width:170px;text-align:right;font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">SALIÓ</div>
+    </div>
+    ${filas}
+    ${spec.detalle.length > TOPE ? `<div style="margin-top:auto;padding-top:12px;text-align:center;font-size:23px;font-weight:800;color:${G};">+ ${spec.detalle.length - TOPE} ítem${spec.detalle.length - TOPE === 1 ? '' : 's'} más en la plataforma</div>` : ''}
+  </div>`;
+
+  return [`<div style="position:fixed;left:-99999px;top:0;">
+    <div id="proImgInner" style="width:1080px;height:1350px;box-sizing:border-box;font-family:Inter,Arial,sans-serif;background:#e9f3fd;padding:20px 20px 40px;display:flex;flex-direction:column;gap:16px;overflow:hidden;">${contenido}</div>
+  </div>`];
+}
+
+function descargarRqImagen(btn){
+  const spec = buildRqImagenSpec();
+  if(!spec){ alert('Busca primero un requerimiento: la imagen resume lo que estás viendo en pantalla.'); return; }
+  const base = 'Requerimiento ' + String(spec.chip).replace(/[^\w\- ]+/g, '');
+  generarPartesEnZip(btn, rqImagenPartesHtml(spec), base, 1);
+}
+
 document.getElementById('rqExportar').addEventListener('click', rqExportar);
+document.getElementById('rqImagen').addEventListener('click', function(){ descargarRqImagen(this); });
 
 // ---------------------------------------------------------------- arranque
 function drawCertificados(){
