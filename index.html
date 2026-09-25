@@ -10399,6 +10399,9 @@ function rqAbrirStock(btn){
     const res = rqReservasDe(cod);
     const reservado = Math.round(res.reduce(function(a,x){ return a + x.q; }, 0) * 100) / 100;
     const libre = Math.round(((yo.lima || 0) - reservado) * 100) / 100;
+    // Sin "En tránsito" (25.09.2026, Piero): lo que viene en camino casi siempre es la OC de un
+    // requerimiento, o sea material que ya tiene dueño; mostrarlo al lado del stock se leía como
+    // stock libre por llegar. El tránsito completo sigue en Análisis de Inventario.
     const TOPE = 4;
     const reqActual = btn.dataset.rqreq || '';
     const listaRes = res.slice(0, TOPE).map(function(x){
@@ -10413,7 +10416,6 @@ function rqAbrirStock(btn){
       <h5>${escapeHtml(cod)}</h5>
       <div class="desc">${escapeHtml(yo.descripcion || p.descripcion || '')}${p.unidad ? ' · <b>' + escapeHtml(p.unidad) + '</b>' : ''}</div>
       <div class="sedes">${sede('LIMA', yo.lima)}${sede('TRUJILLO', yo.trujillo)}${sede('ICA', yo.ica)}</div>
-      <div class="extra"><div><span>En tránsito</span><b>${num(yo.transito)}</b></div></div>
       ${(!p.miembros && p.nCodigos > 1) ? `<div class="alt"><div class="aviso" style="font-size:11.5px;">Este link se publicó antes del desglose por código: lo de arriba suma ${p.nCodigos} códigos. Vuelve a publicar con ☁.</div></div>` : ''}
       <div class="res">
         <div class="res-tit"><span>Reservado</span><b>${reservado ? '−' + num(reservado) : '0'}</b></div>
