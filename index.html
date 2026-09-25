@@ -1042,11 +1042,6 @@
 
       <div class="kpi-grid" id="rqKpis"></div>
 
-      <div class="tabs" id="rqVistaTabs">
-        <div class="tab active" data-rqv="grupo">&#128203; Agrupado por requerimiento</div>
-        <div class="tab" data-rqv="item">&#128230; Por ítem</div>
-      </div>
-
       <div id="rqVista"></div>
     </div><!-- /section-requerimientos -->
 
@@ -9862,7 +9857,7 @@ function crtFila(f){
 // picking, la validación— viven en el sistema de Almacén y acá se verían desactualizadas, así que no se
 // replican.
 // ============================================================================
-const RQ = { vista:'grupo', q:'', tope:200, preparado:-1 };
+const RQ = { q:'', tope:200, preparado:-1 };
 const RQ_PASO = 200;
 
 function getReqRows(){ return (DATA && DATA.reqRows) || []; }
@@ -9881,9 +9876,14 @@ const rqTxt = (t)=> (t==null || t==='') ? '—' : escapeHtml(String(t));
 //   4. si nada de lo anterior → lo que diga el Excel ("En revisión de Almacén" se muestra "En Revisión")
 function rqEstadoReal(r){
   const arch = (t)=> String(t||'').trim().toLowerCase() === 'archivado';
-  if(r.fSalida || r.guia) return r.codOrden ? 'Enviado a Obra — Pedido' : 'Enviado a Obra — Picking directo';
+  // Lo único que prueba que el material SALIÓ del almacén es FechaSalida (25.09.2026, Piero: "no estás
+  // considerando la fecha de salida que está en la data"). La columna GUIA (ALMACÉN) trae la guía del
+  // PROVEEDOR —GRR/FAC/DUI, el documento con el que la mercadería LLEGÓ—, así que contarla como salida
+  // daba por despachadas 1,234 líneas que en realidad estaban recibidas en almacén esperando despacho.
+  // Va donde corresponde: como prueba de recepción, igual que en el dashboard de Almacén.
+  if(r.fSalida) return r.codOrden ? 'Enviado a Obra — Pedido' : 'Enviado a Obra — Picking directo';
   if(r.codOrden){
-    const recibido = (r.cantRecep != null && r.cantRecep > 0) || !!r.fRecep;
+    const recibido = (r.cantRecep != null && r.cantRecep > 0) || !!r.fRecep || !!r.guia;
     if(recibido){
       const completo = (r.cantOrden != null && r.cantOrden > 0 && r.cantRecep != null && r.cantRecep >= r.cantOrden);
       return completo ? 'Recibido en Almacén — Pedido' : 'Recibido Parcial en Almacén — Pedido';
@@ -9943,23 +9943,6 @@ function rqFiltradas(){
   });
 }
 
-/** Une las líneas de un mismo requerimiento en una sola fila. */
-function rqAgrupar(filas){
-  const m = new Map();
-  filas.forEach(function(r){
-    const k = r.codRequerimiento || '(sin número)';
-    if(!m.has(k)) m.set(k, { req:k, fReq:r.fReq, responsable:r.responsable, idProyecto:r.idProyecto,
-      proyecto:r.proyecto, items:0, cantidad:0, conOc:0, atendidos:0, estados:new Set() });
-    const g = m.get(k);
-    g.items++; g.cantidad += (r.cantidad || 0);
-    if(r.codOrden) g.conOc++;
-    if(r.fSalida) g.atendidos++;
-    g.estados.add(r.estadoCalc);
-    if(!g.fReq || (r.fReq && r.fReq < g.fReq)) g.fReq = r.fReq;
-  });
-  return [...m.values()].sort(function(a,b){ return (b.fReq||0) - (a.fReq||0) || (a.req < b.req ? 1 : -1); });
-}
-
 function drawRequerimientos(){
   const nota = document.getElementById('rqNota');
   const cont = document.getElementById('rqVista');
@@ -9974,7 +9957,6 @@ function drawRequerimientos(){
   nota.style.display = 'none';
   rqPreparar();
   rqLlenarFiltros();
-  document.querySelectorAll('[data-rqv]').forEach(function(t){ t.classList.toggle('active', t.dataset.rqv === RQ.vista); });
 
   const filas = rqFiltradas();
   const reqs = new Set(filas.map(function(r){ return r.codRequerimiento; }));
@@ -9989,36 +9971,7 @@ function drawRequerimientos(){
     <div class="card kpi"><div class="label">Responsables</div><div class="value">${resp.size}</div><div class="sub">pidieron material</div></div>
     <div class="card kpi"><div class="label">Cantidad pedida</div><div class="value">${rqNum(Math.round(cant*100)/100)}</div><div class="sub">unidades</div></div>`;
 
-  RQ.vista === 'item' ? rqVistaItem(cont, filas) : rqVistaGrupo(cont, filas);
-}
-
-function rqVistaGrupo(cont, filas){
-  const g = rqAgrupar(filas);
-  const ver = g.slice(0, RQ.tope);
-  const cuerpo = ver.map(function(x){
-    const est = [...x.estados];
-    const etiqueta = est.length === 1
-      ? `<span class="rq-est ${rqClaseEstado(est[0])}">${escapeHtml(est[0])}</span>`
-      : `<span class="rq-est camino">Mixto</span> <span class="rq-mix">${est.length} estados</span>`;
-    return `<tr>
-      <td>${rqFecha(x.fReq)}</td>
-      <td><span class="cod">${escapeHtml(x.req)}</span></td>
-      <td>${rqTxt(x.responsable)}</td>
-      <td><span class="cod">${escapeHtml(x.idProyecto)}</span></td>
-      <td class="desc">${rqTxt(x.proyecto)}</td>
-      <td class="num">${x.items}</td>
-      <td>${etiqueta}</td>
-      <td class="num">${rqNum(Math.round(x.cantidad*100)/100)}</td>
-      <td class="num">${x.conOc}</td>
-      <td class="num">${x.atendidos}</td>
-    </tr>`;
-  }).join('');
-  cont.innerHTML = `<div class="card table-card rq-scroll"><table class="rq-tabla">
-      <thead><tr><th>F. Req.</th><th>N° Req.</th><th>Responsable</th><th>Id Proyecto</th><th>Proyecto</th>
-        <th class="num">Ítems</th><th>Estado</th><th class="num">Cant. total</th><th class="num">Con OC</th><th class="num">Despachados</th></tr></thead>
-      <tbody>${cuerpo || '<tr><td colspan="10" style="text-align:center;padding:26px;color:var(--muted);">Ningún requerimiento calza con esos filtros.</td></tr>'}</tbody>
-    </table></div>` + rqMasHtml(ver.length, g.length, 'requerimientos');
-  rqEngancharMas();
+  rqVistaItem(cont, filas);
 }
 
 function rqVistaItem(cont, filas){
@@ -10055,7 +10008,7 @@ function rqVistaItem(cont, filas){
         <th>Código</th><th>Descripción</th><th class="num">Cant.</th><th>UM</th>
         <th>N° Pedido</th><th>F. Pedido</th><th>N° OC</th><th>Usuario Compras</th><th>Proveedor</th>
         <th>F. Emisión</th><th>F. Aprobación</th><th>F. Entrega</th><th class="num">Cant. recep.</th><th>F. Recepción</th>
-        <th>F. Salida</th><th>Guía</th></tr></thead>
+        <th>F. Salida</th><th>Guía Proveedor</th></tr></thead>
       <tbody>${cuerpo || '<tr><td colspan="22" style="text-align:center;padding:26px;color:var(--muted);">Ninguna línea calza con esos filtros.</td></tr>'}</tbody>
     </table></div>` + rqMasHtml(ver.length, orden.length, 'líneas');
   rqEngancharMas();
@@ -10105,7 +10058,7 @@ function rqExportar(){
   if(!filas.length) return;
   const aoa = [['F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Estado en Nisira','Origen',
     'Código','Descripción','Cantidad','UM','Familia','N° Pedido','F. Pedido','Resp. Pedido','N° OC','Usuario Compras',
-    'Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada','Cant. recepcionada','F. Recepción','F. Salida','Guía']];
+    'Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada','Cant. recepcionada','F. Recepción','F. Salida','Guía Proveedor']];
   const f = (d)=> d ? fmtDate(d) : '';
   filas.forEach(function(r){
     aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, r.proyecto, r.estadoCalc, r.estado,
@@ -10122,9 +10075,6 @@ function rqExportar(){
   XLSX.writeFile(wb, 'Requerimientos - Grupo Friopacking.xlsx');
 }
 
-document.querySelectorAll('[data-rqv]').forEach(function(t){
-  t.addEventListener('click', function(){ RQ.vista = t.dataset.rqv; RQ.tope = RQ_PASO; drawRequerimientos(); });
-});
 ['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].forEach(function(id){
   document.getElementById(id).addEventListener('change', function(){ RQ.tope = RQ_PASO; drawRequerimientos(); });
 });
