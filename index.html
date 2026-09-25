@@ -10359,9 +10359,8 @@ function rqReservasDe(codigo){
     if(r.idProducto !== codigo || r.estadoCalc !== 'Recibido en Almacén') return;
     const q = (r.cantRecep || 0) - (r.cantSalida || 0);
     if(!(q > 0)) return;
-    const y = porReq.get(r.codRequerimiento) || { req:r.codRequerimiento, proyecto:r.proyecto, q:0, fRecep:null };
+    const y = porReq.get(r.codRequerimiento) || { req:r.codRequerimiento, proyecto:r.proyecto, q:0, fReq:r.fReq || null };
     y.q += q;
-    if(r.fRecep && (!y.fRecep || r.fRecep > y.fRecep)) y.fRecep = r.fRecep;
     porReq.set(r.codRequerimiento, y);
   });
   return Array.from(porReq.values())
@@ -10405,7 +10404,7 @@ function rqAbrirStock(btn){
     const listaRes = res.slice(0, TOPE).map(function(x){
       const esEste = x.req === reqActual;
       return `<div class="res-fila${esEste ? ' este' : ''}">
-        <div><span class="res-req">${escapeHtml(x.req)}</span>${x.fRecep ? '<span class="res-fecha">llegó ' + x.fRecep.toLocaleDateString('es-PE', { day:'2-digit', month:'short' }).replace('.', '') + '</span>' : ''}${esEste ? '<span class="res-tag">este req</span>' : ''}
+        <div><span class="res-req">${escapeHtml(x.req)}</span>${x.fReq ? '<span class="res-fecha">' + x.fReq.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'2-digit' }).replace('.', '') + '</span>' : ''}${esEste ? '<span class="res-tag">este req</span>' : ''}
           <span class="res-pry">${escapeHtml(String(x.proyecto || '').slice(0, 30))}</span></div>
         <b>${num(x.q)}</b>
       </div>`;
