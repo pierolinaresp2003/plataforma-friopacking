@@ -458,21 +458,26 @@
   .rq-est.recibido{background:var(--azul-bg);color:var(--brand-ink);}
   .rq-est.espera{background:var(--red-bg);color:var(--red);}
   .rq-est.fuera{opacity:.65;}
-  .rq-hero{display:flex;align-items:center;gap:14px;background:var(--surface);border:2px solid var(--border);
-    border-radius:16px;padding:6px 20px;margin-bottom:14px;transition:border-color .15s,box-shadow .15s;}
-  .rq-hero:focus-within{border-color:var(--brand);box-shadow:0 0 0 4px var(--azul-bg);}
-  .rq-hero-lupa{font-size:26px;line-height:1;opacity:.55;flex-shrink:0;}
-  .rq-hero input{flex:1;min-width:0;border:none;outline:none;background:transparent;padding:14px 0;
-    font:700 26px/1.2 Inter,Arial,sans-serif;color:var(--ink);letter-spacing:.3px;}
-  .rq-hero input::placeholder{font-weight:600;color:var(--muted);letter-spacing:0;}
-  .rq-vacio{text-align:center;padding:60px 24px;color:var(--muted);}
-  .rq-vacio .ico{font-size:56px;line-height:1;opacity:.35;}
-  .rq-vacio b{display:block;margin-top:16px;font-size:19px;color:var(--ink);}
-  .rq-vacio span{display:block;margin-top:8px;font-size:14px;}
+  /* Fondo azul de marca para que el buscador se despegue del resto de la pantalla: es la acción
+     principal del módulo (25.09.2026, pedido de Piero: "ponle un fondo para que resalte más"). */
+  .rq-hero{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,var(--brand) 0%,#123a9e 55%,var(--brand-2-dark) 100%);
+    border-radius:18px;padding:18px 26px;margin-bottom:14px;box-shadow:0 8px 22px rgba(10,30,100,.22);}
+  .rq-hero-caja{flex:1;min-width:0;display:flex;align-items:center;gap:13px;background:rgba(255,255,255,.96);
+    border:2px solid transparent;border-radius:13px;padding:4px 18px;transition:border-color .15s,box-shadow .15s;}
+  .rq-hero-caja:focus-within{border-color:var(--brand-2);box-shadow:0 0 0 4px rgba(62,198,172,.32);}
+  .rq-hero-rotulo{flex-shrink:0;color:#fff;line-height:1.15;}
+  .rq-hero-rotulo b{display:block;font-size:20px;font-weight:800;letter-spacing:.02em;}
+  .rq-hero-rotulo span{display:block;font-size:13px;font-weight:600;opacity:.72;letter-spacing:.04em;text-transform:uppercase;}
+  .rq-hero-lupa{font-size:24px;line-height:1;opacity:.5;flex-shrink:0;}
+  .rq-hero input{flex:1;min-width:0;border:none;outline:none;background:transparent;padding:13px 0;
+    font:700 26px/1.2 Inter,Arial,sans-serif;color:#0f1b2d;letter-spacing:.3px;}
+  .rq-hero input::placeholder{font-weight:600;color:#8695a8;letter-spacing:0;}
   @media (max-width:760px){
-    .rq-hero{padding:4px 14px;gap:10px;}
-    .rq-hero input{font-size:19px;padding:12px 0;}
-    .rq-hero-lupa{font-size:20px;}
+    .rq-hero{flex-direction:column;align-items:stretch;gap:10px;padding:14px;}
+    .rq-hero-rotulo b{font-size:17px;} .rq-hero-rotulo span{font-size:11px;}
+    .rq-hero-caja{padding:2px 14px;gap:9px;}
+    .rq-hero input{font-size:19px;padding:11px 0;}
+    .rq-hero-lupa{font-size:19px;}
   }
   .rq-mix{display:block;font-size:10px;color:var(--amber-ink);font-weight:700;margin-top:3px;white-space:nowrap;}
   .rq-via{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
@@ -1063,8 +1068,11 @@
            requerimiento, no se navega (25.09.2026, pedido de Piero). La tabla no se dibuja hasta
            que hay algo escrito acá. -->
       <div class="rq-hero">
-        <span class="rq-hero-lupa" aria-hidden="true">&#128269;</span>
-        <input type="search" id="rqBuscar" placeholder="Escribe el N° de requerimiento…">
+        <div class="rq-hero-rotulo"><b>Consultar</b><span>Trazabilidad</span></div>
+        <div class="rq-hero-caja">
+          <span class="rq-hero-lupa" aria-hidden="true">&#128269;</span>
+          <input type="search" id="rqBuscar" placeholder="Escribe el N° de requerimiento…">
+        </div>
       </div>
 
       <div class="toolbar">
@@ -10109,15 +10117,7 @@ function drawRequerimientos(){
     const b = document.getElementById(id);
     if(b) b.disabled = !filas.length;
   });
-  if(!hayQue){
-    cont.innerHTML = `<div class="card"><div class="rq-vacio">
-      <div class="ico">&#128269;</div>
-      <b>Escribe un N° de requerimiento arriba</b>
-      <span>Acepta el número completo (0001-0023138) o solo el correlativo (23138).
-        También busca por código de producto, proyecto, proveedor o responsable.</span>
-    </div></div>`;
-    return;
-  }
+  if(!hayQue){ cont.innerHTML = ''; return; }
   rqVistaItem(cont, filas);
 }
 
@@ -10290,6 +10290,18 @@ const RQ_IMG_TRAMOS = [
   { estado:'En Revisión',                      corto:'En revisión',         color:'#7b8a99', bg:'#e8edf2' },
 ];
 
+// Los 6 tramos de la trazabilidad, los mismos que agrupan las columnas de la tabla. Cada uno sabe
+// si una línea ya lo pasó y con qué fecha, para poder dibujar el recorrido completo en la imagen
+// (25.09.2026, Piero: "debe verse toda la trazabilidad").
+const RQ_PASOS = [
+  { n:'REQUERI-\nMIENTO', f:'fReq',    ok:function(r){ return !!r.fReq; } },
+  { n:'PEDIDO A\nCOMPRAS', f:'fPedido', ok:function(r){ return !!r.codPedido; } },
+  { n:'ORDEN DE\nCOMPRA', f:'fOrden',  ok:function(r){ return !!r.codOrden; } },
+  { n:'EN\nALMACÉN',      f:'fRecep',  ok:function(r){ return !!(r.fRecep || (r.cantRecep != null && r.cantRecep > 0) || r.guia); } },
+  { n:'SALIÓ A\nOBRA',    f:'fSalida', ok:function(r){ return !!r.fSalida; } },
+  { n:'RECIBIDO\nEN OBRA', f:'fObra',  ok:function(r){ return !!(r.fObra || (r.cantObra != null && r.cantObra > 0)); } },
+];
+
 function buildRqImagenSpec(){
   const filas = rqFiltradas();
   if(!filas.length) return null;
@@ -10299,123 +10311,173 @@ function buildRqImagenSpec(){
   }).filter(function(t){ return t.n > 0; });
   const otros = filas.length - tramos.reduce(function(a,t){ return a + t.n; }, 0);
   if(otros > 0) tramos.push({ corto:'Otros', color:'#7b8a99', bg:'#e8edf2', n:otros });
-  const enObra = filas.filter(function(r){ return r.estadoCalc === 'Recibido en Obra' || r.estadoCalc === 'Enviado a Obra'; }).length;
+  // Recorrido: por cada tramo, cuántas líneas ya lo pasaron y entre qué fechas.
+  const pasos = RQ_PASOS.map(function(p){
+    const pasaron = filas.filter(p.ok);
+    const fechas = pasaron.map(function(r){ return r[p.f]; }).filter(Boolean).sort(function(a,b){ return a-b; });
+    return { nombre:p.n, n:pasaron.length, total:filas.length,
+      desde: fechas[0] || null, hasta: fechas[fechas.length-1] || null };
+  });
   const pedido = filas.reduce(function(a,r){ return a + (r.cantidad || 0); }, 0);
+  const recibido = filas.reduce(function(a,r){ return a + (r.cantRecep || 0); }, 0);
   const salido = filas.reduce(function(a,r){ return a + (r.cantSalida || 0); }, 0);
+  const enObra = filas.reduce(function(a,r){ return a + (r.cantObra || 0); }, 0);
   return {
-    titulo: reqs.length === 1 ? 'ESTADO DEL REQUERIMIENTO' : 'ESTADO DE LOS REQUERIMIENTOS',
+    titulo: reqs.length === 1 ? 'TRAZABILIDAD DEL REQUERIMIENTO' : 'TRAZABILIDAD DE REQUERIMIENTOS',
     chip: reqs.length === 1 ? reqs[0] : (reqs.length + ' REQUERIMIENTOS'),
     fecha: new Date().toLocaleDateString('es-PE', { day:'2-digit', month:'long', year:'numeric' }),
     proyecto: [...new Set(filas.map(function(r){ return r.proyecto; }).filter(Boolean))],
     responsable: [...new Set(filas.map(function(r){ return r.responsable; }).filter(Boolean))],
-    fReq: filas.map(function(r){ return r.fReq; }).filter(Boolean).sort(function(a,b){ return a-b; })[0] || null,
-    items: filas.length, enObra: enObra, pendientes: filas.length - enObra,
-    avance: pedido > 0 ? Math.round(salido / pedido * 100) : 0,
-    pedido: Math.round(pedido*100)/100, salido: Math.round(salido*100)/100,
+    proveedor: [...new Set(filas.map(function(r){ return r.proveedor; }).filter(Boolean))],
+    items: filas.length, pasos: pasos, tramos: tramos,
+    pedido: Math.round(pedido*100)/100, recibido: Math.round(recibido*100)/100,
+    salido: Math.round(salido*100)/100, enObra: Math.round(enObra*100)/100,
     falta: Math.max(0, Math.round((pedido - salido)*100)/100),
-    tramos: tramos,
+    avance: pedido > 0 ? Math.round(salido / pedido * 100) : 0,
     detalle: filas.slice().sort(function(a,b){ return String(a.idProducto).localeCompare(String(b.idProducto)); }),
   };
 }
 
+// Un nodo del recorrido: verde con check si TODAS las líneas lo pasaron, turquesa con "n/total" si
+// solo algunas, y gris punteado si todavía ninguna.
+function rqNodoHtml(paso, i){
+  const N = PRO_C_NAVY, T = PRO_C_TEAL, G = PRO_C_GRIS, VERDE = '#15803d';
+  const completo = paso.n === paso.total, nada = paso.n === 0;
+  const color = nada ? '#c3cedb' : (completo ? VERDE : T);
+  const relleno = nada ? '#eef2f7' : color;
+  const dentro = nada
+    ? `<div style="font-size:30px;font-weight:900;color:#93a3b5;">${i+1}</div>`
+    : (completo
+      ? `<svg width="36" height="36" viewBox="0 0 24 24"><path d="M4.5 12.8l4.8 4.8L19.5 7.4" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      : `<div style="font-size:27px;font-weight:900;color:#ffffff;letter-spacing:-.02em;">${paso.n}</div>`);
+  const f = (d)=> d ? d.toLocaleDateString('es-PE', { day:'2-digit', month:'short' }).replace('.','') : '';
+  const fecha = nada ? '—'
+    : (paso.desde && paso.hasta && (+paso.desde !== +paso.hasta) ? f(paso.desde) + ' › ' + f(paso.hasta) : f(paso.hasta || paso.desde));
+  return `<div style="width:150px;flex-shrink:0;text-align:center;">
+    <div style="height:74px;display:flex;align-items:center;justify-content:center;">
+      <div style="width:70px;height:70px;border-radius:50%;background:${relleno};border:4px solid ${nada ? '#d5dee8' : color};box-sizing:border-box;display:flex;align-items:center;justify-content:center;">${dentro}</div>
+    </div>
+    <div style="margin-top:10px;font-size:19px;font-weight:900;color:${nada ? '#93a3b5' : N};line-height:1.15;letter-spacing:.04em;white-space:pre-line;">${paso.nombre}</div>
+    <div style="margin-top:7px;font-size:23px;${PRO_C_NUM}color:${nada ? '#a8b5c4' : color};white-space:nowrap;">${fecha}</div>
+    <div style="margin-top:4px;font-size:17px;font-weight:800;color:${G};">${paso.n} de ${paso.total}</div>
+  </div>`;
+}
+
 function rqImagenPartesHtml(spec){
-  const N = PRO_C_NAVY, T = PRO_C_TEAL, G = PRO_C_GRIS;
+  const N = PRO_C_NAVY, T = PRO_C_TEAL, G = PRO_C_GRIS, VERDE = '#15803d';
   const n = (v)=> v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
   const corta = (t, max)=> { t = String(t || ''); return t.length > max ? t.slice(0, max-1) + '…' : t; };
-  const linea = (etq, val)=> `<div style="display:flex;gap:10px;align-items:baseline;min-width:0;">
-      <div style="font-size:24px;font-weight:700;color:${G};flex-shrink:0;">${etq}</div>
-      <div style="font-size:28px;${PRO_C_BOLD}color:${N};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(val)}</div>
-    </div>`;
+  const uno = (lista, plural)=> lista.length === 1 ? lista[0] : (lista.length + ' ' + plural);
 
-  const barras = spec.tramos.map(function(t){
-    const pct = Math.round(t.n / spec.items * 100);
-    return `<div style="display:flex;align-items:center;gap:14px;">
-      <div style="width:330px;font-size:27px;font-weight:800;color:${N};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.corto}</div>
-      <div style="flex:1;height:34px;background:#e6edf5;border-radius:17px;overflow:hidden;">
-        <div style="width:${Math.max(pct,3)}%;height:34px;background:${t.color};border-radius:17px;"></div>
+  // --- recorrido: 6 nodos unidos por una línea que se pinta hasta donde llegó el material --------
+  const nodos = spec.pasos.map(function(p,i){
+    const sep = i === 0 ? '' : `<div style="flex:1;height:5px;border-radius:3px;margin-top:37px;background:${spec.pasos[i].n > 0 ? (spec.pasos[i].n === spec.pasos[i].total ? VERDE : T) : '#dde5ee'};"></div>`;
+    return sep + rqNodoHtml(p, i);
+  }).join('');
+
+  // --- detalle por ítem, con su propio recorrido en 6 puntos ------------------------------------
+  const TOPE = 7;
+  const ver = spec.detalle.slice(0, TOPE);
+  const filas = ver.map(function(r, i){
+    const puntos = RQ_PASOS.map(function(p, j){
+      const ok = p.ok(r);
+      const linea = j === 0 ? '' : `<div style="width:13px;height:4px;background:${ok ? VERDE : '#dde5ee'};"></div>`;
+      return linea + `<div style="width:16px;height:16px;border-radius:50%;background:${ok ? VERDE : '#e6edf5'};border:2px solid ${ok ? VERDE : '#cfdae6'};box-sizing:border-box;"></div>`;
+    }).join('');
+    const falta = (r.cantidad != null && r.cantSalida != null) ? Math.round((r.cantidad - r.cantSalida)*100)/100 : null;
+    return `<div style="height:60px;box-sizing:border-box;display:flex;align-items:center;gap:10px;${i ? 'border-top:1px solid #e6edf5;' : ''}">
+      <div style="width:300px;min-width:0;">
+        <div style="font-size:21px;${PRO_C_BOLD}color:${N};letter-spacing:.3px;">${escapeHtml(r.idProducto)}</div>
+        <div style="font-size:17px;font-weight:600;color:${G};line-height:1.2;white-space:nowrap;">${escapeHtml(corta(r.producto, 30))}</div>
       </div>
-      <div style="width:165px;text-align:right;font-size:30px;${PRO_C_NUM}color:${t.color};white-space:nowrap;">${t.n}<span style="font-size:20px;font-weight:700;text-shadow:none;color:${G};letter-spacing:0;"> ítem${t.n===1?'':'s'}</span></div>
+      <div style="width:220px;display:flex;align-items:center;justify-content:center;">${puntos}</div>
+      <div style="width:110px;text-align:right;">
+        <div style="font-size:17px;font-weight:800;color:${G};">${escapeHtml(r.via || '—')}</div>
+      </div>
+      <div style="width:100px;text-align:right;font-size:24px;${PRO_C_NUM}color:${N};">${n(r.cantidad)}</div>
+      <div style="width:140px;text-align:right;">
+        <div style="font-size:24px;${PRO_C_NUM}color:${r.cantSalida == null ? '#a8b5c4' : (falta != null && falta > 0 ? '#b45309' : VERDE)};">${n(r.cantSalida)}</div>
+        ${falta != null && falta > 0 ? `<div style="font-size:16px;font-weight:800;color:#b45309;">falta ${n(falta)}</div>` : ''}
+      </div>
     </div>`;
   }).join('');
 
-  const TOPE = Math.max(3, 7 - spec.tramos.length);
-  const ver = spec.detalle.slice(0, TOPE);
-  const filas = ver.map(function(r, i){
-    const t = RQ_IMG_TRAMOS.filter(function(x){ return x.estado === r.estadoCalc; })[0] || { color:G, bg:'#e8edf2', corto:r.estadoCalc };
-    const falta = (r.cantidad != null && r.cantSalida != null) ? Math.round((r.cantidad - r.cantSalida)*100)/100 : null;
-    return `<div style="height:62px;box-sizing:border-box;display:flex;align-items:center;gap:12px;${i ? 'border-top:1px solid #e6edf5;' : ''}">
-      <div style="width:320px;min-width:0;">
-        <div style="font-size:22px;${PRO_C_BOLD}color:${N};letter-spacing:.3px;">${escapeHtml(r.idProducto)}</div>
-        <div style="font-size:18px;font-weight:600;color:${G};line-height:1.2;white-space:nowrap;">${escapeHtml(corta(r.producto, 30))}</div>
+  // --- embudo de cantidades: lo que se pidió, llegó, salió y se recibió en obra ------------------
+  const escalones = [
+    { et:'PIDIÓ',        v:spec.pedido,   c:N },
+    { et:'LLEGÓ AL ALM.', v:spec.recibido, c:'#0e7490' },
+    { et:'SALIÓ',        v:spec.salido,   c:T },
+    { et:'EN OBRA',      v:spec.enObra,   c:VERDE },
+  ];
+  const tope = Math.max.apply(null, escalones.map(function(e){ return e.v || 0; })) || 1;
+  const embudo = escalones.map(function(e){
+    const pct = Math.max(Math.round((e.v || 0) / tope * 100), 2);
+    return `<div style="display:flex;align-items:center;gap:14px;">
+      <div style="width:215px;font-size:21px;font-weight:900;color:${G};letter-spacing:.05em;">${e.et}</div>
+      <div style="flex:1;height:30px;background:#e9eff6;border-radius:15px;overflow:hidden;">
+        <div style="width:${pct}%;height:30px;background:${e.c};border-radius:15px;"></div>
       </div>
-      <div style="flex:1;text-align:center;"><span style="display:inline-block;background:${t.bg};color:${t.color};font-size:20px;font-weight:800;padding:7px 16px;border-radius:22px;white-space:nowrap;">${t.corto}</span></div>
-      <div style="width:120px;text-align:right;font-size:26px;${PRO_C_NUM}color:${N};">${n(r.cantidad)}</div>
-      <div style="width:170px;text-align:right;">
-        <div style="font-size:26px;${PRO_C_NUM}color:${r.cantSalida == null ? G : (falta != null && falta > 0 ? '#b45309' : '#15803d')};">${n(r.cantSalida)}</div>
-        ${falta != null && falta > 0 ? `<div style="font-size:18px;font-weight:800;color:#b45309;">falta ${n(falta)}</div>` : ''}
-      </div>
+      <div style="width:160px;text-align:right;font-size:28px;${PRO_C_NUM}color:${e.v ? e.c : '#a8b5c4'};">${n(e.v)}</div>
     </div>`;
   }).join('');
 
   const contenido = `
-  <div style="height:170px;box-sizing:border-box;background:#fff;border-radius:22px;padding:0 24px;display:flex;align-items:center;gap:20px;">
-    <img src="${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}" style="height:74px;flex-shrink:0;" alt="Grupo Friopacking">
-    <div style="width:3px;height:110px;background:#dbe6f0;border-radius:2px;flex-shrink:0;"></div>
+  <div style="height:158px;box-sizing:border-box;background:#fff;border-radius:22px;padding:0 24px;display:flex;align-items:center;gap:20px;">
+    <img src="${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}" style="height:70px;flex-shrink:0;" alt="Grupo Friopacking">
+    <div style="width:3px;height:104px;background:#dbe6f0;border-radius:2px;flex-shrink:0;"></div>
     <div style="flex:1;min-width:0;text-align:center;">
-      <div style="font-size:44px;${PRO_C_BOLD}color:${N};line-height:1;white-space:nowrap;">${spec.titulo}</div>
-      <div style="display:flex;gap:12px;margin-top:16px;justify-content:center;">
-        <div style="background:${T};color:#fff;font-size:30px;font-weight:800;padding:10px 26px;border-radius:34px;white-space:nowrap;letter-spacing:.4px;">${escapeHtml(spec.chip)}</div>
-        <div style="background:#e8f3fd;color:${N};font-size:30px;font-weight:700;padding:10px 26px;border-radius:34px;white-space:nowrap;">${escapeHtml(spec.fecha)}</div>
+      <div style="font-size:39px;${PRO_C_BOLD}color:${N};line-height:1;white-space:nowrap;">${spec.titulo}</div>
+      <div style="display:flex;gap:12px;margin-top:15px;justify-content:center;">
+        <div style="background:${T};color:#fff;font-size:29px;font-weight:800;padding:9px 24px;border-radius:32px;white-space:nowrap;letter-spacing:.4px;">${escapeHtml(spec.chip)}</div>
+        <div style="background:#e8f3fd;color:${N};font-size:29px;font-weight:700;padding:9px 24px;border-radius:32px;white-space:nowrap;">${escapeHtml(spec.fecha)}</div>
       </div>
     </div>
   </div>
 
-  <div style="background:#fff;border-radius:20px;padding:18px 26px;display:flex;flex-direction:column;gap:8px;">
-    ${linea('Proyecto', spec.proyecto.length === 1 ? spec.proyecto[0] : spec.proyecto.length + ' proyectos')}
-    ${linea('Pidió', spec.responsable.length === 1 ? spec.responsable[0] : spec.responsable.length + ' responsables')}
-  </div>
-
-  <div style="background:#fff;border-radius:20px;padding:24px 26px;display:flex;align-items:center;gap:26px;">
-    <div style="text-align:center;flex-shrink:0;width:280px;">
-      <div style="font-size:132px;${PRO_C_NUM}color:${spec.avance >= 100 ? '#15803d' : T};line-height:1;">${spec.avance}<span style="font-size:64px;">%</span></div>
-      <div style="font-size:25px;font-weight:800;color:${G};letter-spacing:.06em;margin-top:2px;">DESPACHADO</div>
+  <div style="background:#fff;border-radius:20px;padding:15px 26px;display:flex;align-items:center;gap:22px;">
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">PROYECTO</div>
+      <div style="font-size:23px;${PRO_C_BOLD}color:${N};white-space:nowrap;">${escapeHtml(corta(uno(spec.proyecto,'proyectos'), 28))}</div>
     </div>
-    <div style="width:3px;height:150px;background:#dbe6f0;border-radius:2px;flex-shrink:0;"></div>
-    <div style="flex:1;display:flex;flex-direction:column;gap:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <div style="font-size:26px;font-weight:800;color:${G};">Ítems del requerimiento</div>
-        <div style="font-size:44px;${PRO_C_NUM}color:${N};">${spec.items}</div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <div style="font-size:26px;font-weight:800;color:${G};">Ya salieron a obra</div>
-        <div style="font-size:44px;${PRO_C_NUM}color:#15803d;">${spec.enObra}</div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <div style="font-size:26px;font-weight:800;color:${G};">Falta despachar</div>
-        <div style="font-size:44px;${PRO_C_NUM}color:${spec.falta ? '#b45309' : '#15803d'};">${n(spec.falta)}</div>
-      </div>
+    <div style="width:2px;height:58px;background:#e3eaf2;flex-shrink:0;"></div>
+    <div style="width:300px;flex-shrink:0;min-width:0;">
+      <div style="font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">PIDIÓ</div>
+      <div style="font-size:23px;${PRO_C_BOLD}color:${N};white-space:nowrap;">${escapeHtml(corta(uno(spec.responsable,'responsables'), 20))}</div>
+    </div>
+    <div style="width:2px;height:58px;background:#e3eaf2;flex-shrink:0;"></div>
+    <div style="width:150px;flex-shrink:0;text-align:right;">
+      <div style="font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">ÍTEMS</div>
+      <div style="font-size:34px;${PRO_C_NUM}color:${N};line-height:1.05;">${spec.items}</div>
     </div>
   </div>
 
-  <div style="background:#fff;border-radius:20px;padding:22px 26px;display:flex;flex-direction:column;gap:14px;">
-    <div style="font-size:30px;${PRO_C_BOLD}color:${N};letter-spacing:.04em;">EN QUÉ TRAMO ESTÁ CADA ÍTEM</div>
-    ${barras}
+  <div style="background:#fff;border-radius:20px;padding:20px 22px 18px;">
+    <div style="display:flex;align-items:flex-start;">${nodos}</div>
   </div>
 
-  <div style="background:#fff;border-radius:20px;padding:22px 26px;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
-    <div style="display:flex;align-items:center;gap:12px;padding-bottom:10px;border-bottom:3px solid #dbe6f0;">
-      <div style="width:320px;font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">PRODUCTO</div>
-      <div style="flex:1;text-align:center;font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">ESTADO</div>
-      <div style="width:120px;text-align:right;font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">PIDIÓ</div>
-      <div style="width:170px;text-align:right;font-size:21px;font-weight:800;color:${G};letter-spacing:.05em;">SALIÓ</div>
+  <div style="background:#fff;border-radius:20px;padding:20px 26px;display:flex;align-items:center;gap:24px;">
+    <div style="width:250px;flex-shrink:0;text-align:center;">
+      <div style="font-size:104px;${PRO_C_NUM}color:${spec.avance >= 100 ? VERDE : T};line-height:1;">${spec.avance}<span style="font-size:52px;">%</span></div>
+      <div style="font-size:22px;font-weight:900;color:${G};letter-spacing:.06em;">DESPACHADO</div>
+      ${spec.falta ? `<div style="margin-top:6px;font-size:22px;font-weight:900;color:#b45309;">faltan ${n(spec.falta)}</div>` : ''}
+    </div>
+    <div style="width:2px;height:150px;background:#e3eaf2;flex-shrink:0;"></div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:11px;">${embudo}</div>
+  </div>
+
+  <div style="background:#fff;border-radius:20px;padding:18px 26px;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;gap:10px;padding-bottom:9px;border-bottom:3px solid #dbe6f0;">
+      <div style="width:300px;font-size:19px;font-weight:900;color:${G};letter-spacing:.05em;">PRODUCTO</div>
+      <div style="width:220px;text-align:center;font-size:19px;font-weight:900;color:${G};letter-spacing:.05em;">RECORRIDO</div>
+      <div style="width:110px;text-align:right;font-size:19px;font-weight:900;color:${G};letter-spacing:.05em;">VÍA</div>
+      <div style="width:100px;text-align:right;font-size:19px;font-weight:900;color:${G};letter-spacing:.05em;">PIDIÓ</div>
+      <div style="width:140px;text-align:right;font-size:19px;font-weight:900;color:${G};letter-spacing:.05em;">SALIÓ</div>
     </div>
     ${filas}
-    ${spec.detalle.length > TOPE ? `<div style="margin-top:auto;padding-top:12px;text-align:center;font-size:23px;font-weight:800;color:${G};">+ ${spec.detalle.length - TOPE} ítem${spec.detalle.length - TOPE === 1 ? '' : 's'} más en la plataforma</div>` : ''}
+    ${spec.detalle.length > TOPE ? `<div style="margin-top:auto;padding-top:10px;text-align:center;font-size:21px;font-weight:800;color:${G};">+ ${spec.detalle.length - TOPE} ítem${spec.detalle.length - TOPE === 1 ? '' : 's'} más en la plataforma</div>` : ''}
   </div>`;
 
-  return [`<div style="position:fixed;left:-99999px;top:0;">
-    <div id="proImgInner" style="width:1080px;height:1350px;box-sizing:border-box;font-family:Inter,Arial,sans-serif;background:#e9f3fd;padding:20px 20px 40px;display:flex;flex-direction:column;gap:16px;overflow:hidden;">${contenido}</div>
-  </div>`];
+  return [`<div id="proImgInner" style="width:1080px;height:1350px;box-sizing:border-box;font-family:Inter,Arial,sans-serif;background:#e9f3fd;padding:18px 18px 40px;display:flex;flex-direction:column;gap:13px;overflow:hidden;">${contenido}</div>`];
 }
 
 function descargarRqImagen(btn){
