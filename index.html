@@ -461,6 +461,17 @@
   .rq-mix{font-size:11px;color:var(--muted);}
   .rq-scroll{max-height:620px;overflow:auto;padding:0;}
   .rq-mas{padding:14px;text-align:center;}
+  .rq-tabla thead th{top:0;}
+  .rq-tabla thead tr.rq-grupos th{top:0;font-size:10px;letter-spacing:.08em;text-align:center;padding:7px 10px;border-bottom:none;color:#fff;}
+  .rq-tabla thead tr:not(.rq-grupos) th{top:30px;}
+  .rq-grupos .t1{background:#64748b;} .rq-grupos .t2{background:#7c5cbf;} .rq-grupos .t3{background:var(--seg-a);}
+  .rq-grupos .t4{background:#0e7490;} .rq-grupos .t5{background:var(--brand-2-dark);} .rq-grupos .t6{background:#15803d;}
+  .rq-tabla td.g{border-left:2px solid var(--border);}
+  .rq-tabla thead tr:not(.rq-grupos) th:nth-child(10),
+  .rq-tabla thead tr:not(.rq-grupos) th:nth-child(13),
+  .rq-tabla thead tr:not(.rq-grupos) th:nth-child(20),
+  .rq-tabla thead tr:not(.rq-grupos) th:nth-child(24),
+  .rq-tabla thead tr:not(.rq-grupos) th:nth-child(27){border-left:2px solid var(--border);}
 
   /* ---------- Módulo Certificados ---------- */
   .crt-barra{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
@@ -2050,7 +2061,9 @@ function buildSnapshot(){
         cp: r.codPedido, fp: isoDay(r.fPedido), rp: r.responsablePedido,
         ep: r.estadoPedido, co: r.codOrden, uc: r.usuarioCompras,
         fo: isoDay(r.fOrden), fb: isoDay(r.fAprob), fx: isoDay(r.fCompromiso), fc: isoDay(r.fRecep),
-        qo: r.cantOrden, qr: r.cantRecep, fs: isoDay(r.fSalida), g: r.guia,
+        qo: r.cantOrden, qr: r.cantRecep, g: r.guia, fx2: r.factura,
+        fs: isoDay(r.fSalida), qs: r.cantSalida, gs: r.docSalida,
+        fob: isoDay(r.fObra), qob: r.cantObra, gob: r.docObra,
       })),
       // Pedidos directos de PedidoSinReq.xlsx (04.09.2026 ronda 37) — OC que Reporte Maestro.xlsx nunca
       // trae (ver PEDIDO_SIN_REQ_ROWS). Se publican aparte para que el Reporte de Compras por responsable
@@ -2331,7 +2344,9 @@ function loadFromSnapshot(snap){
       estadoPedido: r.ep || '', codOrden: r.co || '', usuarioCompras: r.uc || '',
       fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb), fCompromiso: fromIsoDay(r.fx), fRecep: fromIsoDay(r.fc),
       cantOrden: (r.qo!=null ? r.qo : null), cantRecep: (r.qr!=null ? r.qr : null),
-      fSalida: fromIsoDay(r.fs), guia: r.g || '',
+      guia: r.g || '', factura: r.fx2 || '',
+      fSalida: fromIsoDay(r.fs), cantSalida: (r.qs!=null ? r.qs : null), docSalida: r.gs || '',
+      fObra: fromIsoDay(r.fob), cantObra: (r.qob!=null ? r.qob : null), docObra: r.gob || '',
     })) : [],
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
     // ese caso, simplemente no se muestran alertas hasta que se vuelva a publicar con el archivo actual.
@@ -2634,6 +2649,12 @@ function processWorkbook(wb, filename){
     cantidadReq: findCol(headerRow, ["CantidadRequerimiento","Cantidad de requerimiento"]),
     cantRecepcion: findCol(headerRow, ["CantRecepcion","Cantidad Recepcion","Cantidad de recepción"]),
     guiaAlmacen: findCol(headerRow, ["GUIA (ALMACÉN)","GUIA (ALMACEN)","Guia Almacen"]),
+    facturaProv: findCol(headerRow, ["REGISTRO FACTURA PROVISIÓN","REGISTRO FACTURA PROVISION"]),
+    docOrigen: findCol(headerRow, ["DocumentoDeOrigen"]),
+    cantidadSalida: findCol(headerRow, ["CantidadSalida"]),
+    docDestino: findCol(headerRow, ["DocumentoDeDestino"]),
+    cantidadIngreso: findCol(headerRow, ["Ingreso"]),
+    fechaIngreso: findCol(headerRow, ["FechaIngreso"]),
   };
 
   const dataRows = rows.slice(headerRowIdx+1);
@@ -2834,7 +2855,9 @@ function processWorkbook(wb, filename){
       // tienen pedido ni salida —las que están "En revisión de Almacén"—, que son las que más
       // interesa ver acá. Es un dataset aparte y liviano: no toca nada de Tiempos del Proceso.
       const numOrNull = (v)=> (v!=null && v!=='' && !isNaN(Number(v))) ? Number(v) : null;
-      const txt = (i)=> i!==-1 ? (r[i]||"").toString().trim() : "";
+      // Nisira escribe "sin dato" como un guion, no como celda vacía — se normaliza para que la
+      // pantalla muestre "—" y no un "-" suelto que parece un documento real.
+      const txt = (i)=>{ const v = i!==-1 ? (r[i]||"").toString().trim() : ""; return v === "-" ? "" : v; };
       reqRows.push({
         fReq, codRequerimiento: col.codRequerimiento!==-1 ? txt(col.codRequerimiento) : "",
         responsable: txt(col.nombreResponsable),
@@ -2853,8 +2876,16 @@ function processWorkbook(wb, filename){
         codOrden: codOrdenAt, usuarioCompras: txt(col.usuarioCompras),
         fOrden, fAprob, fCompromiso, fRecep,
         cantOrden: numOrNull(col.cantidadOrden!==-1 ? r[col.cantidadOrden] : null),
+        // Recepción en ALMACÉN: lo que llegó de la compra, con la guía y la factura del proveedor.
         cantRecep: numOrNull(col.cantRecepcion!==-1 ? r[col.cantRecepcion] : null),
-        fSalida, guia: txt(col.guiaAlmacen),
+        guia: txt(col.guiaAlmacen), factura: txt(col.facturaProv),
+        // Salida del ALMACÉN hacia la obra.
+        fSalida, cantSalida: numOrNull(col.cantidadSalida!==-1 ? r[col.cantidadSalida] : null),
+        docSalida: txt(col.docOrigen),
+        // Recepción EN OBRA: el ingreso al almacén del proyecto, con su guía de recepción (GRC).
+        fObra: col.fechaIngreso!==-1 ? parseExcelDate(r[col.fechaIngreso]) : null,
+        cantObra: numOrNull(col.cantidadIngreso!==-1 ? r[col.cantidadIngreso] : null),
+        docObra: txt(col.docDestino),
       });
 
       if(d1==null && d2==null && d3==null && d4==null && d6==null) continue; // nada calculable
@@ -9984,32 +10015,56 @@ function rqVistaItem(cont, filas){
       <td>${rqTxt(r.responsable)}</td>
       <td class="desc">${rqTxt(r.proyecto)}</td>
       <td><span class="rq-est ${rqClaseEstado(r.estadoCalc)}" title="Estado en Nisira: ${escapeHtml(r.estado)}">${escapeHtml(r.estadoCalc)}</span></td>
-      <td>${r.origen === 'importado' ? 'Importado' : 'Nacional'}</td>
       <td><span class="cod">${escapeHtml(r.idProducto)}</span></td>
       <td class="desc">${rqTxt(r.producto)}</td>
       <td class="num">${rqNum(r.cantidad)}</td>
       <td>${rqTxt(r.unidad)}</td>
-      <td>${rqTxt(r.codPedido)}</td>
+      <td class="g">${rqTxt(r.codPedido)}</td>
       <td>${rqFecha(r.fPedido)}</td>
-      <td>${rqTxt(r.codOrden)}</td>
+      <td>${rqTxt(r.responsablePedido)}</td>
+      <td class="g">${rqTxt(r.codOrden)}</td>
+      <td>${r.origen === 'importado' ? 'Importado' : 'Nacional'}</td>
       <td>${rqTxt(r.usuarioCompras)}</td>
       <td class="desc">${rqTxt(r.proveedor)}</td>
       <td>${rqFecha(r.fOrden)}</td>
       <td>${rqFecha(r.fAprob)}</td>
       <td>${rqFecha(r.fCompromiso)}</td>
-      <td class="num">${rqNum(r.cantRecep)}</td>
+      <td class="num g">${rqNum(r.cantRecep)}</td>
       <td>${rqFecha(r.fRecep)}</td>
-      <td>${rqFecha(r.fSalida)}</td>
       <td>${rqTxt(r.guia)}</td>
+      <td>${rqTxt(r.factura)}</td>
+      <td class="num g">${rqNum(r.cantSalida)}</td>
+      <td>${rqFecha(r.fSalida)}</td>
+      <td>${rqTxt(r.docSalida)}</td>
+      <td class="num g">${rqNum(r.cantObra)}</td>
+      <td>${rqFecha(r.fObra)}</td>
+      <td>${rqTxt(r.docObra)}</td>
     </tr>`;
   }).join('');
+  // Dos filas de encabezado: arriba el tramo del proceso, abajo la columna. Así se lee de izquierda a
+  // derecha en el mismo orden en que las cosas pasan de verdad (25.09.2026, pedido de Piero).
   cont.innerHTML = `<div class="card table-card rq-scroll"><table class="rq-tabla">
-      <thead><tr><th>Fecha</th><th>N° Req.</th><th>Responsable</th><th>Proyecto</th><th>Estado</th><th>Origen</th>
-        <th>Código</th><th>Descripción</th><th class="num">Cant.</th><th>UM</th>
-        <th>N° Pedido</th><th>F. Pedido</th><th>N° OC</th><th>Usuario Compras</th><th>Proveedor</th>
-        <th>F. Emisión</th><th>F. Aprobación</th><th>F. Entrega</th><th class="num">Cant. recep.</th><th>F. Recepción</th>
-        <th>F. Salida</th><th>Guía Proveedor</th></tr></thead>
-      <tbody>${cuerpo || '<tr><td colspan="22" style="text-align:center;padding:26px;color:var(--muted);">Ninguna línea calza con esos filtros.</td></tr>'}</tbody>
+      <thead>
+        <tr class="rq-grupos">
+          <th colspan="9" class="t1">1 · Requerimiento</th>
+          <th colspan="3" class="t2">2 · Pedido a Compras</th>
+          <th colspan="7" class="t3">3 · Orden de compra</th>
+          <th colspan="4" class="t4">4 · Recepción en almacén</th>
+          <th colspan="3" class="t5">5 · Salida del almacén</th>
+          <th colspan="3" class="t6">6 · Recepción en obra</th>
+        </tr>
+        <tr>
+          <th>F. Req.</th><th>N° Req.</th><th>Responsable</th><th>Proyecto</th><th>Estado</th>
+          <th>Código</th><th>Descripción</th><th class="num">Cant.</th><th>UM</th>
+          <th>N° Pedido</th><th>F. Pedido</th><th>Resp. Pedido</th>
+          <th>N° OC</th><th>Origen</th><th>Usuario Compras</th><th>Proveedor</th>
+          <th>F. Emisión</th><th>F. Aprobación</th><th>F. Entrega</th>
+          <th class="num">Cant. recep.</th><th>F. Recepción</th><th>Guía Proveedor</th><th>Factura</th>
+          <th class="num">Cant. salida</th><th>F. Salida</th><th>Guía salida</th>
+          <th class="num">Cant. recibida</th><th>F. Recep. obra</th><th>Guía obra</th>
+        </tr>
+      </thead>
+      <tbody>${cuerpo || '<tr><td colspan="29" style="text-align:center;padding:26px;color:var(--muted);">Ninguna línea calza con esos filtros.</td></tr>'}</tbody>
     </table></div>` + rqMasHtml(ver.length, orden.length, 'líneas');
   rqEngancharMas();
 }
@@ -10056,20 +10111,34 @@ function rqLlenarFiltros(){
 function rqExportar(){
   const filas = rqFiltradas();
   if(!filas.length) return;
-  const aoa = [['F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Estado en Nisira','Origen',
-    'Código','Descripción','Cantidad','UM','Familia','N° Pedido','F. Pedido','Resp. Pedido','N° OC','Usuario Compras',
-    'Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada','Cant. recepcionada','F. Recepción','F. Salida','Guía Proveedor']];
+  const aoa = [[
+    'F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Estado en Nisira',
+    'Código','Descripción','Cantidad','UM','Familia',
+    'N° Pedido','F. Pedido','Resp. Pedido',
+    'N° OC','Origen','Usuario Compras','Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada',
+    'Cant. recepcionada','F. Recepción almacén','Guía Proveedor','Factura',
+    'Cant. salida','F. Salida almacén','Guía de salida',
+    'Cant. recibida en obra','F. Recepción en obra','Guía de obra']];
   const f = (d)=> d ? fmtDate(d) : '';
+  const n = (v)=> v==null ? '' : v;
   filas.forEach(function(r){
     aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, r.proyecto, r.estadoCalc, r.estado,
-      r.origen === 'importado' ? 'Importado' : 'Nacional', r.idProducto, r.producto,
-      r.cantidad==null?'':r.cantidad, r.unidad, r.familia, r.codPedido, f(r.fPedido), r.responsablePedido,
-      r.codOrden, r.usuarioCompras, r.proveedor, f(r.fOrden), f(r.fAprob), f(r.fCompromiso),
-      r.cantRecep==null?'':r.cantRecep, f(r.fRecep), f(r.fSalida), r.guia]);
+      r.idProducto, r.producto, n(r.cantidad), r.unidad, r.familia,
+      r.codPedido, f(r.fPedido), r.responsablePedido,
+      r.codOrden, r.origen === 'importado' ? 'Importado' : 'Nacional', r.usuarioCompras, r.proveedor,
+      f(r.fOrden), f(r.fAprob), f(r.fCompromiso),
+      n(r.cantRecep), f(r.fRecep), r.guia, r.factura,
+      n(r.cantSalida), f(r.fSalida), r.docSalida,
+      n(r.cantObra), f(r.fObra), r.docObra]);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:12},{wch:15},{wch:24},{wch:17},{wch:32},{wch:32},{wch:22},{wch:11},{wch:15},{wch:50},{wch:11},
-    {wch:8},{wch:26},{wch:15},{wch:12},{wch:22},{wch:15},{wch:16},{wch:32},{wch:12},{wch:13},{wch:14},{wch:14},{wch:12},{wch:12},{wch:16}];
+  ws['!cols'] = [{wch:12},{wch:15},{wch:24},{wch:17},{wch:32},{wch:32},{wch:22},
+    {wch:15},{wch:50},{wch:11},{wch:8},{wch:26},
+    {wch:15},{wch:12},{wch:22},
+    {wch:15},{wch:11},{wch:16},{wch:32},{wch:12},{wch:14},{wch:15},
+    {wch:14},{wch:15},{wch:18},{wch:18},
+    {wch:12},{wch:14},{wch:18},
+    {wch:15},{wch:16},{wch:18}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Requerimientos');
   XLSX.writeFile(wb, 'Requerimientos - Grupo Friopacking.xlsx');
