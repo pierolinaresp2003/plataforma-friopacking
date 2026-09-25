@@ -9959,7 +9959,7 @@ function rqPreparar(){
   // estados que se contradicen ("Pedido pendiente" y "cuenta con OC" a la vez).
   // OJO: la línea sin OC que SÍ tiene salida no es un duplicado, es la parte que se despachó directo
   // de stock; esa se conserva y se marca como mixta (25.09.2026).
-  const conOc = new Set(), conTraza = new Set(), vias = {}, viasReq = {};
+  const conOc = new Set(), conTraza = new Set(), vias = {};
   rows.forEach(function(r){
     const k = r.codRequerimiento + '|' + r.idProducto;
     if(r.codOrden) conOc.add(k);
@@ -9973,18 +9973,14 @@ function rqPreparar(){
             || (!r.codOrden && !r.codPedido && !r.fSalida && conTraza.has(k));
     r.estadoCalc = rqEstadoReal(r);
     r.via = rqViaReal(r);
-    if(!r.omitir && r.via){
-      (vias[k] = vias[k] || {})[r.via] = 1;
-      (viasReq[r.codRequerimiento] = viasReq[r.codRequerimiento] || {})[r.via] = 1;
-    }
+    if(!r.omitir && r.via) (vias[k] = vias[k] || {})[r.via] = 1;
   });
   rows.forEach(function(r){
-    // mixtoReq: el requerimiento se atendió en parte de stock y en parte comprando (lo más común:
-    // unos ítems salen directo y otros pasan a pedido). mixtoItem: es el MISMO producto el que se
-    // partió en dos, una parte de stock y otra con OC.
-    const v = vias[r.codRequerimiento + '|' + r.idProducto], vr = viasReq[r.codRequerimiento];
+    // Solo se marca cuando es el MISMO ítem el que se partió: una parte salió del stock del almacén
+    // y la otra se compró con OC. Que el requerimiento tenga unos ítems directos y otros por pedido
+    // no se marca — eso ya lo dice la columna Vía línea por línea (25.09.2026, aclaración de Piero).
+    const v = vias[r.codRequerimiento + '|' + r.idProducto];
     r.mixtoItem = !!(v && v.Directo && v.Pedido);
-    r.mixtoReq = !!(vr && vr.Directo && vr.Pedido);
   });
   RQ.preparado = rows.length;
 }
@@ -10073,8 +10069,7 @@ function rqVistaItem(cont, filas){
       <td class="desc">${rqTxt(r.proyecto)}</td>
       <td><span class="rq-est ${rqClaseEstado(r.estadoCalc)}" title="Estado en Nisira: ${escapeHtml(r.estado)}">${escapeHtml(r.estadoCalc)}</span></td>
       <td>${r.via ? `<span class="rq-via ${r.via === 'Directo' ? 'dir' : 'ped'}">${r.via}</span>` : '—'}
-        ${r.mixtoItem ? '<span class="rq-mix" title="De este mismo producto, una parte salió del stock del almacén y la otra se compró con OC.">este ítem: directo + pedido</span>'
-          : (r.mixtoReq ? '<span class="rq-mix" title="En este requerimiento unos ítems salieron del stock del almacén y otros se compraron con OC.">req. mixto: directo + pedido</span>' : '')}</td>
+        ${r.mixtoItem ? '<span class="rq-mix" title="De este mismo ítem una parte salió del stock del almacén y la otra se compró con OC: esta línea es solo una de las dos partes.">ítem partido: directo + pedido</span>' : ''}</td>
       <td><span class="cod">${escapeHtml(r.idProducto)}</span></td>
       <td class="desc">${rqTxt(r.producto)}</td>
       <td class="num">${rqNum(r.cantidad)}</td>
@@ -10174,7 +10169,7 @@ function rqExportar(){
   if(!filas.length) return;
   const aoa = [[
     'F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Estado en Nisira',
-    'Vía','¿Mixto?','Código','Descripción','Cantidad','UM','Familia',
+    'Vía','¿Ítem partido?','Código','Descripción','Cantidad','UM','Familia',
     'N° Pedido','F. Pedido','Cant. pedida','Resp. Pedido',
     'N° OC','Origen','Usuario Compras','Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada',
     'Cant. recepcionada','F. Recepción almacén','Guía Proveedor','Factura',
@@ -10184,7 +10179,7 @@ function rqExportar(){
   const n = (v)=> v==null ? '' : v;
   filas.forEach(function(r){
     aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, r.proyecto, r.estadoCalc, r.estado,
-      r.via, r.mixtoItem ? 'Sí — el mismo ítem: directo + pedido' : (r.mixtoReq ? 'Sí — requerimiento mixto: directo + pedido' : ''),
+      r.via, r.mixtoItem ? 'Sí — el mismo ítem se partió: directo + pedido' : '',
       r.idProducto, r.producto, n(r.cantidad), r.unidad, r.familia,
       r.codPedido, f(r.fPedido), n(r.cantPedido), r.responsablePedido,
       r.codOrden, r.origen === 'importado' ? 'Importado' : 'Nacional', r.usuarioCompras, r.proveedor,
