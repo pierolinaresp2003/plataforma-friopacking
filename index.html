@@ -473,6 +473,25 @@
   .rq-pop .cerrar{position:absolute;top:8px;right:10px;border:none;background:none;cursor:pointer;
     font-size:17px;line-height:1;color:var(--muted);}
   .rq-pop .aviso{color:var(--muted);line-height:1.45;}
+  .rq-pop .res{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
+  .rq-pop .res-tit{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;font-weight:800;color:var(--ink);}
+  .rq-pop .res-tit b{color:var(--amber-ink);font-size:14px;}
+  .rq-pop .res-sub{font-size:10.5px;color:var(--muted);margin:1px 0 6px;}
+  .rq-pop .res-fila{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 8px;margin:0 -8px;border-radius:8px;}
+  .rq-pop .res-fila.este{background:var(--amber-bg);}
+  .rq-pop .res-fila b{font-size:12.5px;color:var(--ink);white-space:nowrap;}
+  .rq-pop .res-req{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700;color:var(--brand-ink);}
+  .rq-pop .res-fecha{margin-left:7px;font-size:10.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;}
+  .rq-pop .res-tag{margin-left:6px;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--amber-ink);}
+  .rq-pop .res-pry{display:block;font-size:10.5px;color:var(--muted);line-height:1.25;}
+  .rq-pop .res-mas{font-size:10.5px;color:var(--muted);margin-top:3px;}
+  .rq-pop .libre{margin-top:10px;display:flex;justify-content:space-between;align-items:center;
+    background:var(--green-bg);border-radius:10px;padding:9px 12px;}
+  .rq-pop .libre span{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--green);}
+  .rq-pop .libre b{font-size:21px;font-weight:800;color:var(--green);}
+  .rq-pop .libre.cero{background:var(--surface-2);}
+  .rq-pop .libre.cero span,.rq-pop .libre.cero b{color:var(--muted);}
+  .rq-pop .res-aviso{margin-top:8px;font-size:11px;line-height:1.4;color:var(--red);}
   .rq-est{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;background:var(--surface-2);color:var(--ink-soft);}
   .rq-est.ok{background:var(--green-bg);color:var(--green);}
   .rq-est.camino{background:var(--amber-bg);color:var(--amber-ink);}
@@ -10048,13 +10067,15 @@ function rqPreparar(){
 // escondiendo que faltaban 18 — y dejaba los otros ítems como si nunca se hubieran atendido.
 // Acá se reparte igual que la pantalla "Seguimiento de Requerimiento Interno": ítem por ítem, cada
 // uno toma hasta lo que pidió (su cantidad pedida, o la requerida si nunca pasó por Compras) y el
-// sobrante cae en el último. Los ítems con OC se reparten aparte de los que salieron de stock, para
-// no mezclar lo que se compró con lo que ya estaba en almacén.
+// sobrante cae en el último. Se reparte entre TODOS los ítems del mismo producto, tengan OC o no:
+// cuando una parte salió de stock y otra se compró, Nisira suele despacharlas juntas en una sola
+// guía (el 0001-0021874 sacó 720 m que cubrían sus ítems de 240 y 480). Separarlos dejaba el ítem
+// con OC como "sin salida" y lo contaba como reserva fantasma (25.09.2026).
 function rqRepartirSalida(rows){
   const copias = rows.map(function(r){ return Object.assign({}, r); });
   const grupos = new Map();
   copias.forEach(function(r){
-    const k = r.codRequerimiento + '|' + r.idProducto + '|' + (r.codOrden ? 'oc' : 'stock');
+    const k = r.codRequerimiento + '|' + r.idProducto;
     if(!grupos.has(k)) grupos.set(k, []);
     grupos.get(k).push(r);
   });
@@ -10166,7 +10187,7 @@ function rqVistaItem(cont, filas){
       <td><span class="rq-est ${rqClaseEstado(r.estadoCalc)}" title="Estado en Nisira: ${escapeHtml(r.estado)}">${escapeHtml(r.estadoCalc)}</span></td>
       <td>${r.via ? `<span class="rq-via ${r.via === 'Directo' ? 'dir' : 'ped'}">${r.via}</span>` : '—'}
         ${r.mixtoItem ? '<span class="rq-mix" title="De este mismo ítem una parte salió del stock del almacén y la otra se compró con OC: esta línea es solo una de las dos partes.">ítem partido: directo + pedido</span>' : ''}</td>
-      <td><button type="button" class="cod rq-cod" data-rqstock="${escapeHtml(r.idProducto)}" title="Ver stock en Lima, Trujillo e Ica">${escapeHtml(r.idProducto)}</button></td>
+      <td><button type="button" class="cod rq-cod" data-rqstock="${escapeHtml(r.idProducto)}" data-rqreq="${escapeHtml(r.codRequerimiento)}" title="Ver stock en Lima, Trujillo e Ica">${escapeHtml(r.idProducto)}</button></td>
       <td class="desc">${rqTxt(r.producto)}</td>
       <td class="num">${rqNum(r.cantidad)}</td>
       <td>${rqTxt(r.unidad)}</td>
@@ -10324,6 +10345,30 @@ function rqStockDe(codigo){
   return null;
 }
 
+// Reservas de un código: material que YA LLEGÓ al almacén para un requerimiento y todavía no tiene
+// salida. Está físicamente en el stock, pero ya tiene dueño (25.09.2026, Piero: "figuran 210 mts en
+// stock de ese cable porque ya le dieron ingreso, pero en realidad ese stock se va a ir por ese mismo
+// requerimiento"). Se mira RQ.filas, que ya tiene la salida repartida ítem por ítem.
+// No cuentan como reserva:
+//  - "En Revisión": 466 de esas líneas tienen más de 60 días sin que nadie las cierre; sumarlas
+//    inflaría la reserva de casi cualquier código con demanda vieja.
+//  - "Pedido pendiente" / "cuenta con OC": ese material todavía no llegó, no está en el stock.
+function rqReservasDe(codigo){
+  const porReq = new Map();
+  (RQ.filas || []).forEach(function(r){
+    if(r.idProducto !== codigo || r.estadoCalc !== 'Recibido en Almacén') return;
+    const q = (r.cantRecep || 0) - (r.cantSalida || 0);
+    if(!(q > 0)) return;
+    const y = porReq.get(r.codRequerimiento) || { req:r.codRequerimiento, proyecto:r.proyecto, q:0, fRecep:null };
+    y.q += q;
+    if(r.fRecep && (!y.fRecep || r.fRecep > y.fRecep)) y.fRecep = r.fRecep;
+    porReq.set(r.codRequerimiento, y);
+  });
+  return Array.from(porReq.values())
+    .map(function(y){ y.q = Math.round(y.q * 100) / 100; return y; })
+    .sort(function(a,b){ return b.q - a.q; });
+}
+
 function rqCerrarPop(){
   const p = document.getElementById('rqPop');
   if(p) p.remove();
@@ -10350,12 +10395,37 @@ function rqAbrirStock(btn){
     // reposición—, pero en trazabilidad se responde por el código que pidió la obra.
     const yo = (p.miembros || []).filter(function(m){ return m.codigo === cod; })[0] || p;
     const sede = (etq, v)=> `<div class="sede${(v||0) ? '' : ' cero'}"><b>${etq}</b><i>${num(v)}</i></div>`;
+    // Solo Lima: es donde llega lo que se compra y de donde sale a obra. Trujillo e Ica se muestran
+    // como referencia pero no entran al descuento (25.09.2026, pedido de Piero).
+    const res = rqReservasDe(cod);
+    const reservado = Math.round(res.reduce(function(a,x){ return a + x.q; }, 0) * 100) / 100;
+    const libre = Math.round(((yo.lima || 0) - reservado) * 100) / 100;
+    const TOPE = 4;
+    const reqActual = btn.dataset.rqreq || '';
+    const listaRes = res.slice(0, TOPE).map(function(x){
+      const esEste = x.req === reqActual;
+      return `<div class="res-fila${esEste ? ' este' : ''}">
+        <div><span class="res-req">${escapeHtml(x.req)}</span>${x.fRecep ? '<span class="res-fecha">llegó ' + x.fRecep.toLocaleDateString('es-PE', { day:'2-digit', month:'short' }).replace('.', '') + '</span>' : ''}${esEste ? '<span class="res-tag">este req</span>' : ''}
+          <span class="res-pry">${escapeHtml(String(x.proyecto || '').slice(0, 30))}</span></div>
+        <b>${num(x.q)}</b>
+      </div>`;
+    }).join('');
     pop.innerHTML = `<button class="cerrar" type="button" aria-label="Cerrar">&times;</button>
       <h5>${escapeHtml(cod)}</h5>
       <div class="desc">${escapeHtml(yo.descripcion || p.descripcion || '')}${p.unidad ? ' · <b>' + escapeHtml(p.unidad) + '</b>' : ''}</div>
       <div class="sedes">${sede('LIMA', yo.lima)}${sede('TRUJILLO', yo.trujillo)}${sede('ICA', yo.ica)}</div>
       <div class="extra"><div><span>En tránsito</span><b>${num(yo.transito)}</b></div></div>
-      ${(!p.miembros && p.nCodigos > 1) ? `<div class="alt"><div class="aviso" style="font-size:11.5px;">Este link se publicó antes del desglose por código: lo de arriba suma ${p.nCodigos} códigos. Vuelve a publicar con ☁.</div></div>` : ''}`;
+      ${(!p.miembros && p.nCodigos > 1) ? `<div class="alt"><div class="aviso" style="font-size:11.5px;">Este link se publicó antes del desglose por código: lo de arriba suma ${p.nCodigos} códigos. Vuelve a publicar con ☁.</div></div>` : ''}
+      <div class="res">
+        <div class="res-tit"><span>Reservado</span><b>${reservado ? '−' + num(reservado) : '0'}</b></div>
+        <div class="res-sub">Llegó para un requerimiento y aún no tiene salida</div>
+        ${listaRes}
+        ${res.length > TOPE ? `<div class="res-mas">y ${res.length - TOPE} requerimiento${res.length - TOPE === 1 ? '' : 's'} más</div>` : ''}
+      </div>
+      <div class="libre${libre > 0 ? '' : ' cero'}">
+        <span>Disponible real en Lima</span><b>${num(Math.max(0, libre))}</b>
+      </div>
+      ${libre < 0 ? `<div class="res-aviso">Lo reservado supera el stock de Lima en <b>${num(-libre)}</b>: algún requerimiento figura como recibido sin salida, pero el material ya no está. Conviene revisarlo con Almacén.</div>` : ''}`;
   }
   document.body.appendChild(pop);
   // Se ancla debajo del código y se corrige si se sale de la pantalla.
