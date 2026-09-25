@@ -2854,10 +2854,10 @@ function processWorkbook(wb, filename){
       // "continue" de abajo a propósito: ese descarte deja fuera justo las líneas que todavía no
       // tienen pedido ni salida —las que están "En revisión de Almacén"—, que son las que más
       // interesa ver acá. Es un dataset aparte y liviano: no toca nada de Tiempos del Proceso.
-      const numOrNull = (v)=> (v!=null && v!=='' && !isNaN(Number(v))) ? Number(v) : null;
+      const numOrNull = (v)=>{ const s = (v==null ? '' : String(v)).trim(); return (s !== '' && !isNaN(Number(s))) ? Number(s) : null; };
       // Nisira escribe "sin dato" como un guion, no como celda vacía — se normaliza para que la
       // pantalla muestre "—" y no un "-" suelto que parece un documento real.
-      const txt = (i)=>{ const v = i!==-1 ? (r[i]||"").toString().trim() : ""; return v === "-" ? "" : v; };
+      const txt = (i)=>{ const v = i!==-1 ? (r[i]||"").toString().trim() : ""; return (v === "-" || v.charAt(0) === "#") ? "" : v; };
       reqRows.push({
         fReq, codRequerimiento: col.codRequerimiento!==-1 ? txt(col.codRequerimiento) : "",
         responsable: txt(col.nombreResponsable),
