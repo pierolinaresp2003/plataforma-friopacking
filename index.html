@@ -4712,19 +4712,12 @@ function drawGasto(){
   const nTop80 = agg.filter(g=>g.top80).length;
   const levelNoun = levelDef.plural;
 
-  // El gasto del nivel también en dólares (28.09.2026, pedido de Piero). El número grande sigue
-  // siendo el equivalente en soles —es el que ordena las barras y permite comparar peras con
-  // manzanas—, y debajo va cada moneda con su monto REAL, sin convertir, igual que en las tarjetas
-  // de Nacional/Importado. Solo se muestra la moneda que tiene monto.
-  const { soles: nivelSoles, dolares: nivelDolares } = montoPorMonedaOrigen(scoped);
-  const nivelMonedas = [
-    nivelSoles > 0 ? `${fmtPEN(nivelSoles)} <span style="opacity:.6;font-weight:600;">Soles</span>` : '',
-    nivelDolares > 0 ? `${fmtUSD(nivelDolares)} <span style="opacity:.6;font-weight:600;">Dólares</span>` : '',
-  ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+  // El gasto del nivel se muestra solo en dólares (28.09.2026, pedido de Piero: "déjalo en $ y ya"):
+  // el equivalente total (soles + dólares) convertido con el mismo tipo de cambio fijo del módulo.
+  const totalUSD = total / TIPO_CAMBIO['USD'];
 
   document.getElementById('kpiGridGasto').innerHTML = `
-    <div class="card kpi"><div class="label">Gasto en este nivel (período filtrado)</div><div class="value">${fmtPEN(total)}</div>
-      ${nivelMonedas ? `<div class="sub" style="font-size:13px;font-weight:700;color:var(--ink-soft);">${nivelMonedas}</div>` : ''}</div>
+    <div class="card kpi"><div class="label">Gasto en este nivel (período filtrado)</div><div class="value">${fmtUSD(totalUSD)}</div></div>
     <div class="card kpi"><div class="label">${levelNoun} con compras</div><div class="value">${agg.length.toLocaleString('es-PE')}</div></div>
     <div class="card kpi"><div class="label">${levelNoun} en el 80% principal</div><div class="value">${nTop80.toLocaleString('es-PE')}</div></div>
   `;
