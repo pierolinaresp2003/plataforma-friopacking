@@ -962,7 +962,7 @@
     .bv-lbl{display:block;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;opacity:.75;margin:14px 2px 7px;}
     .bv-inp{display:block;width:100%;box-sizing:border-box;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;
       border-radius:14px;padding:14px;font-size:16px;font-family:inherit;} .bv-inp::placeholder{color:rgba(255,255,255,.55);}
-    .bv-op.sel{background:rgba(62,198,172,.22);border-color:#3ec6ac;} .bv-op.sel .fl{opacity:1;color:#3ec6ac;}
+    .bv-acceso{margin:9px 2px 0;font-size:13.5px;color:#bff3e8;} .bv-acceso b{color:#3ec6ac;} .bv-acceso small{opacity:.75;}
     .bv-err{background:rgba(240,102,95,.2);border:1px solid rgba(240,102,95,.5);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:700;margin:12px 0 0;}
     .bv-entrar{display:block;width:100%;margin-top:18px;background:#3ec6ac;color:#06123f;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;}
     .app-sheet-usr{padding:4px 4px 12px;border-bottom:1px solid var(--border);margin-bottom:12px;}
@@ -10924,8 +10924,9 @@ function rqVistaTarjetas(cont, filas){
       <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>${faltaTxt}
     </div>` : '');
 
-  RQ.tarjetas = ver;
-  const tarjetas = ver.map(function(r, iTarjeta){
+  const listosVer = listos.slice(0, 300);
+  RQ.tarjetas = ver.concat(listosVer);
+  const tarjeta = function(r, iTarjeta){
     const refRecep = r.cantPedido != null ? r.cantPedido : r.cantOrden;
     const docs = [
       r.codOrden ? 'OC ' + escapeHtml(r.codOrden) + (r.ocsExtra ? ' · ' + r.ocsExtra.map(escapeHtml).join(' · ') : '') : '',
@@ -10949,12 +10950,12 @@ function rqVistaTarjetas(cont, filas){
       </div>
       ${docs.length ? `<div class="rqm-docs">${docs.join('<br>')}</div>` : ''}
     </div>`;
-  }).join('');
+  };
+  const tarjetas = ver.map(tarjeta).join('');
 
-  // Lo que ya llegó: una línea por ítem, plegado.
+  // Lo que ya llegó: plegado, pero con la misma tarjeta y los mismos círculos de arriba (29.09.2026, Piero).
   const listosHtml = listos.length ? `<details class="rqm-listos"><summary>✅ Ya llegó a obra · ${listos.length} ítem${listos.length === 1 ? '' : 's'}</summary>
-      ${listos.slice(0, 300).map(function(r){ return `<div class="rqm-listo"><span class="d">${rqTxt(r.producto)}</span>
-        <small>${unSoloReq ? '' : escapeHtml(r.codRequerimiento) + ' · '}${escapeHtml(r.estadoCalc)}${r.fObra ? ' · ' + rqFecha(r.fObra) : (r.fSalida ? ' · ' + rqFecha(r.fSalida) : '')}</small></div>`; }).join('')}</details>` : '';
+      ${listosVer.map(function(r, k){ return tarjeta(r, ver.length + k); }).join('')}</details>` : '';
   const nada = soloFalta && !orden.length ? '<div class="rqm-tip">✅ No falta nada: todo lo pedido ya llegó a obra.</div>' : '';
   cont.innerHTML = `<div class="rqm">${cab}${orden.length ? '' : nada}${tarjetas}${listosHtml}</div>` + rqMasHtml(ver.length, orden.length, soloFalta ? 'ítems por llegar' : 'ítems');
   rqEngancharMas();
@@ -12072,8 +12073,30 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 // es una página estática, no hay un servidor con la lista de usuarios. Qué vistas ve cada tipo:
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
 const APP_ACCESO = { gerencia:['gerencia','logistica','supervisor'], logistica:['logistica','supervisor'], supervisor:['supervisor'] };
+// El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
+// y en base a ese correo se designará la vista"). Se compara la parte antes de la @ porque hay gente con
+// @friopacking.pe y con @grupofriopacking.pe. Para dar acceso, agregar el correo a la lista que toca;
+// cualquier otro correo corporativo entra como Supervisor.
+const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
+const APP_CORREOS_GERENCIA = ['plinares@friopacking.pe'];
+const APP_CORREOS_LOGISTICA = CRT_COPIA_FIJA.slice();   // el equipo de Compras y Logística
+function appUsuarioDe(correo){ return String(correo || '').trim().toLowerCase().split('@')[0]; }
+function appCorreoValido(correo){
+  const m = String(correo || '').trim().toLowerCase().match(/^[a-z0-9._%+-]+@([a-z0-9.-]+)$/);
+  return !!(m && APP_DOMINIOS.indexOf(m[1]) !== -1);
+}
+function appTipoPorCorreo(correo){
+  if(!appCorreoValido(correo)) return null;
+  const u = appUsuarioDe(correo), en = function(l){ return l.some(function(c){ return appUsuarioDe(c) === u; }); };
+  return en(APP_CORREOS_GERENCIA) ? 'gerencia' : (en(APP_CORREOS_LOGISTICA) ? 'logistica' : 'supervisor');
+}
 APP.usuario = null;
-try{ const u = JSON.parse(localStorage.getItem('fp-usuario') || 'null'); if(u && APP_ACCESO[u.tipo]) APP.usuario = u; }catch(err){}
+try{
+  const u = JSON.parse(localStorage.getItem('fp-usuario') || 'null');
+  // El tipo se vuelve a sacar del correo cada vez: si cambian las listas, cambia el acceso.
+  const t = u && appTipoPorCorreo(u.correo);
+  if(t){ u.tipo = t; APP.usuario = u; }
+}catch(err){}
 if(APP.usuario){
   if(APP_ACCESO[APP.usuario.tipo].indexOf(APP.vista) === -1) APP.vista = APP.usuario.tipo;
   // Gerencia ya puso la clave al crear su usuario: en su celular no se le vuelve a pedir.
@@ -12148,15 +12171,14 @@ function appArrancar(){
 
 function appBienvenida(){
   const b = document.getElementById('appBienv');
-  const tipos = ['supervisor', 'logistica', 'gerencia'];
   b.innerHTML = `<div class="bv-in"><img src="${appLogo()}" alt="Grupo Friopacking" class="bv-logo">
     <h1>Plataforma de reportes</h1><p>Grupo Friopacking · crea tu usuario para entrar</p>
     <form class="bv-form" id="bvForm" autocomplete="off">
+      <label class="bv-lbl" for="bvCorreo">Correo corporativo</label>
+      <input type="email" id="bvCorreo" class="bv-inp" placeholder="usuario@friopacking.pe" autocomplete="email" inputmode="email" autocapitalize="off" enterkeyhint="next">
+      <div class="bv-acceso" id="bvAcceso" hidden></div>
       <label class="bv-lbl" for="bvNombre">Tu nombre</label>
       <input type="text" id="bvNombre" class="bv-inp" placeholder="Nombre y apellido" autocomplete="name" enterkeyhint="next">
-      <div class="bv-lbl">Tipo de usuario</div>
-      ${tipos.map(function(k){ const v = APP_VISTAS[k];
-        return `<button type="button" class="bv-op" data-tipo="${k}"><span class="ic">${v.ico}</span><span class="tx"><b>${v.nombre}</b><small>${v.desc}</small></span><span class="fl">○</span></button>`; }).join('')}
       <div class="bv-clave" id="bvClave" hidden>
         <label class="bv-lbl" for="bvPass">Clave de acceso</label>
         <input type="password" id="bvPass" class="bv-inp" placeholder="Clave" autocomplete="off" enterkeyhint="go">
@@ -12164,27 +12186,26 @@ function appBienvenida(){
       <p class="bv-err" id="bvErr" hidden></p>
       <button type="submit" class="bv-entrar">Entrar</button>
     </form>
-    <p class="bv-nota">Gerencia y Logística necesitan la clave. El usuario queda guardado en este celular; para cambiarlo, usa el botón de arriba a la derecha → Cambiar de usuario.</p></div>`;
+    <p class="bv-nota">Tu correo define qué vistas puedes usar. Gerencia y Logística piden además la clave. El usuario queda guardado en este celular; para cambiarlo, usa el botón de arriba a la derecha → Cambiar de usuario.</p></div>`;
   b.classList.add('abierto');
-  let tipo = null;
+  b.onclick = null;
   const err = function(t){ const e = document.getElementById('bvErr'); e.textContent = t; e.hidden = !t; };
-  b.onclick = function(e){
-    const o = e.target.closest('[data-tipo]'); if(!o) return;
-    tipo = o.dataset.tipo;
-    b.querySelectorAll('[data-tipo]').forEach(function(x){ x.classList.toggle('sel', x === o); x.querySelector('.fl').textContent = x === o ? '●' : '○'; });
-    const pide = tipo !== 'supervisor';
-    document.getElementById('bvClave').hidden = !pide;
+  const correo = document.getElementById('bvCorreo'), nombre = document.getElementById('bvNombre');
+  correo.oninput = function(){
+    const t = appTipoPorCorreo(correo.value), a = document.getElementById('bvAcceso');
+    a.hidden = !t;
+    if(t) a.innerHTML = `${APP_VISTAS[t].ico} Acceso: <b>${APP_VISTAS[t].nombre}</b>` + (APP_ACCESO[t].length > 1 ? ` <small>(también ${APP_ACCESO[t].slice(1).map(function(k){ return APP_VISTAS[k].nombre; }).join(' y ')})</small>` : '');
+    document.getElementById('bvClave').hidden = !t || t === 'supervisor';
     err('');
-    if(pide) document.getElementById('bvPass').focus();
   };
   document.getElementById('bvForm').onsubmit = function(e){
     e.preventDefault();
-    const nombre = document.getElementById('bvNombre').value.trim();
-    if(nombre.length < 2) return err('Escribe tu nombre.');
-    if(!tipo) return err('Elige el tipo de usuario.');
+    const c = correo.value.trim().toLowerCase(), tipo = appTipoPorCorreo(c);
+    if(!tipo) return err(appCorreoValido(c) ? 'Correo no reconocido.' : 'Usa tu correo corporativo (@friopacking.pe o @grupofriopacking.pe).');
+    if(nombre.value.trim().length < 2){ nombre.focus(); return err('Escribe tu nombre.'); }
     const pass = document.getElementById('bvPass');
     if(tipo !== 'supervisor' && fpHuella(pass.value) !== GER_LLAVE){ pass.select(); return err('Clave incorrecta.'); }
-    APP.usuario = { nombre:nombre.slice(0, 60), tipo:tipo, creado:new Date().toISOString().slice(0, 10) };
+    APP.usuario = { correo:c, nombre:nombre.value.trim().slice(0, 60), tipo:tipo, creado:new Date().toISOString().slice(0, 10) };
     try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); }catch(er){}
     if(tipo === 'gerencia'){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(er){} }
     pass.value = '';
@@ -12571,7 +12592,7 @@ function appAbrirSheet(){
   const pub = document.getElementById('btnPublish');
   const oscuro = document.documentElement.getAttribute('data-theme') === 'dark';
   document.getElementById('appSheetIn').innerHTML = `<div class="asa"></div>
-    ${APP.usuario ? `<div class="app-sheet-usr"><b>${escapeHtml(APP.usuario.nombre)}</b><span>Usuario ${escapeHtml(APP_VISTAS[APP.usuario.tipo].nombre)}</span></div>` : ''}
+    ${APP.usuario ? `<div class="app-sheet-usr"><b>${escapeHtml(APP.usuario.nombre)}</b><span>${escapeHtml(APP.usuario.correo || '')} · Usuario ${escapeHtml(APP_VISTAS[APP.usuario.tipo].nombre)}</span></div>` : ''}
     ${appVistasPermitidas().length > 1 ? '<h4>Cambiar de vista</h4>' : ''}
     ${Object.entries(APP_VISTAS).filter(([k])=> appVistasPermitidas().length > 1 && appVistasPermitidas().indexOf(k) !== -1).map(([k,v])=>`<button type="button" data-vista="${k}" class="${k === APP.vista ? 'on' : ''}"><span>${v.ico}</span>${v.nombre}${k === APP.vista ? ' <em>✓</em>' : ''}</button>`).join('')}
     <h4>Apariencia</h4>
