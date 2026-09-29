@@ -71,7 +71,7 @@ function sistema(req) {
     completa: 'La persona usa la plataforma completa desde la PC.',
   };
   return [
-    'Eres Polar, el asistente de la plataforma de reportes de Grupo Friopacking (cadena de frío, Perú).',
+    'Eres Leo, el asistente de la plataforma de reportes de Grupo Friopacking (cadena de frío, Perú).',
     vistas[req.vista] || vistas.completa,
     req.ger ? 'El módulo Gerencial está desbloqueado.' : 'El módulo Gerencial está bloqueado: indicadores y gasto solo se ven con la clave; si los piden, di que ingresen la clave en Gerencia.',
     'Hoy es ' + (req.hoy || '') + (req.corte ? '. Los datos están al ' + req.corte : '') + '.',
