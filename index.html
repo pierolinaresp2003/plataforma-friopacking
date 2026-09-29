@@ -2231,6 +2231,7 @@ function buildSnapshot(){
         mn: r.moneda, mo: r.montoNativo==null?null:Math.round(r.montoNativo*100)/100, cd: r.condiciones,
         // 29.09.2026: proveedor, cantidades y unidad para el panel de "en tránsito" del Análisis de Inventario.
         pv: r.proveedor || '', qo: r.cantidadOrden, qr: r.cantRecepcion, um: r.unidad || '', eo: r.estadoOrden || '',
+        et: isoDay(r.etd), fer: isoDay(r.fEntregaRef), fe: isoDay(r.fEntregaReal),
       })),
     },
     // gastoSchemaVersion sube a 4 el 03.09.2026: se agrega "no" (montoNativo, el monto real en la
@@ -2531,7 +2532,7 @@ function loadFromSnapshot(snap){
     d1: null, d2: r.d2, d3: r.d3, d4: (origenForDocumento(r.co) === 'importado' ? null : r.d4), d6: null,
     d4cumple: r.d4c, d4raw: r.d4, esRegularizacion: false,
     responsableD1: r.rp || 'JCENTENO', moneda: r.mn || null, montoNativo: (r.mo!=null ? r.mo : null), condiciones: r.cd || "",
-    etd: null, fEntregaReal: null, esPedidoDirecto: true,
+    etd: fromIsoDay(r.et), fEntregaRef: fromIsoDay(r.fer), fEntregaReal: fromIsoDay(r.fe), esPedidoDirecto: true,
   })) : [];
   GASTO_DATA = (snap.gasto && snap.gasto.rows) ? {
     fromSnapshot: true,
@@ -3204,6 +3205,10 @@ function processPedidoSinReq(wb, filename){
     cantRecepcion: findCol(headerRow, ["CantRecepcion"]),
     medida: findCol(headerRow, ["Medida","UnidadMedida"]),
     estadoOrden: findCol(headerRow, ["EstadoOrden"]),
+    // Fechas de importación que la macro llena desde ETA_IMPO (29.09.2026).
+    etd: findCol(headerRow, ["ETD"]),
+    fEntregaRef: findCol(headerRow, ["F. Entrega Ref","F Entrega Ref"]),
+    fEntregaReal: findCol(headerRow, ["F. Entrega Real","F Entrega Real"]),
   };
   const dataRows = rows.slice(headerRowIdx+1);
   const map = {};
@@ -3275,7 +3280,9 @@ function processPedidoSinReq(wb, filename){
       unidad: sinBasura(col.medida!==-1 ? r[col.medida] : ""),
       estadoOrden: sinBasura(col.estadoOrden!==-1 ? r[col.estadoOrden] : ""),
       condiciones: col.condiciones!==-1 ? (r[col.condiciones]||"").toString().trim() : "",
-      etd: null, fEntregaReal: null,
+      etd: col.etd!==-1 ? parseExcelDate(r[col.etd]) : null,
+      fEntregaRef: col.fEntregaRef!==-1 ? parseExcelDate(r[col.fEntregaRef]) : null,
+      fEntregaReal: col.fEntregaReal!==-1 ? parseExcelDate(r[col.fEntregaReal]) : null,
       // Marca para poder distinguir estas filas en el detalle si hiciera falta más adelante.
       esPedidoDirecto: true,
     });
