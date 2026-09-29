@@ -2229,6 +2229,8 @@ function buildSnapshot(){
         fp: isoDay(r.fPedido), fo: isoDay(r.fOrden), fb: isoDay(r.fAprob), fc: isoDay(r.fRecep), fx: isoDay(r.fCompromiso),
         d2: r.d2, d3: r.d3, d4: r.d4, d4c: r.d4cumple,
         mn: r.moneda, mo: r.montoNativo==null?null:Math.round(r.montoNativo*100)/100, cd: r.condiciones,
+        // 29.09.2026: proveedor, cantidades y unidad para el panel de "en tránsito" del Análisis de Inventario.
+        pv: r.proveedor || '', qo: r.cantidadOrden, qr: r.cantRecepcion, um: r.unidad || '',
       })),
     },
     // gastoSchemaVersion sube a 4 el 03.09.2026: se agrega "no" (montoNativo, el monto real en la
@@ -2521,7 +2523,8 @@ function loadFromSnapshot(snap){
   // CodOrden (no se publica aparte: es una función pura del código, ver origenForDocumento).
   PEDIDO_SIN_REQ_ROWS = (snap.proceso && snap.proceso.pedidoDirecto) ? snap.proceso.pedidoDirecto.map(r => ({
     proyecto: "SIN PROYECTO (compra de almacén)", producto: r.pr, idProducto: r.ip, familia: r.fa || 'Sin familia',
-    proveedor: "", origen: origenForDocumento(r.co), responsablePedido: r.rp || "", usuarioCompras: r.uc,
+    proveedor: r.pv || "", cantidadOrden: (r.qo != null ? r.qo : null), cantRecepcion: (r.qr != null ? r.qr : null), unidad: r.um || "",
+    origen: origenForDocumento(r.co), responsablePedido: r.rp || "", usuarioCompras: r.uc,
     responsableSalida: "", codRequerimiento: "", codPedido: r.cp, codOrden: r.co, camino: 'compra',
     fReq: null, fPedido: fromIsoDay(r.fp), fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb), fRecep: fromIsoDay(r.fc), fSalida: null, fCompromiso: fromIsoDay(r.fx),
     d1: null, d2: r.d2, d3: r.d3, d4: (origenForDocumento(r.co) === 'importado' ? null : r.d4), d6: null,
@@ -3192,10 +3195,19 @@ function processPedidoSinReq(wb, filename){
     moneda: findCol(headerRow, ["MONEDA","Moneda"]),
     cantidadOrden: findCol(headerRow, ["Cantidad de orden"]),
     precioUnitario: findCol(headerRow, ["PRECIO UNITARIO SIN IGV"]),
+    // Para el panel de "en tránsito" del Análisis de Inventario (29.09.2026): sin la cantidad recibida
+    // una OC ya atendida seguiría figurando en camino, y sin el proveedor/unidad el detalle sale mudo.
+    nombreProveedor: findCol(headerRow, ["NombreProveedor"]),
+    cantRecepcion: findCol(headerRow, ["CantRecepcion"]),
+    medida: findCol(headerRow, ["Medida","UnidadMedida"]),
   };
   const dataRows = rows.slice(headerRowIdx+1);
   const map = {};
   const ordenRows = [];
+  // Misma limpieza que en Reporte Maestro: Nisira escribe "-", "#N/A" y celdas con puros espacios
+  // (y Number("   ") da 0, no error).
+  const sinBasura = (v)=>{ const s = (v==null ? '' : String(v)).trim(); return (s === '-' || s.charAt(0) === '#') ? '' : s; };
+  const cifraOnull = (v)=>{ const s = sinBasura(v); return (s !== '' && !isNaN(Number(s))) ? Number(s) : null; };
   let n = 0;
   for(const r of dataRows){
     if(!r || r.every(c => c==null || c==="")) continue;
@@ -3230,7 +3242,7 @@ function processPedidoSinReq(wb, filename){
       // FAMILIA_BY_PRODUCTO). Si Reporte Maestro aún no se cargó o el producto no aparece ahí, queda
       // "Sin familia" hasta que se cargue/recargue (no hay forma de saberlo sin esa referencia).
       familia: (idProductoAt && FAMILIA_BY_PRODUCTO[idProductoAt]) || 'Sin familia',
-      proveedor: "",
+      proveedor: sinBasura(col.nombreProveedor!==-1 ? r[col.nombreProveedor] : ""),
       // Origen por prefijo de CodOrden (0001-/0002-), a pedido explícito de Piero (04.09.2026) — no por
       // RUC como el resto de la plataforma, porque acá no hay columna de RUC en el archivo real.
       origen: origenForDocumento(codOrdenAt),
@@ -3253,6 +3265,10 @@ function processPedidoSinReq(wb, filename){
         ? Number(r[col.cantidadOrden]) * Number(r[col.precioUnitario]) : null,
       cantidadOrden: (col.cantidadOrden!==-1 && r[col.cantidadOrden]!=null && !isNaN(Number(r[col.cantidadOrden])))
         ? Number(r[col.cantidadOrden]) : null,
+      // Lo ya recibido de esta OC: sin esto el panel de "en tránsito" daría por en camino OC que
+      // Nisira ya atendió pero que dejó la FechaRecepcion en "#N/A" (29.09.2026).
+      cantRecepcion: cifraOnull(col.cantRecepcion!==-1 ? r[col.cantRecepcion] : null),
+      unidad: sinBasura(col.medida!==-1 ? r[col.medida] : ""),
       condiciones: col.condiciones!==-1 ? (r[col.condiciones]||"").toString().trim() : "",
       etd: null, fEntregaReal: null,
       // Marca para poder distinguir estas filas en el detalle si hiciera falta más adelante.
@@ -10584,7 +10600,10 @@ document.getElementById('rqLimpiar').addEventListener('click', function(){
 // Se agrupa por OC porque una misma OC puede traer el producto en varias líneas de requerimiento.
 function trTransitoDe(codigo, codigos){
   const todos = (codigos && codigos.length) ? codigos : [codigo];
-  const rows = (DATA && DATA.procesoRows) || [];
+  // Se suman los "pedidos directos" de PedidoSinReq.xlsx: son OC reales que Reporte Maestro nunca trae,
+  // así que sin ellas el panel decía "no hay ninguna OC pendiente" para material que sí venía en camino
+  // (29.09.2026, caso de Piero: válvula 001905600004, 58 UND en la OC 0002-0001759 de HOTOWELL).
+  const rows = ((DATA && DATA.procesoRows) || []).concat(PEDIDO_SIN_REQ_ROWS || []);
   const porOC = new Map();
   rows.forEach(function(r){
     if(!r.codOrden || todos.indexOf(r.idProducto) === -1) return;
