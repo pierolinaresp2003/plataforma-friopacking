@@ -633,8 +633,51 @@
   .crt-sug .id{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;color:var(--brand-ink);}
   .crt-sug .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--ink);}
   .crt-sug .n{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;}
-  .crt-chip{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:18px;cursor:pointer;background:var(--card);color:var(--ink-soft);border:1px solid var(--border);}
-  .crt-chip[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:var(--brand);}
+  .crt-chip,.pd-chip{font:inherit;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:18px;cursor:pointer;background:var(--card);color:var(--ink-soft);border:1px solid var(--border);}
+  .crt-chip[aria-pressed="true"],.pd-chip[aria-pressed="true"]{background:var(--brand);color:#fff;border-color:var(--brand);}
+  /* Compras → Pendientes (28.09.2026): una tarjeta por OC / pedido, con sus ítems adentro */
+  .pd-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px;}
+  .pd-kpi{font:inherit;text-align:left;cursor:pointer;padding:12px 16px;border-left:4px solid var(--brand);}
+  .pd-kpi .label{font-size:11px;}
+  .pd-kpi .value{font-size:24px;margin-top:2px;}
+  .pd-kpi .sub{font-size:11.5px;margin-top:2px;}
+  .pd-kpi.venc{border-left-color:var(--red);} .pd-kpi.venc .value{color:var(--red);}
+  .pd-kpi.prox{border-left-color:var(--amber);} .pd-kpi.prox .value{color:var(--amber-ink);}
+  .pd-kpi.sinap{border-left-color:var(--muted);}
+  .pd-kpi[aria-pressed="true"]{box-shadow:0 0 0 2px var(--brand) inset, var(--shadow);}
+  .pd-lista{display:flex;flex-direction:column;gap:10px;}
+  .pd-card{border-left:5px solid var(--border);overflow:hidden;}
+  .pd-card.venc{border-left-color:var(--red);} .pd-card.prox{border-left-color:var(--amber);}
+  .pd-card.ok{border-left-color:var(--green);}
+  .pd-kpi.ok{border-left-color:var(--green);} .pd-kpi.ok .value{color:var(--green);}
+  .pd-cab{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:11px 16px;background:var(--th-bg);border-bottom:1px solid var(--border);}
+  .pd-num{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14.5px;font-weight:800;color:var(--brand-ink);}
+  .pd-prov{font-weight:700;color:var(--ink);font-size:13.5px;flex:1 1 220px;min-width:0;}
+  .pd-meta{font-size:12px;color:var(--ink-soft);}
+  .pd-meta b{color:var(--ink);font-weight:700;}
+  .pd-der{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .pd-items{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .pd-items th{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 16px 3px;}
+  .pd-items td{padding:6px 16px;border-top:1px solid var(--border);vertical-align:top;}
+  .pd-items tr:first-child td{border-top:none;}
+  .pd-items .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .pd-items .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;font-weight:700;color:var(--brand-ink);}
+  .pd-items .req{white-space:nowrap;width:1%;}
+  .pd-items .pry{width:26%;color:var(--ink-soft);}
+  .pd-items .falta{font-weight:800;color:var(--ink);}
+  .pd-items small{display:block;color:var(--muted);font-size:11px;}
+  @media (max-width:760px){
+    .pd-items thead{display:none;}
+    .pd-items,.pd-items tbody{display:block;width:100%;}
+    .pd-items tr{display:grid;grid-template-columns:1fr auto auto;gap:3px 14px;padding:9px 14px;border-top:1px solid var(--border);}
+    .pd-items tr:first-child{border-top:none;}
+    .pd-items td{border:none;padding:0;width:auto !important;grid-row:1;}
+    .pd-items td.pry{grid-row:2;grid-column:1 / -1;}
+    .pd-items td.prod{grid-row:3;grid-column:1 / -1;min-width:0;white-space:normal;overflow-wrap:anywhere;}
+  }
+  .pd-dias{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;background:var(--surface-2);color:var(--ink-soft);}
+  .pd-dias.tarde{background:var(--red-bg);color:var(--red);}
+  .pd-dias.ok{background:var(--green-bg);color:var(--green);}
   .crt-limpiar{font:inherit;font-size:12.5px;font-weight:700;color:var(--red);background:none;border:0;cursor:pointer;padding:6px 2px;}
   .crt-conteo{margin-left:auto;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;}
   .crt-th,.crt-tr{display:grid;grid-template-columns:180px minmax(220px,1fr) 100px 100px 170px;gap:14px;align-items:center;padding:11px 16px;}
@@ -851,6 +894,7 @@
       <div class="navitem externo" data-url="https://melissa2026714.github.io/dashboard-friopacking/compras.html" title="Se abre en una pestaña nueva">
         <span>📊 Plataforma Compras</span><svg class="fuera" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v7H3V3h7"/></svg>
       </div>
+      <div class="navitem" data-section="pendientes">⏳ Pendientes</div>
       <div class="navitem" data-section="certificados">📄 Certificados</div>
     </div>
   </nav>
@@ -1210,6 +1254,22 @@
       <div id="rqVista"></div>
     </div><!-- /section-requerimientos -->
 
+    <!-- Compras → Pendientes (28.09.2026, pedido de Piero): solo la lista de lo que falta, filtrada por
+         persona. Dos pestañas: OC que todavía no llegan al almacén y pedidos que todavía no pasan a OC. -->
+    <div id="section-pendientes" class="section">
+      <div class="note" id="pdNota" style="display:none;"></div>
+      <div class="toolbar" style="margin-bottom:10px;">
+        <button class="pd-chip" type="button" data-pd="oc" aria-pressed="true">OC por llegar</button>
+        <button class="pd-chip" type="button" data-pd="ped" aria-pressed="false">Pedidos sin OC</button>
+        <select id="pdPersona"><option value="all">Persona: todas</option></select>
+        <input type="search" id="pdBuscar" placeholder="Buscar OC, pedido, req., proyecto, código…" style="min-width:240px;">
+        <button class="btn secondary" id="pdExportar" type="button">&#11015; Exportar</button>
+        <span class="crt-conteo" id="pdConteo"></span>
+      </div>
+      <div class="pd-kpis" id="pdKpis"></div>
+      <div id="pdVista"></div>
+    </div><!-- /section-pendientes -->
+
     <div id="section-certificados" class="section">
       <div class="note" id="crtNota" style="display:none;"></div>
 
@@ -1419,6 +1479,9 @@ function responsableD1For(codPedido){
 // SOLO ahí — a propósito no se mezclan en DATA.procesoRows para no tocar Indicador 1-4 en el resto de
 // la plataforma, que Piero no pidió modificar.
 let PEDIDO_SIN_REQ_ROWS = [];
+// Líneas de PedidoSinReq.xlsx para Compras → Pendientes (28.09.2026): a diferencia de
+// PEDIDO_SIN_REQ_ROWS trae también los pedidos que todavía no tienen OC, y el estado/recepción de la OC.
+let PEDIDO_SIN_REQ_PEND = [];
 // ---------- Catálogo maestro de productos (Articulos.xlsx / MasterArt, Nisira) ----------
 // Fuente de verdad para Familia/Subfamilia por IdProducto — reemplaza la adivinanza por palabras
 // clave como primer criterio (pedido de Piero, 07.09.2026, tras auditar el archivo real: 15,511 de
@@ -2214,7 +2277,7 @@ function buildSnapshot(){
         e: r.estado, fa: r.familia, ip: r.idProducto, pr: r.producto, u: r.unidad, q: r.cantidad,
         og: r.origen, pv: r.proveedor,
         cp: r.codPedido, fp: isoDay(r.fPedido), rp: r.responsablePedido, qp: r.cantPedido,
-        ep: r.estadoPedido, co: r.codOrden, uc: r.usuarioCompras,
+        ep: r.estadoPedido, co: r.codOrden, uc: r.usuarioCompras, eo: r.estadoOrden,
         fo: isoDay(r.fOrden), fb: isoDay(r.fAprob), fx: isoDay(r.fCompromiso), fc: isoDay(r.fRecep),
         qo: r.cantOrden, qr: r.cantRecep, g: r.guia, fx2: r.factura,
         fs: isoDay(r.fSalida), qs: r.cantSalida, gs: r.docSalida,
@@ -2232,6 +2295,13 @@ function buildSnapshot(){
         // 29.09.2026: proveedor, cantidades y unidad para el panel de "en tránsito" del Análisis de Inventario.
         pv: r.proveedor || '', qo: r.cantidadOrden, qr: r.cantRecepcion, um: r.unidad || '', eo: r.estadoOrden || '',
         et: isoDay(r.etd), fer: isoDay(r.fEntregaRef), fe: isoDay(r.fEntregaReal),
+      })),
+      // Compras → Pendientes (28.09.2026): solo las líneas de PedidoSinReq que siguen abiertas.
+      pendDirecto: PEDIDO_SIN_REQ_PEND.filter(r => pdOcAbierta(r) || pdPedidoAbierto(r)).map(r => ({
+        cp: r.codPedido, fp: isoDay(r.fPedido), ep: r.estadoPedido, rp: r.responsablePedido, qp: r.cantPedido,
+        co: r.codOrden, eo: r.estadoOrden, uc: r.usuarioCompras, pv: r.proveedor, ip: r.idProducto,
+        pr: r.producto, u: r.unidad, qo: r.cantOrden, qr: r.cantRecep,
+        fo: isoDay(r.fOrden), fx: isoDay(r.fCompromiso), fc: isoDay(r.fRecep),
       })),
     },
     // gastoSchemaVersion sube a 4 el 03.09.2026: se agrega "no" (montoNativo, el monto real en la
@@ -2505,7 +2575,7 @@ function loadFromSnapshot(snap){
       origen: r.og || 'nacional', proveedor: r.pv || '',
       codPedido: r.cp || '', fPedido: fromIsoDay(r.fp), responsablePedido: r.rp || '',
       cantPedido: (r.qp!=null ? r.qp : null),
-      estadoPedido: r.ep || '', codOrden: r.co || '', usuarioCompras: r.uc || '',
+      estadoPedido: r.ep || '', codOrden: r.co || '', usuarioCompras: r.uc || '', estadoOrden: r.eo || '',
       fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb), fCompromiso: fromIsoDay(r.fx), fRecep: fromIsoDay(r.fc),
       cantOrden: (r.qo!=null ? r.qo : null), cantRecep: (r.qr!=null ? r.qr : null),
       guia: r.g || '', factura: r.fx2 || '',
@@ -2533,6 +2603,13 @@ function loadFromSnapshot(snap){
     d4cumple: r.d4c, d4raw: r.d4, esRegularizacion: false,
     responsableD1: r.rp || 'JCENTENO', moneda: r.mn || null, montoNativo: (r.mo!=null ? r.mo : null), condiciones: r.cd || "",
     etd: fromIsoDay(r.et), fEntregaRef: fromIsoDay(r.fer), fEntregaReal: fromIsoDay(r.fe), esPedidoDirecto: true,
+  })) : [];
+  PEDIDO_SIN_REQ_PEND = (snap.proceso && snap.proceso.pendDirecto) ? snap.proceso.pendDirecto.map(r => ({
+    codPedido: r.cp || '', fPedido: fromIsoDay(r.fp), estadoPedido: r.ep || '', responsablePedido: r.rp || '',
+    cantPedido: (r.qp!=null ? r.qp : null), codOrden: r.co || '', estadoOrden: r.eo || '', usuarioCompras: r.uc || '',
+    proveedor: r.pv || '', idProducto: r.ip || '', producto: r.pr || '', unidad: r.u || '',
+    cantOrden: (r.qo!=null ? r.qo : null), cantRecep: (r.qr!=null ? r.qr : null),
+    fOrden: fromIsoDay(r.fo), fCompromiso: fromIsoDay(r.fx), fRecep: fromIsoDay(r.fc),
   })) : [];
   GASTO_DATA = (snap.gasto && snap.gasto.rows) ? {
     fromSnapshot: true,
@@ -2786,6 +2863,7 @@ function processWorkbook(wb, filename){
     idProyecto: findCol(headerRow, ["IdProyecto"]),
     estadoReq: findCol(headerRow, ["EstadoRequerimiento"]),
     estadoPedido: findCol(headerRow, ["EstadoPedido"]),
+    estadoOrden: findCol(headerRow, ["EstadoOrden"]),
     fechaSalida: findCol(headerRow, ["FechaSalida"]),
     fechaRequerimiento: findCol(headerRow, ["FechaRequerimiento"]),
     motivoDescr: findCol(headerRow, ["MotivoDescr"]),
@@ -2814,7 +2892,6 @@ function processWorkbook(wb, filename){
     etd: findCol(headerRow, ["ETD"]),
     fEntregaReal: findCol(headerRow, ["F. Entrega Real","F Entrega Real"]),
     fEntregaRef: findCol(headerRow, ["F. Entrega Ref","F Entrega Ref"]),
-    estadoOrden: findCol(headerRow, ["EstadoOrden"]),
     // Columnas que solo necesita el módulo de Requerimientos (24.09.2026).
     unidadMedida: findCol(headerRow, ["UnidadMedida","Unidad de Medida","Unidad"]),
     cantidadReq: findCol(headerRow, ["CantidadRequerimiento","Cantidad de requerimiento"]),
@@ -3061,6 +3138,7 @@ function processWorkbook(wb, filename){
         cantPedido: numOrNull(col.cantidadPedido!==-1 ? r[col.cantidadPedido] : null),
         estadoPedido: estadoPedidoAt,
         codOrden: codOrdenAt, usuarioCompras: txt(col.usuarioCompras),
+        estadoOrden: txt(col.estadoOrden),
         fOrden, fAprob, fCompromiso, fRecep,
         cantOrden: numOrNull(col.cantidadOrden!==-1 ? r[col.cantidadOrden] : null),
         // Recepción en ALMACÉN: lo que llegó de la compra, con la guía y la factura del proveedor.
@@ -3195,6 +3273,12 @@ function processPedidoSinReq(wb, filename){
     usuarioCompras: findCol(headerRow, ["UsuarioCompras"]),
     idProducto: findCol(headerRow, ["IdProducto"]),
     producto: findCol(headerRow, ["Descripción","Descripcion"]),
+    estadoPedido: findCol(headerRow, ["EstadoPedido"]),
+    estadoOrden: findCol(headerRow, ["EstadoOrden"]),
+    cantidadPedido: findCol(headerRow, ["Cantidad de pedido"]),
+    cantRecepcion: findCol(headerRow, ["CantRecepcion"]),
+    nombreProveedor: findCol(headerRow, ["NombreProveedor"]),
+    medida: findCol(headerRow, ["Medida"]),
     condiciones: findCol(headerRow, ["Condiciones"]),
     moneda: findCol(headerRow, ["MONEDA","Moneda"]),
     cantidadOrden: findCol(headerRow, ["Cantidad de orden"]),
@@ -3204,7 +3288,6 @@ function processPedidoSinReq(wb, filename){
     nombreProveedor: findCol(headerRow, ["NombreProveedor"]),
     cantRecepcion: findCol(headerRow, ["CantRecepcion"]),
     medida: findCol(headerRow, ["Medida","UnidadMedida"]),
-    estadoOrden: findCol(headerRow, ["EstadoOrden"]),
     // Fechas de importación que la macro llena desde ETA_IMPO (29.09.2026).
     etd: findCol(headerRow, ["ETD"]),
     fEntregaRef: findCol(headerRow, ["F. Entrega Ref","F Entrega Ref"]),
@@ -3217,6 +3300,7 @@ function processPedidoSinReq(wb, filename){
   // (y Number("   ") da 0, no error).
   const sinBasura = (v)=>{ const s = (v==null ? '' : String(v)).trim(); return (s === '-' || s.charAt(0) === '#') ? '' : s; };
   const cifraOnull = (v)=>{ const s = sinBasura(v); return (s !== '' && !isNaN(Number(s))) ? Number(s) : null; };
+  const pendRows = [];
   let n = 0;
   for(const r of dataRows){
     if(!r || r.every(c => c==null || c==="")) continue;
@@ -3225,6 +3309,22 @@ function processPedidoSinReq(wb, filename){
     if(!cp) continue;
     const resp = col.responsablePedido!==-1 ? (r[col.responsablePedido]||"").toString().trim() : "";
     if(resp) { map[cp] = resp; n++; }
+
+    // Compras → Pendientes (28.09.2026): todas las líneas, tengan OC o no.
+    {
+      const t = (i)=>{ const v = i!==-1 ? (r[i]==null ? '' : String(r[i])).trim() : ''; return (v === '-' || v.charAt(0) === '#') ? '' : v; };
+      const num = (i)=>{ const v = t(i); return (v !== '' && !isNaN(Number(v))) ? Number(v) : null; };
+      pendRows.push({
+        codPedido: cp, fPedido: col.fechaPedido!==-1 ? parseExcelDate(r[col.fechaPedido]) : null,
+        estadoPedido: t(col.estadoPedido), responsablePedido: resp, cantPedido: num(col.cantidadPedido),
+        codOrden: t(col.codOrden), estadoOrden: t(col.estadoOrden), usuarioCompras: t(col.usuarioCompras),
+        proveedor: t(col.nombreProveedor), idProducto: t(col.idProducto), producto: t(col.producto),
+        unidad: t(col.medida), cantOrden: num(col.cantidadOrden), cantRecep: num(col.cantRecepcion),
+        fOrden: col.fechaOrden!==-1 ? parseExcelDate(r[col.fechaOrden]) : null,
+        fCompromiso: col.paraFechaOrden!==-1 ? parseExcelDate(r[col.paraFechaOrden]) : null,
+        fRecep: col.fechaRecep!==-1 ? parseExcelDate(r[col.fechaRecep]) : null,
+      });
+    }
 
     // Fila de OC completa (ver PEDIDO_SIN_REQ_ROWS) — solo si trae CodOrden real (algunas líneas de
     // pedidos directos siguen sin OC todavía, "#N/A" en el archivo real).
@@ -3289,6 +3389,7 @@ function processPedidoSinReq(wb, filename){
   }
   PEDIDO_SIN_REQ_RESP = map;
   PEDIDO_SIN_REQ_ROWS = ordenRows;
+  PEDIDO_SIN_REQ_PEND = pendRows;
   reresolveResponsableD1(); // por si Reporte Maestro.xlsx ya se había cargado antes que este archivo (esto ya llama a render())
 
   if(n === 0 && ordenRows.length === 0){
@@ -4701,19 +4802,12 @@ function drawGasto(){
   const nTop80 = agg.filter(g=>g.top80).length;
   const levelNoun = levelDef.plural;
 
-  // El gasto del nivel también en dólares (28.09.2026, pedido de Piero). El número grande sigue
-  // siendo el equivalente en soles —es el que ordena las barras y permite comparar peras con
-  // manzanas—, y debajo va cada moneda con su monto REAL, sin convertir, igual que en las tarjetas
-  // de Nacional/Importado. Solo se muestra la moneda que tiene monto.
-  const { soles: nivelSoles, dolares: nivelDolares } = montoPorMonedaOrigen(scoped);
-  const nivelMonedas = [
-    nivelSoles > 0 ? `${fmtPEN(nivelSoles)} <span style="opacity:.6;font-weight:600;">Soles</span>` : '',
-    nivelDolares > 0 ? `${fmtUSD(nivelDolares)} <span style="opacity:.6;font-weight:600;">Dólares</span>` : '',
-  ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+  // El gasto del nivel se muestra solo en dólares (28.09.2026, pedido de Piero: "déjalo en $ y ya"):
+  // el equivalente total (soles + dólares) convertido con el mismo tipo de cambio fijo del módulo.
+  const totalUSD = total / TIPO_CAMBIO['USD'];
 
   document.getElementById('kpiGridGasto').innerHTML = `
-    <div class="card kpi"><div class="label">Gasto en este nivel (período filtrado)</div><div class="value">${fmtPEN(total)}</div>
-      ${nivelMonedas ? `<div class="sub" style="font-size:13px;font-weight:700;color:var(--ink-soft);">${nivelMonedas}</div>` : ''}</div>
+    <div class="card kpi"><div class="label">Gasto en este nivel (período filtrado)</div><div class="value">${fmtUSD(totalUSD)}</div></div>
     <div class="card kpi"><div class="label">${levelNoun} con compras</div><div class="value">${agg.length.toLocaleString('es-PE')}</div></div>
     <div class="card kpi"><div class="label">${levelNoun} en el 80% principal</div><div class="value">${nTop80.toLocaleString('es-PE')}</div></div>
   `;
@@ -4994,6 +5088,7 @@ function render(){
   renderProceso();
   renderGasto();
   renderAlertas();
+  { const sp = document.getElementById('section-pendientes'); if(sp && sp.classList.contains('active')) drawPendientes(); }
 }
 
 // ---------- Alertas de Atención (Req sin Pedido / Pedido sin OC) ----------
@@ -11048,6 +11143,285 @@ document.getElementById('rqExportar').addEventListener('click', rqExportar);
 })();
 document.getElementById('rqImagen').addEventListener('click', function(){ descargarRqImagen(this); });
 
+// ============================================================================
+// Compras → Pendientes (28.09.2026, pedido de Piero: "los pendientes de OC que falta llegar, así como
+// los pendientes de pedidos que falta pasar a OC… indicar el proyecto y el número de requerimiento…
+// solo una lista de lo pendiente, filtrada por persona"). Sale de Reporte Maestro.xlsx (líneas con
+// requerimiento) + PedidoSinReq.xlsx (pedidos directos, sin requerimiento): son partes distintas de la
+// operación y se suman.
+//   · OC por llegar  = la OC existe y su EstadoOrden es "Pendiente (…)" o "Atendido Parcial" con
+//                      cantidad por recibir. Persona = UsuarioCompras (quien emitió la OC).
+//   · Pedido sin OC  = el pedido existe, no tiene OC y su EstadoPedido es "Pendiente" (misma regla que
+//                      pendienteLineaA, incluidos los cierres manuales). Persona = ResponsablePedido.
+// ============================================================================
+const PD = { tab:'oc', q:'', urg:'all', tope:40 };
+// Nombre ↔ usuario de Nisira. UsuarioCompras viene como código y ResponsablePedido como nombre, en
+// formatos distintos según el archivo ("Carolina Checa", "CAROLINA CHECA SANDOVAL", "ALTAMIRANO ORTIZ
+// JAIME"): se reconoce por las palabras del nombre, sin importar el orden.
+const PD_PERSONAS = {
+  CCHECA:'Carolina Checa', MSIHUAIRO:'Melissa Sihuairo', JALTAMIRANO:'Jaime Altamirano',
+  JPOMEZ:'José Pomez', MLUJAN:'Manuel Luján', PLINARES:'Piero Linares', JCENTENO:'Javier Centeno',
+  KALBUJAR:'Katherine Albujar', CMORA:'Camila Mora',
+};
+function pdPersona(v){
+  const n = sinAcentos(String(v||'')).toUpperCase().replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();
+  if(!n) return '';
+  if(PD_PERSONAS[n]) return n;
+  if(RESP_PEDIDO_USUARIO[n]) return RESP_PEDIDO_USUARIO[n];
+  const pal = n.split(' ');
+  for(const [cod, nom] of Object.entries(PD_PERSONAS)){
+    const req = sinAcentos(nom).toUpperCase().split(' ');
+    if(req.every(p => pal.indexOf(p) !== -1)) return cod;
+  }
+  if(pal.indexOf('LUJAN') !== -1 && pal.indexOf('MANUEL') !== -1) return 'MLUJAN';
+  return n;   // alguien fuera de la lista: se muestra tal cual viene
+}
+function pdEtiquetaPersona(cod){
+  if(PD_PERSONAS[cod]) return PD_PERSONAS[cod] + ' (' + cod + ')';
+  return String(cod||'').toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); });
+}
+
+function pdFalta(r){
+  if(r.cantOrden == null) return null;
+  const f = Math.round((r.cantOrden - Math.max(0, r.cantRecep || 0)) * 100) / 100;
+  return f;
+}
+function pdOcAbierta(r){
+  if(!r.codOrden) return false;
+  const e = sinAcentos(String(r.estadoOrden||'')).toLowerCase();
+  if(e){
+    if(e.indexOf('pendiente') !== 0 && e.indexOf('parcial') === -1) return false;   // completa o anulada
+  } else if((r.cantRecep != null && r.cantRecep > 0) || r.fRecep){
+    return false;   // snapshot viejo sin EstadoOrden: se usa la recepción
+  }
+  const f = pdFalta(r);
+  return f == null || f > 0;
+}
+function pdPedidoAbierto(r){
+  if(!r.codPedido || r.codOrden) return false;
+  if(String(r.estadoPedido||'').trim().toLowerCase() !== 'pendiente') return false;
+  return !pedidoCerradoManual({ codPedido:r.codPedido, idProducto:r.idProducto, cantidadPedido:r.cantPedido });
+}
+
+function pdFilas(){
+  const out = [];
+  getReqRows().forEach(function(r){
+    const base = { req: r.codRequerimiento, proyecto: r.proyecto, idProyecto: r.idProyecto,
+      idProducto: r.idProducto, producto: r.producto, unidad: r.unidad, codPedido: r.codPedido,
+      fPedido: r.fPedido, cantPedido: r.cantPedido, codOrden: r.codOrden, estadoOrden: r.estadoOrden,
+      proveedor: r.proveedor, cantOrden: r.cantOrden, cantRecep: r.cantRecep, fOrden: r.fOrden,
+      fCompromiso: r.fCompromiso };
+    if(pdOcAbierta(r)) out.push(Object.assign({ tipo:'oc', persona: pdPersona(r.usuarioCompras) }, base));
+    else if(pdPedidoAbierto(r)) out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, base));
+  });
+  PEDIDO_SIN_REQ_PEND.forEach(function(r){
+    const base = Object.assign({ req:'', proyecto:'Pedido directo (sin requerimiento)', idProyecto:'' }, r);
+    if(pdOcAbierta(r)) out.push(Object.assign(base, { tipo:'oc', persona: pdPersona(r.usuarioCompras) }));
+    else if(pdPedidoAbierto(r)) out.push(Object.assign(base, { tipo:'ped', persona: pdPersona(r.responsablePedido) }));
+  });
+  return out;
+}
+
+function pdDiasHtml(r){
+  const hoy = new Date();
+  if(r.tipo === 'ped'){
+    const d = r.fPedido ? busdayCount(r.fPedido, hoy) : null;
+    return d == null ? '—' : `<span class="pd-dias${d > 2 ? ' tarde' : ''}">${d} d.h.</span>`;
+  }
+  if(!r.fCompromiso) return '—';
+  const d = busdayCount(r.fCompromiso, hoy);
+  if(d > 0) return `<span class="pd-dias tarde">Vencida hace ${d} d.h.</span>`;
+  return `<span class="pd-dias ok">${d === 0 ? 'Vence hoy' : 'Faltan ' + (-d) + ' d.h.'}</span>`;
+}
+function pdEstadoOC(r){
+  const e = sinAcentos(String(r.estadoOrden||'')).toLowerCase();
+  if(e.indexOf('sin aprobar') !== -1) return 'Sin aprobar';
+  if(e.indexOf('parcial') !== -1) return 'Llegó parcial';
+  return 'Aprobada';
+}
+
+function drawPendientes(){
+  const nota = document.getElementById('pdNota');
+  const cont = document.getElementById('pdVista');
+  const todas = pdFilas();
+  if(!getReqRows().length && !PEDIDO_SIN_REQ_PEND.length){
+    nota.style.display = '';
+    nota.innerHTML = (DATA && DATA.fromSnapshot)
+      ? '<b>Este link se publicó antes de que existiera este módulo.</b> Vuelve a publicar con el botón ☁ (o carga el Reporte Maestro y PedidoSinReq) para verlo.'
+      : '<b>Carga el Reporte Maestro y PedidoSinReq</b> para ver los pendientes.';
+    cont.innerHTML = ''; document.getElementById('pdConteo').textContent = '';
+    return;
+  }
+  nota.style.display = 'none';
+  const deTab = todas.filter(function(r){ return r.tipo === PD.tab; });
+
+  // Personas de la pestaña activa, con cuántas líneas tiene cada una.
+  const sel = document.getElementById('pdPersona');
+  const actual = sel.value;
+  const cuenta = new Map();
+  deTab.forEach(function(r){ cuenta.set(r.persona, (cuenta.get(r.persona) || 0) + 1); });
+  const personas = [...cuenta.keys()].sort(function(a,b){ return pdEtiquetaPersona(a).localeCompare(pdEtiquetaPersona(b), 'es'); });
+  sel.innerHTML = `<option value="all">Persona: todas (${deTab.length})</option>` + personas.map(function(p){
+    return `<option value="${escapeHtml(p)}">${escapeHtml((p ? pdEtiquetaPersona(p) : '(sin persona)'))} · ${cuenta.get(p)}</option>`; }).join('');
+  if(personas.indexOf(actual) !== -1) sel.value = actual;
+
+  const q = PD.q;
+  const filas = deTab.filter(function(r){
+    if(sel.value !== 'all' && r.persona !== sel.value) return false;
+    if(!q) return true;
+    return [r.codOrden, r.codPedido, r.req, r.proyecto, r.idProducto, r.producto, r.proveedor]
+      .some(function(v){ return crtNorm(v).indexOf(q) !== -1; });
+  }).sort(function(a,b){
+    const fa = (PD.tab === 'oc' ? a.fOrden : a.fPedido) || 0, fb = (PD.tab === 'oc' ? b.fOrden : b.fPedido) || 0;
+    return pdEtiquetaPersona(a.persona).localeCompare(pdEtiquetaPersona(b.persona), 'es') || (fa - fb);
+  });
+  // Urgencia de cada línea: OC → contra la fecha de entrega pactada; pedido → contra la meta de 2 d.h.
+  // del Indicador 2 (Emisión de OC).
+  const hoy = new Date();
+  filas.forEach(function(r){
+    if(PD.tab === 'oc'){
+      r.dias = r.fCompromiso ? busdayCount(r.fCompromiso, hoy) : null;
+      r.urg = r.dias == null ? 'sinf' : r.dias > 0 ? 'venc' : r.dias >= -5 ? 'prox' : 'ok';
+      r.sinAprobar = pdEstadoOC(r) === 'Sin aprobar';
+    } else {
+      r.dias = r.fPedido ? busdayCount(r.fPedido, hoy) : null;
+      r.urg = r.dias != null && r.dias > 2 ? 'venc' : 'ok';
+    }
+  });
+
+  // Una tarjeta por documento (OC o pedido) con sus ítems adentro.
+  const docs = new Map();
+  filas.forEach(function(r){
+    const k = PD.tab === 'oc' ? r.codOrden : r.codPedido;
+    if(!docs.has(k)) docs.set(k, { k: k, items: [], dias: null, urg: 'ok', persona: r.persona, r0: r, sinAprobar: false });
+    const d = docs.get(k);
+    d.items.push(r);
+    if(r.dias != null && (d.dias == null || r.dias > d.dias)) d.dias = r.dias;
+    if(r.sinAprobar) d.sinAprobar = true;
+  });
+  const lista = [...docs.values()];
+  lista.forEach(function(d){
+    d.urg = PD.tab === 'oc'
+      ? (d.dias == null ? 'sinf' : d.dias > 0 ? 'venc' : d.dias >= -5 ? 'prox' : 'ok')
+      : (d.dias != null && d.dias > 2 ? 'venc' : 'ok');
+  });
+
+  // Indicadores de arriba: también sirven de filtro (clic para ver solo esas).
+  const cuentaDe = function(fn){ return lista.filter(fn).length; };
+  const tiles = PD.tab === 'oc' ? [
+    { k:'all',   cls:'',      t:'OC pendientes',        n: lista.length, sub: filas.length.toLocaleString('es-PE') + ' ítems por llegar' },
+    { k:'venc',  cls:'venc',  t:'Vencidas',             n: cuentaDe(function(d){ return d.urg === 'venc'; }), sub:'pasó la fecha de entrega' },
+    { k:'prox',  cls:'prox',  t:'Vencen en 5 d.h.',     n: cuentaDe(function(d){ return d.urg === 'prox'; }), sub:'hay que confirmar con el proveedor' },
+    { k:'sinap', cls:'sinap', t:'Sin aprobar',          n: cuentaDe(function(d){ return d.sinAprobar; }), sub:'OC todavía sin aprobación' },
+  ] : [
+    { k:'all',   cls:'',      t:'Pedidos sin OC',       n: lista.length, sub: filas.length.toLocaleString('es-PE') + ' ítems' },
+    { k:'venc',  cls:'venc',  t:'Fuera de meta',        n: cuentaDe(function(d){ return d.urg === 'venc'; }), sub:'más de 2 d.h. sin OC' },
+    { k:'ok',    cls:'ok',    t:'Dentro de meta',       n: cuentaDe(function(d){ return d.urg === 'ok'; }), sub:'2 d.h. o menos' },
+  ];
+  if(!tiles.some(function(t){ return t.k === PD.urg; })) PD.urg = 'all';
+  document.getElementById('pdKpis').innerHTML = tiles.map(function(t){
+    return `<button type="button" class="card kpi pd-kpi ${t.cls}" data-pdurg="${t.k}" aria-pressed="${PD.urg === t.k}">
+      <div class="label">${t.t}</div><div class="value">${t.n.toLocaleString('es-PE')}</div><div class="sub">${t.sub}</div></button>`;
+  }).join('');
+  document.querySelectorAll('.pd-kpi').forEach(function(b){
+    b.addEventListener('click', function(){ PD.urg = (PD.urg === b.dataset.pdurg ? 'all' : b.dataset.pdurg); PD.tope = 40; drawPendientes(); });
+  });
+
+  const visibles = lista.filter(function(d){
+    if(PD.urg === 'all') return true;
+    if(PD.urg === 'sinap') return d.sinAprobar;
+    return d.urg === PD.urg;
+  }).sort(function(a,b){
+    // Lo más atrasado primero; sin fecha al final.
+    const da = a.dias == null ? -1e9 : a.dias, db = b.dias == null ? -1e9 : b.dias;
+    return db - da;
+  });
+  PD.vista = [].concat.apply([], visibles.map(function(d){ return d.items; }));
+  document.getElementById('pdExportar').disabled = !PD.vista.length;
+  document.getElementById('pdConteo').textContent = visibles.length.toLocaleString('es-PE') + (PD.tab === 'oc' ? ' OC' : ' pedidos') +
+    ' · ' + PD.vista.length.toLocaleString('es-PE') + ' ítems';
+
+  const verPersona = sel.value === 'all';
+  const plazo = function(d){
+    if(d.dias == null) return '<span class="pd-dias">Sin fecha de entrega</span>';
+    if(PD.tab === 'ped') return `<span class="pd-dias${d.urg === 'venc' ? ' tarde' : ''}">${d.dias} d.h. sin OC</span>`;
+    if(d.dias > 0) return `<span class="pd-dias tarde">Vencida hace ${d.dias} d.h.</span>`;
+    return `<span class="pd-dias${d.dias >= -5 ? '' : ' ok'}"${d.dias >= -5 ? ' style="background:var(--amber-bg);color:var(--amber-ink);"' : ''}>${d.dias === 0 ? 'Vence hoy' : 'Faltan ' + (-d.dias) + ' d.h.'}</span>`;
+  };
+  const reqTd = (r)=> r.req ? `<span class="cod">${escapeHtml(r.req)}</span>` : '<span style="color:var(--muted);">Directo</span>';
+  const tarjetas = visibles.slice(0, PD.tope).map(function(d){
+    const r0 = d.r0;
+    const cab = PD.tab === 'oc'
+      ? `<span class="pd-num">OC ${escapeHtml(d.k)}</span>
+         <span class="rq-est ${d.sinAprobar ? 'espera' : (pdEstadoOC(r0) === 'Llegó parcial' ? 'recibido' : 'camino')}">${pdEstadoOC(r0)}</span>
+         <span class="pd-prov">${rqTxt(r0.proveedor)}</span>
+         <span class="pd-der"><span class="pd-meta">Emitida <b>${rqFecha(r0.fOrden)}</b> · Entrega <b>${rqFecha(r0.fCompromiso)}</b></span>${plazo(d)}</span>`
+      : `<span class="pd-num">Pedido ${escapeHtml(d.k)}</span>
+         <span class="pd-prov"></span>
+         <span class="pd-der"><span class="pd-meta">Pedido el <b>${rqFecha(r0.fPedido)}</b></span>${plazo(d)}</span>`;
+    const quien = verPersona ? `<div class="pd-meta" style="padding:6px 16px 0;">👤 <b>${escapeHtml(pdEtiquetaPersona(d.persona) || '(sin persona)')}</b> · ${d.items.length} ítem${d.items.length === 1 ? '' : 's'}</div>` : '';
+    const filasItems = d.items.map(function(r){
+      const f = pdFalta(r);
+      return `<tr>
+        <td class="req">${reqTd(r)}</td>
+        <td class="pry">${rqTxt(r.proyecto)}</td>
+        <td class="prod"><span class="cod">${rqTxt(r.idProducto)}</span> ${rqTxt(r.producto)}</td>
+        ${PD.tab === 'oc'
+          ? `<td class="num">${rqNum(r.cantOrden)} <small>${rqTxt(r.unidad)}</small></td>
+             <td class="num falta">${f == null ? '—' : rqNum(f)}${r.cantRecep > 0 ? `<small>llegó ${rqNum(r.cantRecep)}</small>` : ''}</td>`
+          : `<td class="num falta">${rqNum(r.cantPedido)} <small>${rqTxt(r.unidad)}</small></td>`}
+      </tr>`;
+    }).join('');
+    return `<div class="card pd-card ${d.urg}">
+      <div class="pd-cab">${cab}</div>${quien}
+      <table class="pd-items"><thead><tr><th>N° Req.</th><th>Proyecto</th><th>Producto</th>${PD.tab === 'oc' ? '<th class="num">Cant. OC</th><th class="num">Falta</th>' : '<th class="num">Cant. pedida</th>'}</tr></thead>
+      <tbody>${filasItems}</tbody></table>
+    </div>`;
+  }).join('');
+  const mas = visibles.length > PD.tope
+    ? `<div class="rq-mas"><button class="btn secondary" type="button" id="pdMas">Ver ${Math.min(40, visibles.length - PD.tope)} más · ${PD.tope} de ${visibles.length}</button></div>` : '';
+  cont.innerHTML = tarjetas
+    ? `<div class="pd-lista">${tarjetas}</div>${mas}`
+    : '<div class="card" style="text-align:center;padding:26px;color:var(--muted);">No hay pendientes con ese filtro.</div>';
+  const bm = document.getElementById('pdMas');
+  if(bm) bm.addEventListener('click', function(){ PD.tope += 40; drawPendientes(); });
+}
+
+function pdExportar(){
+  const filas = PD.vista || [];
+  if(!filas.length) return;
+  const f = (d)=> d ? fmtDate(d) : '';
+  const n = (v)=> v == null ? '' : v;
+  const hoy = new Date();
+  let aoa;
+  if(PD.tab === 'oc'){
+    aoa = [['Persona','N° OC','Estado OC','N° Requerimiento','Proyecto','Proveedor','Código','Descripción','UM',
+      'Cant. OC','Recibido','Falta','F. Emisión','F. Entrega pactada','Días hábiles vs. entrega (+ vencida)']];
+    filas.forEach(function(r){ aoa.push([pdEtiquetaPersona(r.persona), r.codOrden, pdEstadoOC(r), r.req || 'Directo', r.proyecto,
+      r.proveedor, r.idProducto, r.producto, r.unidad, n(r.cantOrden), (r.cantRecep && r.cantRecep > 0) ? r.cantRecep : 0,
+      n(pdFalta(r)), f(r.fOrden), f(r.fCompromiso), r.fCompromiso ? busdayCount(r.fCompromiso, hoy) : '']); });
+  } else {
+    aoa = [['Persona','N° Pedido','F. Pedido','Días hábiles sin OC','N° Requerimiento','Proyecto','Código','Descripción','UM','Cant. pedida']];
+    filas.forEach(function(r){ aoa.push([pdEtiquetaPersona(r.persona), r.codPedido, f(r.fPedido),
+      r.fPedido ? busdayCount(r.fPedido, hoy) : '', r.req || 'Directo', r.proyecto, r.idProducto, r.producto, r.unidad, n(r.cantPedido)]); });
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, PD.tab === 'oc' ? 'OC por llegar' : 'Pedidos sin OC');
+  XLSX.writeFile(wb, (PD.tab === 'oc' ? 'OC por llegar' : 'Pedidos sin OC') + ' - Grupo Friopacking.xlsx');
+}
+
+document.querySelectorAll('.pd-chip').forEach(function(b){
+  b.addEventListener('click', function(){
+    PD.tab = b.dataset.pd; PD.urg = 'all'; PD.tope = 40;
+    document.querySelectorAll('.pd-chip').forEach(function(o){ o.setAttribute('aria-pressed', String(o === b)); });
+    drawPendientes();
+  });
+});
+document.getElementById('pdPersona').addEventListener('change', function(){ PD.tope = 40; drawPendientes(); });
+document.getElementById('pdBuscar').addEventListener('input', function(e){ PD.q = crtNorm(e.target.value.trim()); drawPendientes(); });
+document.getElementById('pdExportar').addEventListener('click', pdExportar);
+
 // ---------------------------------------------------------------- arranque
 function drawCertificados(){
   const nota = document.getElementById('crtNota');
@@ -11132,7 +11506,7 @@ document.getElementById('crtQuitarSel').addEventListener('click', ()=>{ CRT.sel.
 const MODULOS = {
   gerencial:    { nombre:'Gerencial',    secciones:{ proceso:'Indicadores de Logística', gasto:'Concentración de Gasto' } },
   logistica:    { nombre:'Logística',    secciones:{ alertas:'Análisis de Inventario', requerimientos:'Requerimientos' } },
-  compras:      { nombre:'Compras',      secciones:{ certificados:'Certificados' } },
+  compras:      { nombre:'Compras',      secciones:{ pendientes:'Pendientes', certificados:'Certificados' } },
 };
 const MOD_DE_SECCION = {};
 for(const [mod, cfg] of Object.entries(MODULOS))
@@ -11184,6 +11558,7 @@ function irASeccion(seccion){
   if(bloqueado){ const c = document.getElementById('gerClave'); if(c){ c.value = ''; c.focus(); } return; }
   if(seccion === 'certificados') drawCertificados();
   if(seccion === 'requerimientos') drawRequerimientos();
+  if(seccion === 'pendientes') drawPendientes();
 }
 
 document.getElementById('gerForm').addEventListener('submit', (e)=>{
