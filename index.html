@@ -885,9 +885,9 @@
     .app-tabbar button .i{font-size:21px;line-height:1.1;filter:grayscale(1);opacity:.7;}
     .app-tabbar button.on{color:var(--brand-ink);}
     .app-tabbar button.on .i{filter:none;opacity:1;}
-    .app-tabbar button.polar .i{width:52px;height:52px;margin-top:-26px;border-radius:50%;display:grid;place-items:center;
-      background:linear-gradient(135deg,var(--brand),#1b3fa8 60%,var(--brand-2));color:#fff;font-size:24px;filter:none;opacity:1;
-      box-shadow:0 6px 16px rgba(10,30,100,.35);border:3px solid var(--card);}
+    .app-tabbar button.polar .i{width:58px;height:58px;margin-top:-30px;border-radius:50%;display:block;overflow:hidden;
+      background:var(--brand);filter:none;opacity:1;box-shadow:0 6px 16px rgba(10,30,100,.35);border:3px solid var(--card);}
+    .app-tabbar button.polar .i img{width:100%;height:100%;display:block;}
     .app-tabbar button.polar{color:var(--brand-ink);}
     /* Hoja de acciones (lo que antes eran los íconos de la barra de arriba) */
     .app-sheet-fondo{position:fixed;inset:0;background:rgba(10,20,40,.45);z-index:90;align-items:flex-end;}
@@ -907,6 +907,7 @@
     .ini-hola span{font-size:13px;color:var(--ink-soft);}
     .ini-pregunta{display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid var(--brand-2);border-radius:16px;
       padding:4px 6px 4px 14px;box-shadow:0 6px 18px rgba(62,198,172,.18);margin-bottom:10px;}
+    .ini-pregunta .av{width:30px;height:30px;border-radius:50%;flex-shrink:0;margin-left:-6px;}
     .ini-pregunta input{flex:1;min-width:0;border:0;outline:0;background:none;font-size:15px;padding:11px 0;color:var(--ink);font-family:inherit;}
     .ini-pregunta button{border:0;background:var(--brand);color:#fff;border-radius:12px;width:42px;height:42px;font-size:18px;cursor:pointer;}
     .ini-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px;}
@@ -976,6 +977,10 @@
     .ini-bar em{display:block;height:100%;background:var(--seg-a);border-radius:8px;} .ini-bar b{text-align:right;}
     .ini-link{background:none;border:0;color:var(--brand-ink);font-weight:800;font-size:13px;padding:8px 0 0;cursor:pointer;font-family:inherit;}
     .ini-vacio{font-size:13px;color:var(--muted);padding:6px 0;}
+    .ini-req{flex-wrap:wrap;} .ini-req .e{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+    .ini-req .e .asis-est{margin:0;}
+    /* El supervisor no ve stock: el código del ítem deja de abrir el panel de stock por almacén. */
+    body.vista-supervisor .rq-cod[data-rqstock]{pointer-events:none;text-decoration:none;border-bottom:0;}
     .ini-datos{font-size:11.5px;color:var(--muted);text-align:center;margin-top:6px;}
     /* Tablas anchas del Análisis de Inventario → tarjetas */
     #section-alertas .table-card{max-height:none !important;overflow:visible !important;border:0;box-shadow:none;background:none;}
@@ -1015,7 +1020,7 @@
   .asis-fab{position:fixed;right:22px;bottom:22px;z-index:80;border:0;cursor:pointer;display:flex;align-items:center;gap:8px;
     background:linear-gradient(135deg,var(--brand),#1b3fa8 60%,var(--brand-2));color:#fff;border-radius:30px;padding:12px 18px 12px 14px;
     font-size:14px;font-weight:800;box-shadow:0 8px 22px rgba(10,30,100,.35);font-family:inherit;}
-  .asis-fab .i{font-size:20px;}
+  .asis-fab .i{width:34px;height:34px;border-radius:50%;margin:-6px 0 -6px -6px;}
   @media (max-width:760px){ .asis-fab{display:none;} }
   .asis{position:fixed;z-index:95;display:none;flex-direction:column;background:var(--bg);
     right:18px;bottom:18px;width:400px;height:min(640px, calc(100vh - 36px));border-radius:18px;border:1px solid var(--border);
@@ -1023,8 +1028,7 @@
   .asis.abierto{display:flex;}
   @media (max-width:760px){ .asis{inset:0;width:auto;height:auto;border-radius:0;border:0;} }
   .asis-cab{display:flex;align-items:center;gap:10px;background:var(--brand);color:#fff;padding:calc(12px + env(safe-area-inset-top)) 14px 12px;}
-  .asis-cab .av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:20px;
-    background:linear-gradient(135deg,#1b3fa8,var(--brand-2));flex-shrink:0;}
+  .asis-cab .av{width:42px;height:42px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,.35);}
   .asis-cab .tx{flex:1;line-height:1.2;} .asis-cab b{display:block;font-size:15px;} .asis-cab span{font-size:11.5px;opacity:.75;}
   .asis-cab button{background:rgba(255,255,255,.14);border:0;color:#fff;width:36px;height:36px;border-radius:11px;font-size:18px;cursor:pointer;}
   .asis-chat{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;}
@@ -1046,6 +1050,13 @@
   .asis-est.ok{background:var(--green-bg);color:var(--green);} .asis-est.camino,.asis-est.recibido{background:var(--azul-bg);color:var(--brand-ink);}
   .asis-est.espera{background:var(--amber-bg);color:var(--amber-ink);} .asis-est.fuera,.asis-est.tarde{background:var(--red-bg);color:var(--red);}
   .asis-acc{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+  .asis-ul{margin:4px 0 6px;padding-left:18px;} .asis-ul li{margin:2px 0;}
+  .asis-nota{font-size:11px;color:var(--muted);margin-top:6px !important;}
+  .asis-pensando{color:var(--ink-soft);font-style:italic;}
+  .asis-pensando span{animation:asisPunto 1.2s infinite;opacity:.2;} .asis-pensando span:nth-child(2){animation-delay:.2s;} .asis-pensando span:nth-child(3){animation-delay:.4s;}
+  @keyframes asisPunto{50%{opacity:1;}}
+  .asis-estados{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px;} .asis-estados .asis-est{margin:0;}
+  .asis-item .q .asis-est{margin:2px 3px 2px 0;}
   .asis-item button{border:1px solid var(--brand-2);background:rgba(62,198,172,.1);color:var(--brand-ink);border-radius:14px;padding:2px 9px;
     font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;font-family:inherit;}
   .asis-acc button{border:1px solid var(--brand-2);background:rgba(62,198,172,.1);color:var(--brand-ink);border-radius:18px;padding:6px 11px;
@@ -10856,6 +10867,11 @@ function rqLlenarFiltros(){
 function rqExportar(){
   const filas = rqFiltradas();
   if(!filas.length) return;
+  XLSX.writeFile(rqLibroExcel(filas), 'Requerimientos - Grupo Friopacking.xlsx');
+}
+// La hoja "Requerimientos" del Excel, aparte para que Polar la reuse al exportar un proyecto o un
+// requerimiento (29.09.2026): mismas columnas que el botón ⬇ Exportar del módulo.
+function rqLibroExcel(filas, wb){
   const aoa = [[
     'F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Estado en Nisira',
     'Vía','¿Ítem partido?','Código','Descripción','Cantidad','UM','Familia',
@@ -10885,9 +10901,9 @@ function rqExportar(){
     {wch:14},{wch:15},{wch:18},{wch:18},
     {wch:12},{wch:14},{wch:18},
     {wch:15},{wch:16},{wch:18}];
-  const wb = XLSX.utils.book_new();
+  wb = wb || XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Requerimientos');
-  XLSX.writeFile(wb, 'Requerimientos - Grupo Friopacking.xlsx');
+  return wb;
 }
 
 ['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].forEach(function(id){
@@ -11814,13 +11830,16 @@ document.querySelectorAll('.navmod').forEach(mod=>{
 // vista Logística: "son cosas de datos, solo debería salir lo del modo oscuro y claro". En la PC no
 // cambia nada de esto: todo vive debajo de 760 px (RQ_MOVIL). El asistente Polar sí va en los dos.
 // ===================================================================================================
+// Imagen de Polar (29.09.2026, la pasó Piero): recortada en círculo, 192 px en WebP.
+const POLAR_AVATAR = 'data:image/webp;base64,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';
 const APP_SEC = { proceso:'Indicadores', gasto:'Concentración de gasto', requerimientos:'Requerimientos',
   alertas:'Inventario y kardex', pendientes:'Pendientes de compra', certificados:'Certificados' };
 const APP_VISTAS = {
   gerencia:   { nombre:'Gerencia',   ico:'📊', desc:'Indicadores de logística y concentración de gasto.',
     tabs:[['inicio','🏠','Inicio'], ['proceso','⏱️','Indicadores'], ['polar'], ['gasto','💰','Gasto'], ['vista','👥','Vista']] },
   supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
-    tabs:[['inicio','🏠','Inicio'], ['requerimientos','📋','Mis req.'], ['polar'], ['alertas','📦','Stock'], ['vista','👥','Vista']] },
+    // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
+    tabs:[['inicio','🏠','Inicio'], ['requerimientos','📋','Mis req.'], ['polar'], ['vista','👥','Vista']] },
   logistica:  { nombre:'Logística',  ico:'🚚', desc:'Ingresos, salidas, kardex y qué comprar para stock.',
     tabs:[['inicio','🏠','Inicio'], ['alertas','📦','Inventario'], ['polar'], ['pendientes','⏳','Pendientes'], ['vista','👥','Vista']] },
 };
@@ -11840,9 +11859,9 @@ function appConstruir(){
   appAntesDe(`<nav class="app-tabbar" id="appTabbar"></nav>
     <div class="app-sheet-fondo" id="appSheet"><div class="app-sheet" id="appSheetIn"></div></div>
     <div class="app-bienv" id="appBienv"></div>
-    <button type="button" class="asis-fab" id="asisFab"><span class="i">❄️</span>Pregúntale a Polar</button>
+    <button type="button" class="asis-fab" id="asisFab"><img class="i" src="${POLAR_AVATAR}" alt="">Pregúntale a Polar</button>
     <div class="asis" id="asis" role="dialog" aria-label="Asistente Polar">
-      <div class="asis-cab"><div class="av">❄️</div><div class="tx"><b>Polar</b><span>Asistente de consultas · Friopacking</span></div>
+      <div class="asis-cab"><img class="av" src="${POLAR_AVATAR}" alt="Polar"><div class="tx"><b>Polar</b><span>Asistente de consultas · Friopacking</span></div>
         <button type="button" id="asisCerrar" aria-label="Cerrar">✕</button></div>
       <div class="asis-chat" id="asisChat"></div>
       <div class="asis-sug" id="asisSug"></div>
@@ -11908,8 +11927,11 @@ function appElegirVista(v){
 
 function appPintarBarra(activa){
   const v = APP_VISTAS[APP.vista] || APP_VISTAS.supervisor;
-  document.getElementById('appTabbar').innerHTML = v.tabs.map(function(t){
-    if(t[0] === 'polar') return '<button type="button" class="polar" data-tab="polar"><span class="i">❄️</span>Polar</button>';
+  const barra = document.getElementById('appTabbar');
+  barra.style.gridTemplateColumns = 'repeat(' + v.tabs.length + ',1fr)';
+  Object.keys(APP_VISTAS).forEach(function(k){ document.body.classList.toggle('vista-' + k, k === (APP.vista || 'supervisor')); });
+  barra.innerHTML = v.tabs.map(function(t){
+    if(t[0] === 'polar') return '<button type="button" class="polar" data-tab="polar"><span class="i"><img src="' + POLAR_AVATAR + '" alt=""></span>Polar</button>';
     return `<button type="button" data-tab="${t[0]}" class="${t[0] === activa ? 'on' : ''}"><span class="i">${t[1]}</span>${t[2]}</button>`;
   }).join('');
   document.getElementById('appVistaBtn').innerHTML = `${v.ico} ${v.nombre} <span>▾</span>`;
@@ -11962,7 +11984,7 @@ function appRenderInicio(){
   else cuerpo = appInicioSupervisor();
   const corte = (DATA && DATA.corte) ? 'Datos al ' + fmtDate(DATA.corte) : '';
   cont.innerHTML = `<div class="ini-hola"><span>${appSaludo()} 👋</span><b>${escapeHtml(APP_VISTAS[v].nombre === 'Supervisor' ? '¿Cómo va lo que pediste?' : (v === 'gerencia' ? 'Resumen gerencial' : '¿Qué revisamos hoy?'))}</b></div>
-    <form class="ini-pregunta" data-form="polar"><span aria-hidden="true">❄️</span><input type="text" name="q" placeholder="${ph}" enterkeyhint="search"><button type="submit" aria-label="Preguntar">➤</button></form>
+    <form class="ini-pregunta" data-form="polar"><img class="av" src="${POLAR_AVATAR}" alt=""><input type="text" name="q" placeholder="${ph}" enterkeyhint="search"><button type="submit" aria-label="Preguntar">➤</button></form>
     <div class="ini-chips">${polarChips().map(c=>`<button type="button" data-q="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>
     ${cuerpo}
     ${corte ? `<div class="ini-datos">${corte}</div>` : ''}`;
@@ -11984,12 +12006,27 @@ function appInicioSupervisor(){
     <div class="ini-card"><div class="ini-card-tit">🕐 Últimos requerimientos</div>${appListaReqs(RQ.filas, 6)}</div>`;
 }
 
+// Estado de cada cosa pedida, contado por requerimiento (29.09.2026, Piero: "ahí se debe tener el
+// estado de cada cosa que se tenga"). Mismo estado recalculado del módulo Requerimientos.
+const APP_ESTADOS = [
+  ['Recibido en Obra', 'Recibido en obra'], ['Enviado a Obra', 'Enviado a obra'], ['Recibido en Almacén', 'En almacén'],
+  ['Enviado a pedido — cuenta con OC', 'Con OC, por llegar'], ['Pedido pendiente', 'En Compras, sin OC'],
+  ['En Revisión', 'En revisión de almacén'], ['Archivado', 'Archivado'],
+];
+function appChipsEstado(cuenta){
+  const orden = APP_ESTADOS.map(function(e){ return e[0]; });
+  const extra = Object.keys(cuenta).filter(function(k){ return orden.indexOf(k) === -1; });
+  return APP_ESTADOS.filter(function(e){ return cuenta[e[0]]; }).map(function(e){
+      return `<span class="asis-est ${rqClaseEstado(e[0])}">${cuenta[e[0]]} ${e[1]}</span>`; })
+    .concat(extra.map(function(k){ return `<span class="asis-est">${cuenta[k]} ${escapeHtml(k)}</span>`; })).join('');
+}
 function appResumenReqs(filas){
   const porReq = new Map();
   filas.forEach(function(r){
-    const y = porReq.get(r.codRequerimiento) || { cod:r.codRequerimiento, proyecto:r.proyecto, idProyecto:r.idProyecto, fReq:r.fReq, n:0, obra:0 };
+    const y = porReq.get(r.codRequerimiento) || { cod:r.codRequerimiento, proyecto:r.proyecto, idProyecto:r.idProyecto, fReq:r.fReq, n:0, obra:0, est:{} };
     y.n++;
     if(/obra/i.test(r.estadoCalc || '')) y.obra++;
+    y.est[r.estadoCalc || '—'] = (y.est[r.estadoCalc || '—'] || 0) + 1;
     porReq.set(r.codRequerimiento, y);
   });
   return [...porReq.values()].sort(function(a,b){ return (b.fReq || 0) - (a.fReq || 0); });
@@ -11999,9 +12036,10 @@ function appListaReqs(filas, tope){
   if(!lista.length) return '<div class="ini-vacio">No hay requerimientos cargados.</div>';
   return lista.map(function(y){
     const pct = y.n ? Math.round(y.obra / y.n * 100) : 0;
-    return `<button type="button" class="ini-fila" data-req="${escapeHtml(y.cod)}">
+    return `<button type="button" class="ini-fila ini-req" data-req="${escapeHtml(y.cod)}">
       <span class="t"><b class="mono">${escapeHtml(y.cod)}</b><small>${escapeHtml(y.proyecto || '')}</small></span>
-      <span class="p"><span class="bar"><i style="width:${pct}%"></i></span><small>${y.obra}/${y.n} en obra · ${rqFecha(y.fReq)}</small></span></button>`;
+      <span class="p"><span class="bar"><i style="width:${pct}%"></i></span><small>${y.obra}/${y.n} en obra · ${rqFecha(y.fReq)}</small></span>
+      <span class="e">${appChipsEstado(y.est)}</span></button>`;
   }).join('');
 }
 
@@ -12172,7 +12210,7 @@ function polarChips(){
   try{ rqPreparar(); const u = appResumenReqs(RQ.filas)[0]; if(u) req = u.cod.replace(/^0001-0*/, ''); }catch(err){}
   if(v === 'gerencia') return ['¿Cómo van los indicadores?', '¿En qué gastamos más?', 'OC vencidas'];
   if(v === 'logistica') return ['¿Qué hay que reponer?', 'OC vencidas', 'Pendientes de Melissa'];
-  return [req ? '¿Cómo va el req ' + req + '?' : '¿Cómo va mi requerimiento?', 'Requerimientos de mi proyecto', '¿Hay stock de un código?'];
+  return [req ? '¿Cómo va el req ' + req + '?' : '¿Cómo va mi requerimiento?', 'Requerimientos de mi proyecto'];
 }
 function polarSugerencias(){
   const s = document.getElementById('asisSug'); if(!s) return;
@@ -12184,7 +12222,9 @@ function polarAbrir(texto){
   polarSugerencias();
   if(!POLAR.saludo){
     POLAR.saludo = true;
-    polarBot(`<p>¡Hola! Soy <b>Polar</b> ❄️, el asistente de la plataforma.</p><p>Escríbeme un <b>N° de requerimiento</b>, un <b>proyecto</b> (PRY…), un <b>código de producto</b> o una <b>OC</b> y te digo cómo va.</p>`);
+    polarBot(RQ_MOVIL.matches && APP.vista === 'supervisor'
+      ? `<p>¡Hola! Soy <b>Polar</b> ❄️.</p><p>Escríbeme tu <b>N° de requerimiento</b> o tu <b>proyecto</b> (PRY…) y te digo cómo va cada cosa que pediste.</p>`
+      : `<p>¡Hola! Soy <b>Polar</b> ❄️, el asistente de la plataforma.</p><p>Escríbeme un <b>N° de requerimiento</b>, un <b>proyecto</b> (PRY…), un <b>código de producto</b> o una <b>OC</b> y te digo cómo va.</p>`);
   }
   if(texto) polarEnviar(texto);
   else if(!RQ_MOVIL.matches) setTimeout(function(){ document.getElementById('asisInput').focus(); }, 50);
@@ -12199,6 +12239,17 @@ function polarMsg(html, quien){
 function polarBot(html){ polarMsg(html, 'bot'); }
 function polarEnviar(texto){
   polarMsg(escapeHtml(texto), 'yo');
+  if(POLAR_IA_URL && appHayDatos()){
+    polarBot('<p class="asis-pensando">Polar está pensando<span>.</span><span>.</span><span>.</span></p>');
+    const chat = document.getElementById('asisChat'), burbuja = chat.lastElementChild;
+    polarIA(texto).then(function(r){
+      burbuja.innerHTML = polarMarkdown(r.texto) + (r.archivos.length ? '<p class="asis-nota">📥 Descargado: ' + r.archivos.map(escapeHtml).join(', ') + '</p>' : '');
+    }).catch(function(err){
+      let local; try{ local = polarResponder(texto); }catch(e){ local = '<p>No pude contestar esa consulta.</p>'; }
+      burbuja.innerHTML = local + '<p class="asis-nota">Respondí en modo básico: la IA no contestó (' + escapeHtml(err && err.message || err) + ').</p>';
+    }).then(function(){ chat.scrollTop = chat.scrollHeight; });
+    return;
+  }
   let r;
   try{ r = polarResponder(texto); }catch(err){ r = '<p>Uy, tuve un problema leyendo esa consulta. Intenta de nuevo con un N° de requerimiento o un código.</p>'; }
   polarBot(r);
@@ -12216,10 +12267,15 @@ function polarAccion(e){
 const polarBtn = (attr, val, txt)=> `<button type="button" data-${attr}="${escapeHtml(val)}">${txt}</button>`;
 
 function polarAyuda(){
+  if(RQ_MOVIL.matches && APP.vista === 'supervisor') return `<p>Puedo ayudarte con:</p>
+    <p>📋 <b>Tus requerimientos:</b> "¿cómo va el 23303?", "req 0001-0023303"<br>🏗️ <b>Tus proyectos:</b> "PRY2026-0000036" o el nombre del cliente</p>
+    <p>Te digo el estado de cada cosa que pediste: si está en revisión, en Compras, con OC, en almacén o ya en obra.</p>
+    <p>📥 También te lo paso en Excel: "excel del req 23303" o "excel del proyecto PRY2026-0000036".</p>`;
   return `<p>Puedo ayudarte con:</p>
     <p>📋 <b>Requerimientos:</b> "¿cómo va el 23303?", "req 0001-0023303"<br>🏗️ <b>Proyectos:</b> "PRY2026-0000036" o el nombre del cliente<br>
     📦 <b>Stock y kardex:</b> "stock de 003800401015", "stock de válvula mariposa"<br>🧾 <b>OC:</b> "OC 0001-0012110"<br>
-    ⏳ <b>Pendientes:</b> "pendientes de Melissa", "OC vencidas", "¿qué hay que reponer?"<br>📊 <b>Gerencia:</b> "indicadores", "gasto" (con la clave)</p>`;
+    ⏳ <b>Pendientes:</b> "pendientes de Melissa", "OC vencidas", "¿qué hay que reponer?"<br>📊 <b>Gerencia:</b> "indicadores de Carolina en agosto", "gasto" (con la clave)<br>
+    📥 <b>Excel:</b> "excel del proyecto PRY2026-0000036", "excel del req 23303", "excel de pendientes de Melissa"</p>`;
 }
 
 function polarResponder(texto){
@@ -12229,6 +12285,12 @@ function polarResponder(texto){
   if(/(que|como) (puedes|sabes|me ayudas)|^ayuda|como funciona/.test(q)) return polarAyuda();
 
   const T = String(texto).toUpperCase();
+  // En la vista Supervisor (celular) Polar solo habla de requerimientos y proyectos: nada de stock,
+  // pendientes de Compras ni reposición (29.09.2026, pedido de Piero).
+  const soloReqs = RQ_MOVIL.matches && APP.vista === 'supervisor';
+  const fueraDeAlcance = '<p>En la vista <b>Supervisor</b> te ayudo con tus <b>requerimientos</b> y <b>proyectos</b> 📋</p><p>Escríbeme tu N° de requerimiento (por ejemplo <span class="mono">23303</span>) o tu proyecto (PRY… o el nombre del cliente).</p>';
+  if(soloReqs && (/\b\d{12}\b/.test(T) || /stock|kardex|inventario|reponer|a pedir|vencid|indicador|gasto|pendientes de/.test(q) || polarPersonaEn(q))) return fueraDeAlcance;
+  if(/excel|exporta|descarg|xlsx/.test(q)) return polarExportar(q, T);
   const prod = T.match(/\b\d{12}\b/);
   if(prod) return polarProducto(prod[0]);
   const pry = T.match(/PRY\s*-?\s*(\d{4})\s*-?\s*(\d{1,7})/);
@@ -12251,7 +12313,7 @@ function polarResponder(texto){
     return `<p>No encontré el ${esOC ? 'OC' : (esPed ? 'pedido' : 'requerimiento')} <b class="mono">${escapeHtml(num)}</b> en los datos cargados.</p><p>Revisa el número o prueba con el código completo, por ejemplo <span class="mono">0001-0023303</span>.</p>`;
   }
 
-  if(/indicador|kpi|tiempo de|cumplimiento|d\.?h\.? promedio/.test(q)) return polarIndicadores();
+  if(/indicador|kpi|tiempo de|cumplimiento|rendimiento|desempeno|d\.?h\.? promedio/.test(q)) return polarIndicadoresHtml(polarFiltrosDe(q));
   if(/gasto|gastamos|concentracion|cuanto (se )?compr/.test(q)) return polarGasto();
   if(/reponer|comprar para stock|que (hay que )?(comprar|pedir)|a pedir|quiebre/.test(q)) return polarReponer();
 
@@ -12268,6 +12330,7 @@ function polarResponder(texto){
     .split(' ').filter(function(w){ return w.length >= 3; });
   const quiereStock = /stock|kardex|movimiento|ingreso|salida|hay de|tenemos/.test(q);
   if(!quiereStock){ const p = polarProyectoPorNombre(palabras); if(p) return p; }
+  if(soloReqs){ const p = polarProyectoPorNombre(palabras); return p || fueraDeAlcance; }
   const pr = polarBuscarProducto(palabras);
   if(pr) return pr;
   if(quiereStock) return `<p>No encontré productos con "${escapeHtml(palabras.join(' '))}". Prueba con el código de 12 dígitos o con otra palabra de la descripción.</p>`;
@@ -12296,8 +12359,9 @@ function polarReq(cod){
     <div class="sub">${escapeHtml(r0.proyecto || '')}<br>Pidió ${escapeHtml(r0.responsable || '—')} · ${rqFecha(r0.fReq)}</div>
     <p>${frase}</p>
     <div class="asis-kpis"><div><b>${n}</b><span>Ítems</span></div><div><b>${obra}</b><span>En obra</span></div><div><b>${n - obra}</b><span>Pendientes</span></div></div>
+    <div class="asis-estados">${appChipsEstado(appResumenReqs(items)[0].est)}</div>
     ${lista}${n > 10 ? `<div class="q" style="margin-top:6px;">…y ${n - 10} ítems más.</div>` : ''}
-    <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad completa')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Todo el proyecto') : ''}</div>`;
+    <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad completa')}${polarBtn('q', 'excel del req ' + cod, '📥 Excel')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Todo el proyecto') : ''}</div>`;
 }
 
 // ---------- Proyecto ----------
@@ -12312,12 +12376,12 @@ function polarResumenProyecto(filas, idPry){
   const items = filas.length, obra = filas.filter(function(r){ return /obra/i.test(r.estadoCalc || ''); }).length;
   const lista = reqs.slice(0, 8).map(function(y){
     return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(y.cod)}</span> · ${rqFecha(y.fReq)}</div>
-      <div class="q">${y.obra} de ${y.n} ítems en obra ${polarBtn('q', y.cod, 'ver')}</div></div>`;
+      <div class="q">${appChipsEstado(y.est)} ${polarBtn('q', y.cod, 'ver')}</div></div>`;
   }).join('');
   return `<div class="cab">${escapeHtml(filas[0].proyecto || idPry)}</div><div class="sub mono">${escapeHtml(idPry)}</div>
     <div class="asis-kpis"><div><b>${reqs.length}</b><span>Reqs.</span></div><div><b>${items}</b><span>Ítems</span></div><div><b>${items ? Math.round(obra / items * 100) : 0}%</b><span>En obra</span></div></div>
     ${lista}${reqs.length > 8 ? `<div class="q" style="margin-top:6px;">…y ${reqs.length - 8} requerimientos más.</div>` : ''}
-    <div class="asis-acc">${polarBtn('pry', idPry, 'Ver en Requerimientos')}</div>`;
+    <div class="asis-acc">${polarBtn('pry', idPry, 'Ver en Requerimientos')}${polarBtn('q', 'excel del proyecto ' + idPry, '📥 Excel del proyecto')}</div>`;
 }
 function polarProyectoPorNombre(palabras){
   if(!palabras.length) return null;
@@ -12404,11 +12468,14 @@ function polarPedido(cod){
 }
 
 // ---------- Pendientes de compra ----------
-function polarPersonaEn(q){
+function polarPersonaEn(q, forzar){
+  // Por nombre solo cuenta si la pregunta es de compras ("pendientes de Melissa"): así un cliente que
+  // se llame parecido ("… LA MORA") no se confunde con una persona de Compras.
+  const deCompras = forzar || /pendiente|falta|\boc\b|orden|pedido|compra|vencid|tiene|lleva|indicador|rendimiento|desempeno/.test(q);
   for(const [cod, nom] of Object.entries(PD_PERSONAS)){
     const partes = polarNorm(nom).split(' ');
-    if(q.indexOf(cod.toLowerCase()) !== -1) return cod;
-    if(partes.some(function(p){ return p.length >= 4 && new RegExp('\\b' + p + '\\b').test(q); })) return cod;
+    if(new RegExp('\\b' + cod.toLowerCase() + '\\b').test(q)) return cod;
+    if(deCompras && partes.some(function(p){ return p.length >= 4 && new RegExp('\\b' + p + '\\b').test(q); })) return cod;
   }
   return null;
 }
@@ -12457,17 +12524,6 @@ function polarReponer(){
 
 // ---------- Gerencia ----------
 function polarCandado(){ return `<p>Eso es del módulo <b>Gerencial</b> 🔒. Ingresa la clave y te lo muestro.</p><div class="asis-acc">${polarBtn('ir', 'proceso', 'Ingresar clave')}</div>`; }
-function polarIndicadores(){
-  if(!gerAbierto) return polarCandado();
-  const filas = visibleIndicators().map(function(ind){
-    const st = aggStatsForIndicator(rowsForIndicator(ind), ind);
-    const pct = st.cumplePct, cls = pct == null ? '' : (pct >= 80 ? 'ok' : pct >= 50 ? 'espera' : 'tarde');
-    return `<div class="asis-item"><div class="d">${escapeHtml(ind.name)}</div>
-      <div class="q"><b>${st.promedio == null ? '—' : st.promedio.toFixed(1)} d.h.</b> promedio · <span class="asis-est ${cls}">${pct == null ? 'Sin datos' : 'Cumple ' + pct.toFixed(0) + '%'}</span></div></div>`;
-  }).join('');
-  return `<div class="cab">Indicadores de logística</div><div class="sub">Con los filtros que tengas puestos en el módulo</div>${filas}
-    <div class="asis-acc">${polarBtn('ir', 'proceso', 'Abrir Indicadores')}</div>`;
-}
 function polarGasto(){
   if(!gerAbierto) return polarCandado();
   if(!(GASTO_DATA && GASTO_DATA.rows && GASTO_DATA.rows.length)) return '<p>No hay datos de gasto cargados (Consulta.xlsx).</p>';
@@ -12478,6 +12534,377 @@ function polarGasto(){
   return `<div class="cab">Concentración de gasto</div><div class="sub">Todo el período cargado · equivalente ${fmtUSD(total / TIPO_CAMBIO['USD'])}</div>
     ${top.map(function(f){ return `<div class="asis-item"><div class="d">${escapeHtml(f[0] || 'Sin familia')}</div><div class="q"><b>${(total ? f[1] / total * 100 : 0).toFixed(1)}%</b> del gasto · ${fmtUSD(f[1] / TIPO_CAMBIO['USD'])}</div></div>`; }).join('')}
     <div class="asis-acc">${polarBtn('ir', 'gasto', 'Abrir Concentración de gasto')}</div>`;
+}
+
+
+// ===================================================================================================
+// POLAR — Excel, indicadores por persona y modo IA (29.09.2026, Piero: "el asistente debe ser muy
+// inteligente... pueden ser indicadores de cierta persona o que exporten un excel con el resumen de un
+// proyecto en específico").
+//  - Sin configurar nada, Polar ya exporta a Excel y saca indicadores por persona / mes con reglas.
+//  - Con POLAR_IA_URL (Apps Script "polar-ia.gs", que guarda la API key de Anthropic), las preguntas
+//    las entiende Claude: decide qué consultar, llama a las herramientas de abajo —que corren acá, en
+//    el navegador, con la data ya cargada— y redacta la respuesta. Si la IA falla, contesta el modo
+//    de reglas.
+// ===================================================================================================
+const POLAR_IA_URL = '';   // pegar acá la URL /exec del Apps Script polar-ia (ver polar-ia.gs)
+const POLAR_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function polarVista(){ return RQ_MOVIL.matches ? (APP.vista || 'supervisor') : 'completa'; }
+function polarPuede(que){
+  const v = polarVista();
+  if(que === 'gerencia') return gerAbierto && v !== 'supervisor';
+  if(que === 'logistica') return v !== 'supervisor';
+  return true;
+}
+
+// ---------- Excel ----------
+function polarHoja(wb, nombre, aoa, anchos){
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  if(anchos) ws['!cols'] = anchos.map(function(w){ return { wch:w }; });
+  XLSX.utils.book_append_sheet(wb, ws, nombre);
+}
+function polarArchivo(t){ return String(t).replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) + ' - Grupo Friopacking.xlsx'; }
+function polarExcelReqs(filas, titulo, sub){
+  const reqs = appResumenReqs(filas);
+  const est = {};
+  filas.forEach(function(r){ est[r.estadoCalc || '—'] = (est[r.estadoCalc || '—'] || 0) + 1; });
+  const obra = filas.filter(function(r){ return /obra/i.test(r.estadoCalc || ''); }).length;
+  const aoa = [[titulo], [sub || ''], ['Generado', fmtDate(new Date())], [],
+    ['Requerimientos', reqs.length], ['Ítems pedidos', filas.length], ['Ítems en obra', obra],
+    ['Avance', filas.length ? Math.round(obra / filas.length * 100) + '%' : '—'], [], ['Estado', 'Ítems']]
+    .concat(APP_ESTADOS.filter(function(e){ return est[e[0]]; }).map(function(e){ return [e[1], est[e[0]]]; }))
+    .concat([[], ['N° Requerimiento', 'Fecha', 'Ítems', 'En obra', 'Pendientes', 'Estados']])
+    .concat(reqs.map(function(y){
+      return [y.cod, y.fReq ? fmtDate(y.fReq) : '', y.n, y.obra, y.n - y.obra,
+        APP_ESTADOS.filter(function(e){ return y.est[e[0]]; }).map(function(e){ return y.est[e[0]] + ' ' + e[1]; }).join(' · ')];
+    }));
+  const wb = XLSX.utils.book_new();
+  polarHoja(wb, 'Resumen', aoa, [26, 14, 10, 10, 12, 60]);
+  rqLibroExcel(filas, wb);
+  const nombre = polarArchivo(titulo);
+  XLSX.writeFile(wb, nombre);
+  return nombre;
+}
+function polarExcelPendientes(persona){
+  const hoy = new Date();
+  const filas = pdFilas().filter(function(r){ return !persona || r.persona === persona; });
+  const aoa = [['Tipo', 'Persona', 'N° OC', 'Estado OC', 'N° Pedido', 'N° Req.', 'Proyecto', 'Código', 'Descripción', 'UM',
+    'Cant. OC', 'Recibido', 'Falta', 'Proveedor', 'F. entrega pactada', 'Días hábiles vencida']];
+  filas.forEach(function(r){
+    const d = r.tipo === 'oc' && r.fCompromiso ? busdayCount(r.fCompromiso, hoy) : null;
+    aoa.push([r.tipo === 'oc' ? 'OC por llegar' : 'Pedido sin OC', pdEtiquetaPersona(r.persona), r.codOrden || '', r.estadoOrden || '',
+      r.codPedido || '', r.req || '', r.proyecto || '', r.idProducto || '', r.producto || '', r.unidad || '',
+      r.cantOrden == null ? '' : r.cantOrden, r.cantRecep == null ? '' : r.cantRecep, pdFalta(r) == null ? '' : pdFalta(r),
+      r.proveedor || '', r.fCompromiso ? fmtDate(r.fCompromiso) : '', d > 0 ? d : '']);
+  });
+  const wb = XLSX.utils.book_new();
+  polarHoja(wb, 'Pendientes', aoa, [14, 24, 14, 18, 14, 14, 30, 14, 48, 7, 9, 9, 8, 30, 14, 12]);
+  const nombre = polarArchivo('Pendientes de compra' + (persona ? ' - ' + (PD_PERSONAS[persona] || persona) : ''));
+  XLSX.writeFile(wb, nombre);
+  return nombre;
+}
+function polarExcelReponer(){
+  const rows = appPorReponer();
+  const aoa = [['Código', 'Descripción', 'UM', 'Lima', 'Trujillo', 'Ica', 'En tránsito', 'Rotación mensual', 'ROP', 'A pedir']];
+  rows.forEach(function(r){ aoa.push([r.codigo, r.descripcion, r.unidad, r.lima, r.trujillo, r.ica, r.transito, r.consumoMensual, Math.round(ropEfectivo(r) * 100) / 100, Math.round(r.aPedir)]); });
+  const wb = XLSX.utils.book_new();
+  polarHoja(wb, 'Por reponer', aoa, [15, 55, 7, 9, 9, 9, 11, 14, 9, 10]);
+  const nombre = polarArchivo('Productos por reponer');
+  XLSX.writeFile(wb, nombre);
+  return nombre;
+}
+function polarExcelIndicadores(f){
+  const datos = polarIndicadoresDatos(f);
+  if(datos.error) return null;
+  const aoa = [['Indicadores de logística'], ['Filtro', polarFiltroTexto(f)], [], ['Indicador', 'Promedio (d.h.)', 'Meta (d.h.)', '% cumple', 'Casos medidos']]
+    .concat(datos.indicadores.map(function(d){ return [d.indicador, d.promedio_dh == null ? '' : d.promedio_dh, d.meta_dh == null ? '' : d.meta_dh, d.cumple_pct == null ? '' : d.cumple_pct + '%', d.casos]; }));
+  const wb = XLSX.utils.book_new();
+  polarHoja(wb, 'Indicadores', aoa, [40, 15, 12, 10, 14]);
+  const nombre = polarArchivo('Indicadores ' + polarFiltroTexto(f));
+  XLSX.writeFile(wb, nombre);
+  return nombre;
+}
+
+// ---------- Indicadores con filtros (persona / año / mes / origen) ----------
+// Se usan los MISMOS filtros del módulo: se ponen un momento, se calcula con las funciones de
+// siempre (rowsForIndicator + aggStatsForIndicator) y se devuelven como estaban.
+function polarIndicadoresDatos(f){
+  f = f || {};
+  const ids = { persona:'filterProcesoResponsable', anio:'filterProcesoAnio', mes:'filterProcesoMes', origen:'filterProcesoOrigen',
+    desde:'filterProcesoDesde', hasta:'filterProcesoHasta', area:'filterProcesoArea' };
+  const els = {}, antes = {};
+  Object.keys(ids).forEach(function(k){ els[k] = document.getElementById(ids[k]); antes[k] = els[k] ? els[k].value : null; });
+  const tiene = function(el, v){ return !!el && [...el.options].some(function(o){ return o.value === String(v); }); };
+  if(f.persona && !tiene(els.persona, f.persona)) return { error:'Esa persona no tiene OC en los datos cargados.' };
+  try{
+    els.persona.value = f.persona || 'all';
+    els.anio.value = (f.anio && tiene(els.anio, f.anio)) ? String(f.anio) : 'all';
+    els.mes.value = (f.mes && tiene(els.mes, f.mes)) ? String(f.mes) : 'all';
+    els.origen.value = (f.origen && tiene(els.origen, f.origen)) ? f.origen : 'all';
+    if(els.desde) els.desde.value = ''; if(els.hasta) els.hasta.value = '';
+    if(els.area) els.area.value = 'all';
+    return { filtro: polarFiltroTexto(f), indicadores: INDICATORS.map(function(ind){
+      const st = aggStatsForIndicator(rowsForIndicator(ind), ind);
+      return { indicador: ind.name, promedio_dh: st.promedio == null ? null : Math.round(st.promedio * 10) / 10,
+        cumple_pct: st.cumplePct == null ? null : Math.round(st.cumplePct), casos: st.n, meta_dh: ind.meta };
+    }) };
+  } finally {
+    Object.keys(ids).forEach(function(k){ if(els[k] && antes[k] != null) els[k].value = antes[k]; });
+  }
+}
+function polarFiltroTexto(f){
+  f = f || {};
+  const partes = [];
+  if(f.persona) partes.push(PD_PERSONAS[f.persona] || f.persona);
+  if(f.mes) partes.push(POLAR_MESES[f.mes - 1]);
+  if(f.anio) partes.push(String(f.anio));
+  if(f.origen) partes.push(f.origen === 'importado' ? 'importaciones' : 'nacional');
+  return partes.length ? partes.join(' · ') : 'todo el período';
+}
+function polarFiltrosDe(q){
+  const f = {};
+  const per = polarPersonaEn(q, true); if(per) f.persona = per;
+  const a = q.match(/\b(20[2-3]\d)\b/); if(a) f.anio = Number(a[1]);
+  POLAR_MESES.forEach(function(m, i){ if(new RegExp('\\b' + m + '\\b').test(q) || (m === 'septiembre' && /\bsetiembre\b/.test(q))) f.mes = i + 1; });
+  if(/importad|importacion/.test(q)) f.origen = 'importado'; else if(/nacional/.test(q)) f.origen = 'nacional';
+  return f;
+}
+function polarIndicadoresHtml(f){
+  if(!polarPuede('gerencia')) return polarCandado();
+  const d = polarIndicadoresDatos(f);
+  if(d.error) return '<p>' + escapeHtml(d.error) + '</p>';
+  return `<div class="cab">Indicadores de logística</div><div class="sub">${escapeHtml(d.filtro)}</div>
+    ${d.indicadores.map(function(x){
+      const cls = x.cumple_pct == null ? '' : (x.cumple_pct >= 80 ? 'ok' : x.cumple_pct >= 50 ? 'espera' : 'tarde');
+      return `<div class="asis-item"><div class="d">${escapeHtml(x.indicador)}</div>
+        <div class="q"><b>${x.promedio_dh == null ? '—' : x.promedio_dh + ' d.h.'}</b> promedio · <span class="asis-est ${cls}">${x.cumple_pct == null ? 'Sin datos' : 'Cumple ' + x.cumple_pct + '%'}</span> · ${x.casos} casos</div></div>`;
+    }).join('')}
+    <div class="asis-acc">${polarBtn('q', 'exporta en excel los indicadores' + (f.persona ? ' de ' + f.persona : '') + (f.mes ? ' ' + POLAR_MESES[f.mes - 1] : '') + (f.anio ? ' ' + f.anio : ''), '📥 Excel')}${polarBtn('ir', 'proceso', 'Abrir Indicadores')}</div>`;
+}
+
+// ---------- Exportar desde el modo de reglas ----------
+function polarExportar(q, T){
+  const pry = T.match(/PRY\s*-?\s*(\d{4})\s*-?\s*(\d{1,7})/);
+  const doc = T.match(/\b(\d{4})\s*-\s*(\d{3,7})\b/);
+  const bare = T.match(/\b(\d{3,7})\b/);
+  rqPreparar();
+  const hecho = function(n){ return `<p>📥 Listo, descargué <b>${escapeHtml(n)}</b>.</p><p class="q">Trae una hoja de resumen con el estado de cada cosa y otra con el detalle ítem por ítem.</p>`; };
+  if(pry){
+    const id = 'PRY' + pry[1] + '-' + pry[2].padStart(7, '0');
+    const filas = RQ.filas.filter(function(r){ return r.idProyecto === id; });
+    if(!filas.length) return `<p>No encontré requerimientos del proyecto <b class="mono">${escapeHtml(id)}</b>.</p>`;
+    return hecho(polarExcelReqs(filas, (filas[0].proyecto || id) + ' ' + id, 'Proyecto ' + id));
+  }
+  if(/indicador/.test(q)){
+    if(!polarPuede('gerencia')) return polarCandado();
+    const n = polarExcelIndicadores(polarFiltrosDe(q));
+    return n ? `<p>📥 Listo, descargué <b>${escapeHtml(n)}</b>.</p>` : '<p>No pude armar los indicadores con ese filtro.</p>';
+  }
+  if(/pendiente|por llegar|vencid/.test(q)){
+    if(!polarPuede('logistica')) return '<p>En la vista Supervisor puedo exportarte tus <b>requerimientos</b> o tu <b>proyecto</b>.</p>';
+    return hecho(polarExcelPendientes(polarPersonaEn(q, true)));
+  }
+  if(/reponer|a pedir|comprar/.test(q)){
+    if(!polarPuede('logistica')) return '<p>En la vista Supervisor puedo exportarte tus <b>requerimientos</b> o tu <b>proyecto</b>.</p>';
+    return hecho(polarExcelReponer());
+  }
+  if(doc || bare){
+    const cod = doc ? doc[1] + '-' + doc[2].padStart(7, '0') : '0001-' + bare[1].padStart(7, '0');
+    const filas = RQ.filas.filter(function(r){ return r.codRequerimiento === cod; });
+    if(!filas.length) return `<p>No encontré el requerimiento <b class="mono">${escapeHtml(cod)}</b>.</p>`;
+    return hecho(polarExcelReqs(filas, 'Requerimiento ' + cod, (filas[0].proyecto || '') + ' ' + (filas[0].idProyecto || '')));
+  }
+  // por nombre de proyecto o cliente
+  const palabras = q.replace(/\b(exporta|exportar|exportame|descarga|descargar|dame|genera|generar|un|una|el|la|los|las|en|de|del|excel|xlsx|archivo|reporte|resumen|proyecto|cliente|con|todo|todos|por|favor)\b/g, ' ')
+    .split(' ').filter(function(w){ return w.length >= 3; });
+  if(palabras.length){
+    const ids = new Map();
+    RQ.filas.forEach(function(r){ const n = polarNorm(r.proyecto); if(r.idProyecto && palabras.every(function(w){ return n.indexOf(w) !== -1; }) && !ids.has(r.idProyecto)) ids.set(r.idProyecto, r.proyecto); });
+    if(ids.size === 1){
+      const id = [...ids.keys()][0], filas = RQ.filas.filter(function(r){ return r.idProyecto === id; });
+      return hecho(polarExcelReqs(filas, (filas[0].proyecto || id) + ' ' + id, 'Proyecto ' + id));
+    }
+    if(ids.size > 1) return `<p>Hay ${ids.size} proyectos con ese nombre. ¿De cuál saco el Excel?</p><div class="asis-acc">${[...ids.entries()].slice(0, 6).map(function(e){ return polarBtn('q', 'excel ' + e[0], escapeHtml(polarCorta(e[1], 30)) + ' · ' + escapeHtml(e[0])); }).join('')}</div>`;
+  }
+  return '<p>¿De qué quieres el Excel? Por ejemplo: <b>"excel del proyecto PRY2026-0000036"</b>, <b>"excel del req 23303"</b>' + (polarPuede('logistica') ? ', <b>"excel de pendientes de Melissa"</b> o <b>"excel de lo que hay que reponer"</b>' : '') + '.</p>';
+}
+
+// ---------- Modo IA: herramientas que Claude puede usar (corren acá, con la data cargada) ----------
+function polarIdProyecto(consulta){
+  rqPreparar();
+  const T = String(consulta || '').toUpperCase();
+  const m = T.match(/PRY\s*-?\s*(\d{4})\s*-?\s*(\d{1,7})/);
+  if(m) return { id: 'PRY' + m[1] + '-' + m[2].padStart(7, '0') };
+  const pal = polarNorm(consulta).split(' ').filter(function(w){ return w.length >= 3; });
+  const ids = new Map();
+  RQ.filas.forEach(function(r){ const n = polarNorm(r.proyecto); if(r.idProyecto && pal.length && pal.every(function(w){ return n.indexOf(w) !== -1; }) && !ids.has(r.idProyecto)) ids.set(r.idProyecto, r.proyecto); });
+  if(ids.size === 1) return { id: [...ids.keys()][0] };
+  return { coincidencias: [...ids.entries()].slice(0, 15).map(function(e){ return { id_proyecto:e[0], proyecto:e[1] }; }) };
+}
+function polarItemIA(r){
+  return { codigo:r.idProducto, descripcion:r.producto, um:r.unidad, cantidad:r.cantidad, estado:r.estadoCalc,
+    pedido:r.codPedido || null, oc:r.codOrden || null, proveedor:r.proveedor || null, entrega_oc:r.fCompromiso ? fmtDate(r.fCompromiso) : null,
+    recibido_almacen:r.cantRecep, salida:r.cantSalida, fecha_salida:r.fSalida ? fmtDate(r.fSalida) : null, guia_salida:r.docSalida || null,
+    recibido_obra:r.cantObra };
+}
+function polarReqsIA(filas, tope){
+  return appResumenReqs(filas).slice(0, tope || 60).map(function(y){
+    return { requerimiento:y.cod, fecha:y.fReq ? fmtDate(y.fReq) : null, items:y.n, en_obra:y.obra, estados:y.est };
+  });
+}
+function polarHerramienta(nombre, a){
+  a = a || {};
+  rqPreparar();
+  const prohibido = { error:'No disponible en esta vista.' };
+  switch(nombre){
+    case 'consultar_requerimiento': {
+      const cod = appNormReq(a.codigo);
+      const items = RQ.filas.filter(function(r){ return r.codRequerimiento === cod; });
+      if(!items.length) return { error:'No existe el requerimiento ' + cod };
+      const r0 = items[0];
+      return { requerimiento:cod, proyecto:r0.proyecto, id_proyecto:r0.idProyecto, solicitante:r0.responsable, fecha:r0.fReq ? fmtDate(r0.fReq) : null,
+        total_items:items.length, items:items.slice(0, 80).map(polarItemIA) };
+    }
+    case 'consultar_proyecto': {
+      const p = polarIdProyecto(a.proyecto);
+      if(!p.id) return p.coincidencias.length ? { varias_coincidencias:p.coincidencias } : { error:'No encontré ese proyecto' };
+      const filas = RQ.filas.filter(function(r){ return r.idProyecto === p.id; });
+      if(!filas.length) return { error:'Sin requerimientos para ' + p.id };
+      const est = {}; filas.forEach(function(r){ est[r.estadoCalc] = (est[r.estadoCalc] || 0) + 1; });
+      return { id_proyecto:p.id, proyecto:filas[0].proyecto, total_items:filas.length, estados_items:est, requerimientos:polarReqsIA(filas, 60) };
+    }
+    case 'requerimientos_de_solicitante': {
+      const pal = polarNorm(a.nombre).split(' ').filter(function(w){ return w.length >= 3; });
+      const filas = RQ.filas.filter(function(r){ const n = polarNorm(r.responsable); return pal.length && pal.every(function(w){ return n.indexOf(w) !== -1; }); });
+      if(!filas.length) return { error:'No encontré requerimientos de ese solicitante' };
+      return { solicitantes:[...new Set(filas.map(function(r){ return r.responsable; }))], requerimientos:polarReqsIA(filas, 40) };
+    }
+    case 'stock_producto': {
+      if(!polarPuede('logistica')) return prohibido;
+      const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+      const q = String(a.consulta || '').trim();
+      let hits = /^\d{12}$/.test(q) ? [rqStockDe(q)].filter(Boolean)
+        : rows.filter(function(r){ const d = polarNorm(r.descripcion); return polarNorm(q).split(' ').filter(function(w){ return w.length >= 2; }).every(function(w){ return d.indexOf(w) !== -1; }); });
+      return { total:hits.length, productos:hits.slice(0, 10).map(function(p){
+        const res = rqReservasDe(p.codigo), reservado = res.reduce(function(s,y){ return s + y.q; }, 0);
+        return { codigo:p.codigo, descripcion:p.descripcion, um:p.unidad, lima:p.lima, trujillo:p.trujillo, ica:p.ica, en_transito:p.transito,
+          reservado_lima:Math.round(reservado * 100) / 100, disponible_lima:Math.max(0, Math.round(((p.lima || 0) - reservado) * 100) / 100),
+          rotacion_mensual:p.consumoMensual, rop:Math.round(ropEfectivo(p) * 100) / 100,
+          oc_en_camino:hits.length <= 3 ? trTransitoDe(p.codigo, p.codigos).map(function(o){ return { oc:o.oc, proveedor:o.proveedor, cantidad:o.cant, origen:o.origen, llega:o.fCompromiso ? fmtDate(o.fCompromiso) : null }; }) : undefined };
+      }) };
+    }
+    case 'consultar_oc': {
+      const cod = appNormReq(a.codigo);
+      const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return r.codOrden === cod; });
+      if(!filas.length) return { error:'No existe la OC ' + cod };
+      const f0 = filas.find(function(r){ return r.proveedor; }) || filas[0];
+      return { oc:cod, proveedor:f0.proveedor, origen:f0.origen, estado:(filas.find(function(r){ return r.estadoOrden; }) || {}).estadoOrden || null,
+        emitida:f0.fOrden ? fmtDate(f0.fOrden) : null, aprobada:f0.fAprob ? fmtDate(f0.fAprob) : null,
+        entrega_pactada:(filas.find(function(r){ return r.fCompromiso; }) || {}).fCompromiso ? fmtDate(filas.find(function(r){ return r.fCompromiso; }).fCompromiso) : null,
+        items:filas.slice(0, 40).map(function(r){ return { producto:r.producto, cantidad:r.cantOrden != null ? r.cantOrden : r.cantidadOrden,
+          recibido:(r.cantRecep != null ? r.cantRecep : r.cantRecepcion) || 0, requerimiento:r.codRequerimiento || 'pedido directo', proyecto:r.proyecto }; }) };
+    }
+    case 'pendientes_compras': {
+      if(!polarPuede('logistica')) return prohibido;
+      const per = a.persona ? polarPersonaEn(polarNorm(a.persona), true) || String(a.persona).toUpperCase() : null;
+      const filas = pdFilas().filter(function(r){ return !per || r.persona === per; });
+      const ocs = new Set(filas.filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; }));
+      const peds = new Set(filas.filter(function(r){ return r.tipo === 'ped'; }).map(function(r){ return r.codPedido; }));
+      const venc = polarTopVencidas(filas, 999);
+      const porPersona = {}; venc.forEach(function(v){ porPersona[pdEtiquetaPersona(v.persona)] = (porPersona[pdEtiquetaPersona(v.persona)] || 0) + 1; });
+      return { persona:per ? pdEtiquetaPersona(per) : 'todas', oc_por_llegar:ocs.size, oc_vencidas:venc.length, pedidos_sin_oc:peds.size,
+        vencidas_por_persona:per ? undefined : porPersona,
+        mas_atrasadas:venc.slice(0, 15).map(function(v){ return { oc:v.oc, proveedor:v.proveedor, dias_habiles_vencida:v.d, persona:pdEtiquetaPersona(v.persona) }; }) };
+    }
+    case 'productos_por_reponer': {
+      if(!polarPuede('logistica')) return prohibido;
+      const rep = appPorReponer();
+      return { total:rep.length, meses_a_abastecer:Number(document.getElementById('mesesAbastecer').value) || 3,
+        productos:rep.slice(0, Math.min(Number(a.limite) || 15, 40)).map(function(r){ return { codigo:r.codigo, descripcion:r.descripcion, um:r.unidad,
+          stock_lima:r.lima, en_transito:r.transito, rotacion_mensual:r.consumoMensual, a_pedir:Math.round(r.aPedir) }; }) };
+    }
+    case 'indicadores_logistica': {
+      if(!polarPuede('gerencia')) return { error:'Requiere la clave del módulo Gerencial.' };
+      const f = { anio:a.anio || null, mes:a.mes || null, origen:a.origen || null };
+      if(a.persona){ f.persona = polarPersonaEn(polarNorm(a.persona), true) || String(a.persona).toUpperCase(); }
+      return polarIndicadoresDatos(f);
+    }
+    case 'gasto_compras': {
+      if(!polarPuede('gerencia')) return { error:'Requiere la clave del módulo Gerencial.' };
+      let rows = (GASTO_DATA && GASTO_DATA.rows) || [];
+      if(a.anio) rows = rows.filter(function(r){ return Number(r.anio) === Number(a.anio); });
+      if(a.mes) rows = rows.filter(function(r){ return Number(r.mes) === Number(a.mes); });
+      if(a.familia){ const fq = polarNorm(a.familia); rows = rows.filter(function(r){ return polarNorm(r.familia).indexOf(fq) !== -1; }); }
+      const agrupar = function(campo){ const m = new Map(); rows.forEach(function(r){ m.set(r[campo] || '—', (m.get(r[campo] || '—') || 0) + (r.montoPEN || 0)); }); return m; };
+      const total = rows.reduce(function(s,r){ return s + (r.montoPEN || 0); }, 0);
+      const top = function(m, n){ return [...m.entries()].sort(function(x,y){ return y[1] - x[1]; }).slice(0, n).map(function(e){ return { nombre:e[0], usd:Math.round(e[1] / TIPO_CAMBIO['USD']), pct:total ? Math.round(e[1] / total * 1000) / 10 : 0 }; }); };
+      const mn = montoPorMonedaOrigen(rows.filter(function(r){ return r.origen === 'nacional'; })), mi = montoPorMonedaOrigen(rows.filter(function(r){ return r.origen === 'importado'; }));
+      return { total_equivalente_usd:Math.round(total / TIPO_CAMBIO['USD']), nacional:{ soles:Math.round(mn.soles), dolares:Math.round(mn.dolares) },
+        importado:{ soles:Math.round(mi.soles), dolares:Math.round(mi.dolares) }, top_familias:top(agrupar('familia'), 10), top_proveedores:top(agrupar('proveedor'), 10) };
+    }
+    case 'exportar_excel': {
+      const tipo = a.tipo;
+      if(tipo === 'requerimiento'){
+        const cod = appNormReq(a.id), filas = RQ.filas.filter(function(r){ return r.codRequerimiento === cod; });
+        if(!filas.length) return { error:'No existe el requerimiento ' + cod };
+        return { descargado: polarExcelReqs(filas, 'Requerimiento ' + cod, (filas[0].proyecto || '') + ' ' + (filas[0].idProyecto || '')) };
+      }
+      if(tipo === 'proyecto'){
+        const p = polarIdProyecto(a.id);
+        if(!p.id) return p.coincidencias.length ? { varias_coincidencias:p.coincidencias } : { error:'No encontré ese proyecto' };
+        const filas = RQ.filas.filter(function(r){ return r.idProyecto === p.id; });
+        return { descargado: polarExcelReqs(filas, (filas[0].proyecto || p.id) + ' ' + p.id, 'Proyecto ' + p.id) };
+      }
+      if(tipo === 'pendientes'){ if(!polarPuede('logistica')) return prohibido; return { descargado: polarExcelPendientes(a.persona ? polarPersonaEn(polarNorm(a.persona), true) : null) }; }
+      if(tipo === 'reponer'){ if(!polarPuede('logistica')) return prohibido; return { descargado: polarExcelReponer() }; }
+      if(tipo === 'indicadores'){
+        if(!polarPuede('gerencia')) return { error:'Requiere la clave del módulo Gerencial.' };
+        const f = { anio:a.anio || null, mes:a.mes || null, persona:a.persona ? polarPersonaEn(polarNorm(a.persona), true) : null };
+        const n = polarExcelIndicadores(f); return n ? { descargado:n } : { error:'Sin datos con ese filtro' };
+      }
+      return { error:'Tipo de Excel no reconocido' };
+    }
+  }
+  return { error:'Herramienta desconocida: ' + nombre };
+}
+
+function polarMarkdown(t){
+  const lineas = escapeHtml(String(t || '')).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<span class="mono">$1</span>').split('\n');
+  let html = '', enLista = false;
+  lineas.forEach(function(l){
+    const li = l.match(/^\s*(?:[-•*]|\d+\.)\s+(.*)/);
+    if(li){ if(!enLista){ html += '<ul class="asis-ul">'; enLista = true; } html += '<li>' + li[1] + '</li>'; return; }
+    if(enLista){ html += '</ul>'; enLista = false; }
+    if(l.trim()) html += '<p>' + l.replace(/^#+\s*/, '') + '</p>';
+  });
+  if(enLista) html += '</ul>';
+  return html;
+}
+
+POLAR.hist = [];
+async function polarIA(texto){
+  const msgs = POLAR.hist.concat([{ role:'user', content:texto }]);
+  const archivos = [];
+  for(let vuelta = 0; vuelta < 6; vuelta++){
+    const resp = await fetch(POLAR_IA_URL, { method:'POST',
+      body: JSON.stringify({ vista: polarVista(), ger: !!gerAbierto, hoy: fmtDate(new Date()), corte: (DATA && DATA.corte) ? fmtDate(DATA.corte) : null, messages: msgs }) });
+    const data = await resp.json();
+    if(data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || 'error'));
+    msgs.push({ role:'assistant', content:data.content });
+    const usos = (data.content || []).filter(function(c){ return c.type === 'tool_use'; });
+    if(data.stop_reason !== 'tool_use' || !usos.length){
+      const final = (data.content || []).filter(function(c){ return c.type === 'text'; }).map(function(c){ return c.text; }).join('\n');
+      POLAR.hist = POLAR.hist.concat([{ role:'user', content:texto }, { role:'assistant', content:final || '…' }]).slice(-10);
+      return { texto:final, archivos:archivos };
+    }
+    msgs.push({ role:'user', content: usos.map(function(u){
+      let r; try{ r = polarHerramienta(u.name, u.input); }catch(err){ r = { error:String(err && err.message || err) }; }
+      if(r && r.descargado) archivos.push(r.descargado);
+      return { type:'tool_result', tool_use_id:u.id, content:JSON.stringify(r).slice(0, 60000) };
+    }) });
+  }
+  throw new Error('La consulta necesitó demasiados pasos.');
 }
 
 appConstruir();
