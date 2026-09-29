@@ -2513,6 +2513,7 @@ function buildSnapshot(){
     // certificado" también funcione en el link publicado, sin tener que cargar el Excel.
     proveedores: PROVEEDOR_MAIL || null,
     supervisores: SUPERVISOR_MAIL || null,
+    accesos: SUPERVISOR_ROL || null,
     filename: DATA.filename,
     corte: DATA.corte ? DATA.corte.toISOString() : null,
     excluded: DATA.excluded,
@@ -2813,6 +2814,7 @@ async function loadPublishedSnapshot(manual){
 function loadFromSnapshot(snap){
   if(snap.proveedores) PROVEEDOR_MAIL = snap.proveedores;
   if(snap.supervisores) SUPERVISOR_MAIL = snap.supervisores;
+  if(snap.accesos) SUPERVISOR_ROL = snap.accesos;
   const isLegacyProcesoSnapshot = !(snap.procesoSchemaVersion >= 2);
   if(isLegacyProcesoSnapshot && snap.proceso && snap.proceso.rows && snap.proceso.rows.length){
     console.warn('Snapshot publicado con un formato antiguo de "proceso" (sin procesoSchemaVersion >= 2) — se ignoró el campo "rp" heredado de cada fila y se usó JCENTENO por defecto para el Indicador 1. Vuelve a publicar ("Guardar y compartir") con el archivo actual para actualizar el link.');
@@ -4241,6 +4243,10 @@ function processProveedores(wb, filename){
 // indexa por nombre normalizado (sin tildes y con las palabras ordenadas) porque Nisira y esta base no
 // siempre escriben el nombre en el mismo orden.
 let SUPERVISOR_MAIL = null;
+// Accesos de la app del celular (29.09.2026, Piero): columna "Acceso" de DB Supervisores (Supervisor /
+// Logistica / Gerencial). Se indexa por la parte del correo antes de la @; si alguien sale dos veces,
+// queda el acceso más alto. { usuario: { t:'supervisor'|'logistica'|'gerencia', n:nombre, c:correo } }
+let SUPERVISOR_ROL = null;
 function claveNombre(txt){
   return sinAcentos(String(txt||'').toUpperCase()).replace(/[^A-Z\s]/g,' ').split(/\s+/)
     .filter(Boolean).sort().join(' ');
@@ -4256,13 +4262,19 @@ function processSupervisores(wb, filename){
   }
   if(hdr === -1){ SUPERVISOR_MAIL = null; return { ok:false, message:"no encontré las columnas Nombre y Correo." }; }
   const iN = findCol(rows[hdr], ["Nombre"]), iC = findCol(rows[hdr], ["Correo","Email","E_MAIL"]);
-  const mapa = {};
+  const iA = findCol(rows[hdr], ["Acceso","Tipo","Rol"]);
+  const mapa = {}, roles = {}, rango = { supervisor:1, logistica:2, gerencia:3 };
   for(let r=hdr+1; r<rows.length; r++){
     const row = rows[r]; if(!row) continue;
     const nom = s(row[iN]), correos = partirCorreos(row[iC]);
     if(!nom || !correos.length) continue;
     mapa[claveNombre(nom)] = correos[0];
+    const a = sinAcentos(s(iA === -1 ? '' : row[iA]).toLowerCase());
+    const t = /^ger/.test(a) ? 'gerencia' : (/^log/.test(a) ? 'logistica' : 'supervisor');
+    const u = correos[0].toLowerCase().split('@')[0];
+    if(!roles[u] || rango[t] > rango[roles[u].t]) roles[u] = { t:t, n:nom.replace(/\s+/g, ' '), c:correos[0].toLowerCase() };
   }
+  SUPERVISOR_ROL = Object.keys(roles).length ? roles : null;
   const n = Object.keys(mapa).length;
   SUPERVISOR_MAIL = n ? mapa : null;
   if(DATA) drawCertificados();
@@ -12074,9 +12086,12 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
 const APP_ACCESO = { gerencia:['gerencia','logistica','supervisor'], logistica:['logistica','supervisor'], supervisor:['supervisor'] };
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
-// y en base a ese correo se designará la vista"). Se compara la parte antes de la @ porque hay gente con
-// @friopacking.pe y con @grupofriopacking.pe. Para dar acceso, agregar el correo a la lista que toca;
-// cualquier otro correo corporativo entra como Supervisor.
+// y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
+// solo entran los correos que están ahí. Los de Supervisor entran directo; Logística y Gerencial ponen la
+// clave de la app (APP_LLAVE). Se compara la parte antes de la @ (hay gente con los dos dominios). Las
+// dos listas de abajo solo se usan si el link publicado todavía no trae la base con la columna Acceso.
+// Clave de la app para Logística y Gerencia (29.09.2026, Piero). Va su huella, no la clave: fpHuella('…').
+const APP_LLAVE = 4057433394;
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
 const APP_CORREOS_GERENCIA = ['plinares@friopacking.pe'];
 const APP_CORREOS_LOGISTICA = CRT_COPIA_FIJA.slice();   // el equipo de Compras y Logística
@@ -12087,16 +12102,32 @@ function appCorreoValido(correo){
 }
 function appTipoPorCorreo(correo){
   if(!appCorreoValido(correo)) return null;
+  if(SUPERVISOR_ROL){ const a = SUPERVISOR_ROL[appUsuarioDe(correo)]; return a ? a.t : null; }
   const u = appUsuarioDe(correo), en = function(l){ return l.some(function(c){ return appUsuarioDe(c) === u; }); };
   return en(APP_CORREOS_GERENCIA) ? 'gerencia' : (en(APP_CORREOS_LOGISTICA) ? 'logistica' : 'supervisor');
 }
+function appNombrePorCorreo(correo){
+  const a = SUPERVISOR_ROL && appCorreoValido(correo) && SUPERVISOR_ROL[appUsuarioDe(correo)];
+  return a ? a.n.toLowerCase().replace(/(^|[\s-])(\S)/g, function(m, e, l){ return e + l.toUpperCase(); }) : '';
+}
 APP.usuario = null;
 try{
+  // La base de accesos llega con los datos publicados; hasta entonces se confía en lo guardado y
+  // appRevisarAcceso lo vuelve a comprobar apenas llegan (si cambió su acceso en la base, cambia acá).
   const u = JSON.parse(localStorage.getItem('fp-usuario') || 'null');
-  // El tipo se vuelve a sacar del correo cada vez: si cambian las listas, cambia el acceso.
-  const t = u && appTipoPorCorreo(u.correo);
-  if(t){ u.tipo = t; APP.usuario = u; }
+  if(u && APP_ACCESO[u.tipo] && appCorreoValido(u.correo)) APP.usuario = u;
 }catch(err){}
+function appRevisarAcceso(){
+  if(!SUPERVISOR_ROL || !APP.usuario) return;
+  if(!APP.usuario.nombre) APP.usuario.nombre = appNombrePorCorreo(APP.usuario.correo);
+  const t = appTipoPorCorreo(APP.usuario.correo);
+  if(!t) return appCerrarUsuario();                 // ya no está en la base
+  if(t === APP.usuario.tipo) return;
+  APP.usuario.tipo = t;
+  try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); }catch(err){}
+  if(t !== 'gerencia'){ gerAbierto = false; try{ sessionStorage.removeItem(GER_SESION); }catch(err){} }
+  APP.vista = t; try{ localStorage.setItem('fp-vista', t); }catch(err){}   // cambió su acceso: entra a su vista
+}
 if(APP.usuario){
   if(APP_ACCESO[APP.usuario.tipo].indexOf(APP.vista) === -1) APP.vista = APP.usuario.tipo;
   // Gerencia ya puso la clave al crear su usuario: en su celular no se le vuelve a pedir.
@@ -12177,8 +12208,6 @@ function appBienvenida(){
       <label class="bv-lbl" for="bvCorreo">Correo corporativo</label>
       <input type="email" id="bvCorreo" class="bv-inp" placeholder="usuario@friopacking.pe" autocomplete="email" inputmode="email" autocapitalize="off" enterkeyhint="next">
       <div class="bv-acceso" id="bvAcceso" hidden></div>
-      <label class="bv-lbl" for="bvNombre">Tu nombre</label>
-      <input type="text" id="bvNombre" class="bv-inp" placeholder="Nombre y apellido" autocomplete="name" enterkeyhint="next">
       <div class="bv-clave" id="bvClave" hidden>
         <label class="bv-lbl" for="bvPass">Clave de acceso</label>
         <input type="password" id="bvPass" class="bv-inp" placeholder="Clave" autocomplete="off" enterkeyhint="go">
@@ -12186,11 +12215,12 @@ function appBienvenida(){
       <p class="bv-err" id="bvErr" hidden></p>
       <button type="submit" class="bv-entrar">Entrar</button>
     </form>
-    <p class="bv-nota">Tu correo define qué vistas puedes usar. Gerencia y Logística piden además la clave. El usuario queda guardado en este celular; para cambiarlo, usa el botón de arriba a la derecha → Cambiar de usuario.</p></div>`;
+    <p class="bv-nota">Tu correo define qué vistas puedes usar: los supervisores entran directo; Logística y Gerencia piden además la clave. El usuario queda guardado en este celular; para cambiarlo, usa el botón de arriba a la derecha → Cambiar de usuario.</p></div>`;
   b.classList.add('abierto');
   b.onclick = null;
   const err = function(t){ const e = document.getElementById('bvErr'); e.textContent = t; e.hidden = !t; };
-  const correo = document.getElementById('bvCorreo'), nombre = document.getElementById('bvNombre');
+  // Sin nombre (29.09.2026, Piero: "no es necesario colocar nombre y apellido"): sale de DB Supervisores.
+  const correo = document.getElementById('bvCorreo');
   correo.oninput = function(){
     const t = appTipoPorCorreo(correo.value), a = document.getElementById('bvAcceso');
     a.hidden = !t;
@@ -12201,11 +12231,10 @@ function appBienvenida(){
   document.getElementById('bvForm').onsubmit = function(e){
     e.preventDefault();
     const c = correo.value.trim().toLowerCase(), tipo = appTipoPorCorreo(c);
-    if(!tipo) return err(appCorreoValido(c) ? 'Correo no reconocido.' : 'Usa tu correo corporativo (@friopacking.pe o @grupofriopacking.pe).');
-    if(nombre.value.trim().length < 2){ nombre.focus(); return err('Escribe tu nombre.'); }
+    if(!tipo) return err(appCorreoValido(c) ? 'Tu correo no está registrado en la plataforma. Pide a Logística que te agregue.' : 'Usa tu correo corporativo (@friopacking.pe o @grupofriopacking.pe).');
     const pass = document.getElementById('bvPass');
-    if(tipo !== 'supervisor' && fpHuella(pass.value) !== GER_LLAVE){ pass.select(); return err('Clave incorrecta.'); }
-    APP.usuario = { correo:c, nombre:nombre.value.trim().slice(0, 60), tipo:tipo, creado:new Date().toISOString().slice(0, 10) };
+    if(tipo !== 'supervisor' && fpHuella(pass.value) !== APP_LLAVE){ pass.select(); return err('Clave incorrecta.'); }
+    APP.usuario = { correo:c, nombre:appNombrePorCorreo(c), tipo:tipo, creado:new Date().toISOString().slice(0, 10) };
     try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); }catch(er){}
     if(tipo === 'gerencia'){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(er){} }
     pass.value = '';
@@ -12282,6 +12311,11 @@ function appRenderInicio(){
   const v = APP.vista || 'supervisor';
   const ph = { supervisor:'N° de requerimiento, proyecto o pregunta…', logistica:'Código, producto, OC o pregunta…', gerencia:'Pregunta por un indicador o el gasto…' }[v];
   const hay = appHayDatos();
+  if(hay && SUPERVISOR_ROL && APP.usuario){
+    const antes = APP.usuario.tipo; appRevisarAcceso();
+    if(!APP.usuario) return;
+    if(APP.usuario.tipo !== antes) return appInicio(APP.pantalla);
+  }
   let cuerpo = '';
   if(!hay){
     appIntentos++;
@@ -12592,7 +12626,7 @@ function appAbrirSheet(){
   const pub = document.getElementById('btnPublish');
   const oscuro = document.documentElement.getAttribute('data-theme') === 'dark';
   document.getElementById('appSheetIn').innerHTML = `<div class="asa"></div>
-    ${APP.usuario ? `<div class="app-sheet-usr"><b>${escapeHtml(APP.usuario.nombre)}</b><span>${escapeHtml(APP.usuario.correo || '')} · Usuario ${escapeHtml(APP_VISTAS[APP.usuario.tipo].nombre)}</span></div>` : ''}
+    ${APP.usuario ? `<div class="app-sheet-usr"><b>${escapeHtml(APP.usuario.nombre || APP.usuario.correo || '')}</b><span>${escapeHtml(APP.usuario.correo || '')} · Usuario ${escapeHtml(APP_VISTAS[APP.usuario.tipo].nombre)}</span></div>` : ''}
     ${appVistasPermitidas().length > 1 ? '<h4>Cambiar de vista</h4>' : ''}
     ${Object.entries(APP_VISTAS).filter(([k])=> appVistasPermitidas().length > 1 && appVistasPermitidas().indexOf(k) !== -1).map(([k,v])=>`<button type="button" data-vista="${k}" class="${k === APP.vista ? 'on' : ''}"><span>${v.ico}</span>${v.nombre}${k === APP.vista ? ' <em>✓</em>' : ''}</button>`).join('')}
     <h4>Apariencia</h4>
