@@ -1029,10 +1029,6 @@
     .sup-bienv-top img{width:52px;height:52px;border-radius:50%;flex-shrink:0;}
     .sup-bienv-top b{display:block;font-size:17px;font-weight:800;color:var(--ink);} .sup-bienv-top span{font-size:12.5px;color:var(--ink-soft);line-height:1.35;}
     .sup-guia{display:grid;gap:8px;}
-    .sup-sub{font-size:12px;font-weight:800;color:var(--ink-soft);margin:14px 0 4px;} .sup-sub small{font-weight:600;color:var(--muted);}
-    .sup-pry{width:100%;background:none;border:0;color:var(--ink);cursor:pointer;font-family:inherit;text-align:left;}
-    .ini-bar em.ok{background:var(--brand-2);} .ini-bar em.late,.ini-bar em.camino{background:var(--amber);} .ini-bar em.warn,.ini-bar em.espera{background:var(--red);}
-    .ini-bar em.recibido{background:var(--brand-ink);}
     .sup-guia button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:1px solid var(--border);border-radius:12px;padding:10px 12px;
       text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);}
     .sup-guia i{font-style:normal;font-size:22px;width:32px;text-align:center;flex-shrink:0;} .sup-guia i img{width:32px;height:32px;border-radius:50%;display:block;}
@@ -10925,7 +10921,8 @@ function rqVistaTarjetas(cont, filas){
   const soloFalta = typeof APP !== 'undefined' && APP.vista === 'supervisor';
   const listos = soloFalta ? todo.filter(rqItemListo) : [];
   const orden = soloFalta ? todo.filter(function(r){ return !rqItemListo(r); }) : todo;
-  const ver = orden.slice(0, RQ.tope);
+  // En el celular las tarjetas pesan: de 30 en 30 (cada "ver más" suma otras 30).
+  const ver = orden.slice(0, Math.round(RQ.tope / RQ_PASO * 30));
   const reqs = [...new Set(todo.map(function(r){ return r.codRequerimiento; }))];
   const unSoloReq = reqs.length === 1;
   const pryUnico = !unSoloReq && todo.length && todo.every(function(r){ return r.idProyecto === todo[0].idProyecto; });
@@ -10943,7 +10940,7 @@ function rqVistaTarjetas(cont, filas){
       <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>${faltaTxt}
     </div>` : '');
 
-  const listosVer = listos.slice(0, 300);
+  const listosVer = listos.slice(0, 60);
   RQ.tarjetas = ver.concat(listosVer);
   const tarjeta = function(r, iTarjeta){
     const refRecep = r.cantPedido != null ? r.cantPedido : r.cantOrden;
@@ -10972,12 +10969,19 @@ function rqVistaTarjetas(cont, filas){
   };
   const tarjetas = ver.map(tarjeta).join('');
 
-  // Lo que ya llegó: plegado, pero con la misma tarjeta y los mismos círculos de arriba (29.09.2026, Piero).
-  const listosHtml = listos.length ? `<details class="rqm-listos"><summary>✅ Ya llegó a obra · ${listos.length} ítem${listos.length === 1 ? '' : 's'}</summary>
-      ${listosVer.map(function(r, k){ return tarjeta(r, ver.length + k); }).join('')}</details>` : '';
+  // Lo que ya se envió: plegado, con la misma tarjeta y los mismos círculos de arriba (29.09.2026, Piero).
+  // Las tarjetas se arman recién al abrirlo, para que buscar no se ponga lento.
+  const listosHtml = listos.length ? `<details class="rqm-listos" id="rqListos"><summary>✅ Ya se envió a obra · ${listos.length} ítem${listos.length === 1 ? '' : 's'}</summary><div></div></details>` : '';
   const nada = soloFalta && !orden.length ? '<div class="rqm-tip">✅ No falta nada: todo lo pedido ya llegó a obra.</div>' : '';
-  cont.innerHTML = `<div class="rqm">${cab}${orden.length ? '' : nada}${tarjetas}${listosHtml}</div>` + rqMasHtml(ver.length, orden.length, soloFalta ? 'ítems por llegar' : 'ítems');
+  cont.innerHTML = `<div class="rqm">${cab}${orden.length ? '' : nada}${tarjetas}${listosHtml}</div>` + rqMasHtml(ver.length, orden.length, soloFalta ? 'ítems por llegar' : 'ítems', 30);
   rqEngancharMas();
+  const det = document.getElementById('rqListos');
+  if(det) det.addEventListener('toggle', function(){
+    if(!det.open || det.dataset.listo) return;
+    det.dataset.listo = '1';
+    det.lastElementChild.innerHTML = listosVer.map(function(r, k){ return tarjeta(r, ver.length + k); }).join('')
+      + (listos.length > listosVer.length ? `<div class="rqm-tip">…y ${listos.length - listosVer.length} ítems más. Busca el N° de requerimiento para verlos.</div>` : '');
+  });
   if(!cont.dataset.pasos){
     cont.dataset.pasos = '1';
     cont.addEventListener('click', function(e){
@@ -11061,9 +11065,9 @@ function rqVistaItem(cont, filas){
   rqEngancharMas();
 }
 
-function rqMasHtml(mostradas, total, que){
+function rqMasHtml(mostradas, total, que, paso){
   if(mostradas >= total) return total ? `<div class="rq-mas" style="color:var(--muted);font-size:12.5px;">${total.toLocaleString('es-PE')} ${que} · todo a la vista</div>` : '';
-  return `<div class="rq-mas"><button class="btn secondary" type="button" id="rqMas">Ver ${Math.min(RQ_PASO, total-mostradas)} más · ${mostradas.toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} ${que}</button></div>`;
+  return `<div class="rq-mas"><button class="btn secondary" type="button" id="rqMas">Ver ${Math.min(paso || RQ_PASO, total-mostradas)} más · ${mostradas.toLocaleString('es-PE')} de ${total.toLocaleString('es-PE')} ${que}</button></div>`;
 }
 function rqEngancharMas(){
   const b = document.getElementById('rqMas');
@@ -11145,8 +11149,14 @@ function rqLibroExcel(filas, wb){
 ['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].forEach(function(id){
   document.getElementById(id).addEventListener('change', function(){ RQ.tope = RQ_PASO; drawRequerimientos(); });
 });
+// Se espera a que deje de escribir (29.09.2026, Piero: "se pone lenta a medida que escribo números"):
+// con cada número se volvía a dibujar todo lo que calzaba con "2", "23", "233"…
+let rqBuscarEspera = null;
 document.getElementById('rqBuscar').addEventListener('input', function(e){
-  RQ.q = crtNorm(e.target.value.trim()); RQ.tope = RQ_PASO; drawRequerimientos();
+  const v = e.target.value, ir = function(){ RQ.q = crtNorm(v.trim()); RQ.tope = RQ_PASO; drawRequerimientos(); };
+  clearTimeout(rqBuscarEspera);
+  if(!e.isTrusted) return ir();                       // búsquedas que arma la propia app (Inicio, Polar)
+  rqBuscarEspera = setTimeout(ir, 280);
 });
 document.getElementById('rqLimpiar').addEventListener('click', function(){
   document.getElementById('rqBuscar').value = ''; RQ.q = '';
@@ -12107,8 +12117,10 @@ function appNecesitaClave(){
   try{ return sessionStorage.getItem(APP_SESION) !== '1'; }catch(err){ return true; }
 }
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
-const APP_CORREOS_GERENCIA = ['plinares@friopacking.pe'];
-const APP_CORREOS_LOGISTICA = CRT_COPIA_FIJA.slice();   // el equipo de Compras y Logística
+// Respaldo copiado de la DB Supervisores del 29.09.2026 (columna Acceso), para que Gerencia y Logística se
+// reconozcan aunque el link publicado todavía no traiga la base.
+const APP_CORREOS_GERENCIA = ['plinares@friopacking.pe', 'mlujan@grupofriopacking.pe', 'apl@grupofriopacking.pe', 'aflores@friopacking.pe'];
+const APP_CORREOS_LOGISTICA = CRT_COPIA_FIJA.concat(['jcenteno@friopacking.pe']);   // Compras y Logística
 function appUsuarioDe(correo){ return String(correo || '').trim().toLowerCase().split('@')[0]; }
 function appCorreoValido(correo){
   const m = String(correo || '').trim().toLowerCase().match(/^[a-z0-9._%+-]+@([a-z0-9.-]+)$/);
@@ -12461,42 +12473,15 @@ function appAvanceHtml(){
 
 // ---------- Inicio: Supervisor ----------
 function appInicioSupervisor(){
-  rqPreparar();
-  // Sin caja para escribir arriba (29.09.2026, Piero: "quita la parte de arriba donde se escribe; que vaya
-  // una bienvenida al supervisor"). Buscar por N° o proyecto queda en Mis req., y Polar en la barra de abajo.
-  // Sin los contadores ni "Lo que todavía falta": en su lugar, en gráficos, el estado de atención de los
-  // proyectos según la trazabilidad de cada ítem (29.09.2026, Piero). Mismo cálculo que Avance de Gerencia.
-  const pry = appAvanceProyectos();
-  const n = pry.reduce(function(a, y){ return a + y.n; }, 0), suma = pry.reduce(function(a, y){ return a + y.suma; }, 0);
-  const g = n ? Math.round(suma / n * 100) : 0;
-  const conPend = pry.filter(function(y){ return y.faltan > 0; })
-    .sort(function(a,b){ return (a.pct - b.pct) || ((a.masViejo || 0) - (b.masViejo || 0)); });
-  const ver = APP.supTodos ? conPend : conPend.slice(0, 8);
-  const est = {};
-  pry.forEach(function(y){ Object.keys(y.estFalta).forEach(function(k){ est[k] = (est[k] || 0) + y.estFalta[k]; }); });
-  const faltan = Object.keys(est).reduce(function(a, k){ return a + est[k]; }, 0);
-  const etapas = APP_ESTADOS.filter(function(e){ return est[e[0]]; });
+  // Solo la bienvenida (29.09.2026, Piero): sin caja para escribir, sin contadores, sin "Lo que todavía
+  // falta" y sin el gráfico de atención de proyectos ("siento que está de más"). Buscar va en Mis req. y
+  // preguntar, en Polar (barra de abajo).
   return `<div class="ini-card sup-bienv">
       <div class="sup-bienv-top"><img src="${POLAR_AVATAR}" alt=""><div><b>¡Bienvenido!</b><span>Aquí sigues cómo va todo lo que pediste para tus obras, paso a paso.</span></div></div>
       <div class="sup-guia">
         <button type="button" data-ir="requerimientos"><i>📋</i><span><b>Mis req.</b><small>Busca por N° de requerimiento o por proyecto y mira qué falta.</small></span></button>
         <button type="button" data-q=""><i><img src="${POLAR_AVATAR}" alt=""></i><span><b>Polar</b><small>Pregúntale: "¿qué me falta del 23303?", "¿cómo va el proyecto 36?"</small></span></button>
       </div>
-    </div>
-    <div class="ini-card"><div class="ini-card-tit">📈 Estado de atención de los proyectos</div>
-      <div class="av-global">
-        <div class="av-anillo ${appAvanceClase(g)}" style="--p:${g}"><b>${g}%</b><small>atendido</small></div>
-        <div class="av-num"><div><b>${pry.length - conPend.length}</b><span>de ${pry.length} proyectos atendidos al 100%</span></div></div>
-      </div>
-      ${faltan ? `<div class="sup-sub">Dónde está lo que falta</div>
-        ${etapas.map(function(e){ const p = est[e[0]] / faltan * 100;
-          return `<div class="ini-bar"><span>${e[1]}</span><i><em class="${rqClaseEstado(e[0])}" style="width:${p.toFixed(1)}%"></em></i><b>${est[e[0]]}</b></div>`; }).join('')}` : ''}
-      ${conPend.length ? `<div class="sup-sub">Proyectos con pendientes <small>(los más atrasados primero)</small></div>
-        ${ver.map(function(y){ const p = Math.round(y.pct);
-          return `<button type="button" class="ini-bar sup-pry" data-pry="${escapeHtml(y.id)}"><span>${escapeHtml(polarCorta(y.nombre, 40))}</span><i><em class="${appAvanceClase(p)}" style="width:${p}%"></em></i><b>${p}%</b></button>`; }).join('')}
-        ${conPend.length > 8 ? `<button type="button" class="ini-link" data-av="suptodos">${APP.supTodos ? 'Ver menos ‹' : 'Ver los ' + conPend.length + ' proyectos ›'}</button>` : ''}`
-        : '<div class="ini-vacio">✅ Todos los proyectos están atendidos.</div>'}
-      <div class="av-nota">El % sale de la trazabilidad de cada ítem (Req. → Compras → OC → Almacén → Salida → Obra). Toca un proyecto para ver sus requerimientos.</div>
     </div>`;
 }
 
@@ -12650,7 +12635,6 @@ function appClickInicio(e){
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.req) return appAbrirReq(b.dataset.req);
   if(b.dataset.pry) return appAbrirProyecto(b.dataset.pry);
-  if(b.dataset.av === 'suptodos'){ APP.supTodos = !APP.supTodos; return appRenderInicio(); }
   if(b.dataset.av === 'todos'){ APP.avTodos = !APP.avTodos; APP.avTope = 25; return appRenderInicio(); }
   if(b.dataset.av === 'mas'){ APP.avTope += 25; const l = document.getElementById('avLista'); if(l) l.innerHTML = appAvanceLista(); return; }
   if(b.dataset.inv) return appAbrirInv(b.dataset.inv);
