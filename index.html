@@ -2197,7 +2197,7 @@ function buildSnapshot(){
         // null/"" (no hay valor "por defecto" engañoso posible aquí, a diferencia de "rp").
         mn: r.moneda, mo: r.montoNativo==null?null:Math.round(r.montoNativo*100)/100, cd: r.condiciones,
         et: isoDay(r.etd), fe: isoDay(r.fEntregaReal), fer: isoDay(r.fEntregaRef),
-        qo2: r.cantidadOrden, qr2: r.cantRecepcion, um: r.unidad,
+        qo2: r.cantidadOrden, qr2: r.cantRecepcion, um: r.unidad, eo: r.estadoOrden || '',
       })),
       // Alertas de atención (Req sin Pedido / Pedido sin OC) — se publican aparte porque son casos SIN
       // fecha final (siguen abiertos), y "proceso.rows" de arriba solo contiene casos con al menos un
@@ -2230,7 +2230,7 @@ function buildSnapshot(){
         d2: r.d2, d3: r.d3, d4: r.d4, d4c: r.d4cumple,
         mn: r.moneda, mo: r.montoNativo==null?null:Math.round(r.montoNativo*100)/100, cd: r.condiciones,
         // 29.09.2026: proveedor, cantidades y unidad para el panel de "en tránsito" del Análisis de Inventario.
-        pv: r.proveedor || '', qo: r.cantidadOrden, qr: r.cantRecepcion, um: r.unidad || '',
+        pv: r.proveedor || '', qo: r.cantidadOrden, qr: r.cantRecepcion, um: r.unidad || '', eo: r.estadoOrden || '',
       })),
     },
     // gastoSchemaVersion sube a 4 el 03.09.2026: se agrega "no" (montoNativo, el monto real en la
@@ -2492,6 +2492,7 @@ function loadFromSnapshot(snap){
       moneda: r.mn || null, montoNativo: (r.mo!=null ? r.mo : null), condiciones: r.cd || "",
       etd: fromIsoDay(r.et), fEntregaReal: fromIsoDay(r.fe), fEntregaRef: fromIsoDay(r.fer),
       cantidadOrden: (r.qo2!=null ? r.qo2 : null), cantRecepcion: (r.qr2!=null ? r.qr2 : null), unidad: r.um || '',
+      estadoOrden: r.eo || '',
     })) : [],
     // Requerimientos (24.09.2026): ausente en snapshots viejos — el módulo avisa que hay que
     // volver a publicar, en vez de mostrar una lista vacía como si no hubiera requerimientos.
@@ -2523,7 +2524,7 @@ function loadFromSnapshot(snap){
   // CodOrden (no se publica aparte: es una función pura del código, ver origenForDocumento).
   PEDIDO_SIN_REQ_ROWS = (snap.proceso && snap.proceso.pedidoDirecto) ? snap.proceso.pedidoDirecto.map(r => ({
     proyecto: "SIN PROYECTO (compra de almacén)", producto: r.pr, idProducto: r.ip, familia: r.fa || 'Sin familia',
-    proveedor: r.pv || "", cantidadOrden: (r.qo != null ? r.qo : null), cantRecepcion: (r.qr != null ? r.qr : null), unidad: r.um || "",
+    proveedor: r.pv || "", cantidadOrden: (r.qo != null ? r.qo : null), cantRecepcion: (r.qr != null ? r.qr : null), unidad: r.um || "", estadoOrden: r.eo || "",
     origen: origenForDocumento(r.co), responsablePedido: r.rp || "", usuarioCompras: r.uc,
     responsableSalida: "", codRequerimiento: "", codPedido: r.cp, codOrden: r.co, camino: 'compra',
     fReq: null, fPedido: fromIsoDay(r.fp), fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb), fRecep: fromIsoDay(r.fc), fSalida: null, fCompromiso: fromIsoDay(r.fx),
@@ -2812,6 +2813,7 @@ function processWorkbook(wb, filename){
     etd: findCol(headerRow, ["ETD"]),
     fEntregaReal: findCol(headerRow, ["F. Entrega Real","F Entrega Real"]),
     fEntregaRef: findCol(headerRow, ["F. Entrega Ref","F Entrega Ref"]),
+    estadoOrden: findCol(headerRow, ["EstadoOrden"]),
     // Columnas que solo necesita el módulo de Requerimientos (24.09.2026).
     unidadMedida: findCol(headerRow, ["UnidadMedida","Unidad de Medida","Unidad"]),
     cantidadReq: findCol(headerRow, ["CantidadRequerimiento","Cantidad de requerimiento"]),
@@ -3126,6 +3128,7 @@ function processWorkbook(wb, filename){
         // Fecha de entrega que referenció el proveedor (29.09.2026) — punto intermedio de la
         // trazabilidad de una importación, entre la OC y la entrega real del proveedor.
         fEntregaRef: col.fEntregaRef!==-1 ? parseExcelDate(r[col.fEntregaRef]) : null,
+        estadoOrden: col.estadoOrden!==-1 ? (r[col.estadoOrden]||"").toString().trim() : "",
         cantRecepcion: (col.cantRecepcion!==-1 && String(r[col.cantRecepcion]||'').trim()!=='' && !isNaN(Number(String(r[col.cantRecepcion]).trim()))) ? Number(String(r[col.cantRecepcion]).trim()) : null,
         unidad: col.unidadMedida!==-1 ? (r[col.unidadMedida]||"").toString().trim() : "",
       });
@@ -3200,6 +3203,7 @@ function processPedidoSinReq(wb, filename){
     nombreProveedor: findCol(headerRow, ["NombreProveedor"]),
     cantRecepcion: findCol(headerRow, ["CantRecepcion"]),
     medida: findCol(headerRow, ["Medida","UnidadMedida"]),
+    estadoOrden: findCol(headerRow, ["EstadoOrden"]),
   };
   const dataRows = rows.slice(headerRowIdx+1);
   const map = {};
@@ -3269,6 +3273,7 @@ function processPedidoSinReq(wb, filename){
       // Nisira ya atendió pero que dejó la FechaRecepcion en "#N/A" (29.09.2026).
       cantRecepcion: cifraOnull(col.cantRecepcion!==-1 ? r[col.cantRecepcion] : null),
       unidad: sinBasura(col.medida!==-1 ? r[col.medida] : ""),
+      estadoOrden: sinBasura(col.estadoOrden!==-1 ? r[col.estadoOrden] : ""),
       condiciones: col.condiciones!==-1 ? (r[col.condiciones]||"").toString().trim() : "",
       etd: null, fEntregaReal: null,
       // Marca para poder distinguir estas filas en el detalle si hiciera falta más adelante.
@@ -10608,6 +10613,9 @@ function trTransitoDe(codigo, codigos){
   rows.forEach(function(r){
     if(!r.codOrden || todos.indexOf(r.idProducto) === -1) return;
     if(r.fRecep || (r.cantRecepcion != null && r.cantRecepcion > 0)) return;  // ya llegó
+    // Una OC cerrada no viene en camino aunque Nisira no haya llenado la recepción (29.09.2026, Piero:
+    // "si la OC sale como Atendido Completo por qué lo jala como en tránsito"); una anulada, tampoco.
+    if(/^(atendido completo|anulad)/.test(String(r.estadoOrden || '').trim().toLowerCase())) return;
     const y = porOC.get(r.codOrden);
     if(!y){
       porOC.set(r.codOrden, { oc:r.codOrden, proveedor:r.proveedor, origen:r.origen, unidad:r.unidad || '',
