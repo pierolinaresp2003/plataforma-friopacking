@@ -572,7 +572,12 @@
   .rqm-top .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;font-weight:800;color:var(--brand-ink);}
   .rqm-desc{margin-top:4px;font-size:13px;line-height:1.35;color:var(--ink);}
   .rqm-pasos{margin-top:12px;display:grid;grid-template-columns:repeat(6,1fr);position:relative;}
-  .rqm-paso{display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;min-width:0;}
+  .rqm-paso{display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;min-width:0;background:none;border:0;padding:0;
+    cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
+  .rqm-paso.sel i{outline:3px solid var(--brand-ink);outline-offset:2px;}
+  .rqm-sit.detalle{background:var(--card);border:1px solid var(--border);border-left-width:4px;}
+  .rqm-sit small.volver{color:var(--muted);font-style:italic;margin-top:5px;}
+  .rqm-tip{font-size:11.5px;color:var(--ink-soft);background:var(--surface-2);border-radius:10px;padding:8px 11px;margin:10px 0;}
   .rqm-paso + .rqm-paso::before{content:"";position:absolute;top:15px;right:calc(50% + 16px);width:calc(100% - 32px);height:3px;border-radius:3px;background:var(--border);}
   .rqm-paso.ok::before,.rqm-paso.act::before{background:var(--green);}
   .rqm-paso.salto::before{background:repeating-linear-gradient(90deg,var(--border) 0 4px,transparent 4px 8px);}
@@ -10758,6 +10763,60 @@ function rqSituacion(r){
   if(e === 'Archivado') return { ico:'🗄️', cls:'fuera', titulo:'Archivado', detalle:'Se anuló o se cerró sin atender' };
   return { ico:'•', cls:'', titulo:e || '—', detalle:'' };
 }
+// Resumen de lo que pasó en UN paso, al tocar su ícono (29.09.2026, Piero: "si le doy click al ícono
+// de req, compras, oc, almacén o salida, que salga el detalle aunque ya haya pasado"). Por defecto
+// la tarjeta sigue mostrando el estado actual (rqSituacion); esto solo se ve al tocar un paso.
+function rqPasoDetalle(r, j){
+  const n = (v)=> v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
+  const um = r.unidad ? ' ' + r.unidad : '';
+  const directo = r.via === 'Directo';
+  const lin = function(){ return [].slice.call(arguments).filter(Boolean); };
+  if(j === 0) return { ico:'📝', cls:'ok', titulo:'Requerimiento ' + r.codRequerimiento,
+    lineas: lin(r.fReq ? 'Pedido el ' + rqFecha(r.fReq) + (r.responsable ? ' por ' + r.responsable : '') : '', 'Cantidad pedida: ' + n(r.cantidad) + um,
+      r.estadoCalc === 'En Revisión' ? 'En revisión de almacén ' + rqHace(r.fReq) : '') };
+  if(j === 1){
+    if(directo) return { ico:'🛒', cls:'', titulo:'No pasó por Compras', lineas:['Se atendió directo del stock del almacén.'] };
+    if(!r.codPedido) return { ico:'🛒', cls:'espera', titulo:'Todavía no pasa a Compras', lineas:['El almacén aún está revisando si sale de stock o se compra.'] };
+    return { ico:'🛒', cls:'ok', titulo:'Pasó a Compras' + (r.fPedido ? ' el ' + rqFecha(r.fPedido) : ''),
+      lineas: lin('Pedido ' + r.codPedido + (r.cantPedido != null ? ' · ' + n(r.cantPedido) + um : ''), r.responsablePedido ? 'Lo recibió ' + r.responsablePedido : '',
+        !r.codOrden && r.fPedido ? 'Sin OC todavía, ' + rqHace(r.fPedido) : '') };
+  }
+  if(j === 2){
+    if(directo) return { ico:'🧾', cls:'', titulo:'No necesitó orden de compra', lineas:['Se atendió directo del stock del almacén.'] };
+    if(!r.codOrden) return { ico:'🧾', cls:'espera', titulo:'Todavía sin orden de compra', lineas: lin(r.codPedido ? 'Compras está cotizando el pedido ' + r.codPedido + (r.fPedido ? ' (' + rqHace(r.fPedido) + ')' : '') : '') };
+    return { ico:'🧾', cls:'ok', titulo:'OC ' + r.codOrden + (r.ocsExtra ? ' · ' + r.ocsExtra.join(' · ') : ''),
+      lineas: lin(r.proveedor ? 'Proveedor: ' + r.proveedor + (r.origen === 'importado' ? ' (importación)' : '') : '',
+        r.fOrden ? 'Emitida el ' + rqFecha(r.fOrden) + (r.usuarioCompras ? ' por ' + (PD_PERSONAS[r.usuarioCompras] || r.usuarioCompras) : '') : '', r.fAprob ? 'Aprobada el ' + rqFecha(r.fAprob) : 'Pendiente de aprobación',
+        r.fCompromiso ? 'Entrega pactada: ' + rqFecha(r.fCompromiso) : '', r.cantOrden != null ? 'Cantidad en la OC: ' + n(r.cantOrden) + um : '') };
+  }
+  if(j === 3){
+    if(directo) return { ico:'🏬', cls:'ok', titulo:'Salió del stock del almacén', lineas: lin(r.fSalida ? 'Se despachó el ' + rqFecha(r.fSalida) : '') };
+    const llego = (r.cantRecep != null && r.cantRecep > 0) || r.fRecep;
+    if(!llego) return { ico:'🏬', cls:'espera', titulo:'Todavía no llega al almacén', lineas: lin(r.fCompromiso ? 'Llegada aprox.: ' + rqFecha(r.fCompromiso) : '') };
+    return { ico:'🏬', cls:'ok', titulo:'Llegó al almacén' + (r.fRecep ? ' el ' + rqFecha(r.fRecep) : ''),
+      lineas: lin('Cantidad recibida: ' + n(r.cantRecep) + um, r.guia ? 'Guía del proveedor: ' + r.guia : '', r.factura ? 'Factura: ' + r.factura : '') };
+  }
+  if(j === 4){
+    if(!r.fSalida) return { ico:'🚚', cls:'espera', titulo:'Todavía no sale del almacén', lineas: lin((r.cantRecep > 0 || r.fRecep) ? 'Ya está en almacén, por despachar.' : '') };
+    const falta = (r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0) ? 'Faltan ' + n(Math.round((r.cantidad - r.cantSalida) * 100) / 100) + um + ' por despachar' : '';
+    return { ico:'🚚', cls:'ok', titulo:'Salió a obra el ' + rqFecha(r.fSalida), lineas: lin('Cantidad despachada: ' + n(r.cantSalida) + um, r.docSalida ? 'Guía de salida: ' + r.docSalida : '', falta) };
+  }
+  const enObra = r.fObra || (r.cantObra != null && r.cantObra > 0);
+  if(!enObra) return { ico:'🏗️', cls:'espera', titulo:'Todavía no se confirma en obra', lineas: lin(r.fSalida ? 'Salió el ' + rqFecha(r.fSalida) + ': falta que obra registre la recepción.' : '') };
+  return { ico:'🏗️', cls:'ok', titulo:'Recibido en obra' + (r.fObra ? ' el ' + rqFecha(r.fObra) : ''), lineas: lin('Cantidad recibida: ' + n(r.cantObra) + um, r.docObra ? 'Guía: ' + r.docObra : '') };
+}
+function rqSitHtml(r, j){
+  if(j == null){
+    const sit = rqSituacion(r);
+    return `<span class="ic">${sit.ico}</span><div><b>${escapeHtml(sit.titulo)}</b>${sit.detalle ? `<small>${escapeHtml(sit.detalle)}</small>` : ''}
+      ${r.via === 'Directo' ? '<small class="dir">Atendido del stock del almacén: no pasó por Compras.</small>' : ''}</div>`;
+  }
+  const d = rqPasoDetalle(r, j);
+  return `<span class="ic">${d.ico}</span><div><b>${escapeHtml(d.titulo)}</b>${d.lineas.map(function(l){ return '<small>' + escapeHtml(l) + '</small>'; }).join('')}
+    <small class="volver">Toca de nuevo el ícono para ver el estado actual</small></div>`;
+}
+function rqClaseSit(r, j){ return j == null ? rqSituacion(r).cls : (rqPasoDetalle(r, j).cls || '') + ' detalle'; }
+
 // Pasos con ícono. Si salió directo del stock, Compras y OC no aplican: se ven tachados, no pendientes.
 const RQ_PASOS_ICO = [['📝','Req.'], ['🛒','Compras'], ['🧾','OC'], ['🏬','Almacén'], ['🚚','Salida'], ['🏗️','Obra']];
 function rqPasosHtml(r){
@@ -10773,7 +10832,7 @@ function rqPasosHtml(r){
     let cls = salto ? 'salto' : (ok ? 'ok' : '');
     if(j === 0 && r.estadoCalc === 'En Revisión') cls = 'act';
     if(!salto && !ok && !actual && r.estadoCalc !== 'Archivado'){ cls = 'act'; actual = true; }
-    return `<div class="rqm-paso ${cls}"><i>${RQ_PASOS_ICO[j][0]}</i><span>${salto ? 'No aplica' : RQ_PASOS_ICO[j][1]}</span></div>`;
+    return `<button type="button" class="rqm-paso ${cls}" data-paso="${j}" aria-label="Ver el detalle de ${RQ_PASOS_ICO[j][1]}"><i>${RQ_PASOS_ICO[j][0]}</i><span>${salto ? 'No aplica' : RQ_PASOS_ICO[j][1]}</span></button>`;
   }).join('') + '</div>';
 }
 
@@ -10791,16 +10850,17 @@ function rqVistaTarjetas(cont, filas){
       <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>
       <div class="rqm-resp">Pidió <b>${rqTxt(r0.responsable)}</b> · ${orden.length} ítem${orden.length === 1 ? '' : 's'}</div>
     </div>` : '';
+  const tip = '<div class="rqm-tip">👆 Toca un paso (📝 🛒 🧾 🏬 🚚 🏗️) para ver qué pasó en cada uno.</div>';
 
-  const tarjetas = ver.map(function(r){
-    const sit = rqSituacion(r);
+  RQ.tarjetas = ver;
+  const tarjetas = ver.map(function(r, iTarjeta){
     const refRecep = r.cantPedido != null ? r.cantPedido : r.cantOrden;
     const docs = [
       r.codOrden ? 'OC ' + escapeHtml(r.codOrden) + (r.ocsExtra ? ' · ' + r.ocsExtra.map(escapeHtml).join(' · ') : '') : '',
       r.docSalida ? 'Salida ' + escapeHtml(r.docSalida) + (r.fSalida ? ' · ' + rqFecha(r.fSalida) : '') : '',
       r.docObra ? 'Obra ' + escapeHtml(r.docObra) + (r.fObra ? ' · ' + rqFecha(r.fObra) : '') : '',
     ].filter(Boolean);
-    return `<div class="rqm-card">
+    return `<div class="rqm-card" data-i="${iTarjeta}">
       ${unSoloReq ? '' : `<div class="rqm-req"><span class="rqm-num">${escapeHtml(r.codRequerimiento)}</span> · ${rqFecha(r.fReq)} · ${rqTxt(r.proyecto)}</div>`}
       <div class="rqm-top">
         <button type="button" class="cod rq-cod" data-rqstock="${escapeHtml(r.idProducto)}" data-rqreq="${escapeHtml(r.codRequerimiento)}">${escapeHtml(r.idProducto)}</button>
@@ -10808,8 +10868,7 @@ function rqVistaTarjetas(cont, filas){
       </div>
       <div class="rqm-desc">${rqTxt(r.producto)}</div>
       ${rqPasosHtml(r)}
-      <div class="rqm-sit ${sit.cls}"><span class="ic">${sit.ico}</span><div><b>${escapeHtml(sit.titulo)}</b>${sit.detalle ? `<small>${escapeHtml(sit.detalle)}</small>` : ''}
-        ${r.via === 'Directo' ? '<small class="dir">Atendido del stock del almacén: no pasó por Compras.</small>' : ''}</div></div>
+      <div class="rqm-sit ${rqClaseSit(r)}">${rqSitHtml(r)}</div>
       <div class="rqm-cants">
         <div><span>Pidió</span><b>${n(r.cantidad)}</b><em>${rqTxt(r.unidad)}</em></div>
         <div><span>Llegó</span><b>${rqCant(r.cantRecep, refRecep)}</b></div>
@@ -10820,8 +10879,21 @@ function rqVistaTarjetas(cont, filas){
     </div>`;
   }).join('');
 
-  cont.innerHTML = `<div class="rqm">${cab}${tarjetas}</div>` + rqMasHtml(ver.length, orden.length, 'ítems');
+  cont.innerHTML = `<div class="rqm">${cab}${tip}${tarjetas}</div>` + rqMasHtml(ver.length, orden.length, 'ítems');
   rqEngancharMas();
+  if(!cont.dataset.pasos){
+    cont.dataset.pasos = '1';
+    cont.addEventListener('click', function(e){
+      const b = e.target.closest('.rqm-paso'); if(!b) return;
+      const card = b.closest('.rqm-card'), r = RQ.tarjetas && RQ.tarjetas[Number(card.dataset.i)]; if(!r) return;
+      const j = Number(b.dataset.paso), yaEstaba = b.classList.contains('sel');
+      card.querySelectorAll('.rqm-paso.sel').forEach(function(x){ x.classList.remove('sel'); });
+      const caja = card.querySelector('.rqm-sit');
+      if(yaEstaba){ caja.className = 'rqm-sit ' + rqClaseSit(r); caja.innerHTML = rqSitHtml(r); return; }
+      b.classList.add('sel');
+      caja.className = 'rqm-sit ' + rqClaseSit(r, j); caja.innerHTML = rqSitHtml(r, j);
+    });
+  }
 }
 
 function rqVistaItem(cont, filas){
@@ -11906,7 +11978,9 @@ const APP_VISTAS = {
     tabs:[['inicio','🏠','Inicio'], ['proceso','⏱️','Indicadores'], ['polar'], ['gasto','💰','Gasto'], ['vista','👥','Vista']] },
   supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
     // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
-    tabs:[['inicio','🏠','Inicio'], ['requerimientos','📋','Mis req.'], ['polar'], ['vista','👥','Vista']] },
+    // Solo Inicio y Mis req. (29.09.2026, Piero: "para el supervisor solo coloca inicio y mis req"). La vista
+    // se cambia desde el botón de arriba y a Polar se le pregunta desde la caja del Inicio.
+    tabs:[['inicio','🏠','Inicio'], ['requerimientos','📋','Mis req.']] },
   logistica:  { nombre:'Logística',  ico:'🚚', desc:'Ingresos, salidas, kardex y qué comprar para stock.',
     tabs:[['inicio','🏠','Inicio'], ['alertas','📦','Inventario'], ['polar'], ['pendientes','⏳','Pendientes'], ['vista','👥','Vista']] },
 };
@@ -11978,7 +12052,7 @@ function appBienvenida(){
     <h1>Plataforma de reportes</h1><p>¿Cómo quieres entrar?</p>
     ${Object.entries(APP_VISTAS).map(([k,v])=>`<button type="button" class="bv-op" data-vista="${k}">
       <span class="ic">${v.ico}</span><span class="tx"><b>${v.nombre}</b><small>${v.desc}</small></span><span class="fl">›</span></button>`).join('')}
-    <p class="bv-nota">Puedes cambiar de vista cuando quieras desde el botón 👥 Vista.</p></div>`;
+    <p class="bv-nota">Puedes cambiar de vista cuando quieras desde el botón de arriba a la derecha.</p></div>`;
   b.classList.add('abierto');
   b.onclick = function(e){ const o = e.target.closest('[data-vista]'); if(o) appElegirVista(o.dataset.vista); };
 }
