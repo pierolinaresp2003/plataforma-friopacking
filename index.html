@@ -930,6 +930,9 @@
     .ini-hola{margin:4px 2px 12px;}
     .ini-hola b{display:block;font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.3px;}
     .ini-hola span{font-size:13px;color:var(--ink-soft);}
+    /* Gerencia y Supervisor: el saludo con el nombre en grande y el título chico (29.09.2026, Piero). */
+    body.vista-gerencia .ini-hola span,body.vista-supervisor .ini-hola span{display:block;font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.3px;}
+    body.vista-gerencia .ini-hola b,body.vista-supervisor .ini-hola b{font-size:13px;font-weight:600;color:var(--ink-soft);letter-spacing:0;margin-top:2px;}
     .ini-pregunta{display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid var(--brand-2);border-radius:16px;
       padding:4px 6px 4px 14px;box-shadow:0 6px 18px rgba(62,198,172,.18);margin-bottom:10px;}
     .ini-pregunta .av{width:30px;height:30px;border-radius:50%;flex-shrink:0;margin-left:-6px;}
@@ -962,6 +965,9 @@
     .bv-lbl{display:block;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;opacity:.75;margin:14px 2px 7px;}
     .bv-inp{display:block;width:100%;box-sizing:border-box;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;
       border-radius:14px;padding:14px;font-size:16px;font-family:inherit;} .bv-inp::placeholder{color:rgba(255,255,255,.55);}
+    .bv-recordar{display:flex;align-items:center;gap:9px;margin:12px 2px 0;font-size:13.5px;font-weight:600;cursor:pointer;}
+    .bv-recordar input{width:20px;height:20px;accent-color:#3ec6ac;flex-shrink:0;margin:0;} .bv-recordar small{opacity:.65;font-weight:500;}
+    .bv-otro{display:block;width:100%;margin-top:10px;background:none;border:0;color:rgba(255,255,255,.75);font-size:13.5px;font-weight:700;padding:8px;cursor:pointer;font-family:inherit;text-decoration:underline;}
     .bv-acceso{margin:9px 2px 0;font-size:13.5px;color:#bff3e8;} .bv-acceso b{color:#3ec6ac;} .bv-acceso small{opacity:.75;}
     .bv-err{background:rgba(240,102,95,.2);border:1px solid rgba(240,102,95,.5);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:700;margin:12px 0 0;}
     .bv-entrar{display:block;width:100%;margin-top:18px;background:#3ec6ac;color:#06123f;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;}
@@ -1022,10 +1028,11 @@
     .sup-bienv-top{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
     .sup-bienv-top img{width:52px;height:52px;border-radius:50%;flex-shrink:0;}
     .sup-bienv-top b{display:block;font-size:17px;font-weight:800;color:var(--ink);} .sup-bienv-top span{font-size:12.5px;color:var(--ink-soft);line-height:1.35;}
-    .sup-num{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
-    .sup-num div{background:var(--surface-2);border-radius:12px;padding:10px;} .sup-num b{display:block;font-size:22px;font-weight:800;color:var(--amber-ink);}
-    .sup-num span{font-size:11.5px;font-weight:600;color:var(--ink-soft);}
     .sup-guia{display:grid;gap:8px;}
+    .sup-sub{font-size:12px;font-weight:800;color:var(--ink-soft);margin:14px 0 4px;} .sup-sub small{font-weight:600;color:var(--muted);}
+    .sup-pry{width:100%;background:none;border:0;color:var(--ink);cursor:pointer;font-family:inherit;text-align:left;}
+    .ini-bar em.ok{background:var(--brand-2);} .ini-bar em.late,.ini-bar em.camino{background:var(--amber);} .ini-bar em.warn,.ini-bar em.espera{background:var(--red);}
+    .ini-bar em.recibido{background:var(--brand-ink);}
     .sup-guia button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:1px solid var(--border);border-radius:12px;padding:10px 12px;
       text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);}
     .sup-guia i{font-style:normal;font-size:22px;width:32px;text-align:center;flex-shrink:0;} .sup-guia i img{width:32px;height:32px;border-radius:50%;display:block;}
@@ -12091,7 +12098,14 @@ const APP_ACCESO = { gerencia:['gerencia','logistica','supervisor'], logistica:[
 // clave de la app (APP_LLAVE). Se compara la parte antes de la @ (hay gente con los dos dominios). Las
 // dos listas de abajo solo se usan si el link publicado todavía no trae la base con la columna Acceso.
 // Clave de la app para Logística y Gerencia (29.09.2026, Piero). Va su huella, no la clave: fpHuella('…').
-const APP_LLAVE = 4057433394;
+const APP_LLAVE = 2843050290;
+// "Guardar mi acceso" (29.09.2026, Piero): Logística y Gerencia pueden marcarlo para no volver a poner la
+// clave en ese celular; si no lo marcan, se pide cada vez que se abre la app (vale solo esa sesión).
+const APP_SESION = 'fp_app_ok';
+function appNecesitaClave(){
+  if(!APP.usuario || APP.usuario.tipo === 'supervisor' || APP.usuario.recordar) return false;
+  try{ return sessionStorage.getItem(APP_SESION) !== '1'; }catch(err){ return true; }
+}
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
 const APP_CORREOS_GERENCIA = ['plinares@friopacking.pe'];
 const APP_CORREOS_LOGISTICA = CRT_COPIA_FIJA.slice();   // el equipo de Compras y Logística
@@ -12119,7 +12133,10 @@ try{
 }catch(err){}
 function appRevisarAcceso(){
   if(!SUPERVISOR_ROL || !APP.usuario) return;
-  if(!APP.usuario.nombre) APP.usuario.nombre = appNombrePorCorreo(APP.usuario.correo);
+  if(!APP.usuario.nombre){
+    APP.usuario.nombre = appNombrePorCorreo(APP.usuario.correo);
+    try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); }catch(err){}
+  }
   const t = appTipoPorCorreo(APP.usuario.correo);
   if(!t) return appCerrarUsuario();                 // ya no está en la base
   if(t === APP.usuario.tipo) return;
@@ -12127,11 +12144,12 @@ function appRevisarAcceso(){
   try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); }catch(err){}
   if(t !== 'gerencia'){ gerAbierto = false; try{ sessionStorage.removeItem(GER_SESION); }catch(err){} }
   APP.vista = t; try{ localStorage.setItem('fp-vista', t); }catch(err){}   // cambió su acceso: entra a su vista
+  if(appNecesitaClave()) appBienvenida(APP.usuario.correo);                // subió a Logística/Gerencia: clave
 }
 if(APP.usuario){
   if(APP_ACCESO[APP.usuario.tipo].indexOf(APP.vista) === -1) APP.vista = APP.usuario.tipo;
-  // Gerencia ya puso la clave al crear su usuario: en su celular no se le vuelve a pedir.
-  if(APP.usuario.tipo === 'gerencia' && RQ_MOVIL.matches){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(err){} }
+  // Gerencia con la clave ya puesta (acceso guardado o en esta sesión): no se le vuelve a pedir.
+  if(APP.usuario.tipo === 'gerencia' && RQ_MOVIL.matches && !appNecesitaClave()){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(err){} }
 } else APP.vista = null;
 function appVistasPermitidas(){ return APP.usuario ? APP_ACCESO[APP.usuario.tipo] : ['supervisor']; }
 
@@ -12198,12 +12216,14 @@ function appArrancar(){
   if(!RQ_MOVIL.matches) return;
   if(!APP.usuario || !APP.vista) return appBienvenida();
   appInicio();
+  if(appNecesitaClave()) appBienvenida(APP.usuario.correo);
 }
 
-function appBienvenida(){
+// Con correoFijo: el usuario ya existe en este celular y solo falta la clave (no guardó su acceso).
+function appBienvenida(correoFijo){
   const b = document.getElementById('appBienv');
   b.innerHTML = `<div class="bv-in"><img src="${appLogo()}" alt="Grupo Friopacking" class="bv-logo">
-    <h1>Plataforma de reportes</h1><p>Grupo Friopacking · crea tu usuario para entrar</p>
+    <h1>Plataforma de reportes</h1><p>Grupo Friopacking · ${correoFijo ? 'ingresa tu clave para entrar' : 'crea tu usuario para entrar'}</p>
     <form class="bv-form" id="bvForm" autocomplete="off">
       <label class="bv-lbl" for="bvCorreo">Correo corporativo</label>
       <input type="email" id="bvCorreo" class="bv-inp" placeholder="usuario@friopacking.pe" autocomplete="email" inputmode="email" autocapitalize="off" enterkeyhint="next">
@@ -12211,9 +12231,11 @@ function appBienvenida(){
       <div class="bv-clave" id="bvClave" hidden>
         <label class="bv-lbl" for="bvPass">Clave de acceso</label>
         <input type="password" id="bvPass" class="bv-inp" placeholder="Clave" autocomplete="off" enterkeyhint="go">
+        <label class="bv-recordar"><input type="checkbox" id="bvRecordar"> Guardar mi acceso en este celular <small>(no volver a pedir la clave)</small></label>
       </div>
       <p class="bv-err" id="bvErr" hidden></p>
       <button type="submit" class="bv-entrar">Entrar</button>
+      ${correoFijo ? '<button type="button" class="bv-otro" id="bvOtro">Usar otro correo</button>' : ''}
     </form>
     <p class="bv-nota">Tu correo define qué vistas puedes usar: los supervisores entran directo; Logística y Gerencia piden además la clave. El usuario queda guardado en este celular; para cambiarlo, usa el botón de arriba a la derecha → Cambiar de usuario.</p></div>`;
   b.classList.add('abierto');
@@ -12221,21 +12243,33 @@ function appBienvenida(){
   const err = function(t){ const e = document.getElementById('bvErr'); e.textContent = t; e.hidden = !t; };
   // Sin nombre (29.09.2026, Piero: "no es necesario colocar nombre y apellido"): sale de DB Supervisores.
   const correo = document.getElementById('bvCorreo');
+  // Si la base de accesos todavía no llegó con los datos, al que ya tiene usuario se le respeta su tipo.
+  const tipoDe = function(c){
+    c = String(c || '').trim().toLowerCase();
+    return (correoFijo && !SUPERVISOR_ROL && APP.usuario && APP.usuario.correo === c) ? APP.usuario.tipo : appTipoPorCorreo(c);
+  };
   correo.oninput = function(){
-    const t = appTipoPorCorreo(correo.value), a = document.getElementById('bvAcceso');
+    const t = tipoDe(correo.value), a = document.getElementById('bvAcceso');
     a.hidden = !t;
     if(t) a.innerHTML = `${APP_VISTAS[t].ico} Acceso: <b>${APP_VISTAS[t].nombre}</b>` + (APP_ACCESO[t].length > 1 ? ` <small>(también ${APP_ACCESO[t].slice(1).map(function(k){ return APP_VISTAS[k].nombre; }).join(' y ')})</small>` : '');
     document.getElementById('bvClave').hidden = !t || t === 'supervisor';
     err('');
   };
+  if(correoFijo){
+    correo.value = correoFijo; correo.readOnly = true; correo.oninput();
+    document.getElementById('bvRecordar').checked = !!(APP.usuario && APP.usuario.recordar);
+    document.getElementById('bvOtro').onclick = appCerrarUsuario;
+  }
   document.getElementById('bvForm').onsubmit = function(e){
     e.preventDefault();
-    const c = correo.value.trim().toLowerCase(), tipo = appTipoPorCorreo(c);
+    const c = correo.value.trim().toLowerCase(), tipo = tipoDe(c);
     if(!tipo) return err(appCorreoValido(c) ? 'Tu correo no está registrado en la plataforma. Pide a Logística que te agregue.' : 'Usa tu correo corporativo (@friopacking.pe o @grupofriopacking.pe).');
     const pass = document.getElementById('bvPass');
     if(tipo !== 'supervisor' && fpHuella(pass.value) !== APP_LLAVE){ pass.select(); return err('Clave incorrecta.'); }
-    APP.usuario = { correo:c, nombre:appNombrePorCorreo(c), tipo:tipo, creado:new Date().toISOString().slice(0, 10) };
-    try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); }catch(er){}
+    const recordar = tipo !== 'supervisor' && document.getElementById('bvRecordar').checked;
+    APP.usuario = { correo:c, nombre:appNombrePorCorreo(c) || (APP.usuario && APP.usuario.correo === c ? APP.usuario.nombre : ''), tipo:tipo, recordar:recordar,
+      creado:(APP.usuario && APP.usuario.correo === c && APP.usuario.creado) || new Date().toISOString().slice(0, 10) };
+    try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); if(tipo !== 'supervisor') sessionStorage.setItem(APP_SESION, '1'); }catch(er){}
     if(tipo === 'gerencia'){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(er){} }
     pass.value = '';
     appElegirVista(tipo);
@@ -12244,7 +12278,7 @@ function appBienvenida(){
 
 function appCerrarUsuario(){
   APP.usuario = null; APP.vista = null;
-  try{ localStorage.removeItem('fp-usuario'); localStorage.removeItem('fp-vista'); sessionStorage.removeItem(GER_SESION); }catch(err){}
+  try{ localStorage.removeItem('fp-usuario'); localStorage.removeItem('fp-vista'); sessionStorage.removeItem(GER_SESION); sessionStorage.removeItem(APP_SESION); }catch(err){}
   gerAbierto = false;
   appCerrarSheet();
   appBienvenida();
@@ -12339,8 +12373,8 @@ function appRenderInicio(){
     return;
   }
   cont.innerHTML = `<div class="ini-hola"><span>${appSaludo()} 👋</span><b>${escapeHtml(APP_VISTAS[v].nombre === 'Supervisor' ? '¿Cómo va lo que pediste?' : (v === 'gerencia' ? 'Resumen gerencial' : '¿Qué revisamos hoy?'))}</b></div>
-    <form class="ini-pregunta" data-form="polar"><img class="av" src="${POLAR_AVATAR}" alt=""><input type="text" name="q" placeholder="${ph}" enterkeyhint="search"><button type="submit" aria-label="Preguntar">➤</button></form>
-    <div class="ini-chips">${polarChips().map(c=>`<button type="button" data-q="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>
+    ${v === 'gerencia' ? '' : `<form class="ini-pregunta" data-form="polar"><img class="av" src="${POLAR_AVATAR}" alt=""><input type="text" name="q" placeholder="${ph}" enterkeyhint="search"><button type="submit" aria-label="Preguntar">➤</button></form>
+    <div class="ini-chips">${polarChips().map(c=>`<button type="button" data-q="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>`}
     ${cuerpo}
     ${corte ? `<div class="ini-datos">${corte}</div>` : ''}`;
 }
@@ -12430,24 +12464,40 @@ function appInicioSupervisor(){
   rqPreparar();
   // Sin caja para escribir arriba (29.09.2026, Piero: "quita la parte de arriba donde se escribe; que vaya
   // una bienvenida al supervisor"). Buscar por N° o proyecto queda en Mis req., y Polar en la barra de abajo.
-  const reqs = appResumenReqs(RQ.filas);
-  const conFaltas = reqs.filter(function(y){ return y.faltan > 0; });
-  const itemsFaltan = conFaltas.reduce(function(a, y){ return a + y.faltan; }, 0);
+  // Sin los contadores ni "Lo que todavía falta": en su lugar, en gráficos, el estado de atención de los
+  // proyectos según la trazabilidad de cada ítem (29.09.2026, Piero). Mismo cálculo que Avance de Gerencia.
+  const pry = appAvanceProyectos();
+  const n = pry.reduce(function(a, y){ return a + y.n; }, 0), suma = pry.reduce(function(a, y){ return a + y.suma; }, 0);
+  const g = n ? Math.round(suma / n * 100) : 0;
+  const conPend = pry.filter(function(y){ return y.faltan > 0; })
+    .sort(function(a,b){ return (a.pct - b.pct) || ((a.masViejo || 0) - (b.masViejo || 0)); });
+  const ver = APP.supTodos ? conPend : conPend.slice(0, 8);
+  const est = {};
+  pry.forEach(function(y){ Object.keys(y.estFalta).forEach(function(k){ est[k] = (est[k] || 0) + y.estFalta[k]; }); });
+  const faltan = Object.keys(est).reduce(function(a, k){ return a + est[k]; }, 0);
+  const etapas = APP_ESTADOS.filter(function(e){ return est[e[0]]; });
   return `<div class="ini-card sup-bienv">
       <div class="sup-bienv-top"><img src="${POLAR_AVATAR}" alt=""><div><b>¡Bienvenido!</b><span>Aquí sigues cómo va todo lo que pediste para tus obras, paso a paso.</span></div></div>
-      <div class="sup-num"><div><b>${conFaltas.length}</b><span>requerimientos con cosas por llegar</span></div><div><b>${itemsFaltan}</b><span>ítems todavía en camino</span></div></div>
       <div class="sup-guia">
         <button type="button" data-ir="requerimientos"><i>📋</i><span><b>Mis req.</b><small>Busca por N° de requerimiento o por proyecto y mira qué falta.</small></span></button>
         <button type="button" data-q=""><i><img src="${POLAR_AVATAR}" alt=""></i><span><b>Polar</b><small>Pregúntale: "¿qué me falta del 23303?", "¿cómo va el proyecto 36?"</small></span></button>
       </div>
     </div>
-    <div class="ini-card"><div class="ini-card-tit">⏳ Lo que todavía falta <small>(últimos requerimientos)</small></div>
-      ${conFaltas.length ? conFaltas.slice(0, 5).map(function(y){
-        return `<button type="button" class="ini-fila ini-req" data-req="${escapeHtml(y.cod)}">
-          <span class="t"><b class="mono">${escapeHtml(y.cod)}</b><small>${escapeHtml(y.proyecto || '')}</small></span>
-          <span class="q"><b>${y.faltan}</b><small>de ${y.n} por llegar</small></span>
-          <span class="e">${appChipsEstado(y.estFalta)}</span></button>`;
-      }).join('') : '<div class="ini-vacio">✅ No hay pendientes en los últimos requerimientos.</div>'}</div>`;
+    <div class="ini-card"><div class="ini-card-tit">📈 Estado de atención de los proyectos</div>
+      <div class="av-global">
+        <div class="av-anillo ${appAvanceClase(g)}" style="--p:${g}"><b>${g}%</b><small>atendido</small></div>
+        <div class="av-num"><div><b>${pry.length - conPend.length}</b><span>de ${pry.length} proyectos atendidos al 100%</span></div></div>
+      </div>
+      ${faltan ? `<div class="sup-sub">Dónde está lo que falta</div>
+        ${etapas.map(function(e){ const p = est[e[0]] / faltan * 100;
+          return `<div class="ini-bar"><span>${e[1]}</span><i><em class="${rqClaseEstado(e[0])}" style="width:${p.toFixed(1)}%"></em></i><b>${est[e[0]]}</b></div>`; }).join('')}` : ''}
+      ${conPend.length ? `<div class="sup-sub">Proyectos con pendientes <small>(los más atrasados primero)</small></div>
+        ${ver.map(function(y){ const p = Math.round(y.pct);
+          return `<button type="button" class="ini-bar sup-pry" data-pry="${escapeHtml(y.id)}"><span>${escapeHtml(polarCorta(y.nombre, 40))}</span><i><em class="${appAvanceClase(p)}" style="width:${p}%"></em></i><b>${p}%</b></button>`; }).join('')}
+        ${conPend.length > 8 ? `<button type="button" class="ini-link" data-av="suptodos">${APP.supTodos ? 'Ver menos ‹' : 'Ver los ' + conPend.length + ' proyectos ›'}</button>` : ''}`
+        : '<div class="ini-vacio">✅ Todos los proyectos están atendidos.</div>'}
+      <div class="av-nota">El % sale de la trazabilidad de cada ítem (Req. → Compras → OC → Almacén → Salida → Obra). Toca un proyecto para ver sus requerimientos.</div>
+    </div>`;
 }
 
 // Estado de cada cosa pedida, contado por requerimiento (29.09.2026, Piero: "ahí se debe tener el
@@ -12600,6 +12650,7 @@ function appClickInicio(e){
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.req) return appAbrirReq(b.dataset.req);
   if(b.dataset.pry) return appAbrirProyecto(b.dataset.pry);
+  if(b.dataset.av === 'suptodos'){ APP.supTodos = !APP.supTodos; return appRenderInicio(); }
   if(b.dataset.av === 'todos'){ APP.avTodos = !APP.avTodos; APP.avTope = 25; return appRenderInicio(); }
   if(b.dataset.av === 'mas'){ APP.avTope += 25; const l = document.getElementById('avLista'); if(l) l.innerHTML = appAvanceLista(); return; }
   if(b.dataset.inv) return appAbrirInv(b.dataset.inv);
