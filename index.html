@@ -857,6 +857,208 @@
     /* textos que quedaban por debajo de 11px, ilegibles en un celular */
     .report-badge,.crt-mini .t,.chip,.crt-quien,.crt-stock,.crt-lote,.bar-row .bar-pct{font-size:11.5px;}
   }
+
+  /* ===================================================================================
+     APP DEL CELULAR + ASISTENTE POLAR (29.09.2026, pedido de Piero: "que en el celular se
+     pueda consultar bien, como si fuera un app", con 3 enfoques —Gerencia, Consultas de
+     supervisores y Logística— y un asistente que apoye con las consultas).
+     Todo lo de "app-" vive solo debajo de 760 px: en la PC la plataforma se ve igual que antes.
+     El asistente (asis-) sí existe en los dos, en la PC como panel lateral.
+     =================================================================================== */
+  .app-top,.app-tabbar,.app-sheet-fondo,.app-bienv,#section-inicio{display:none;}
+  @media (max-width:760px){
+    .app-shell > .sidebar, .main > .topbar{display:none !important;}
+    body{padding-bottom:calc(74px + env(safe-area-inset-bottom));}
+    .content{padding:14px 14px 30px;}
+    .app-top{display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:60;
+      background:var(--brand);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
+      box-shadow:0 2px 10px rgba(10,30,100,.25);}
+    .app-top .app-logo{height:26px;width:auto;flex-shrink:0;}
+    .app-top .app-tit{flex:1;min-width:0;line-height:1.2;}
+    .app-top .app-tit b{display:block;font-size:15.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .app-top .app-tit span{display:block;font-size:11px;opacity:.7;font-weight:600;letter-spacing:.02em;}
+    .app-tabbar{display:grid;grid-template-columns:repeat(5,1fr);align-items:end;position:fixed;left:0;right:0;bottom:0;z-index:70;
+      background:var(--card);border-top:1px solid var(--border);padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      box-shadow:0 -4px 18px rgba(20,30,45,.08);}
+    .app-tabbar button{background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px;
+      font-size:10.5px;font-weight:700;padding:4px 0;cursor:pointer;font-family:inherit;}
+    .app-tabbar button .i{font-size:21px;line-height:1.1;filter:grayscale(1);opacity:.7;}
+    .app-tabbar button.on{color:var(--brand-ink);}
+    .app-tabbar button.on .i{filter:none;opacity:1;}
+    .app-tabbar button.polar .i{width:52px;height:52px;margin-top:-26px;border-radius:50%;display:grid;place-items:center;
+      background:linear-gradient(135deg,var(--brand),#1b3fa8 60%,var(--brand-2));color:#fff;font-size:24px;filter:none;opacity:1;
+      box-shadow:0 6px 16px rgba(10,30,100,.35);border:3px solid var(--card);}
+    .app-tabbar button.polar{color:var(--brand-ink);}
+    /* Hoja de acciones (lo que antes eran los íconos de la barra de arriba) */
+    .app-sheet-fondo{position:fixed;inset:0;background:rgba(10,20,40,.45);z-index:90;align-items:flex-end;}
+    .app-sheet-fondo.abierto{display:flex;}
+    .app-sheet{background:var(--card);width:100%;border-radius:18px 18px 0 0;padding:8px 16px calc(18px + env(safe-area-inset-bottom));}
+    .app-sheet .asa{width:40px;height:4px;border-radius:4px;background:var(--border);margin:4px auto 12px;}
+    .app-sheet h4{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+    .app-sheet button{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;border-bottom:1px solid var(--border);
+      padding:13px 4px;font-size:14.5px;font-weight:600;color:var(--ink);cursor:pointer;text-align:left;font-family:inherit;}
+    .app-sheet button:last-child{border-bottom:0;}
+    .app-sheet button span{font-size:19px;width:26px;text-align:center;}
+    /* Inicio */
+    #section-inicio.active{display:block;}
+    body.app-inicio #emptyState{display:none !important;}
+    .ini-hola{margin:4px 2px 12px;}
+    .ini-hola b{display:block;font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.3px;}
+    .ini-hola span{font-size:13px;color:var(--ink-soft);}
+    .ini-pregunta{display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid var(--brand-2);border-radius:16px;
+      padding:4px 6px 4px 14px;box-shadow:0 6px 18px rgba(62,198,172,.18);margin-bottom:10px;}
+    .ini-pregunta input{flex:1;min-width:0;border:0;outline:0;background:none;font-size:15px;padding:11px 0;color:var(--ink);font-family:inherit;}
+    .ini-pregunta button{border:0;background:var(--brand);color:#fff;border-radius:12px;width:42px;height:42px;font-size:18px;cursor:pointer;}
+    .ini-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px;}
+    .ini-chips button{border:1px solid var(--border);background:var(--surface-2);color:var(--ink-soft);border-radius:18px;padding:6px 11px;
+      font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+    .app-top .app-vista{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:20px;
+      padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap;}
+    .app-top .app-vista span{opacity:.7;font-size:10px;margin-left:2px;}
+    .app-sheet button.on{color:var(--brand-ink);font-weight:800;} .app-sheet button em{margin-left:auto;font-style:normal;color:var(--brand-2-dark);}
+    .app-sheet button:disabled{opacity:.45;}
+    /* Bienvenida: la primera vez se elige la vista */
+    .app-bienv{position:fixed;inset:0;z-index:100;overflow-y:auto;
+      background:radial-gradient(120% 70% at 50% 0%,#1b3fa8 0%,#0a1e64 55%,#06123f 100%);color:#fff;}
+    .app-bienv.abierto{display:block;}
+    .bv-in{max-width:460px;margin:0 auto;padding:calc(46px + env(safe-area-inset-top)) 20px 30px;text-align:center;}
+    .bv-logo{height:54px;width:auto;margin-bottom:22px;}
+    .bv-in h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.3px;}
+    .bv-in > p{margin:6px 0 22px;font-size:14px;opacity:.75;}
+    .bv-op{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.18);
+      color:#fff;border-radius:18px;padding:16px;margin-bottom:12px;cursor:pointer;font-family:inherit;}
+    .bv-op .ic{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-size:26px;background:rgba(255,255,255,.14);flex-shrink:0;}
+    .bv-op .tx{flex:1;min-width:0;} .bv-op b{display:block;font-size:17px;font-weight:800;}
+    .bv-op small{display:block;font-size:12.5px;opacity:.78;margin-top:3px;line-height:1.35;}
+    .bv-op .fl{font-size:24px;opacity:.6;}
+    .bv-in .bv-nota{font-size:12px;opacity:.6;margin-top:18px;}
+    /* Bloques del inicio */
+    .ini-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow);min-width:0;}
+    .ini-card-tit{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:10px;}
+    .ini-card-tit small{font-weight:600;color:var(--muted);font-size:11.5px;}
+    .ini-busca{display:flex;gap:8px;}
+    .ini-busca input{flex:1;min-width:0;border:1px solid var(--border);background:var(--input-bg);color:var(--ink);border-radius:12px;padding:12px 13px;font-size:16px;font-family:inherit;}
+    .ini-busca button{border:0;background:var(--brand);color:#fff;border-radius:12px;padding:0 18px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;}
+    .ini-o{text-align:center;font-size:11.5px;color:var(--muted);margin:10px 0 8px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+    .ini-select{display:block;width:100%;max-width:100%;border:1px solid var(--border);background:var(--input-bg);color:var(--ink);border-radius:12px;padding:12px;font-size:14.5px;font-family:inherit;}
+    .ini-fila{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:10px 0;
+      cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);}
+    .ini-card-tit + .ini-fila{border-top:0;}
+    .ini-fila .t{flex:1;min-width:0;} .ini-fila .t b{display:block;font-size:13px;}
+    .ini-fila .t small{display:block;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .ini-fila .p{width:108px;flex-shrink:0;text-align:right;} .ini-fila .p small{display:block;font-size:10.5px;color:var(--muted);margin-top:4px;}
+    .ini-fila .bar{display:block;height:7px;border-radius:7px;background:var(--surface-2);overflow:hidden;}
+    .ini-fila .bar i{display:block;height:100%;background:var(--brand-2);border-radius:7px;}
+    .ini-fila .q{flex-shrink:0;text-align:right;} .ini-fila .q b{display:block;font-size:16px;color:var(--amber-ink);} .ini-fila .q small{font-size:10.5px;color:var(--muted);}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace;}
+    .ini-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+    .ini-stats button{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;text-align:left;cursor:pointer;
+      box-shadow:var(--shadow);font-family:inherit;border-left:4px solid var(--brand-ink);}
+    .ini-stats button.rojo{border-left-color:var(--red);} .ini-stats button.ambar{border-left-color:var(--amber);}
+    .ini-stats b{display:block;font-size:24px;font-weight:800;color:var(--ink);} .ini-stats .rojo b{color:var(--red);} .ini-stats .ambar b{color:var(--amber-ink);}
+    .ini-stats span{font-size:11.5px;font-weight:700;color:var(--ink-soft);}
+    .ini-atajos{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+    .ini-atajos button{flex:1 1 auto;background:var(--surface-2);border:1px solid var(--border);color:var(--ink);border-radius:12px;padding:11px 12px;
+      font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+    .ini-lock{text-align:center;padding:24px 16px;} .ini-lock .ic{font-size:34px;} .ini-lock b{display:block;font-size:17px;margin:6px 0 2px;}
+    .ini-lock small{display:block;color:var(--ink-soft);margin-bottom:14px;}
+    .ini-kpi{display:grid;grid-template-columns:1fr auto;grid-template-areas:"n v" "p v";gap:3px 10px;align-items:center;width:100%;background:none;border:0;
+      border-top:1px solid var(--border);padding:10px 0;text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);}
+    .ini-card-tit + .ini-kpi{border-top:0;}
+    .ini-kpi .n{grid-area:n;font-size:13px;font-weight:700;} .ini-kpi .pill{grid-area:p;justify-self:start;}
+    .ini-kpi .v{grid-area:v;font-size:24px;font-weight:800;color:var(--brand-ink);} .ini-kpi .v small{font-size:11px;color:var(--muted);font-weight:700;}
+    .ini-gasto{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+    .ini-gasto div{background:var(--surface-2);border-radius:12px;padding:10px;min-width:0;}
+    .ini-gasto span{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);}
+    .ini-gasto b{display:block;font-size:16px;font-weight:800;color:var(--ink);margin-top:3px;} .ini-gasto small{font-size:11.5px;color:var(--ink-soft);font-weight:700;}
+    .ini-bar{display:grid;grid-template-columns:1fr 90px 36px;gap:8px;align-items:center;font-size:12px;padding:5px 0;}
+    .ini-bar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .ini-bar i{display:block;height:8px;background:var(--surface-2);border-radius:8px;overflow:hidden;}
+    .ini-bar em{display:block;height:100%;background:var(--seg-a);border-radius:8px;} .ini-bar b{text-align:right;}
+    .ini-link{background:none;border:0;color:var(--brand-ink);font-weight:800;font-size:13px;padding:8px 0 0;cursor:pointer;font-family:inherit;}
+    .ini-vacio{font-size:13px;color:var(--muted);padding:6px 0;}
+    .ini-datos{font-size:11.5px;color:var(--muted);text-align:center;margin-top:6px;}
+    /* Tablas anchas del Análisis de Inventario → tarjetas */
+    #section-alertas .table-card{max-height:none !important;overflow:visible !important;border:0;box-shadow:none;background:none;}
+    .pedir-tabla, .pedir-tabla tbody{display:block;width:100%;}
+    .pedir-tabla colgroup, .pedir-tabla thead{display:none;}
+    .pedir-tabla tr{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:var(--card);border:1px solid var(--border);
+      border-radius:14px;padding:12px;margin-bottom:10px;box-shadow:var(--shadow);}
+    .pedir-tabla td{display:block;border:0;padding:0 !important;white-space:normal;min-width:0;background:none !important;}
+    .pedir-tabla td:nth-child(1){grid-column:4;grid-row:1;justify-self:end;}
+    .pedir-tabla td:nth-child(2){grid-column:1 / 4;grid-row:1;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:800;color:var(--brand-ink);align-self:center;}
+    .pedir-tabla td:nth-child(3){grid-column:1 / -1;grid-row:2;font-size:13px;line-height:1.35;color:var(--ink);margin-bottom:4px;}
+    .pedir-tabla td:nth-child(n+4){background:var(--surface-2) !important;border-radius:9px;padding:6px 4px !important;text-align:center !important;font-size:14px;font-weight:800;}
+    .pedir-tabla td:nth-child(n+4)::before{display:block;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:1px;}
+    .pedir-tabla td:nth-child(5){grid-row:3;grid-column:1;} .pedir-tabla td:nth-child(5)::before{content:"Lima";}
+    .pedir-tabla td:nth-child(6){grid-row:3;grid-column:2;} .pedir-tabla td:nth-child(6)::before{content:"Trujillo";}
+    .pedir-tabla td:nth-child(7){grid-row:3;grid-column:3;} .pedir-tabla td:nth-child(7)::before{content:"Ica";}
+    .pedir-tabla td:nth-child(8){grid-row:3;grid-column:4;} .pedir-tabla td:nth-child(8)::before{content:"Tránsito";}
+    .pedir-tabla td:nth-child(9){grid-row:4;grid-column:1;} .pedir-tabla td:nth-child(9)::before{content:"Rotación";}
+    .pedir-tabla td:nth-child(10){grid-row:4;grid-column:2;} .pedir-tabla td:nth-child(10)::before{content:"ROP";}
+    .pedir-tabla td:nth-child(4){grid-row:4;grid-column:3;font-size:12px;} .pedir-tabla td:nth-child(4)::before{content:"UM";}
+    .pedir-tabla td:nth-child(11){grid-row:4;grid-column:4;background:var(--amber-bg) !important;} .pedir-tabla td:nth-child(11)::before{content:"A pedir";}
+    .pedir-tabla td.pedir-cant b{font-size:14px;} .pedir-tabla .pedir-cant-um{display:none;}
+    .pedir-kdx{width:40px;height:34px;font-size:16px;}
+    .kmv table, .kmv tbody{display:block;} .kmv thead{display:none;}
+    .kmv tr{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--border);align-items:center;}
+    .kmv td{border:0;padding:0;}
+    .kmv td:nth-child(1){grid-column:2;grid-row:1;font-size:12px;color:var(--ink-soft);}
+    .kmv td:nth-child(2){grid-column:1;grid-row:1;}
+    .kmv td:nth-child(3){grid-column:1 / 3;grid-row:2;font-size:13px;}
+    .kmv td:nth-child(4){grid-column:1 / 3;grid-row:3;}
+    .kmv td:nth-child(5){grid-column:3;grid-row:1 / 4;font-size:16px;}
+    /* Requerimientos: el filtro por proyecto siempre a la vista (los supervisores consultan por PRY) */
+    .rq-barra #rqProyecto{display:block;width:100%;order:-1;}
+  }
+
+  /* ---------- Asistente Polar (PC y celular) ---------- */
+  .asis-fab{position:fixed;right:22px;bottom:22px;z-index:80;border:0;cursor:pointer;display:flex;align-items:center;gap:8px;
+    background:linear-gradient(135deg,var(--brand),#1b3fa8 60%,var(--brand-2));color:#fff;border-radius:30px;padding:12px 18px 12px 14px;
+    font-size:14px;font-weight:800;box-shadow:0 8px 22px rgba(10,30,100,.35);font-family:inherit;}
+  .asis-fab .i{font-size:20px;}
+  @media (max-width:760px){ .asis-fab{display:none;} }
+  .asis{position:fixed;z-index:95;display:none;flex-direction:column;background:var(--bg);
+    right:18px;bottom:18px;width:400px;height:min(640px, calc(100vh - 36px));border-radius:18px;border:1px solid var(--border);
+    box-shadow:0 18px 50px rgba(10,20,40,.28);overflow:hidden;}
+  .asis.abierto{display:flex;}
+  @media (max-width:760px){ .asis{inset:0;width:auto;height:auto;border-radius:0;border:0;} }
+  .asis-cab{display:flex;align-items:center;gap:10px;background:var(--brand);color:#fff;padding:calc(12px + env(safe-area-inset-top)) 14px 12px;}
+  .asis-cab .av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:20px;
+    background:linear-gradient(135deg,#1b3fa8,var(--brand-2));flex-shrink:0;}
+  .asis-cab .tx{flex:1;line-height:1.2;} .asis-cab b{display:block;font-size:15px;} .asis-cab span{font-size:11.5px;opacity:.75;}
+  .asis-cab button{background:rgba(255,255,255,.14);border:0;color:#fff;width:36px;height:36px;border-radius:11px;font-size:18px;cursor:pointer;}
+  .asis-chat{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;}
+  .asis-msg{max-width:92%;font-size:13.5px;line-height:1.45;color:var(--ink);}
+  .asis-msg.yo{align-self:flex-end;background:var(--brand);color:#fff;padding:9px 13px;border-radius:16px 16px 4px 16px;}
+  .asis-msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--border);padding:11px 13px;border-radius:16px 16px 16px 4px;box-shadow:var(--shadow);}
+  .asis-msg.bot p{margin:0 0 6px;} .asis-msg.bot p:last-child{margin-bottom:0;}
+  .asis-msg .cab{font-weight:800;font-size:14px;margin-bottom:2px;}
+  .asis-msg .sub{font-size:12px;color:var(--ink-soft);margin-bottom:8px;}
+  .asis-msg .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;}
+  .asis-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;}
+  .asis-kpis div{background:var(--surface-2);border-radius:10px;padding:7px 4px;text-align:center;}
+  .asis-kpis b{display:block;font-size:17px;font-weight:800;color:var(--brand-ink);} .asis-kpis span{font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);}
+  .asis-item{border-top:1px solid var(--border);padding:8px 0 2px;}
+  .asis-item .d{font-size:12.5px;font-weight:600;}
+  .asis-item .q{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .asis-est{display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;margin-right:5px;vertical-align:1px;
+    background:var(--surface-2);color:var(--ink-soft);}
+  .asis-est.ok{background:var(--green-bg);color:var(--green);} .asis-est.camino,.asis-est.recibido{background:var(--azul-bg);color:var(--brand-ink);}
+  .asis-est.espera{background:var(--amber-bg);color:var(--amber-ink);} .asis-est.fuera,.asis-est.tarde{background:var(--red-bg);color:var(--red);}
+  .asis-acc{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+  .asis-item button{border:1px solid var(--brand-2);background:rgba(62,198,172,.1);color:var(--brand-ink);border-radius:14px;padding:2px 9px;
+    font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;font-family:inherit;}
+  .asis-acc button{border:1px solid var(--brand-2);background:rgba(62,198,172,.1);color:var(--brand-ink);border-radius:18px;padding:6px 11px;
+    font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .asis-sug{display:flex;gap:7px;overflow-x:auto;padding:0 14px 8px;scrollbar-width:none;}
+  .asis-sug::-webkit-scrollbar{display:none;}
+  .asis-sug button{flex-shrink:0;border:1px solid var(--border);background:var(--card);color:var(--ink-soft);border-radius:18px;padding:7px 12px;
+    font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit;}
+  .asis-pie{display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--border);}
+  .asis-pie input{flex:1;min-width:0;border:1px solid var(--border);background:var(--input-bg);color:var(--ink);border-radius:22px;padding:11px 15px;
+    font-size:15px;outline:0;font-family:inherit;}
+  .asis-pie input:focus{border-color:var(--brand-2);}
+  .asis-pie button{border:0;background:var(--brand-2);color:#08281f;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -10455,6 +10657,7 @@ function rqFiltradas(){
         || crtNorm(r.codOrden).indexOf(q) !== -1
         || crtNorm(r.codPedido).indexOf(q) !== -1
         || crtNorm(r.proyecto).indexOf(q) !== -1
+        || crtNorm(r.idProyecto).indexOf(q) !== -1
         || crtNorm(r.responsable).indexOf(q) !== -1;
   });
 }
@@ -11554,6 +11757,7 @@ function irASeccion(seccion){
 
   document.querySelector('.topbar-crumb').innerHTML =
     MODULOS[modActivo].nombre + ' / <strong>' + (bloqueado ? 'Acceso restringido' : MODULOS[modActivo].secciones[seccion]) + '</strong>';
+  appSync(seccion, bloqueado);   // app del celular: encabezado y barra de abajo
 
   if(bloqueado){ const c = document.getElementById('gerClave'); if(c){ c.value = ''; c.focus(); } return; }
   if(seccion === 'certificados') drawCertificados();
@@ -11599,7 +11803,687 @@ document.querySelectorAll('.navmod').forEach(mod=>{
     }
   });
 });
+
+// ===================================================================================================
+// APP DEL CELULAR (29.09.2026, pedido de Piero): "que parezca una aplicación, con pantalla de inicio",
+// y que se pueda cambiar entre vistas de personas:
+//   - Gerencia:   indicadores y concentración de gasto.
+//   - Supervisor: cómo va lo que pidió, por N° de requerimiento o por proyecto.
+//   - Logística:  ingresos, salidas, kardex y qué comprar para stock.
+// Las opciones de datos (cargar archivos, GitHub, publicar, guardado automático) solo salen en la
+// vista Logística: "son cosas de datos, solo debería salir lo del modo oscuro y claro". En la PC no
+// cambia nada de esto: todo vive debajo de 760 px (RQ_MOVIL). El asistente Polar sí va en los dos.
+// ===================================================================================================
+const APP_SEC = { proceso:'Indicadores', gasto:'Concentración de gasto', requerimientos:'Requerimientos',
+  alertas:'Inventario y kardex', pendientes:'Pendientes de compra', certificados:'Certificados' };
+const APP_VISTAS = {
+  gerencia:   { nombre:'Gerencia',   ico:'📊', desc:'Indicadores de logística y concentración de gasto.',
+    tabs:[['inicio','🏠','Inicio'], ['proceso','⏱️','Indicadores'], ['polar'], ['gasto','💰','Gasto'], ['vista','👥','Vista']] },
+  supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
+    tabs:[['inicio','🏠','Inicio'], ['requerimientos','📋','Mis req.'], ['polar'], ['alertas','📦','Stock'], ['vista','👥','Vista']] },
+  logistica:  { nombre:'Logística',  ico:'🚚', desc:'Ingresos, salidas, kardex y qué comprar para stock.',
+    tabs:[['inicio','🏠','Inicio'], ['alertas','📦','Inventario'], ['polar'], ['pendientes','⏳','Pendientes'], ['vista','👥','Vista']] },
+};
+const APP = { vista:null, enInicio:false };
+try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
+
+function appLogo(){ const l = document.querySelector('.sidebar-brand .logo-lockup'); return l ? l.src : ''; }
+function appAntesDe(html){ document.body.insertAdjacentHTML('beforeend', html); }
+
+function appConstruir(){
+  const logo = appLogo();
+  document.querySelector('.main').insertAdjacentHTML('afterbegin',
+    `<header class="app-top"><img class="app-logo" src="${logo}" alt="Friopacking">
+       <div class="app-tit"><b id="appTit">Inicio</b><span id="appSubTit"></span></div>
+       <button type="button" class="app-vista" id="appVistaBtn"></button></header>`);
+  document.querySelector('.content').insertAdjacentHTML('afterbegin', '<div id="section-inicio" class="section"></div>');
+  appAntesDe(`<nav class="app-tabbar" id="appTabbar"></nav>
+    <div class="app-sheet-fondo" id="appSheet"><div class="app-sheet" id="appSheetIn"></div></div>
+    <div class="app-bienv" id="appBienv"></div>
+    <button type="button" class="asis-fab" id="asisFab"><span class="i">❄️</span>Pregúntale a Polar</button>
+    <div class="asis" id="asis" role="dialog" aria-label="Asistente Polar">
+      <div class="asis-cab"><div class="av">❄️</div><div class="tx"><b>Polar</b><span>Asistente de consultas · Friopacking</span></div>
+        <button type="button" id="asisCerrar" aria-label="Cerrar">✕</button></div>
+      <div class="asis-chat" id="asisChat"></div>
+      <div class="asis-sug" id="asisSug"></div>
+      <form class="asis-pie" id="asisForm" autocomplete="off">
+        <input type="text" id="asisInput" placeholder="Escribe tu consulta…" enterkeyhint="send">
+        <button type="submit" aria-label="Enviar">➤</button></form>
+    </div>`);
+
+  document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
+  document.getElementById('appSheet').addEventListener('click', function(e){ if(e.target === this) appCerrarSheet(); });
+  document.getElementById('appTabbar').addEventListener('click', function(e){
+    const b = e.target.closest('button[data-tab]'); if(!b) return;
+    const t = b.dataset.tab;
+    if(t === 'polar') return polarAbrir();
+    if(t === 'vista') return appAbrirSheet();
+    if(t === 'inicio') return appInicio();
+    irASeccion(t);
+  });
+  document.getElementById('section-inicio').addEventListener('click', appClickInicio);
+  document.getElementById('section-inicio').addEventListener('submit', appSubmitInicio);
+  document.getElementById('section-inicio').addEventListener('change', function(e){
+    if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
+  });
+  document.getElementById('asisFab').addEventListener('click', function(){ polarAbrir(); });
+  document.getElementById('asisCerrar').addEventListener('click', polarCerrar);
+  document.getElementById('asisForm').addEventListener('submit', function(e){
+    e.preventDefault(); const i = document.getElementById('asisInput'); const t = i.value.trim();
+    if(t){ i.value = ''; polarEnviar(t); }
+  });
+  document.getElementById('asisChat').addEventListener('click', polarAccion);
+  document.getElementById('asisSug').addEventListener('click', polarAccion);
+  if(RQ_MOVIL.addEventListener) RQ_MOVIL.addEventListener('change', function(){
+    if(!RQ_MOVIL.matches && APP.enInicio) irASeccion('proceso');
+    if(RQ_MOVIL.matches) appArrancar();
+  });
+}
+
+function appArrancar(){
+  if(!RQ_MOVIL.matches) return;
+  if(!APP.vista) return appBienvenida();
+  appInicio();
+}
+
+function appBienvenida(){
+  const b = document.getElementById('appBienv');
+  b.innerHTML = `<div class="bv-in"><img src="${appLogo()}" alt="Grupo Friopacking" class="bv-logo">
+    <h1>Plataforma de reportes</h1><p>¿Cómo quieres entrar?</p>
+    ${Object.entries(APP_VISTAS).map(([k,v])=>`<button type="button" class="bv-op" data-vista="${k}">
+      <span class="ic">${v.ico}</span><span class="tx"><b>${v.nombre}</b><small>${v.desc}</small></span><span class="fl">›</span></button>`).join('')}
+    <p class="bv-nota">Puedes cambiar de vista cuando quieras desde el botón 👥 Vista.</p></div>`;
+  b.classList.add('abierto');
+  b.onclick = function(e){ const o = e.target.closest('[data-vista]'); if(o) appElegirVista(o.dataset.vista); };
+}
+
+function appElegirVista(v){
+  APP.vista = v;
+  try{ localStorage.setItem('fp-vista', v); }catch(err){}
+  document.getElementById('appBienv').classList.remove('abierto');
+  appCerrarSheet();
+  appInicio();
+  polarSugerencias();
+}
+
+function appPintarBarra(activa){
+  const v = APP_VISTAS[APP.vista] || APP_VISTAS.supervisor;
+  document.getElementById('appTabbar').innerHTML = v.tabs.map(function(t){
+    if(t[0] === 'polar') return '<button type="button" class="polar" data-tab="polar"><span class="i">❄️</span>Polar</button>';
+    return `<button type="button" data-tab="${t[0]}" class="${t[0] === activa ? 'on' : ''}"><span class="i">${t[1]}</span>${t[2]}</button>`;
+  }).join('');
+  document.getElementById('appVistaBtn').innerHTML = `${v.ico} ${v.nombre} <span>▾</span>`;
+}
+
+// Llamada desde irASeccion: mantiene el encabezado y la barra de abajo al día con la navegación normal.
+function appSync(seccion, bloqueado){
+  APP.enInicio = false;
+  document.body.classList.remove('app-inicio');
+  if(!document.getElementById('appTit')) return;
+  document.getElementById('appTit').textContent = bloqueado ? 'Acceso restringido' : (APP_SEC[seccion] || '');
+  document.getElementById('appSubTit').textContent = APP_VISTAS[APP.vista] ? 'Vista ' + APP_VISTAS[APP.vista].nombre : '';
+  appPintarBarra(seccion);
+  if(RQ_MOVIL.matches) window.scrollTo(0, 0);
+}
+
+function appInicio(){
+  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById('section-inicio').classList.add('active');
+  APP.enInicio = true;
+  document.body.classList.add('app-inicio');
+  document.getElementById('appTit').textContent = 'Inicio';
+  document.getElementById('appSubTit').textContent = 'Vista ' + (APP_VISTAS[APP.vista] || APP_VISTAS.supervisor).nombre;
+  appPintarBarra('inicio');
+  appRenderInicio();
+  window.scrollTo(0, 0);
+}
+
+// Si el link publicado todavía está bajando los datos, el inicio se vuelve a pintar solo cuando llegan.
+let appEsperaDatos = null, appIntentos = 0;
+function appHayDatos(){ return getReqRows().length > 0 || !!(ALMACEN_DATA && ALMACEN_DATA.rows && ALMACEN_DATA.rows.length); }
+
+function appSaludo(){ const h = new Date().getHours(); return h < 12 ? 'Buenos días' : (h < 19 ? 'Buenas tardes' : 'Buenas noches'); }
+
+function appRenderInicio(){
+  const cont = document.getElementById('section-inicio');
+  const v = APP.vista || 'supervisor';
+  const ph = { supervisor:'N° de requerimiento, proyecto o pregunta…', logistica:'Código, producto, OC o pregunta…', gerencia:'Pregunta por un indicador o el gasto…' }[v];
+  const hay = appHayDatos();
+  let cuerpo = '';
+  if(!hay){
+    appIntentos++;
+    cuerpo = appIntentos > 12
+      ? '<div class="ini-card"><div class="ini-vacio">Todavía no hay datos publicados.' + (v === 'logistica' ? ' Cárgalos desde <b>👥 Vista → Cargar archivos</b>.' : ' Avísale al área de Logística.') + '</div></div>'
+      : '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los datos de la plataforma…</div></div>';
+    clearTimeout(appEsperaDatos);
+    appEsperaDatos = setTimeout(function(){ if(APP.enInicio) appRenderInicio(); }, 1500);
+  } else if(v === 'gerencia') cuerpo = appInicioGerencia();
+  else if(v === 'logistica') cuerpo = appInicioLogistica();
+  else cuerpo = appInicioSupervisor();
+  const corte = (DATA && DATA.corte) ? 'Datos al ' + fmtDate(DATA.corte) : '';
+  cont.innerHTML = `<div class="ini-hola"><span>${appSaludo()} 👋</span><b>${escapeHtml(APP_VISTAS[v].nombre === 'Supervisor' ? '¿Cómo va lo que pediste?' : (v === 'gerencia' ? 'Resumen gerencial' : '¿Qué revisamos hoy?'))}</b></div>
+    <form class="ini-pregunta" data-form="polar"><span aria-hidden="true">❄️</span><input type="text" name="q" placeholder="${ph}" enterkeyhint="search"><button type="submit" aria-label="Preguntar">➤</button></form>
+    <div class="ini-chips">${polarChips().map(c=>`<button type="button" data-q="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>
+    ${cuerpo}
+    ${corte ? `<div class="ini-datos">${corte}</div>` : ''}`;
+}
+
+// ---------- Inicio: Supervisor ----------
+function appInicioSupervisor(){
+  rqPreparar();
+  const pry = new Map();
+  RQ.filas.forEach(function(r){ if(r.idProyecto && !pry.has(r.idProyecto)) pry.set(r.idProyecto, r.proyecto || r.idProyecto); });
+  const opciones = [...pry.entries()].sort(function(a,b){ return String(a[1]).localeCompare(String(b[1]), 'es'); })
+    .map(function(p){ return `<option value="${escapeHtml(p[0])}">${escapeHtml(p[1])} · ${escapeHtml(p[0])}</option>`; }).join('');
+  return `<div class="ini-card">
+      <div class="ini-card-tit">📋 Consulta tu requerimiento</div>
+      <form class="ini-busca" data-form="req"><input type="search" name="q" inputmode="numeric" placeholder="Ej. 23303 o 0001-0023303"><button type="submit">Ver</button></form>
+      <div class="ini-o">o elige tu proyecto</div>
+      <select id="iniPry" class="ini-select"><option value="">Proyecto…</option>${opciones}</select>
+    </div>
+    <div class="ini-card"><div class="ini-card-tit">🕐 Últimos requerimientos</div>${appListaReqs(RQ.filas, 6)}</div>`;
+}
+
+function appResumenReqs(filas){
+  const porReq = new Map();
+  filas.forEach(function(r){
+    const y = porReq.get(r.codRequerimiento) || { cod:r.codRequerimiento, proyecto:r.proyecto, idProyecto:r.idProyecto, fReq:r.fReq, n:0, obra:0 };
+    y.n++;
+    if(/obra/i.test(r.estadoCalc || '')) y.obra++;
+    porReq.set(r.codRequerimiento, y);
+  });
+  return [...porReq.values()].sort(function(a,b){ return (b.fReq || 0) - (a.fReq || 0); });
+}
+function appListaReqs(filas, tope){
+  const lista = appResumenReqs(filas).slice(0, tope);
+  if(!lista.length) return '<div class="ini-vacio">No hay requerimientos cargados.</div>';
+  return lista.map(function(y){
+    const pct = y.n ? Math.round(y.obra / y.n * 100) : 0;
+    return `<button type="button" class="ini-fila" data-req="${escapeHtml(y.cod)}">
+      <span class="t"><b class="mono">${escapeHtml(y.cod)}</b><small>${escapeHtml(y.proyecto || '')}</small></span>
+      <span class="p"><span class="bar"><i style="width:${pct}%"></i></span><small>${y.obra}/${y.n} en obra · ${rqFecha(y.fReq)}</small></span></button>`;
+  }).join('');
+}
+
+// ---------- Inicio: Logística ----------
+function appCobertura(r){ const s = stockParaReposicion(r); return r.consumoMensual > 0 ? s / r.consumoMensual : 99; }
+function appPorReponer(){
+  if(!(ALMACEN_DATA && ALMACEN_DATA.rows)) return [];
+  const meses = Math.max(0, Number(document.getElementById('mesesAbastecer').value) || 3);
+  // Primero lo que se queda sin stock antes; a igual cobertura, lo que más rota.
+  return pedirRowsFor(meses, 'pedir').rows.filter(function(r){ return Math.round(r.aPedir) >= 1; })
+    .sort(function(a,b){ return (appCobertura(a) - appCobertura(b)) || ((b.consumoMensual || 0) - (a.consumoMensual || 0)); });
+}
+function appPendientesResumen(){
+  const filas = pdFilas(), hoy = new Date();
+  const ocs = new Set(), venc = new Set(), peds = new Set();
+  filas.forEach(function(r){
+    if(r.tipo === 'oc'){ ocs.add(r.codOrden); if(r.fCompromiso && busdayCount(r.fCompromiso, hoy) > 0) venc.add(r.codOrden); }
+    else peds.add(r.codPedido);
+  });
+  return { filas, ocs:ocs.size, venc:venc.size, peds:peds.size };
+}
+function appInicioLogistica(){
+  const pd = appPendientesResumen();
+  const rep = appPorReponer();
+  const n = (v)=> Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:0 });
+  return `<div class="ini-stats">
+      <button type="button" data-ir="pendientes"><b>${n(pd.ocs)}</b><span>OC por llegar</span></button>
+      <button type="button" data-ir="pendientes" class="rojo"><b>${n(pd.venc)}</b><span>OC vencidas</span></button>
+      <button type="button" data-ir="pendientes"><b>${n(pd.peds)}</b><span>Pedidos sin OC</span></button>
+      <button type="button" data-ir="alertas" class="ambar"><b>${n(rep.length)}</b><span>Por reponer</span></button>
+    </div>
+    <div class="ini-card"><div class="ini-card-tit">📦 Kardex de un producto</div>
+      <form class="ini-busca" data-form="inv"><input type="search" name="q" placeholder="Código o descripción"><button type="submit">Ver</button></form></div>
+    <div class="ini-card"><div class="ini-card-tit">⚠️ Reponer primero <small>(menos meses de stock)</small></div>
+      ${rep.length ? rep.slice(0, 6).map(function(r){
+        return `<button type="button" class="ini-fila" data-inv="${escapeHtml(r.codigo)}">
+          <span class="t"><b class="mono">${escapeHtml(r.codigo)}</b><small>${escapeHtml(r.descripcion || '')}</small></span>
+          <span class="q"><b>${n(Math.round(r.aPedir))}</b><small>${escapeHtml(r.unidad || '')} a pedir</small></span></button>`;
+      }).join('') : '<div class="ini-vacio">Nada por reponer con los meses configurados.</div>'}</div>
+    <div class="ini-atajos">
+      <button type="button" data-ir="pendientes">⏳ Pendientes</button>
+      <button type="button" data-ir="certificados">📄 Certificados</button>
+      <button type="button" data-url="https://melissa2026714.github.io/dashboard-friopacking/compras.html">📊 Plataforma Compras ↗</button>
+    </div>`;
+}
+
+// ---------- Inicio: Gerencia ----------
+function appInicioGerencia(){
+  if(!gerAbierto) return `<div class="ini-card ini-lock"><div class="ic">🔒</div><b>Módulo Gerencial</b>
+      <small>Los indicadores y el gasto necesitan la clave.</small><button type="button" class="btn" data-ir="proceso">Ingresar clave</button></div>`;
+  let kpis = '';
+  try{
+    kpis = visibleIndicators().map(function(ind){
+      const st = aggStatsForIndicator(rowsForIndicator(ind), ind);
+      const pct = st.cumplePct, cls = pct == null ? 'muted' : (pct >= 80 ? 'ok' : pct >= 50 ? 'late' : 'warn');
+      return `<button type="button" class="ini-kpi" data-ir="proceso">
+        <span class="n">${escapeHtml(ind.name)}</span>
+        <span class="v">${st.promedio == null ? '—' : st.promedio.toFixed(1)}<small> d.h.</small></span>
+        <span class="pill ${cls}">${pct == null ? 'Sin datos' : 'Cumple ' + pct.toFixed(0) + '%'}</span></button>`;
+    }).join('');
+  }catch(err){ kpis = ''; }
+  let gasto = '<div class="ini-vacio">Carga Consulta.xlsx para ver el gasto.</div>';
+  if(GASTO_DATA && GASTO_DATA.rows && GASTO_DATA.rows.length){
+    const nac = GASTO_DATA.rows.filter(function(r){ return r.origen === 'nacional'; });
+    const imp = GASTO_DATA.rows.filter(function(r){ return r.origen === 'importado'; });
+    const mn = montoPorMonedaOrigen(nac), mi = montoPorMonedaOrigen(imp);
+    const fam = new Map();
+    GASTO_DATA.rows.forEach(function(r){ fam.set(r.familia, (fam.get(r.familia) || 0) + (r.montoPEN || 0)); });
+    const total = [...fam.values()].reduce(function(a,b){ return a + b; }, 0);
+    const top = [...fam.entries()].sort(function(a,b){ return b[1] - a[1]; }).slice(0, 4);
+    gasto = `<div class="ini-gasto"><div><span>🇵🇪 Nacional</span><b>${fmtPEN(mn.soles)}</b><small>${fmtUSD(mn.dolares)}</small></div>
+        <div><span>🌎 Importado</span><b>${fmtUSD(mi.dolares)}</b><small>${mi.soles > 0 ? fmtPEN(mi.soles) : '&nbsp;'}</small></div></div>
+      ${top.map(function(f){ const p = total ? f[1] / total * 100 : 0;
+        return `<div class="ini-bar"><span>${escapeHtml(f[0] || 'Sin familia')}</span><i><em style="width:${p.toFixed(1)}%"></em></i><b>${p.toFixed(0)}%</b></div>`; }).join('')}
+      <button type="button" class="ini-link" data-ir="gasto">Ver concentración de gasto ›</button>`;
+  }
+  return `<div class="ini-card"><div class="ini-card-tit">⏱️ Indicadores de logística</div>${kpis || '<div class="ini-vacio">Sin datos de indicadores.</div>'}</div>
+    <div class="ini-card"><div class="ini-card-tit">💰 Concentración de gasto</div>${gasto}</div>`;
+}
+
+// ---------- Acciones del inicio ----------
+function appAbrirReq(cod){
+  irASeccion('requerimientos');
+  // Se busca solo ese requerimiento: sin filtros que hayan quedado de una consulta anterior.
+  ['rqProyecto','rqEstado','rqResponsable','rqFamilia','rqOrigen'].forEach(function(id){ document.getElementById(id).value = 'all'; });
+  const i = document.getElementById('rqBuscar'); i.value = cod; i.dispatchEvent(new Event('input', { bubbles:true }));
+}
+function appAbrirProyecto(idPry){
+  irASeccion('requerimientos');
+  const s = document.getElementById('rqProyecto');
+  if(![...s.options].some(function(o){ return o.value === idPry; })) return;
+  const b = document.getElementById('rqBuscar'); b.value = ''; RQ.q = '';
+  s.value = idPry; s.dispatchEvent(new Event('change', { bubbles:true }));
+}
+function appAbrirInv(q){
+  irASeccion('alertas');
+  const i = document.getElementById('searchReposicion'); i.value = q; i.dispatchEvent(new Event('input', { bubbles:true }));
+}
+function appAbrirPendientes(persona){
+  irASeccion('pendientes');
+  if(!persona) return;
+  const s = document.getElementById('pdPersona');
+  if([...s.options].some(function(o){ return o.value === persona; })){ s.value = persona; s.dispatchEvent(new Event('change', { bubbles:true })); }
+}
+function appNormReq(t){
+  const m = String(t || '').match(/(\d{4})\s*-\s*(\d{1,7})/);
+  if(m) return m[1] + '-' + m[2].padStart(7, '0');
+  const d = String(t || '').replace(/\D/g, '');
+  return (d.length >= 3 && d.length <= 7) ? '0001-' + d.padStart(7, '0') : String(t || '').trim();
+}
+function appClickInicio(e){
+  const b = e.target.closest('button'); if(!b || b.type === 'submit') return;
+  if(b.dataset.q) return polarAbrir(b.dataset.q);
+  if(b.dataset.req) return appAbrirReq(b.dataset.req);
+  if(b.dataset.inv) return appAbrirInv(b.dataset.inv);
+  if(b.dataset.url) return window.open(b.dataset.url, '_blank', 'noopener');
+  if(b.dataset.ir) return irASeccion(b.dataset.ir);
+}
+function appSubmitInicio(e){
+  e.preventDefault();
+  const f = e.target, q = (f.q && f.q.value || '').trim();
+  if(!q) return;
+  if(f.dataset.form === 'polar') return polarAbrir(q);
+  if(f.dataset.form === 'req') return appAbrirReq(appNormReq(q));
+  if(f.dataset.form === 'inv') return appAbrirInv(q);
+}
+
+// ---------- Hoja "Vista": cambiar de vista, tema y (solo Logística) las opciones de datos ----------
+function appAbrirSheet(){
+  const datos = APP.vista === 'logistica';
+  const pub = document.getElementById('btnPublish');
+  const oscuro = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('appSheetIn').innerHTML = `<div class="asa"></div>
+    <h4>Cambiar de vista</h4>
+    ${Object.entries(APP_VISTAS).map(([k,v])=>`<button type="button" data-vista="${k}" class="${k === APP.vista ? 'on' : ''}"><span>${v.ico}</span>${v.nombre}${k === APP.vista ? ' <em>✓</em>' : ''}</button>`).join('')}
+    <h4>Apariencia</h4>
+    <button type="button" data-accion="btnTheme"><span>${oscuro ? '☀️' : '🌙'}</span>${oscuro ? 'Modo claro' : 'Modo oscuro'}</button>
+    ${datos ? `<h4>Datos</h4>
+      <button type="button" data-accion="fileInput"><span>📂</span>Cargar archivos</button>
+      <button type="button" data-accion="btnConnect"><span>🔑</span>Conectar GitHub</button>
+      <button type="button" data-accion="btnPublish"${pub && pub.disabled ? ' disabled' : ''}><span>☁</span>Guardar y compartir</button>
+      <button type="button" data-accion="btnAuto"><span>🔄</span>Guardado automático</button>` : ''}`;
+  const fondo = document.getElementById('appSheet');
+  fondo.classList.add('abierto');
+  fondo.onclick = function(e){
+    if(e.target === fondo) return appCerrarSheet();
+    const b = e.target.closest('button'); if(!b || b.disabled) return;
+    if(b.dataset.vista) return appElegirVista(b.dataset.vista);
+    if(b.dataset.accion){ appCerrarSheet(); document.getElementById(b.dataset.accion).click(); }
+  };
+}
+function appCerrarSheet(){ document.getElementById('appSheet').classList.remove('abierto'); }
+
+// ===================================================================================================
+// POLAR — asistente de consultas (29.09.2026). Contesta con la data que ya está cargada en la página,
+// sin IA externa: nada sale del navegador. Entiende números de requerimiento, proyectos (PRY…),
+// códigos de producto, OC, personas de Compras y preguntas frecuentes. Lo de Gerencia solo lo contesta
+// si el módulo Gerencial ya se abrió con la clave.
+// ===================================================================================================
+const POLAR = { saludo:false };
+function polarNorm(t){ return sinAcentos(String(t || '')).toLowerCase().replace(/\s+/g, ' ').trim(); }
+function polarCorta(t, n){ t = String(t || ''); return t.length > n ? t.slice(0, n - 1) + '…' : t; }
+function polarNum(v){ return v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 }); }
+
+function polarChips(){
+  const v = APP.vista || 'supervisor';
+  let req = '';
+  try{ rqPreparar(); const u = appResumenReqs(RQ.filas)[0]; if(u) req = u.cod.replace(/^0001-0*/, ''); }catch(err){}
+  if(v === 'gerencia') return ['¿Cómo van los indicadores?', '¿En qué gastamos más?', 'OC vencidas'];
+  if(v === 'logistica') return ['¿Qué hay que reponer?', 'OC vencidas', 'Pendientes de Melissa'];
+  return [req ? '¿Cómo va el req ' + req + '?' : '¿Cómo va mi requerimiento?', 'Requerimientos de mi proyecto', '¿Hay stock de un código?'];
+}
+function polarSugerencias(){
+  const s = document.getElementById('asisSug'); if(!s) return;
+  s.innerHTML = polarChips().concat(['¿Qué puedes hacer?']).map(function(c){ return `<button type="button" data-q="${escapeHtml(c)}">${escapeHtml(c)}</button>`; }).join('');
+}
+function polarAbrir(texto){
+  const a = document.getElementById('asis');
+  a.classList.add('abierto');
+  polarSugerencias();
+  if(!POLAR.saludo){
+    POLAR.saludo = true;
+    polarBot(`<p>¡Hola! Soy <b>Polar</b> ❄️, el asistente de la plataforma.</p><p>Escríbeme un <b>N° de requerimiento</b>, un <b>proyecto</b> (PRY…), un <b>código de producto</b> o una <b>OC</b> y te digo cómo va.</p>`);
+  }
+  if(texto) polarEnviar(texto);
+  else if(!RQ_MOVIL.matches) setTimeout(function(){ document.getElementById('asisInput').focus(); }, 50);
+}
+function polarCerrar(){ document.getElementById('asis').classList.remove('abierto'); }
+function polarMsg(html, quien){
+  const c = document.getElementById('asisChat');
+  const d = document.createElement('div');
+  d.className = 'asis-msg ' + quien; d.innerHTML = html;
+  c.appendChild(d); c.scrollTop = c.scrollHeight;
+}
+function polarBot(html){ polarMsg(html, 'bot'); }
+function polarEnviar(texto){
+  polarMsg(escapeHtml(texto), 'yo');
+  let r;
+  try{ r = polarResponder(texto); }catch(err){ r = '<p>Uy, tuve un problema leyendo esa consulta. Intenta de nuevo con un N° de requerimiento o un código.</p>'; }
+  polarBot(r);
+}
+function polarAccion(e){
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.dataset.q) return polarEnviar(b.dataset.q);
+  const ir = function(fn){ polarCerrar(); fn(); };
+  if(b.dataset.req) return ir(function(){ appAbrirReq(b.dataset.req); });
+  if(b.dataset.pry) return ir(function(){ appAbrirProyecto(b.dataset.pry); });
+  if(b.dataset.inv) return ir(function(){ appAbrirInv(b.dataset.inv); });
+  if(b.dataset.pend !== undefined) return ir(function(){ appAbrirPendientes(b.dataset.pend); });
+  if(b.dataset.ir) return ir(function(){ irASeccion(b.dataset.ir); });
+}
+const polarBtn = (attr, val, txt)=> `<button type="button" data-${attr}="${escapeHtml(val)}">${txt}</button>`;
+
+function polarAyuda(){
+  return `<p>Puedo ayudarte con:</p>
+    <p>📋 <b>Requerimientos:</b> "¿cómo va el 23303?", "req 0001-0023303"<br>🏗️ <b>Proyectos:</b> "PRY2026-0000036" o el nombre del cliente<br>
+    📦 <b>Stock y kardex:</b> "stock de 003800401015", "stock de válvula mariposa"<br>🧾 <b>OC:</b> "OC 0001-0012110"<br>
+    ⏳ <b>Pendientes:</b> "pendientes de Melissa", "OC vencidas", "¿qué hay que reponer?"<br>📊 <b>Gerencia:</b> "indicadores", "gasto" (con la clave)</p>`;
+}
+
+function polarResponder(texto){
+  const q = polarNorm(texto);
+  if(!appHayDatos()) return '<p>Todavía se están cargando los datos de la plataforma. Prueba en unos segundos. ⏳</p>';
+  if(!q || /^(hola|buenas|buenos|hey|ola|que tal)\b/.test(q) && q.length < 25) return '<p>¡Hola! 👋</p>' + polarAyuda();
+  if(/(que|como) (puedes|sabes|me ayudas)|^ayuda|como funciona/.test(q)) return polarAyuda();
+
+  const T = String(texto).toUpperCase();
+  const prod = T.match(/\b\d{12}\b/);
+  if(prod) return polarProducto(prod[0]);
+  const pry = T.match(/PRY\s*-?\s*(\d{4})\s*-?\s*(\d{1,7})/);
+  if(pry) return polarProyecto('PRY' + pry[1] + '-' + pry[2].padStart(7, '0'));
+
+  const esOC = /\b(oc|orden|ordenes|o\.c\.)\b/.test(q), esPed = /\bpedido\b/.test(q);
+  const doc = T.match(/\b(\d{4})\s*-\s*(\d{3,7})\b/);
+  let bare = doc ? null : T.match(/\b(\d{3,7})\b/);
+  if(bare && /^20[2-3]\d$/.test(bare[1]) && !/\breq/.test(q)) bare = null;   // un año, no un N° de req
+  if(doc || bare){
+    const num = doc ? doc[2] : bare[1];
+    const series = doc ? [doc[1]] : (esOC ? ['0001', '0002'] : ['0001']);
+    for(const s of series){
+      const cod = s + '-' + num.padStart(7, '0');
+      if(esOC){ const r = polarOC(cod); if(r) return r; continue; }
+      if(esPed){ const r = polarPedido(cod); if(r) return r; continue; }
+      const r = polarReq(cod) || polarOC(cod) || polarPedido(cod);
+      if(r) return r;
+    }
+    return `<p>No encontré el ${esOC ? 'OC' : (esPed ? 'pedido' : 'requerimiento')} <b class="mono">${escapeHtml(num)}</b> en los datos cargados.</p><p>Revisa el número o prueba con el código completo, por ejemplo <span class="mono">0001-0023303</span>.</p>`;
+  }
+
+  if(/indicador|kpi|tiempo de|cumplimiento|d\.?h\.? promedio/.test(q)) return polarIndicadores();
+  if(/gasto|gastamos|concentracion|cuanto (se )?compr/.test(q)) return polarGasto();
+  if(/reponer|comprar para stock|que (hay que )?(comprar|pedir)|a pedir|quiebre/.test(q)) return polarReponer();
+
+  const persona = polarPersonaEn(q);
+  if(persona) return polarPendientesPersona(persona);
+  if(/vencid|atrasad|retrasad|demorad/.test(q)) return polarVencidas();
+  if(/pendiente|por llegar|en camino|transito/.test(q) && !/stock|kardex/.test(q)) return polarVencidas(true);
+
+  if(/mi requerimiento|mis requerimientos|mi req\b/.test(q)) return '<p>Claro. Escríbeme el <b>N° de tu requerimiento</b> (por ejemplo <span class="mono">23303</span>) o el <b>código de tu proyecto</b> (PRY…).</p>';
+  if(/mi proyecto|requerimientos de/.test(q) && q.replace(/requerimientos de|mi proyecto/g, '').trim().length < 4) return '<p>Dime el <b>código del proyecto</b> (por ejemplo <span class="mono">PRY2026-0000036</span>) o el <b>nombre del cliente</b> y te muestro todos sus requerimientos.</p>';
+  if(/stock de un codigo|hay stock de un/.test(q)) return '<p>Pásame el <b>código de 12 dígitos</b> o parte de la descripción, por ejemplo "stock de válvula mariposa 6".</p>';
+
+  const palabras = q.replace(/\b(stock|kardex|de|del|la|el|los|las|hay|tenemos|cuanto|cuantos|cuantas|movimientos|ingresos|salidas|producto|proyecto|requerimientos|requerimiento|cliente|como|va|van|el|un|una|que|por|favor|me|dices|ver)\b/g, ' ')
+    .split(' ').filter(function(w){ return w.length >= 3; });
+  const quiereStock = /stock|kardex|movimiento|ingreso|salida|hay de|tenemos/.test(q);
+  if(!quiereStock){ const p = polarProyectoPorNombre(palabras); if(p) return p; }
+  const pr = polarBuscarProducto(palabras);
+  if(pr) return pr;
+  if(quiereStock) return `<p>No encontré productos con "${escapeHtml(palabras.join(' '))}". Prueba con el código de 12 dígitos o con otra palabra de la descripción.</p>`;
+  return '<p>No entendí bien la consulta 🤔</p>' + polarAyuda();
+}
+
+// ---------- Requerimiento ----------
+function polarReq(cod){
+  rqPreparar();
+  const items = RQ.filas.filter(function(r){ return r.codRequerimiento === cod; });
+  if(!items.length) return null;
+  const r0 = items[0], n = items.length;
+  const obra = items.filter(function(r){ return /obra/i.test(r.estadoCalc || ''); }).length;
+  const incompletos = items.filter(function(r){ return !(r.cantSalida >= r.cantidad) ; }).length;
+  const frase = (obra === n && !incompletos) ? '✅ Todo lo que se pidió ya salió a obra.'
+    : `Van <b>${obra} de ${n}</b> ítems enviados a obra.`;
+  const lista = items.slice(0, 10).map(function(r){
+    const falta = (r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0) ? ` <b style="color:var(--amber-ink)">(falta ${polarNum(Math.round((r.cantidad - r.cantSalida) * 100) / 100)})</b>` : '';
+    let extra = '';
+    if(!r.fSalida && r.codOrden) extra = `<br>OC <span class="mono">${escapeHtml(r.codOrden)}</span>${r.fCompromiso ? ' · entrega ' + rqFecha(r.fCompromiso) : ''}`;
+    else if(!r.fSalida && r.codPedido && !r.codOrden) extra = `<br>Pedido <span class="mono">${escapeHtml(r.codPedido)}</span> en Compras, todavía sin OC`;
+    return `<div class="asis-item"><div class="d"><span class="asis-est ${rqClaseEstado(r.estadoCalc)}">${escapeHtml(r.estadoCalc)}</span>${escapeHtml(polarCorta(r.producto, 70))}</div>
+      <div class="q">Pidió ${polarNum(r.cantidad)} ${escapeHtml(r.unidad || '')} · Salió ${polarNum(r.cantSalida)}${falta}${extra}</div></div>`;
+  }).join('');
+  return `<div class="cab">Req. <span class="mono">${escapeHtml(cod)}</span></div>
+    <div class="sub">${escapeHtml(r0.proyecto || '')}<br>Pidió ${escapeHtml(r0.responsable || '—')} · ${rqFecha(r0.fReq)}</div>
+    <p>${frase}</p>
+    <div class="asis-kpis"><div><b>${n}</b><span>Ítems</span></div><div><b>${obra}</b><span>En obra</span></div><div><b>${n - obra}</b><span>Pendientes</span></div></div>
+    ${lista}${n > 10 ? `<div class="q" style="margin-top:6px;">…y ${n - 10} ítems más.</div>` : ''}
+    <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad completa')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Todo el proyecto') : ''}</div>`;
+}
+
+// ---------- Proyecto ----------
+function polarProyecto(idPry){
+  rqPreparar();
+  const filas = RQ.filas.filter(function(r){ return r.idProyecto === idPry; });
+  if(!filas.length) return `<p>No encontré requerimientos del proyecto <b class="mono">${escapeHtml(idPry)}</b>.</p>`;
+  return polarResumenProyecto(filas, idPry);
+}
+function polarResumenProyecto(filas, idPry){
+  const reqs = appResumenReqs(filas);
+  const items = filas.length, obra = filas.filter(function(r){ return /obra/i.test(r.estadoCalc || ''); }).length;
+  const lista = reqs.slice(0, 8).map(function(y){
+    return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(y.cod)}</span> · ${rqFecha(y.fReq)}</div>
+      <div class="q">${y.obra} de ${y.n} ítems en obra ${polarBtn('q', y.cod, 'ver')}</div></div>`;
+  }).join('');
+  return `<div class="cab">${escapeHtml(filas[0].proyecto || idPry)}</div><div class="sub mono">${escapeHtml(idPry)}</div>
+    <div class="asis-kpis"><div><b>${reqs.length}</b><span>Reqs.</span></div><div><b>${items}</b><span>Ítems</span></div><div><b>${items ? Math.round(obra / items * 100) : 0}%</b><span>En obra</span></div></div>
+    ${lista}${reqs.length > 8 ? `<div class="q" style="margin-top:6px;">…y ${reqs.length - 8} requerimientos más.</div>` : ''}
+    <div class="asis-acc">${polarBtn('pry', idPry, 'Ver en Requerimientos')}</div>`;
+}
+function polarProyectoPorNombre(palabras){
+  if(!palabras.length) return null;
+  rqPreparar();
+  const ids = new Map();
+  RQ.filas.forEach(function(r){
+    const n = polarNorm(r.proyecto);
+    if(n && r.idProyecto && palabras.every(function(w){ return n.indexOf(w) !== -1; }) && !ids.has(r.idProyecto)) ids.set(r.idProyecto, r.proyecto);
+  });
+  if(!ids.size) return null;
+  if(ids.size === 1) return polarProyecto([...ids.keys()][0]);
+  const opts = [...ids.entries()].slice(0, 6).map(function(e){
+    return polarBtn('q', e[0], escapeHtml(polarCorta(e[1], 34)) + ' · ' + escapeHtml(e[0]));
+  }).join('');
+  return `<p>Encontré ${ids.size} proyectos con ese nombre. ¿Cuál es?</p><div class="asis-acc">${opts}</div>`;
+}
+
+// ---------- Producto / stock ----------
+function polarProducto(cod){
+  const p = rqStockDe(cod);
+  if(!p) return `<p>No encontré el código <b class="mono">${escapeHtml(cod)}</b> en el Reporte Almacén.</p>`;
+  const res = rqReservasDe(p.codigo);
+  const reservado = Math.round(res.reduce(function(a,y){ return a + y.q; }, 0) * 100) / 100;
+  const libre = Math.max(0, Math.round(((p.lima || 0) - reservado) * 100) / 100);
+  const tr = trTransitoDe(p.codigo, p.codigos);
+  const um = escapeHtml(p.unidad || '');
+  const trHtml = tr.length ? tr.slice(0, 4).map(function(o){
+    return `<div class="asis-item"><div class="d">🚚 OC <span class="mono">${escapeHtml(o.oc)}</span> · ${polarNum(o.cant)} ${um}</div>
+      <div class="q">${escapeHtml(polarCorta(o.proveedor, 40))}${o.origen === 'importado' ? ' · importación' : ''}${o.fCompromiso ? ' · llega aprox. ' + rqFecha(o.fCompromiso) : ''}</div></div>`;
+  }).join('') : '';
+  return `<div class="cab mono">${escapeHtml(p.codigo)}</div><div class="sub">${escapeHtml(p.descripcion || '')}</div>
+    <div class="asis-kpis"><div><b>${polarNum(p.lima)}</b><span>Lima</span></div><div><b>${polarNum(p.trujillo)}</b><span>Trujillo</span></div><div><b>${polarNum(p.ica)}</b><span>Ica</span></div></div>
+    ${reservado > 0 ? `<p>En Lima hay <b>${polarNum(reservado)} ${um}</b> reservados para ${res.length} requerimiento(s): disponible real <b>${polarNum(libre)} ${um}</b>.</p>` : ''}
+    ${p.consumoMensual > 0 ? `<p>Rotación: <b>${polarNum(p.consumoMensual)} ${um}</b> al mes.</p>` : ''}
+    ${trHtml ? '<p><b>En camino:</b></p>' + trHtml : (p.transito > 0 ? `<p>El almacén marca ${polarNum(p.transito)} ${um} en tránsito.</p>` : '')}
+    <div class="asis-acc">${polarBtn('inv', p.codigo, 'Ver kardex, ingresos y salidas')}</div>`;
+}
+function polarBuscarProducto(palabras){
+  if(!palabras.length || !(ALMACEN_DATA && ALMACEN_DATA.rows)) return null;
+  const hits = ALMACEN_DATA.rows.filter(function(r){
+    const d = polarNorm(r.descripcion);
+    return palabras.every(function(w){ return d.indexOf(w) !== -1; });
+  });
+  if(!hits.length) return null;
+  if(hits.length === 1) return polarProducto(hits[0].codigo);
+  hits.sort(function(a,b){ return ((b.lima||0)+(b.trujillo||0)+(b.ica||0)) - ((a.lima||0)+(a.trujillo||0)+(a.ica||0)); });
+  return `<p>Encontré <b>${hits.length}</b> productos. Estos son los que tienen más stock:</p>
+    ${hits.slice(0, 6).map(function(r){
+      return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(r.descripcion, 64))}</div>
+        <div class="q"><span class="mono">${escapeHtml(r.codigo)}</span> · Lima ${polarNum(r.lima)} · Trujillo ${polarNum(r.trujillo)} · Ica ${polarNum(r.ica)} ${polarBtn('q', r.codigo, 'ver')}</div></div>`;
+    }).join('')}`;
+}
+
+// ---------- OC y pedido ----------
+function polarOC(cod){
+  const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return r.codOrden === cod; });
+  if(!filas.length) return null;
+  const f0 = filas.find(function(r){ return r.proveedor; }) || filas[0];
+  const est = (filas.find(function(r){ return r.estadoOrden; }) || {}).estadoOrden || '';
+  const vistos = new Set();
+  const items = filas.filter(function(r){ const k = r.idProducto + '|' + (r.codRequerimiento || ''); if(vistos.has(k)) return false; vistos.add(k); return true; });
+  const reqs = [...new Set(filas.map(function(r){ return r.codRequerimiento; }).filter(Boolean))];
+  const lista = items.slice(0, 8).map(function(r){
+    const q = r.cantOrden != null ? r.cantOrden : r.cantidadOrden, rec = r.cantRecep != null ? r.cantRecep : r.cantRecepcion;
+    return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(r.producto, 64))}</div>
+      <div class="q">Pedido ${polarNum(q)} · recibido ${polarNum(rec || 0)}${r.codRequerimiento ? ' · req <span class="mono">' + escapeHtml(r.codRequerimiento) + '</span>' : ' · pedido directo'}</div></div>`;
+  }).join('');
+  const f = filas.find(function(r){ return r.fCompromiso; });
+  return `<div class="cab">OC <span class="mono">${escapeHtml(cod)}</span></div>
+    <div class="sub">${escapeHtml(f0.proveedor || 'Proveedor no registrado')}${f0.origen === 'importado' ? ' · Importación' : ''}</div>
+    <p>${est ? `Estado en Nisira: <b>${escapeHtml(est)}</b>.` : ''} ${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden) + '.' : ''} ${f ? 'Entrega pactada: <b>' + rqFecha(f.fCompromiso) + '</b>.' : ''}</p>
+    ${lista}
+    <div class="asis-acc">${reqs.slice(0, 3).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r)); }).join('')}</div>`;
+}
+function polarPedido(cod){
+  const filas = getReqRows().filter(function(r){ return r.codPedido === cod; });
+  if(!filas.length) return null;
+  const ocs = [...new Set(filas.map(function(r){ return r.codOrden; }).filter(Boolean))];
+  const reqs = [...new Set(filas.map(function(r){ return r.codRequerimiento; }).filter(Boolean))];
+  return `<div class="cab">Pedido <span class="mono">${escapeHtml(cod)}</span></div>
+    <div class="sub">${escapeHtml(filas[0].responsablePedido || '')} · ${rqFecha(filas[0].fPedido)}</div>
+    <p>${filas.length} ítem(s). ${ocs.length ? 'Ya tiene OC: ' + ocs.map(function(o){ return '<span class="mono">' + escapeHtml(o) + '</span>'; }).join(', ') + '.' : 'Todavía no pasa a OC.'}</p>
+    <div class="asis-acc">${ocs.slice(0, 3).map(function(o){ return polarBtn('q', 'OC ' + o, 'OC ' + escapeHtml(o)); }).join('')}${reqs.slice(0, 2).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r)); }).join('')}</div>`;
+}
+
+// ---------- Pendientes de compra ----------
+function polarPersonaEn(q){
+  for(const [cod, nom] of Object.entries(PD_PERSONAS)){
+    const partes = polarNorm(nom).split(' ');
+    if(q.indexOf(cod.toLowerCase()) !== -1) return cod;
+    if(partes.some(function(p){ return p.length >= 4 && new RegExp('\\b' + p + '\\b').test(q); })) return cod;
+  }
+  return null;
+}
+function polarDiasVencida(r){ return r.fCompromiso ? busdayCount(r.fCompromiso, new Date()) : 0; }
+function polarTopVencidas(filas, n){
+  const porOC = new Map();
+  filas.forEach(function(r){
+    if(r.tipo !== 'oc') return;
+    const d = polarDiasVencida(r); if(!(d > 0)) return;
+    if(!porOC.has(r.codOrden)) porOC.set(r.codOrden, { oc:r.codOrden, proveedor:r.proveedor, d, persona:r.persona });
+  });
+  return [...porOC.values()].sort(function(a,b){ return b.d - a.d; }).slice(0, n);
+}
+function polarPendientesPersona(cod){
+  const filas = pdFilas().filter(function(r){ return r.persona === cod; });
+  const nombre = PD_PERSONAS[cod] || cod;
+  if(!filas.length) return `<p><b>${escapeHtml(nombre)}</b> no tiene OC por llegar ni pedidos sin OC. 🎉</p>`;
+  const ocs = new Set(filas.filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; }));
+  const peds = new Set(filas.filter(function(r){ return r.tipo === 'ped'; }).map(function(r){ return r.codPedido; }));
+  const venc = polarTopVencidas(filas, 999);
+  return `<div class="cab">${escapeHtml(nombre)}</div><div class="sub">Pendientes de compra</div>
+    <div class="asis-kpis"><div><b>${ocs.size}</b><span>OC por llegar</span></div><div><b style="color:var(--red)">${venc.length}</b><span>Vencidas</span></div><div><b>${peds.size}</b><span>Pedidos sin OC</span></div></div>
+    ${venc.slice(0, 5).map(function(v){ return `<div class="asis-item"><div class="d"><span class="asis-est tarde">Vencida hace ${v.d} d.h.</span><span class="mono">${escapeHtml(v.oc)}</span></div><div class="q">${escapeHtml(polarCorta(v.proveedor, 44))} ${polarBtn('q', 'OC ' + v.oc, 'ver')}</div></div>`; }).join('')}
+    <div class="asis-acc">${polarBtn('pend', cod, 'Ver sus pendientes')}</div>`;
+}
+function polarVencidas(todas){
+  const filas = pdFilas();
+  const venc = polarTopVencidas(filas, 999);
+  const porPersona = new Map();
+  venc.forEach(function(v){ porPersona.set(v.persona, (porPersona.get(v.persona) || 0) + 1); });
+  const ranking = [...porPersona.entries()].sort(function(a,b){ return b[1] - a[1]; });
+  const ocs = new Set(filas.filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; }));
+  return `<div class="cab">OC ${todas ? 'por llegar' : 'vencidas'}</div>
+    <p>Hay <b>${ocs.size}</b> OC por llegar y <b style="color:var(--red)">${venc.length}</b> ya pasaron su fecha de entrega.</p>
+    ${ranking.slice(0, 6).map(function(p){ return `<div class="asis-item"><div class="d">${escapeHtml(pdEtiquetaPersona(p[0]) || '(sin persona)')}</div><div class="q">${p[1]} OC vencidas ${polarBtn('q', 'pendientes de ' + p[0], 'ver')}</div></div>`; }).join('')}
+    <div class="asis-acc">${polarBtn('pend', '', 'Abrir Pendientes')}</div>`;
+}
+function polarReponer(){
+  const rep = appPorReponer();
+  if(!rep.length) return '<p>Con los meses configurados en Inventario no hay productos por reponer. ✅</p>';
+  return `<div class="cab">Por reponer</div><p><b>${rep.length}</b> productos están en punto de reorden. Los que tienen menos meses de stock:</p>
+    ${rep.slice(0, 8).map(function(r){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(r.descripcion, 60))}</div>
+      <div class="q"><span class="mono">${escapeHtml(r.codigo)}</span> · pedir <b>${polarNum(Math.round(r.aPedir))} ${escapeHtml(r.unidad || '')}</b> ${polarBtn('inv', r.codigo, 'kardex')}</div></div>`; }).join('')}
+    <div class="asis-acc">${polarBtn('ir', 'alertas', 'Abrir Inventario')}</div>`;
+}
+
+// ---------- Gerencia ----------
+function polarCandado(){ return `<p>Eso es del módulo <b>Gerencial</b> 🔒. Ingresa la clave y te lo muestro.</p><div class="asis-acc">${polarBtn('ir', 'proceso', 'Ingresar clave')}</div>`; }
+function polarIndicadores(){
+  if(!gerAbierto) return polarCandado();
+  const filas = visibleIndicators().map(function(ind){
+    const st = aggStatsForIndicator(rowsForIndicator(ind), ind);
+    const pct = st.cumplePct, cls = pct == null ? '' : (pct >= 80 ? 'ok' : pct >= 50 ? 'espera' : 'tarde');
+    return `<div class="asis-item"><div class="d">${escapeHtml(ind.name)}</div>
+      <div class="q"><b>${st.promedio == null ? '—' : st.promedio.toFixed(1)} d.h.</b> promedio · <span class="asis-est ${cls}">${pct == null ? 'Sin datos' : 'Cumple ' + pct.toFixed(0) + '%'}</span></div></div>`;
+  }).join('');
+  return `<div class="cab">Indicadores de logística</div><div class="sub">Con los filtros que tengas puestos en el módulo</div>${filas}
+    <div class="asis-acc">${polarBtn('ir', 'proceso', 'Abrir Indicadores')}</div>`;
+}
+function polarGasto(){
+  if(!gerAbierto) return polarCandado();
+  if(!(GASTO_DATA && GASTO_DATA.rows && GASTO_DATA.rows.length)) return '<p>No hay datos de gasto cargados (Consulta.xlsx).</p>';
+  const fam = new Map();
+  GASTO_DATA.rows.forEach(function(r){ fam.set(r.familia, (fam.get(r.familia) || 0) + (r.montoPEN || 0)); });
+  const total = [...fam.values()].reduce(function(a,b){ return a + b; }, 0);
+  const top = [...fam.entries()].sort(function(a,b){ return b[1] - a[1]; }).slice(0, 5);
+  return `<div class="cab">Concentración de gasto</div><div class="sub">Todo el período cargado · equivalente ${fmtUSD(total / TIPO_CAMBIO['USD'])}</div>
+    ${top.map(function(f){ return `<div class="asis-item"><div class="d">${escapeHtml(f[0] || 'Sin familia')}</div><div class="q"><b>${(total ? f[1] / total * 100 : 0).toFixed(1)}%</b> del gasto · ${fmtUSD(f[1] / TIPO_CAMBIO['USD'])}</div></div>`; }).join('')}
+    <div class="asis-acc">${polarBtn('ir', 'gasto', 'Abrir Concentración de gasto')}</div>`;
+}
+
+appConstruir();
+
 irASeccion('proceso');
+appArrancar();
 
 })();
 </script>
