@@ -621,6 +621,11 @@
   .rqm-cants b .rq-q{font-size:15px;}
   .rqm-cants b small{font-size:10px;font-weight:700;letter-spacing:0;text-transform:none;}
   .rqm-cants em{display:block;font-style:normal;font-size:9.5px;color:var(--muted);}
+  .rqm-partes{margin-top:8px;display:grid;gap:5px;}
+  .rqm-partes > div{display:flex;gap:8px;align-items:flex-start;background:#eef7f0;border-radius:9px;padding:7px 9px;font-size:12px;line-height:1.35;color:var(--ink);}
+  .rqm-partes > div.ped{background:#fff6e6;}
+  .rqm-partes i{font-style:normal;flex-shrink:0;}
+  .rqm-partes span{min-width:0;overflow-wrap:anywhere;}
   .rqm-docs{margin-top:9px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;line-height:1.55;color:var(--ink-soft);
     font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-word;}
   @media (max-width:760px){
@@ -1422,7 +1427,8 @@
   .oc-num{margin-top:10px;font-size:14px;color:var(--ink-soft);} .oc-num b{font-size:30px;font-weight:900;color:var(--ink);letter-spacing:-.5px;}
   .oc-bar,.oc-it .bar{height:10px;border-radius:6px;background:var(--surface-2);overflow:hidden;margin-top:8px;} .oc-bar em,.oc-it .bar em{display:block;height:100%;border-radius:6px;background:var(--brand-2);}
   .oc-hero small{display:block;margin-top:8px;font-size:12.5px;color:var(--ink-soft);}
-  .oc-pasos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;}
+  .oc-pasos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;} .oc-pasos.cinco{grid-template-columns:repeat(5,1fr);gap:6px;}
+  .oc-pasos.cinco .oc-paso{padding:9px 5px;} .oc-pasos.cinco .oc-paso b{font-size:10.5px;}
   .oc-paso{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:10px 8px;text-align:center;border-top:4px solid var(--border);}
   .oc-paso.ok{border-top-color:var(--brand-2);} .oc-paso.no{opacity:.85;}
   .oc-paso i{display:block;font-style:normal;font-size:20px;} .oc-paso b{display:block;font-size:11.5px;margin-top:4px;line-height:1.2;}
@@ -10983,6 +10989,37 @@ function rqViaReal(r){
   return r.codPedido ? 'Pedido' : '';
 }
 
+// Una MISMA fila con salida de stock y además pedido a Compras por el resto (30.09.2026, Piero sobre
+// el 0001-0023509: pidió 12, salieron 4 del almacén y 8 se enviaron a pedido). Nisira lo trae en una
+// sola fila, así que la vía "Directo" escondía los 8 que siguen en Compras: se marca y se muestra
+// como dos líneas.
+function rqEsPartido(r){
+  // La salida tiene que caber en la parte de stock y lo del pedido todavía no haber llegado: si ya llegó
+  // algo de la OC no se puede saber qué salió de dónde, y ahí manda el flujo normal.
+  return !!(r.fSalida && r.codPedido && r.cantPedido > 0 && r.cantidad > 0 && r.cantPedido < r.cantidad
+    && r.cantSalida > 0 && r.cantSalida <= r.cantidad - r.cantPedido + 0.001
+    && !(r.cantRecep > 0 || r.fRecep)
+    && !/archiv|anul/i.test(String(r.estadoPedido || '')));   // pedido archivado: el resto ya no viene
+}
+// Cómo va la parte que se fue a pedido de una fila partida.
+function rqPartePedidoTxt(r){
+  if(r.codOrden){
+    const llego = (r.cantRecep != null && r.cantRecep > 0) || r.fRecep;
+    if(llego) return 'OC ' + r.codOrden + ' · ya llegó al almacén, por despachar';
+    return 'OC ' + r.codOrden + (r.fCompromiso ? ' · llega aprox. ' + rqFecha(r.fCompromiso) : ' · por llegar');
+  }
+  return 'En Compras, sin OC' + (r.fPedido ? ' · desde ' + rqFecha(r.fPedido) + ' (' + rqHace(r.fPedido) + ')' : '');
+}
+function rqPartesHtml(r){
+  if(!r.partido) return '';
+  const n = (v)=> v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
+  const um = r.unidad ? ' ' + escapeHtml(r.unidad) : '';
+  return `<div class="rqm-partes">
+      <div><i>🏬</i><span><b>${n(r.cantSalida)}${um}</b> ${r.cantSalida === 1 ? 'salió' : 'salieron'} del stock${r.docSalida ? ' · ' + escapeHtml(r.docSalida) : ''}${r.fSalida ? ' · ' + rqFecha(r.fSalida) : ''}</span></div>
+      <div class="ped"><i>🛒</i><span><b>${n(r.cantPedido)}${um}</b> enviadas a pedido ${escapeHtml(r.codPedido)} · ${escapeHtml(rqPartePedidoTxt(r))}${r.responsablePedido ? ' · ' + escapeHtml(r.responsablePedido) : ''}</span></div>
+    </div>`;
+}
+
 /** Se calcula una sola vez por archivo cargado y queda guardado en la fila. */
 function rqPreparar(){
   const rows = getReqRows();
@@ -10996,6 +11033,7 @@ function rqPreparar(){
   const vias = {};
   RQ.filas.forEach(function(r){
     r.via = rqViaReal(r);
+    r.partido = rqEsPartido(r);
     r.estadoCalc = rqEstadoReal(r);
     if(r.via) (vias[r.codRequerimiento + '|' + r.idProducto] = vias[r.codRequerimiento + '|' + r.idProducto] || {})[r.via] = 1;
   });
@@ -11004,7 +11042,7 @@ function rqPreparar(){
     // y la otra se compró con OC. Que el requerimiento tenga unos ítems directos y otros por pedido
     // no se marca — eso ya lo dice la columna Vía línea por línea (25.09.2026, aclaración de Piero).
     const v = vias[r.codRequerimiento + '|' + r.idProducto];
-    r.mixtoItem = !!(v && v.Directo && v.Pedido);
+    r.mixtoItem = !!(v && v.Directo && v.Pedido) || r.partido;
   });
   RQ.preparado = rows.length;
 }
@@ -11168,6 +11206,7 @@ const RQ_MOVIL = { get matches(){ return RQ_MQ.matches || APP_EN_PC; },
 // lo que ya llegó queda en segundo plano"). Listo = recibido en obra, despachado completo o archivado.
 function rqItemListo(r){
   const e = r.estadoCalc || '';
+  if(r.partido) return false;          // lo del pedido todavía no llega
   if(e === 'Recibido en Obra' || e === 'Archivado') return true;
   if(e === 'Enviado a Obra') return !(r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0);
   return false;
@@ -11186,7 +11225,7 @@ function rqSituacion(r){
     return { ico:'🏗️', cls:'ok', titulo:'Recibido en obra', detalle:(r.fObra ? 'el ' + rqFecha(r.fObra) : '') + (r.docObra ? ' · ' + r.docObra : '') + falta };
   }
   if(e === 'Enviado a Obra'){
-    const falta = (r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0) ? ' · faltan ' + n(Math.round((r.cantidad - r.cantSalida) * 100) / 100) + um + ' por despachar' : '';
+    const falta = (r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0) ? ' · faltan ' + n(Math.round((r.cantidad - r.cantSalida) * 100) / 100) + um + (r.partido ? ', están en pedido' : ' por despachar') : '';
     return { ico:'🚚', cls:'ok', titulo:'Salió a obra' + (r.fSalida ? ' el ' + rqFecha(r.fSalida) : ''), detalle:(r.docSalida ? 'Guía ' + r.docSalida : '') + falta + (r.fSalida ? ' · en camino o por confirmar en obra' : '') };
   }
   if(e === 'Recibido en Almacén')
@@ -11213,7 +11252,7 @@ function rqSituacion(r){
 function rqPasoDetalle(r, j){
   const n = (v)=> v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
   const um = r.unidad ? ' ' + r.unidad : '';
-  const directo = r.via === 'Directo';
+  const directo = r.via === 'Directo' && !r.partido;
   const lin = function(){ return [].slice.call(arguments).filter(Boolean); };
   if(j === 0) return { ico:'📝', cls:'ok', titulo:'Requerimiento ' + r.codRequerimiento,
     lineas: lin(r.fReq ? 'Pedido el ' + rqFecha(r.fReq) + (r.responsable ? ' por ' + r.responsable : '') : '', 'Cantidad pedida: ' + n(r.cantidad) + um,
@@ -11222,7 +11261,7 @@ function rqPasoDetalle(r, j){
     if(directo) return { ico:'🛒', cls:'', titulo:'No pasó por Compras', lineas:['Se atendió directo del stock del almacén.'] };
     if(!r.codPedido) return { ico:'🛒', cls:'espera', titulo:'Todavía no pasa a Compras', lineas:['El almacén aún está revisando si sale de stock o se compra.'] };
     return { ico:'🛒', cls:'ok', titulo:'Pasó a Compras' + (r.fPedido ? ' el ' + rqFecha(r.fPedido) : ''),
-      lineas: lin('Pedido ' + r.codPedido + (r.cantPedido != null ? ' · ' + n(r.cantPedido) + um : ''), r.responsablePedido ? 'Lo recibió ' + r.responsablePedido : '',
+      lineas: lin(r.partido ? n(r.cantSalida) + um + (r.cantSalida === 1 ? ' ya salió' : ' ya salieron') + ' del stock; el resto se envió a pedido.' : '', 'Pedido ' + r.codPedido + (r.cantPedido != null ? ' · ' + n(r.cantPedido) + um : ''), r.responsablePedido ? 'Lo recibió ' + r.responsablePedido : '',
         !r.codOrden && r.fPedido ? 'Sin OC todavía, ' + rqHace(r.fPedido) : '') };
   }
   if(j === 2){
@@ -11236,6 +11275,8 @@ function rqPasoDetalle(r, j){
   if(j === 3){
     if(directo) return { ico:'🏬', cls:'ok', titulo:'Salió del stock del almacén', lineas: lin(r.fSalida ? 'Se despachó el ' + rqFecha(r.fSalida) : '') };
     const llego = (r.cantRecep != null && r.cantRecep > 0) || r.fRecep;
+    if(!llego && r.partido) return { ico:'🏬', cls:'ok', titulo:'Salió del stock del almacén: ' + n(r.cantSalida) + um,
+      lineas: lin(r.fSalida ? 'Se despachó el ' + rqFecha(r.fSalida) : '', 'Lo del pedido (' + n(r.cantPedido) + um + ') todavía no llega.') };
     if(!llego) return { ico:'🏬', cls:'espera', titulo:'Todavía no llega al almacén', lineas: lin(r.fCompromiso ? 'Llegada aprox.: ' + rqFecha(r.fCompromiso) : '') };
     return { ico:'🏬', cls:'ok', titulo:'Llegó al almacén' + (r.fRecep ? ' el ' + rqFecha(r.fRecep) : ''),
       lineas: lin('Cantidad recibida: ' + n(r.cantRecep) + um, r.guia ? 'Guía del proveedor: ' + r.guia : '', r.factura ? 'Factura: ' + r.factura : '') };
@@ -11253,7 +11294,7 @@ function rqSitHtml(r, j){
   if(j == null){
     const sit = rqSituacion(r);
     return `<span class="ic">${sit.ico}</span><div><b>${escapeHtml(sit.titulo)}</b>${sit.detalle ? `<small>${escapeHtml(sit.detalle)}</small>` : ''}
-      ${r.via === 'Directo' ? '<small class="dir">Atendido del stock del almacén: no pasó por Compras.</small>' : ''}</div>`;
+      ${r.partido ? '<small class="dir">Una parte salió del stock y el resto está en pedido (ver abajo).</small>' : (r.via === 'Directo' ? '<small class="dir">Atendido del stock del almacén: no pasó por Compras.</small>' : '')}</div>`;
   }
   const d = rqPasoDetalle(r, j);
   return `<span class="ic">${d.ico}</span><div><b>${escapeHtml(d.titulo)}</b>${d.lineas.map(function(l){ return '<small>' + escapeHtml(l) + '</small>'; }).join('')}
@@ -11264,14 +11305,14 @@ function rqClaseSit(r, j){ return j == null ? rqSituacion(r).cls : (rqPasoDetall
 // Pasos con ícono. Si salió directo del stock, Compras y OC no aplican: se ven tachados, no pendientes.
 const RQ_PASOS_ICO = [['📝','Req.'], ['🛒','Compras'], ['🧾','OC'], ['🏬','Almacén'], ['🚚','Salida'], ['🏗️','Obra']];
 function rqPasosHtml(r){
-  const directo = r.via === 'Directo';
+  const directo = r.via === 'Directo' && !r.partido;
   // En revisión todavía está en el almacén decidiendo si sale de stock o se compra: el paso vivo es el
   // requerimiento, no Compras.
   let actual = r.estadoCalc === 'En Revisión';
   return '<div class="rqm-pasos">' + RQ_PASOS.map(function(p, j){
     const salto = directo && (j === 1 || j === 2);
     let ok = p.ok(r);
-    if(directo && j === 3) ok = ok || !!r.fSalida;          // salió del stock: el almacén ya lo tenía
+    if((directo || r.partido) && j === 3) ok = ok || !!r.fSalida;   // salió del stock: el almacén ya lo tenía
     if(r.estadoCalc === 'Archivado') ok = ok && j === 0;
     let cls = salto ? 'salto' : (ok ? 'ok' : '');
     if(j === 0 && r.estadoCalc === 'En Revisión') cls = 'act';
@@ -11330,6 +11371,7 @@ function rqVistaTarjetas(cont, filas){
         <div><span>Salió</span><b>${rqCant(r.cantSalida, r.cantidad)}</b></div>
         <div><span>En obra</span><b>${rqCant(r.cantObra, r.cantSalida)}</b></div>
       </div>
+      ${rqPartesHtml(r)}
       ${docs.length ? `<div class="rqm-docs">${docs.join('<br>')}</div>` : ''}
     </div>`;
   };
@@ -12168,6 +12210,7 @@ function drawPendientes(){
       r.dias = r.fCompromiso ? busdayCount(r.fCompromiso, hoy) : null;
       r.urg = r.dias == null ? 'sinf' : r.dias > 0 ? 'venc' : r.dias >= -5 ? 'prox' : 'ok';
       r.sinAprobar = pdEstadoOC(r) === 'Sin aprobar';
+      if(ocEnTransito(r.codOrden)){ r.dias = null; r.urg = 'ok'; r.transito = true; }   // importación entregada/zarpada
     } else {
       r.dias = r.fPedido ? busdayCount(r.fPedido, hoy) : null;
       r.urg = r.dias != null && r.dias > 2 ? 'venc' : 'ok';
@@ -12183,11 +12226,12 @@ function drawPendientes(){
     d.items.push(r);
     if(r.dias != null && (d.dias == null || r.dias > d.dias)) d.dias = r.dias;
     if(r.sinAprobar) d.sinAprobar = true;
+    if(r.transito) d.transito = true;
   });
   const lista = [...docs.values()];
   lista.forEach(function(d){
     d.urg = PD.tab === 'oc'
-      ? (d.dias == null ? 'sinf' : d.dias > 0 ? 'venc' : d.dias >= -5 ? 'prox' : 'ok')
+      ? (d.transito ? 'ok' : d.dias == null ? 'sinf' : d.dias > 0 ? 'venc' : d.dias >= -5 ? 'prox' : 'ok')
       : (d.dias != null && d.dias > 2 ? 'venc' : 'ok');
   });
 
@@ -12228,6 +12272,7 @@ function drawPendientes(){
 
   const verPersona = sel.value === 'all';
   const plazo = function(d){
+    if(d.transito) return '<span class="pd-dias ok">🚢 En tránsito (importación)</span>';
     if(d.dias == null) return '<span class="pd-dias">Sin fecha de entrega</span>';
     if(PD.tab === 'ped') return `<span class="pd-dias${d.urg === 'venc' ? ' tarde' : ''}">${d.dias} d.h. sin OC</span>`;
     if(d.dias > 0) return `<span class="pd-dias tarde">Vencida hace ${d.dias} d.h.</span>`;
@@ -13386,6 +13431,24 @@ function appInventarioHtml(){
 // cómo va esa OC") ----------
 // Todo lo de la OC en una pantalla: en qué paso está (emitida → aprobada → entrega pactada → recibida),
 // cuánto llegó, qué línea falta, de qué requerimiento es cada cosa, comprador, proveedor y monto.
+// Importaciones (30.09.2026, Piero con la OC 1818: "esa columna corresponde a la entrega del proveedor
+// luego de fabricar… luego va a zarpe (ETD) y luego al ETA; no quiere decir que es la llegada a Lurín").
+// La fecha pactada de una importación es cuándo el proveedor la tiene lista, no cuándo llega. Si ya la
+// entregó (F. Entrega Real) o ya zarpó (ETD), la OC está EN TRÁNSITO, no vencida.
+function ocImportInfo(cod){
+  const m = appMemo('ocImp', function(){
+    const x = new Map();
+    polarLineasOC().forEach(function(r){ if(!r.codOrden) return; const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden); if(!imp) return;
+      const y = x.get(r.codOrden) || { etd:null, fReal:null, fRef:null };
+      if(r.etd && (!y.etd || r.etd < y.etd)) y.etd = r.etd;
+      if(r.fEntregaReal && (!y.fReal || r.fEntregaReal > y.fReal)) y.fReal = r.fEntregaReal;
+      const ref = r.fEntregaRef || r.fCompromiso; if(ref && (!y.fRef || ref < y.fRef)) y.fRef = ref;
+      x.set(r.codOrden, y); });
+    return x;
+  });
+  return m.get(cod) || (/^0002-/.test(cod || '') ? { etd:null, fReal:null, fRef:null } : null);
+}
+function ocEnTransito(cod){ const i = ocImportInfo(cod); return !!(i && (i.etd || i.fReal)); }
 function appOCDatos(cod){
   const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return r.codOrden === cod; });
   if(!filas.length) return null;
@@ -13401,13 +13464,17 @@ function appOCDatos(cod){
     fOrden:primero('fOrden'), fAprob:primero('fAprob'), fComp:primero('fCompromiso'), fRecep:ultimo('fRecep'),
     pend:items.filter(function(i){ return i.abierta; }).length, sinAprobar:filas.some(function(r){ return /sin aprobar/i.test(r.estadoOrden || ''); }),
     montos:monto.length ? polarMontos(monto) : '', cond:(filas.find(function(r){ return r.condiciones; }) || {}).condiciones || '',
-    reqs:[...new Set(filas.map(function(r){ return r.codRequerimiento; }).filter(Boolean))] };
+    reqs:[...new Set(filas.map(function(r){ return r.codRequerimiento; }).filter(Boolean))], imp:ocImportInfo(cod) };
 }
 function appOCHtml(d){
   const hoy = new Date(), cod = d.cod, corto = cod.replace(/^000\d-0*/, ''), fin = ocFinalizada(cod);
   const n = d.items.length, rec = n - d.pend, pct = n ? Math.round(rec / n * 100) : 0;
-  const atraso = d.fComp && d.pend && !fin ? busdayCount(d.fComp, hoy) : 0;
+  const imp = d.imp;
+  const fPact = imp ? (imp.fRef || d.fComp) : d.fComp;
+  const atraso = fPact && d.pend && !fin && !(imp && (imp.etd || imp.fReal)) ? busdayCount(fPact, hoy) : 0;
   const est = fin ? ['ok', '✔ Finalizada (OC Finalizadas.xlsx)'] : !d.pend ? ['ok', '✅ Atendida completa'] : d.sinAprobar ? ['espera', '⏳ Sin aprobar']
+    : imp ? (imp.etd ? ['camino', '🚢 En tránsito · zarpó el ' + rqFecha(imp.etd)] : imp.fReal ? ['camino', '📦 Lista en fábrica · por zarpar']
+      : atraso > 0 ? ['espera', '⏳ Proveedor atrasado ' + atraso + ' d.h. en la entrega'] : ['camino', '🏭 En fabricación'])
     : atraso > 0 ? ['tarde', '⚠️ Atrasada ' + atraso + ' d.h.'] : ['camino', '🚚 En camino'];
   const paso = function(ico, tit, f, ok, extra){ return `<div class="oc-paso ${ok ? 'ok' : 'no'}"><i>${ico}</i><b>${tit}</b><span>${f ? rqFecha(f) : '—'}</span>${extra ? '<small>' + extra + '</small>' : ''}</div>`; };
   const persona = pdPersona(d.f0.usuarioCompras), comp = PD_PERSONAS[persona] || d.f0.usuarioCompras || '—';
@@ -13425,9 +13492,14 @@ function appOCHtml(d){
         <div class="oc-num"><b>${rec}</b> de ${n} ítem${n === 1 ? '' : 's'} recibido${n === 1 ? '' : 's'}</div>
         <div class="oc-bar"><em style="width:${fin ? 100 : pct}%"></em></div>
         ${d.pend && !fin ? `<small>Falta${d.pend === 1 ? '' : 'n'} <b>${d.pend}</b> línea${d.pend === 1 ? '' : 's'} por llegar</small>` : ''}</div>
-      <div class="oc-pasos">${paso('🧾', 'Emitida', d.fOrden, !!d.fOrden)}${paso('✅', 'Aprobada', d.fAprob, !!d.fAprob, d.sinAprobar ? 'falta aprobar' : '')}
+      ${imp ? `<div class="oc-pasos cinco">${paso('🧾', 'Emitida', d.fOrden, !!d.fOrden)}${paso('✅', 'Aprobada', d.fAprob, !!d.fAprob, d.sinAprobar ? 'falta aprobar' : '')}
+        ${paso('🏭', 'Entrega del proveedor', imp.fReal || fPact, !!imp.fReal || !d.pend || fin, imp.fReal ? 'ya la entregó' : (fPact ? (atraso > 0 ? 'atrasada ' + atraso + ' d.h.' : 'pactada') : ''))}
+        ${paso('🚢', 'Zarpe (ETD)', imp.etd, !!imp.etd || !d.pend || fin, imp.etd ? '' : (d.pend && !fin ? 'por zarpar' : ''))}
+        ${paso('🏬', 'Llegada a Lurín', d.fRecep, !d.pend || fin, d.fRecep ? (d.pend && !fin ? 'llegó una parte' : '') : 'sin ETA en los datos')}</div>`
+      : `<div class="oc-pasos">${paso('🧾', 'Emitida', d.fOrden, !!d.fOrden)}${paso('✅', 'Aprobada', d.fAprob, !!d.fAprob, d.sinAprobar ? 'falta aprobar' : '')}
         ${paso('📅', 'Entrega pactada', d.fComp, !!d.fComp && (!d.pend || fin), atraso > 0 ? 'vencida hace ' + atraso + ' d.h.' : (d.fComp && d.pend ? (busdayCount(hoy, d.fComp) > 0 ? 'faltan ' + busdayCount(hoy, d.fComp) + ' d.h.' : 'hoy') : ''))}
-        ${paso('🏬', d.pend && !fin ? 'Recibida en parte' : 'Recibida', d.fRecep, !d.pend || fin, d.fRecep ? 'última recepción' : '')}</div>
+        ${paso('🏬', d.pend && !fin ? 'Recibida en parte' : 'Recibida', d.fRecep, !d.pend || fin, d.fRecep ? 'última recepción' : '')}</div>`}
+      ${imp && d.pend && !fin ? '<div class="oc-nota">🌎 Importación: la fecha pactada es la <b>entrega del proveedor</b> (cuando la tiene lista), no la llegada a Lurín. Después viene el zarpe (ETD) y la llegada.</div>' : ''}
       <div class="oc-datos">${dato('Comprador', escapeHtml(comp))}${dato('Origen', d.f0.origen === 'importado' || /^0002-/.test(cod) ? '🌎 Importación' : '🇵🇪 Nacional')}${dato('Monto', escapeHtml(d.montos))}${dato('Pago', escapeHtml(d.cond))}${dato('Requerimientos', d.reqs.length ? d.reqs.length + '' : 'Pedido directo')}</div>
       ${fin && OC_FIN[cod] && (OC_FIN[cod].motivo || OC_FIN[cod].por) ? `<div class="oc-nota">✔ ${escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · '))}</div>` : ''}
       <div class="oc-tit">Ítems de la OC</div>
@@ -13469,12 +13541,12 @@ function appPendComprasHtml(){
     else { const p = peds.get(r.codPedido) || { ped:r.codPedido, f:r.fPedido, persona:r.persona, pry:r.proyecto, n:0 }; p.n++; peds.set(r.codPedido, p); }
   });
   const venc = [], sem = [], luego = [];
-  [...ocs.values()].forEach(function(o){ const d = o.f ? busdayCount(o.f, hoy) : 0; o.d = d; if(o.f && d > 0) venc.push(o); else if(o.f && polarDia(o.f) <= finSem) sem.push(o); else luego.push(o); });
+  [...ocs.values()].forEach(function(o){ const d = o.f ? busdayCount(o.f, hoy) : 0; o.d = d; if(o.f && d > 0 && !ocEnTransito(o.oc)) venc.push(o); else if(o.f && polarDia(o.f) <= finSem) sem.push(o); else luego.push(o); });
   venc.sort(function(a,b){ return b.d - a.d; }); sem.sort(function(a,b){ return a.f - b.f; }); luego.sort(function(a,b){ return (a.f || 9e15) - (b.f || 9e15); });
   const pl = [...peds.values()].sort(function(a,b){ return (a.f || 0) - (b.f || 0); });
   const nom = function(p){ return (PD_PERSONAS[p] || p || '—').split(' ')[0]; };
   const filaOC = function(o, cls){ return `<button type="button" class="m-fila ${cls}" data-oc="${escapeHtml(o.oc)}"><span class="t"><b>${escapeHtml(polarCorta(o.prov, 34))}</b><small><span class="mono">${escapeHtml(o.oc.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(nom(o.persona))}${o.oc.indexOf('0002-') === 0 ? ' · 🌎' : ''}</small></span>
-      <span class="v">${cls === 'rojo' ? '<b>' + o.d + ' d.h.</b><small>de atraso</small>' : o.f ? '<b>' + rqFecha(o.f).replace(/ \d{4}$/, '') + '</b><small>llega</small>' : '<b>—</b><small>sin fecha</small>'}</span></button>`; };
+      <span class="v">${cls === 'rojo' ? '<b>' + o.d + ' d.h.</b><small>' + (o.oc.indexOf('0002-') === 0 ? 'atraso del proveedor' : 'de atraso') + '</small>' : ocEnTransito(o.oc) ? '<b>🚢</b><small>' + (ocImportInfo(o.oc).etd ? 'en tránsito' : 'lista, por zarpar') + '</small>' : o.f ? '<b>' + rqFecha(o.f).replace(/ \d{4}$/, '') + '</b><small>' + (o.oc.indexOf('0002-') === 0 ? 'entrega proveedor' : 'llega') + '</small>' : '<b>—</b><small>sin fecha</small>'}</span></button>`; };
   const sec = function(ico, tit, cls, lista, fila, abierto){ return lista.length ? `<details class="m-sec ${cls}"${abierto ? ' open' : ''}><summary><span>${ico} ${tit}</span><b>${lista.length}</b></summary>${lista.slice(0, 40).map(fila).join('')}${lista.length > 40 ? `<div class="asis-mas">+ ${lista.length - 40} más</div>` : ''}</details>` : ''; };
   return appChips('pcper', APP_PC.persona, [['', 'Todos ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size]].concat([...personas.keys()].filter(Boolean).sort().map(function(p){ return [p, nom(p)]; })))
     + `<div class="m-resumen"><div class="rojo"><b>${venc.length}</b><span>Vencidas</span></div><div class="ambar"><b>${sem.length}</b><span>Llegan esta semana</span></div><div class="azul"><b>${luego.length}</b><span>Más adelante</span></div><div class="gris"><b>${pl.length}</b><span>Pedidos sin OC</span></div></div>`
@@ -13499,7 +13571,8 @@ function appPendLogGruposCalc(){
     let k = null, f = null;
     if(r.estadoCalc === 'En Revisión'){ k = 'rev'; f = r.fReq; }
     else if(r.estadoCalc === 'Recibido en Almacén'){ k = 'des'; f = r.fRecep || r.fReq; }
-    else if(r.estadoCalc === 'Enviado a Obra' && r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0){ k = 'par'; f = r.fSalida; }
+    else if(r.estadoCalc === 'Enviado a Obra' && r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0
+      && !(r.partido && !(r.cantRecep > 0 || r.fRecep))){ k = 'par'; f = r.fSalida; }   // partido: el resto está en Compras, no por despachar
     if(!k) return;
     const y = g[k].get(r.codRequerimiento) || { cod:r.codRequerimiento, pry:r.proyecto, quien:r.responsable, f:f, n:0 };
     y.n++; if(f && (!y.f || f < y.f)) y.f = f; g[k].set(r.codRequerimiento, y);
@@ -13603,7 +13676,7 @@ function appPendientesResumen(){
   const filas = pdFilas(), hoy = new Date();
   const ocs = new Set(), venc = new Set(), peds = new Set();
   filas.forEach(function(r){
-    if(r.tipo === 'oc'){ ocs.add(r.codOrden); if(r.fCompromiso && busdayCount(r.fCompromiso, hoy) > 0) venc.add(r.codOrden); }
+    if(r.tipo === 'oc'){ ocs.add(r.codOrden); if(r.fCompromiso && busdayCount(r.fCompromiso, hoy) > 0 && !ocEnTransito(r.codOrden)) venc.add(r.codOrden); }
     else peds.add(r.codPedido);
   });
   return { filas, ocs:ocs.size, venc:venc.size, peds:peds.size };
@@ -14114,7 +14187,7 @@ const POLAR_CLAVES = ('requerimiento requerimientos proyecto proyectos stock kar
   + 'orden ordenes compra compras proveedor proveedores almacen obra obras salida salidas ingreso ingresos movimiento movimientos '
   + 'cliente codigo producto productos llego llegada entrega estado estados solicitud archivo reporte resumen transito camino '
   + 'importacion nacional importado importados rotacion trazabilidad supervisor responsable despacho despachado recibido').split(' ');
-const POLAR_COMUNES = ('acabar acaban acabara acabaran agotar agotan agotado agotados vencen vencer vencimiento vencimientos llegar lleguen llegue emitio emitieron emitidas items comparado comparacion compara comparame aprobar aprobado aprobada aprobacion urgente urgentes urgencias prioridad prioridades importaciones importacion venden vende proveen atrasada atrasadas atrasado vencida vencidas proveedores novedades despachar despachado despachados despacho despachos revisar revision incompleto incompletos hola gracias ayuda puedes muestrame dime quiero necesito saber todo todos todas como cuanto cuantos cuantas '
+const POLAR_COMUNES = ('req reqs consultar quiero ver acabar acaban acabara acabaran agotar agotan agotado agotados vencen vencer vencimiento vencimientos llegar lleguen llegue emitio emitieron emitidas items comparado comparacion compara comparame aprobar aprobado aprobada aprobacion urgente urgentes urgencias prioridad prioridades importaciones importacion venden vende proveen atrasada atrasadas atrasado vencida vencidas proveedores novedades despachar despachado despachados despacho despachos revisar revision incompleto incompletos hola gracias ayuda puedes muestrame dime quiero necesito saber todo todos todas como cuanto cuantos cuantas '
   + 'donde cuando esta estan este esto esos esas para pero tiene tienen tengo hace hacer sobre entre desde hasta cual cuales quien '
   + 'favor porfa buenas buenos dias tardes noches bien mucho poco algo nada solo tambien ahora semana numero mismo otra otro cada '
   + 'puede podria quisiera sale salio fueron sido tienes hay queda quedan falta faltan pedi pedimos mande mandamos llega llegan '
@@ -14575,7 +14648,7 @@ function polarOCsLista(o){
     const x = ocs.get(r.codOrden) || { oc:r.codOrden, prov:r.proveedor, f:r.fCompromiso, persona:r.persona, n:0, sinAp:false };
     x.n++; if(/sin aprobar/i.test(r.estadoOrden || '')) x.sinAp = true; ocs.set(r.codOrden, x);
   });
-  let l = [...ocs.values()].map(function(x){ x.d = x.f ? busdayCount(x.f, hoy) : null; return x; });
+  let l = [...ocs.values()].map(function(x){ x.d = x.f ? busdayCount(x.f, hoy) : null; x.tr = ocEnTransito(x.oc); if(x.tr) x.d = null; return x; });
   if(o.venc) l = l.filter(function(x){ return x.d != null && x.d > 0; });
   if(o.sinAp){
     const sa = new Set(); getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(r.codOrden && /sin aprobar/i.test(r.estadoOrden || '') && pdOcAbierta(r) && !ocFinalizada(r.codOrden) && pdEsComprador(pdPersona(r.usuarioCompras)) && (!o.persona || pdPersona(r.usuarioCompras) === o.persona)) sa.add(r.codOrden); });
@@ -14590,7 +14663,7 @@ function polarOCsLista(o){
   const nv = l.filter(function(x){ return x.d != null && x.d > 0; }).length;
   const fila = function(x){ const v = x.d != null && x.d > 0;
     return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(x.oc.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(polarCorta(x.prov || '', 34))}</div>
-      <div class="q">${x.sinAp ? '<span class="asis-est espera">sin aprobar</span> ' : ''}${x.f ? (v ? '<span class="asis-est tarde">vencida hace ' + x.d + ' d.h.</span>' : 'llega ' + rqFecha(x.f).replace(/ \d{4}$/, '')) : 'sin fecha'} · ${escapeHtml((PD_PERSONAS[x.persona] || x.persona || '').split(' ')[0])} ${polarBtn(RQ_MOVIL.matches ? 'oc' : 'q', RQ_MOVIL.matches ? x.oc : 'OC ' + x.oc, 'ver')}</div></div>`; };
+      <div class="q">${x.sinAp ? '<span class="asis-est espera">sin aprobar</span> ' : ''}${x.tr ? '<span class="asis-est camino">🚢 en tránsito</span> ' : ''}${x.tr ? '' : x.f ? (v ? '<span class="asis-est tarde">' + (/^0002-/.test(x.oc) ? 'proveedor atrasado ' : 'vencida hace ') + x.d + ' d.h.</span>' : (/^0002-/.test(x.oc) ? 'entrega proveedor ' : 'llega ') + rqFecha(x.f).replace(/ \d{4}$/, '')) : 'sin fecha'} · ${escapeHtml((PD_PERSONAS[x.persona] || x.persona || '').split(' ')[0])} ${polarBtn(RQ_MOVIL.matches ? 'oc' : 'q', RQ_MOVIL.matches ? x.oc : 'OC ' + x.oc, 'ver')}</div></div>`; };
   const cab = o.unaSola ? `<p>La más atrasada es la <b>OC ${escapeHtml(l[0].oc.replace(/^000\d-0*/, ''))}</b> de ${escapeHtml(l[0].prov || '')}: vencida hace <b>${l[0].d} d.h.</b> (${escapeHtml(PD_PERSONAS[l[0].persona] || '')}).</p>` : '';
   return `<div class="cab">${titulo}</div><div class="sub">${escapeHtml(quien)}</div>${cab}
     <p><b>${l.length}</b> OC${!o.venc && nv ? ` · <b style="color:var(--red)">${nv}</b> vencidas` : ''}.</p>
@@ -14669,7 +14742,7 @@ function polarIntenciones(q, qr, p){
   }
   // Proveedores con más vencidas
   if(/proveedor(es)?/.test(q) && /(mas|mayor|peor).*vencid|vencid.*(mas|mayor)/.test(q)) return polarProveedoresVencidas();
-  if(/(comprador|compradores|quien|persona).*(mas|mayor)|mas (oc )?vencidas (tiene|por persona)/.test(q) && /vencid|atras/.test(q) && !per) return null;   // ranking por comprador: lo contesta polarVencidas
+  if(/(comprador|compradores|quien|persona).*(mas|mayor)|mas (oc )?vencidas (tiene|por persona)/.test(q + ' ' + qr) && /vencid|atras/.test(q + ' ' + qr) && !per) return null;   // ranking por comprador: lo contesta polarVencidas
   // OC sin aprobar
   if(/sin aprobar|falta(n)? aprobar|por aprobar|no (estan|esta) aprobad|pendientes? de aprobacion/.test(q)) return polarOCsLista({ sinAp:true, persona:per });
   // La OC más atrasada / OC vencidas (de alguien)
@@ -15173,12 +15246,14 @@ function polarResponder1(texto){
   // "Mis…" explícito, o implícito en la vista Supervisor. Implícito solo vale si quien pregunta tiene
   // requerimientos a su nombre; si no (por ejemplo Gerencia mirando como supervisor), se contesta con
   // todos (30.09.2026: "¿qué salió a obra esta semana?" respondía "no encontré requerimientos a tu nombre").
-  const esMioExpl = /\bmis?\b (requerimiento|requerimientos|pedido|pedidos|obra|obras|cosas|items)|\bmi requerimiento|tengo .*requerimiento|requerimientos? tengo|lo que pedi|me falta|mis pendientes|\bpedi\b/.test(q);
-  if(/\bde todos\b|todos los requerimientos/.test(q) && /requerimiento|pendientes|salio|llego|vencidas|revision|sin oc|con oc|almacen/.test(q)){
+  const esMioExpl = /\bmis?\b (requerimiento|requerimientos|pedido|pedidos|obra|obras|cosas|items)|\bmi requerimiento|tengo .*requerimiento|requerimientos? tengo|lo que pedi|me falta|mis pendientes|\bpedi\b/.test(q) || (soloReqs && /\bque tengo\b|\bme (llega|toca)|\bmios\b|\bmias\b/.test(q));
+  if(/\bde todos\b|todos los (requerimientos|req)\b/.test(q) && /requerimiento|\breq\b|pendientes|salio|llego|vencidas|revision|sin oc|con oc|almacen|consultar|ver/.test(q)){
     rqPreparar(); const evA = polarEventoDe(q);
     return evA ? polarEventos(RQ.filas, evA, p || polarPeriodoDe('esta semana')) : polarSobreFilas(RQ.filas, q, 'Todos los requerimientos', p);
   }
-  const esMioImpl = soloReqs && /requerimiento|pendientes|vencidas|en revision|sin oc|con oc|en almacen|enviado|llego|salio/.test(q);
+  // Ya no hay "míos" implícito (30.09.2026, Piero: "por defecto el supervisor pueda consultar de todo…
+  // si pregunta en específico por 'mis requerimientos' ahí sí serían los que él ha generado").
+  const esMioImpl = false;
   const misFilas = (esMioExpl || esMioImpl) ? polarMisFilas() : null;
   const esMio = esMioExpl || (esMioImpl && misFilas && misFilas.length);
   if(esMioImpl && !esMio){
@@ -15206,6 +15281,13 @@ function polarResponder1(texto){
   if(!soloReqs && /almacen|kardex/.test(q) && /(ingres|entr|llego|llegaron|recib|salio|salida|despach)/.test(q) && !/requerimiento|obra/.test(q)) return polarMovimientosAlmacen(p || polarPeriodoDe('esta semana'), /(salio|salida|despach)/.test(q) ? 'out' : 'in');
   const ev = polarEventoDe(q);
   if(ev && (p || /requerimiento/.test(q))){ rqPreparar(); return polarEventos(RQ.filas, ev, p || polarPeriodoDe('esta semana')); }
+  // Pregunta general de requerimientos ("estado de req", "requerimientos atrasados", "¿qué está en
+  // revisión?"): de TODOS, no solo de quien pregunta.
+  if((soloReqs ? /requerimiento|\breq\b|pendientes|vencidas|atrasad|en revision|sin oc|con oc|en almacen|enviado|llego|salio|estado/ : /estado de (los )?(requerimientos?|req)\b|^(los )?(requerimientos?|req) (pendientes|atrasados|abiertos)$/).test(q)
+      && !/\b(proyecto|pry|obra)\b/.test(q)){
+    rqPreparar(); POLAR.nuevoRef = 'todos los requerimientos'; POLAR.nuevoRefTxt = 'todos los requerimientos';
+    return polarSobreFilas(RQ.filas, q, 'Todos los requerimientos', p);
+  }
 
   if(soloReqs){
     // Supervisor: solo requerimientos y proyectos (por nombre); lo demás queda fuera de su vista.
@@ -15292,6 +15374,8 @@ function polarSitCorta(r){
     return [v ? 'tarde' : 'camino', '🧾', r.fCompromiso ? 'Llega aprox. ' + rqFecha(r.fCompromiso) : 'Con OC, por llegar', v ? '⚠️ atrasada' : ''];
   }
   if(e === 'Recibido en Almacén') return ['recibido', '🏬', 'En almacén, por despachar', polarDh(r.fRecep)];
+  if(r.partido && !(r.cantRecep > 0 || r.fRecep))
+    return [r.codOrden ? 'camino' : 'espera', '🛒', polarNum(r.cantPedido) + ' ' + um + (r.codOrden ? ' con OC ' + r.codOrden : ' en Compras, sin OC'), polarNum(r.cantSalida) + (r.cantSalida === 1 ? ' ya salió' : ' ya salieron') + ' del stock'];
   if(e === 'Enviado a Obra') return ['camino', '🚚', falta ? 'Salió en parte · faltan ' + falta : 'Salió a obra', rqFecha(r.fSalida)];
   if(e === 'Recibido en Obra') return ['ok', '🏗️', 'Recibido en obra', rqFecha(r.fObra)];
   return ['', '•', e || '—', ''];
@@ -15360,6 +15444,19 @@ function polarProyectoPorNombre(palabras){
   }
   if(!ids.size) return null;
   if(ids.size === 1) return polarProyecto([...ids.keys()][0]);
+  // Mismo cliente en varios proyectos (BOMAREA en PRY…32, PRY…02, ALMACEN GENERAL…): se contesta con todo
+  // lo del cliente junto y abajo se puede elegir un proyecto (30.09.2026, Piero: "quiero ver los de bomarea").
+  const nombres = new Set([...ids.values()].map(function(n){ return polarNorm(n).replace(/[^a-z0-9 ]+/g, '').trim(); }));
+  if(nombres.size === 1){
+    // Por id Y por nombre: "ALMACEN GENERAL" es un id compartido por varios clientes.
+    const nomN = [...nombres][0], idsSet = new Set(ids.keys());
+    const filas = RQ.filas.filter(function(r){ return idsSet.has(r.idProyecto) && polarNorm(r.proyecto).replace(/[^a-z0-9 ]+/g, '').trim() === nomN; });
+    const nom = [...ids.values()][0];
+    POLAR.nuevoRef = 'cliente ' + polarNorm(nom); POLAR.nuevoRefTxt = nom;
+    const q0 = POLAR.entendido || '', p0 = polarPeriodoDe(q0);
+    return polarSobreFilas(filas, q0, nom + ' · ' + ids.size + ' proyectos', p0)
+      + `<div class="asis-acc">${[...ids.entries()].sort(function(a,b){ return a[0] < b[0] ? 1 : -1; }).slice(0, 6).map(function(e){ return polarBtn('q', e[0], escapeHtml(e[0])); }).join('')}</div>`;
+  }
   const opts = [...ids.entries()].sort(function(a,b){ return a[0] < b[0] ? 1 : -1; }).slice(0, 6).map(function(e){
     return polarBtn('q', e[0], escapeHtml(polarCorta(e[1], 34)) + ' · ' + escapeHtml(e[0]));
   }).join('');
@@ -15435,12 +15532,13 @@ function polarOC(cod){
   const reqs = [...new Set(filas.map(function(r){ return r.codRequerimiento; }).filter(Boolean))];
   const f = filas.find(function(r){ return r.fCompromiso; });
   const rec = function(r){ const q = r.cantOrden != null ? r.cantOrden : r.cantidadOrden, x = r.cantRecep != null ? r.cantRecep : r.cantRecepcion; return [q, x || 0]; };
-  const venc = f && busdayCount(f.fCompromiso, new Date()) > 0 && !/atendido completo/i.test(est);
+  const impI = ocImportInfo(cod), enTr = !!(impI && (impI.etd || impI.fReal));
+  const venc = f && busdayCount(f.fCompromiso, new Date()) > 0 && !/atendido completo/i.test(est) && !enTr;
   const fin = ocFinalizada(cod);
   const filaI = function(r){ const c = rec(r); return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 46))}</div><div class="s"><small>recibido ${polarNum(c[1])} de ${polarNum(c[0])}</small>${r.codRequerimiento ? '<small class="mono">req ' + escapeHtml(r.codRequerimiento.replace(/^0001-0*/, '')) + '</small>' : '<small>pedido directo</small>'}</div></div>`; };
   return `<div class="cab">OC <span class="mono">${escapeHtml(cod.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(polarCorta(f0.proveedor || 'sin proveedor', 32))}</div>
-    <div class="sub">${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden).replace(/ \d{4}$/, '') : ''}${f ? ' · entrega ' + rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : ''}${f0.origen === 'importado' ? ' · 🌎 importación' : ''}${f0.usuarioCompras ? ' · comprador ' + escapeHtml(PD_PERSONAS[pdPersona(f0.usuarioCompras)] || f0.usuarioCompras) : ''}</div>
-    ${fin ? `<p><span class="asis-est ok">✔ Finalizada (OC Finalizadas.xlsx)</span>${[OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).length ? '<small> · ' + escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · ')) + '</small>' : ''}</p>` : est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? ' · atrasada' : ''}</span></p>` : ''}
+    <div class="sub">${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden).replace(/ \d{4}$/, '') : ''}${f ? (impI ? ' · entrega del proveedor ' : ' · entrega ') + rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : ''}${impI && impI.etd ? ' · zarpó ' + rqFecha(impI.etd).replace(/ \d{4}$/, '') : ''}${f0.origen === 'importado' || impI ? ' · 🌎 importación' : ''}${f0.usuarioCompras ? ' · comprador ' + escapeHtml(PD_PERSONAS[pdPersona(f0.usuarioCompras)] || f0.usuarioCompras) : ''}</div>
+    ${fin ? `<p><span class="asis-est ok">✔ Finalizada (OC Finalizadas.xlsx)</span>${[OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).length ? '<small> · ' + escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · ')) + '</small>' : ''}</p>` : est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? (impI ? ' · proveedor atrasado' : ' · atrasada') : (enTr && !/atendido completo/i.test(est) ? (impI.etd ? ' · en tránsito' : ' · lista en fábrica') : '')}</span></p>` : ''}
     ${items.slice(0, 5).map(filaI).join('')}
     ${polarMas(items, 5, filaI, 'ítems')}
     <div class="asis-acc">${RQ_MOVIL.matches ? polarBtn('oc', cod, '📄 Ver cómo va la OC') : ''}${polarBtn('q', 'proveedor ' + (f0.proveedor || ''), 'Proveedor')}${reqs.slice(0, 2).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r.replace(/^0001-0*/, ''))); }).join('')}</div>`;
@@ -15473,7 +15571,7 @@ function polarDiasVencida(r){ return r.fCompromiso ? busdayCount(r.fCompromiso, 
 function polarTopVencidas(filas, n){
   const porOC = new Map();
   filas.forEach(function(r){
-    if(r.tipo !== 'oc') return;
+    if(r.tipo !== 'oc' || ocEnTransito(r.codOrden)) return;   // importación ya entregada o zarpada: en tránsito, no vencida
     const d = polarDiasVencida(r); if(!(d > 0)) return;
     if(!porOC.has(r.codOrden)) porOC.set(r.codOrden, { oc:r.codOrden, proveedor:r.proveedor, d, persona:r.persona });
   });
