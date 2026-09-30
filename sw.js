@@ -2,7 +2,7 @@
 // Primero la red, para que siempre se vea lo último publicado (index.html y data.json.gz); si no hay
 // señal, se abre la última copia guardada en el celular. Solo archivos de este mismo sitio: lo que va a
 // GitHub (Guardar y compartir) y a Google no pasa por aquí.
-const CACHE = 'friopacking-v2';
+const CACHE = 'friopacking-v3';
 self.addEventListener('install', function(e){
   self.skipWaiting();
   // La primera vez se guarda la página misma, para que abra aunque luego no haya señal.
