@@ -7,6 +7,18 @@
      puede "Agregar a pantalla de inicio" y queda como una app, a pantalla completa y con el ícono
      de la empresa. No hace falta instalar nada ni publicar en tiendas. -->
 <meta name="theme-color" content="#0a1e64">
+<script>
+// Modo app (30.09.2026, Piero: "ajustar la página web para que sea similar al del aplicativo"): en el
+// celular siempre, y en la PC también, salvo que alguien de Logística/Gerencia haya elegido "Ver la
+// plataforma completa". Se decide acá, antes de pintar, para que no se vea la plataforma vieja un instante.
+(function(){ try{
+  var cel = window.matchMedia && matchMedia('(max-width: 760px)').matches, u = null;
+  try{ u = JSON.parse(localStorage.getItem('fp-usuario') || 'null'); }catch(e){}
+  var completa = !cel && localStorage.getItem('fp-pc-completa') === '1' && u && (u.tipo === 'logistica' || u.tipo === 'gerencia');
+  if(!completa) document.documentElement.classList.add('app-modo');
+  if(!cel && !completa) document.documentElement.classList.add('app-pc');
+}catch(e){ document.documentElement.classList.add('app-modo'); } })();
+</script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -893,26 +905,26 @@
      El asistente (asis-) sí existe en los dos, en la PC como panel lateral.
      =================================================================================== */
   .app-top,.app-tabbar,.app-sheet-fondo,.app-bienv,#section-inicio{display:none;}
+  html.app-pc .app-shell > .sidebar, html.app-pc .main > .topbar{display:none !important;}
   /* Pantalla de arranque (30.09.2026): se ve desde el primer instante al abrir la app en el celular y
      se va sola cuando llegan los datos. Por si algo falla, a los 12 s se oculta sola igual. */
   .app-splash{display:none;}
-  @media (max-width:760px){
     /* Continúa sin corte la pantalla de arranque de Android (manifest: fondo #0a1e64 y el logo al centro):
        mismo azul, mismo logo en el mismo lugar, y recién ahí aparecen el anillo, el brillo y el nombre. */
-    .app-splash{position:fixed;inset:0;z-index:200;display:block;color:#fff;background:#0a1e64;animation:spAuto .5s 12s forwards;}
-    .app-splash::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 70% at 50% 45%,rgba(40,90,220,.45) 0%,rgba(10,30,100,0) 60%),radial-gradient(140% 90% at 50% 110%,rgba(4,12,46,.9) 0%,rgba(4,12,46,0) 70%);animation:appFundido 1.2s ease-out both;}
-    .app-splash .sp-logo{position:absolute;left:50%;top:50%;width:132px;height:132px;margin:-66px 0 0 -66px;display:grid;place-items:center;}
-    .app-splash .sp-logo img{width:84px;height:84px;animation:spLogo 1.1s cubic-bezier(.22,.8,.2,1) both;filter:drop-shadow(0 8px 22px rgba(62,198,172,.35));}
-    .app-splash .sp-anillo{position:absolute;inset:0;border-radius:50%;
+    html.app-modo .app-splash{position:fixed;inset:0;z-index:200;display:block;color:#fff;background:#0a1e64;animation:spAuto .5s 12s forwards;}
+    html.app-modo .app-splash::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 70% at 50% 45%,rgba(40,90,220,.45) 0%,rgba(10,30,100,0) 60%),radial-gradient(140% 90% at 50% 110%,rgba(4,12,46,.9) 0%,rgba(4,12,46,0) 70%);animation:appFundido 1.2s ease-out both;}
+    html.app-modo .app-splash .sp-logo{position:absolute;left:50%;top:50%;width:132px;height:132px;margin:-66px 0 0 -66px;display:grid;place-items:center;}
+    html.app-modo .app-splash .sp-logo img{width:84px;height:84px;animation:spLogo 1.1s cubic-bezier(.22,.8,.2,1) both;filter:drop-shadow(0 8px 22px rgba(62,198,172,.35));}
+    html.app-modo .app-splash .sp-anillo{position:absolute;inset:0;border-radius:50%;
       background:conic-gradient(from 0deg,rgba(62,198,172,0) 0deg,rgba(62,198,172,.9) 300deg,rgba(62,198,172,0) 360deg);
       -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));
       animation:spGira 1.4s linear infinite, appFundido .6s .3s both;}
-    .app-splash .sp-halo{position:absolute;inset:14px;border-radius:50%;background:rgba(255,255,255,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);animation:appFundido .8s both;}
-    .app-splash .sp-marca{position:absolute;left:0;right:0;top:calc(50% + 88px);text-align:center;font-size:24px;font-weight:800;letter-spacing:-.3px;animation:bvEntraSp .8s .3s cubic-bezier(.22,.8,.2,1) both;}
-    .app-splash .sp-sub{position:absolute;left:0;right:0;top:calc(50% + 122px);text-align:center;font-size:12.5px;opacity:.65;letter-spacing:.08em;text-transform:uppercase;animation:bvEntraSp .8s .45s cubic-bezier(.22,.8,.2,1) both;}
-    .app-splash .sp-pie{position:absolute;left:0;right:0;text-align:center;bottom:calc(34px + env(safe-area-inset-bottom));font-size:11.5px;opacity:.45;animation:appFundido 1s .6s both;}
-    .app-splash.fuera{animation:spFuera .55s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none;}
-  }
+    html.app-modo .app-splash .sp-halo{position:absolute;inset:14px;border-radius:50%;background:rgba(255,255,255,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);animation:appFundido .8s both;}
+    html.app-modo .app-splash .sp-marca{position:absolute;left:0;right:0;top:calc(50% + 88px);text-align:center;font-size:24px;font-weight:800;letter-spacing:-.3px;animation:bvEntraSp .8s .3s cubic-bezier(.22,.8,.2,1) both;}
+    html.app-modo .app-splash .sp-sub{position:absolute;left:0;right:0;top:calc(50% + 122px);text-align:center;font-size:12.5px;opacity:.65;letter-spacing:.08em;text-transform:uppercase;animation:bvEntraSp .8s .45s cubic-bezier(.22,.8,.2,1) both;}
+    html.app-modo .app-splash .sp-pie{position:absolute;left:0;right:0;text-align:center;bottom:calc(34px + env(safe-area-inset-bottom));font-size:11.5px;opacity:.45;animation:appFundido 1s .6s both;}
+    html.app-modo .app-splash.fuera{animation:spFuera .55s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none;}
+  
   @keyframes spLogo{from{transform:scale(.86);}to{transform:none;}}
   @media (max-width:760px) and (display-mode: standalone){ html{background:#0a1e64;} }
   @keyframes spGira{to{transform:rotate(360deg);}}
@@ -1509,6 +1521,7 @@
       <button class="btn secondary icon-only" id="btnConnect" title="Conectar GitHub">🔑</button>
       <button class="btn secondary icon-only" id="btnPublish" disabled title="Primero carga tu Reporte Maestro.xlsx arriba.">☁</button>
       <button class="btn secondary icon-only" id="btnAuto" type="button" title="Guardado automático">🔄</button>
+      <button class="btn secondary" id="btnVistaApp" type="button" title="Volver a la vista tipo app" onclick="try{localStorage.removeItem('fp-pc-completa')}catch(e){};location.reload();">📱 Vista app</button>
       <button class="theme-toggle icon-only" id="btnTheme" type="button" title="Cambiar entre modo claro y oscuro">☀️</button>
     </div>
   </div>
@@ -11113,7 +11126,12 @@ function drawRequerimientos(){
 
 // En el celular la tabla de 31 columnas medía 3,600 px dentro de una pantalla de 360: solo se veían
 // fecha, N° y responsable repetidos. Ahí se dibuja una tarjeta por ítem (25.09.2026).
-const RQ_MOVIL = window.matchMedia ? window.matchMedia('(max-width: 760px)') : { matches:false };
+const RQ_MQ = window.matchMedia ? window.matchMedia('(max-width: 760px)') : { matches:false };
+// En la PC en modo app todo lo del celular se comporta igual (30.09.2026): RQ_MOVIL responde "sí".
+const APP_EN_PC = document.documentElement.classList.contains('app-pc');
+const RQ_MOVIL = { get matches(){ return RQ_MQ.matches || APP_EN_PC; },
+  addEventListener: function(t, f){ if(RQ_MQ.addEventListener) RQ_MQ.addEventListener(t, f); },
+  addListener: function(f){ if(RQ_MQ.addListener) RQ_MQ.addListener(f); } };
 
 // Dónde está cada ítem y desde cuándo, en palabras (29.09.2026, Piero: "si está en OC que vea cuándo
 // estaría llegando y a quién se le va a comprar; si está en pedido, hace cuánto está así").
@@ -12633,7 +12651,7 @@ function appConstruir(){
   document.getElementById('asisDet').addEventListener('input', function(e){ if(e.target.id !== 'asisDetBusca') return;
     clearTimeout(polarDetClick._t); const v = e.target.value; polarDetClick._t = setTimeout(function(){ POLAR_DET.q = v; POLAR_DET.tope = 40; polarDetPintar(); }, 200); });
   document.getElementById('asisSug').addEventListener('click', polarAccion);
-  if(RQ_MOVIL.addEventListener) RQ_MOVIL.addEventListener('change', function(){
+  if(RQ_MOVIL.addEventListener && !APP_EN_PC) RQ_MOVIL.addEventListener('change', function(){
     if(!RQ_MOVIL.matches && APP.enInicio) irASeccion('proceso');
     if(RQ_MOVIL.matches) appArrancar();
   });
@@ -12676,7 +12694,49 @@ function appAtrasPreparar(){
   });
 }
 
+// ---------- La app en la PC (30.09.2026) ----------
+// Se reusan TAL CUAL las reglas del celular (las de @media max-width 760px) y encima se acomodan para
+// pantalla ancha: contenido centrado, barra de abajo flotante, Leo como panel a la derecha (o al centro,
+// para el supervisor) y el menú ☰ centrado. Nada del celular cambia.
+const APP_PC_CSS = `
+  body.app-pc{padding-bottom:120px;}
+  body.app-pc .app-top{padding-left:max(20px, calc((100% - 980px) / 2));padding-right:max(20px, calc((100% - 980px) / 2));}
+  body.app-pc .content{max-width:940px;margin:0 auto;width:100%;box-sizing:border-box;padding:22px 20px 40px;}
+  body.app-pc .app-tabbar{left:50%;right:auto;bottom:18px;width:min(640px, calc(100% - 32px));transform:translateX(-50%);border-radius:24px;
+    box-shadow:0 14px 40px rgba(10,30,100,.18);padding-bottom:6px;}
+  body.app-pc .app-tabbar button{cursor:pointer;} body.app-pc .app-tabbar button:hover{color:var(--brand-ink);}
+  body.app-pc .asis{inset:16px 16px 16px auto;width:460px;height:auto;border-radius:22px;border:1px solid var(--border);box-shadow:0 24px 60px rgba(10,20,40,.3);}
+  body.app-pc.vista-supervisor .asis{inset:0;width:auto;border-radius:0;border:0;box-shadow:none;}
+  body.app-pc.vista-supervisor .asis-cab, body.app-pc.vista-supervisor .asis-chat, body.app-pc.vista-supervisor .asis-sug, body.app-pc.vista-supervisor .asis-pie{
+    padding-left:max(16px, calc((100% - 860px) / 2));padding-right:max(16px, calc((100% - 860px) / 2));}
+  body.app-pc .asis-escucha{left:max(12px, calc((100% - 860px) / 2));right:max(12px, calc((100% - 860px) / 2));}
+  body.app-pc .app-sheet-fondo{justify-content:center;align-items:center;}
+  body.app-pc .app-sheet{max-width:520px;border-radius:24px;padding-bottom:18px;max-height:calc(100vh - 60px);overflow-y:auto;}
+  body.app-pc .app-sheet-fondo.abierto .app-sheet{animation:appSubeSuave .35s cubic-bezier(.22,.8,.2,1);}
+  body.app-pc .app-sheet-fondo.cerrando .app-sheet{animation:appFondoSale .25s ease-in forwards;}
+  body.app-pc .app-toast{bottom:110px;}
+  body.app-pc .m-fila:hover, body.app-pc .m-prod-cab:hover, body.app-pc .ind-fila:hover{background:var(--surface-2);}
+  body.app-pc .m-cal-dias button{aspect-ratio:auto;height:44px;font-size:14px;} body.app-pc .m-cal-dias button:hover{filter:brightness(.95);}
+  body.app-pc .asis-fab{display:none;}
+  body.app-pc.vista-supervisor .asis-fab{display:flex;}
+`;
+function appPcActivar(){
+  if(!APP_EN_PC || document.getElementById('appPcCss')) return;
+  let css = '';
+  for(const hoja of document.styleSheets){
+    let reglas; try{ reglas = hoja.cssRules; }catch(err){ continue; }
+    for(const r of reglas){
+      if(r.type === 4 && r.media && /^\(max-width:\s*760px\)$/.test(r.media.mediaText.trim())){
+        for(const x of r.cssRules) css += x.cssText + '\n';
+      }
+    }
+  }
+  const st = document.createElement('style'); st.id = 'appPcCss'; st.textContent = css + APP_PC_CSS;
+  document.head.appendChild(st);
+  document.body.classList.add('app-pc');
+}
 function appArrancar(){
+  appPcActivar();
   if(!RQ_MOVIL.matches){ appSplashFuera(); return; }
   appAtrasPreparar();
   if(!APP.usuario || !APP.vista){ appBienvenida(); return appSplashFuera(); }
@@ -13608,6 +13668,8 @@ function appAbrirSheet(){
       <button type="button" data-accion="btnAuto"><span>🔄</span>Guardado automático</button>` : ''}
     ${appEsInstalada() ? '' : `<h4>App</h4>
     <button type="button" data-instalar="1"><span>📲</span>Instalar la app en este equipo</button>`}
+    ${APP_EN_PC && APP.usuario && (APP.usuario.tipo === 'logistica' || APP.usuario.tipo === 'gerencia') ? `<h4>Plataforma</h4>
+    <button type="button" data-completa="1"><span>🖥️</span>Ver la plataforma completa<em>módulos, filtros y reportes</em></button>` : ''}
     <h4>Usuario</h4>
     <button type="button" data-usuario="salir"><span>🚪</span>Cambiar de usuario</button>`;
   const fondo = document.getElementById('appSheet');
@@ -13619,6 +13681,7 @@ function appAbrirSheet(){
     if(b.dataset.vista) return appElegirVista(b.dataset.vista);
     if(b.dataset.usuario) return appCerrarUsuario();
     if(b.dataset.instalar) return appInstalar();
+    if(b.dataset.completa){ try{ localStorage.setItem('fp-pc-completa', '1'); }catch(err){} location.reload(); return; }
     if(b.dataset.accion){ appCerrarSheet(); document.getElementById(b.dataset.accion).click(); }
   };
 }
