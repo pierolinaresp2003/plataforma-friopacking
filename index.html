@@ -13736,6 +13736,70 @@ function appPendLogGruposCalc(){
   const orden = function(m){ return [...m.values()].map(function(y){ y.d = y.f ? Math.max(0, busdayCount(y.f, new Date())) : 0; return y; }).sort(function(a,b){ return b.d - a.d; }); };
   return { rev:orden(g.rev), des:orden(g.des), par:orden(g.par) };
 }
+// ---------- Dashboard de importaciones del año (30.09.2026, Piero: "quiero un dashboard de todas las
+// importaciones de este año 2026") ----------
+// Todas las OC de importación emitidas en el año (Reporte Maestro + PedidoSinReq): cuántas, cuánto, a quién,
+// en qué estado van (llegó / en tránsito / por embarcar / pendiente booking), por mes y cuánto tardan.
+function appDashImpDatos(anio){ return appMemo('dashimp' + anio, function(){
+  const hoy = polarDia(new Date()), est = new Map(), L = appImpDatos(), m = new Map();
+  ['tr', 'em', 'bk'].forEach(function(k){ L[k].forEach(function(g){ g.ocs.forEach(function(o){ est.set(o, k); }); }); });
+  polarLineasOC().forEach(function(r){
+    if(!(r.origen === 'importado' || /^0002-/.test(r.codOrden || '')) || !r.fOrden || r.fOrden.getUTCFullYear() !== anio) return;
+    const o = m.get(r.codOrden) || { oc:r.codOrden, prov:r.proveedor || '', persona:pdPersona(r.usuarioCompras), f:r.fOrden, pen:0, filas:[], abierta:false, fRecep:null, prys:new Set(), pryPen:new Map() };
+    const lbl = monedaLabel(r.moneda), mo = r.montoNativo || 0, pen = lbl === 'S/' ? mo : mo * (TIPO_CAMBIO[lbl] || TIPO_CAMBIO.USD);
+    o.pen += pen; o.filas.push(r);
+    const kp = !r.proyecto || /^pedido directo|sin proyecto/i.test(r.proyecto) ? 'Stock / sin proyecto' : appImpNombre(r.proyecto); o.pryPen.set(kp, (o.pryPen.get(kp) || 0) + pen);
+    if(pdOcPendiente(r)) o.abierta = true;
+    if(r.fRecep && (!o.fRecep || r.fRecep > o.fRecep)) o.fRecep = r.fRecep;
+    if(r.proyecto) o.prys.add(/^pedido directo/i.test(r.proyecto) ? 'Stock / sin proyecto' : appImpNombre(r.proyecto));
+    m.set(r.codOrden, o);
+  });
+  const ocs = [...m.values()];
+  ocs.forEach(function(o){
+    if(ocFinalizada(o.oc)) o.k = 'fin';
+    else if(!o.abierta) o.k = 'ok';
+    else o.k = est.get(o.oc) || (function(){ const i = ocImportInfo(o.oc) || {}; return !i.etd ? 'bk' : (polarDia(i.etd) <= hoy ? 'tr' : 'em'); })();
+    o.dias = o.k === 'ok' && o.fRecep ? Math.round((polarDia(o.fRecep) - polarDia(o.f)) / 864e5) : null;
+  });
+  return ocs;
+}); }
+const APP_DASH_EST = { ok:['✅', 'Llegaron a Lurín', 'verde'], tr:['🚢', 'En tránsito', 'azul'], em:['🛳️', 'Por embarcar', 'azul'], bk:['⏳', 'Pendiente booking', 'ambar'], fin:['✔', 'Finalizadas (Excel)', 'gris'] };
+function appDashImpResumen(anio){
+  const ocs = appDashImpDatos(anio), tot = ocs.reduce(function(a, o){ return a + o.pen; }, 0);
+  const cuenta = {}; ocs.forEach(function(o){ cuenta[o.k] = (cuenta[o.k] || 0) + 1; });
+  const d = ocs.map(function(o){ return o.dias; }).filter(function(x){ return x != null && x >= 0; }).sort(function(a,b){ return a - b; });
+  return { ocs:ocs, tot:tot, cuenta:cuenta, prov:new Set(ocs.map(function(o){ return o.prov; })).size,
+    prom:d.length ? Math.round(d.reduce(function(a,b){ return a + b; }, 0) / d.length) : null, med:d.length ? d[Math.floor(d.length / 2)] : null, nd:d.length };
+}
+function appDashImport(anio){
+  anio = anio || appIndCorte().getUTCFullYear();
+  const R = appDashImpResumen(anio), ocs = R.ocs;
+  if(!ocs.length) return appToast('No hay importaciones emitidas en ' + anio + '.');
+  const grupo = function(campo){ const g = new Map(); ocs.forEach(function(o){ (o[campo] instanceof Set ? [...o[campo]] : [o[campo] || '—']).forEach(function(k){ g.set(k, (g.get(k) || 0) + o.pen); }); }); return [...g.entries()].sort(function(a,b){ return b[1] - a[1]; }); };
+  const nom = function(p){ return PD_PERSONAS[p] || p || '—'; };
+  const hasta = anio === appIndCorte().getUTCFullYear() ? appIndCorte().getUTCMonth() : 11;
+  const meses = []; for(let i = 0; i <= hasta; i++){ const l = ocs.filter(function(o){ return o.f.getUTCMonth() === i; }); meses.push([MESES_CORTOS[i], l.length, l.reduce(function(a, o){ return a + o.pen; }, 0)]); }
+  const maxM = Math.max.apply(null, meses.map(function(x){ return x[2]; }).concat([1]));
+  const orden = ['ok', 'tr', 'em', 'bk', 'fin'].filter(function(k){ return R.cuenta[k]; });
+  const filaOC = function(o){ const i = ocImportInfo(o.oc) || {}, e = APP_DASH_EST[o.k];
+    const v = o.k === 'ok' ? (o.fRecep ? 'llegó ' + appDDMM(o.fRecep) : 'llegó') : o.k === 'tr' ? 'ETD ' + appDDMM(i.etd) : o.k === 'em' ? 'zarpa ' + appDDMM(i.etd) : o.k === 'bk' ? (i.fReal ? 'lista en fábrica' : 'por definir') : '';
+    return appFilaHtml('data-oc="' + escapeHtml(o.oc) + '"', e[2], polarCorta(appImpNombre(o.prov), 38), 'OC ' + escapeHtml(o.oc.replace(/^0002-0*/, '')) + ' · ' + appDDMM(o.f) + ' · ' + escapeHtml(nom(o.persona).split(' ')[0]) + (o.prys.size ? ' · ' + escapeHtml(polarCorta([...o.prys].join(' · '), 30)) : ''), appUSD(o.pen), v); };
+  appListaAbrir('📊 Importaciones ' + anio, ocs.length + ' OC emitidas · datos al ' + rqFecha(appIndCorte()), `
+    <div class="ini-card m-total"><span>Monto total (equivalente en dólares)</span><b>${appUSD(R.tot)}</b><small>${ocs.length} OC · ${R.prov} proveedores · ${ocs.reduce(function(a, o){ return a + o.filas.length; }, 0)} líneas</small>
+      <div class="m-tiles">${orden.map(function(k){ const e = APP_DASH_EST[k]; return `<div><span>${e[0]} ${e[1]}</span><b>${R.cuenta[k]}</b></div>`; }).join('')}</div></div>
+    <div class="ini-card"><div class="ini-card-tit">📅 OC emitidas por mes</div>
+      <div class="m-cols" style="grid-template-columns:repeat(${meses.length},1fr)">${meses.map(function(x){ return `<div><i><em style="height:${Math.max(3, x[2] / maxM * 100).toFixed(0)}%"></em></i><b>${x[1]}</b><small>${x[0]}</small></div>`; }).join('')}</div>
+      <div class="m-sec-nota">Barra = monto del mes · número = cantidad de OC.</div></div>
+    ${R.prom != null ? `<div class="ini-card"><div class="ini-card-tit">⏱️ ¿Cuánto tardaron en llegar?</div><div class="m-tiles"><div><span>Promedio</span><b>${R.prom} días</b></div><div><span>Lo normal (mediana)</span><b>${R.med} días</b></div><div><span>OC medidas</span><b>${R.nd}</b></div></div>
+      <div class="m-sec-nota">Días calendario desde que se emitió la OC hasta que llegó a Lurín (solo las que ya llegaron completas).</div></div>` : ''}
+    <div class="ini-card"><div class="ini-card-tit">🏭 Proveedores</div>${appBarras(grupo('prov').slice(0, 8), R.tot)}</div>
+    <div class="ini-card"><div class="ini-card-tit">🏗️ Proyectos</div>${appBarras((function(){ const g = new Map(); ocs.forEach(function(o){ o.pryPen.forEach(function(v, k){ g.set(k, (g.get(k) || 0) + v); }); }); return [...g.entries()].sort(function(a,b){ return b[1] - a[1]; }); })().slice(0, 8), R.tot)}</div>
+    <div class="ini-card"><div class="ini-card-tit">🧑‍💼 Compradores</div>${appBarras(grupo('persona').map(function(x){ return [nom(x[0]), x[1]]; }).slice(0, 8), R.tot)}</div>
+    <div class="oc-tit">Todas las OC por estado</div>
+    ${orden.map(function(k){ const e = APP_DASH_EST[k], l = ocs.filter(function(o){ return o.k === k; }).sort(function(a,b){ return b.f - a.f; });
+      return `<details class="m-sec ${e[2]}"${k === 'tr' ? ' open' : ''}><summary><span>${e[0]} ${e[1]}</span><b>${l.length}</b></summary>${l.map(filaOC).join('')}</details>`; }).join('')}`);
+}
+
 // ---------- Estatus de importaciones (reemplaza Pendientes de Logística, 30.09.2026) ----------
 // Pedido de Piero: la pestaña Logística muestra el estatus de las importaciones abiertas, como las
 // infografías del Control Tower. Solo con datos de Nisira: ETD = zarpe; ParaFechaOrden = ETA cuando ya
@@ -13844,6 +13908,7 @@ function appPendLogHtml(){
   const tile = function(k, cls){ const l = L[k], noc = l.reduce(function(s, g){ return s + g.ocs.length; }, 0);
     return `<button type="button" class="${cls}${APP_PL.sec === k && !APP_PL.q ? ' sel' : ''}" data-plsec="${k}"><b>${l.length}</b><span>${APP_IMP_SEC[k][1]}</span><small>${noc} OC</small></button>`; };
   return `<div class="m-resumen tres m-pl-tabs imp-tabs">${tile('tr', 'imp-tr')}${tile('em', 'imp-em')}${tile('bk', 'imp-bk')}</div>
+    <button type="button" class="m-aviso" data-dashimp="${appIndCorte().getUTCFullYear()}">📊 Dashboard de importaciones ${appIndCorte().getUTCFullYear()} ›</button>
     <div class="m-buscar"><input type="search" id="plBusca" placeholder="🔍 OC, proveedor, proyecto o producto" value="${escapeHtml(APP_PL.q)}"></div>
     <div id="plLista">${appPendLogLista()}</div>
     <div class="m-sec-nota">ETD: zarpe · ETA: llegada estimada (ParaFechaOrden en Nisira) · toca una OC para ver su detalle.</div>`;
@@ -14031,6 +14096,7 @@ function appNormReq(t){
 function appClickInicio(e){
   const b = e.target.closest('button, [data-clic]'); if(!b || b.type === 'submit') return;
   if(b.dataset.inddet) return appIndDetalle(b.dataset.inddet);
+  if(b.dataset.dashimp) return appDashImport(+b.dataset.dashimp);
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
   if(b.dataset.caldet) return appCalDetalle(b.dataset.caldet);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
@@ -14326,6 +14392,7 @@ function polarAccion(e){
     b.textContent = abrir ? 'Ver menos ▴' : 'Ver los ' + b.dataset.asismas + ' ' + b.dataset.txt + ' restantes ▾';
     if(abrir){ r.classList.remove('asis-entra'); void r.offsetWidth; r.classList.add('asis-entra'); } return; }
   if(b.dataset.asisdet !== undefined) return polarDetAbrir(+b.dataset.asisdet);
+  if(b.dataset.dashimp) return appDashImport(+b.dataset.dashimp);
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
   const ir = function(fn){ polarCerrar(); fn(); };
   if(b.dataset.req) return ir(function(){ appAbrirReq(b.dataset.req); });
@@ -14446,7 +14513,7 @@ const POLAR_CLAVES = ('requerimiento requerimientos proyecto proyectos stock kar
   + 'orden ordenes compra compras proveedor proveedores almacen obra obras salida salidas ingreso ingresos movimiento movimientos '
   + 'cliente codigo producto productos llego llegada entrega estado estados solicitud archivo reporte resumen transito camino '
   + 'importacion nacional importado importados rotacion trazabilidad supervisor responsable despacho despachado recibido').split(' ');
-const POLAR_COMUNES = ('booking etd eta zarpe zarpa zarpo zarpan embarque embarques embarcar transito estatus req reqs consultar quiero ver acabar acaban acabara acabaran agotar agotan agotado agotados vencen vencer vencimiento vencimientos llegar lleguen llegue emitio emitieron emitidas items comparado comparacion compara comparame aprobar aprobado aprobada aprobacion urgente urgentes urgencias prioridad prioridades importaciones importacion venden vende proveen atrasada atrasadas atrasado vencida vencidas proveedores novedades despachar despachado despachados despacho despachos revisar revision incompleto incompletos hola gracias ayuda puedes muestrame dime quiero necesito saber todo todos todas como cuanto cuantos cuantas '
+const POLAR_COMUNES = ('dashboard tablero panorama reporte informe analisis estadisticas balance booking etd eta zarpe zarpa zarpo zarpan embarque embarques embarcar transito estatus req reqs consultar quiero ver acabar acaban acabara acabaran agotar agotan agotado agotados vencen vencer vencimiento vencimientos llegar lleguen llegue emitio emitieron emitidas items comparado comparacion compara comparame aprobar aprobado aprobada aprobacion urgente urgentes urgencias prioridad prioridades importaciones importacion venden vende proveen atrasada atrasadas atrasado vencida vencidas proveedores novedades despachar despachado despachados despacho despachos revisar revision incompleto incompletos hola gracias ayuda puedes muestrame dime quiero necesito saber todo todos todas como cuanto cuantos cuantas '
   + 'donde cuando esta estan este esto esos esas para pero tiene tienen tengo hace hacer sobre entre desde hasta cual cuales quien '
   + 'favor porfa buenas buenos dias tardes noches bien mucho poco algo nada solo tambien ahora semana numero mismo otra otro cada '
   + 'puede podria quisiera sale salio fueron sido tienes hay queda quedan falta faltan pedi pedimos mande mandamos llega llegan '
@@ -14978,7 +15045,8 @@ function polarUrgente(){
 function polarImportaciones(q, p){
   const L = appImpDatos(), todas = L.tr.concat(L.em, L.bk);
   let l = todas, que = 'abiertas';
-  if(/booking|sin etd|por reservar/.test(q)){ l = L.bk; que = 'pendiente booking'; }
+  if(/atras|vencid|retras/.test(q)){ l = L.tr.filter(function(g){ return g.dEta != null && g.dEta < 0; }); que = 'con ETA pasada (todavía no llegan a Lurín)'; }
+  else if(/booking|sin etd|por reservar/.test(q)){ l = L.bk; que = 'pendiente booking'; }
   else if(/por embarcar|embarc|por zarpar/.test(q)){ l = L.em; que = 'por embarcar'; }
   else if(/transito|navegando|zarparon|en camino/.test(q)){ l = L.tr; que = 'en tránsito'; }
   const porEtd = /\betd\b|zarp|embarc/.test(q), porEta = /\beta\b|llega|llegan|arrib/.test(q);
@@ -14995,9 +15063,53 @@ function polarImportaciones(q, p){
     ${l.slice(0, 8).map(fila).join('')}${polarMas(l, 8, fila, 'embarques')}
     <div class="asis-acc">${polarBtn('pantalla', 'pendlog', '🚢 Ver estatus de importaciones')}</div>`;
 }
+function polarDashImportacion(p){
+  const anio = p && p.desde ? p.desde.getUTCFullYear() : appIndCorte().getUTCFullYear(), R = appDashImpResumen(anio);
+  if(!R.ocs.length) return `<p>No hay importaciones emitidas en ${anio}.</p>`;
+  const e = function(k){ return R.cuenta[k] ? `<div class="asis-item"><div class="d">${APP_DASH_EST[k][0]} ${APP_DASH_EST[k][1]}</div><div class="q"><b>${R.cuenta[k]}</b> OC</div></div>` : ''; };
+  return `<div class="cab">📊 Importaciones ${anio}</div><div class="sub">OC de importación emitidas en el año</div>
+    <div class="asis-kpis"><div><b>${R.ocs.length}</b><span>OC</span></div><div><b>${appUSD(R.tot)}</b><span>Monto (eq. $)</span></div><div><b>${R.prov}</b><span>Proveedores</span></div></div>
+    ${['ok', 'tr', 'em', 'bk', 'fin'].map(e).join('')}
+    ${R.prom != null ? `<p>Tardaron en llegar <b>${R.prom} días</b> en promedio (mediana ${R.med}).</p>` : ''}
+    <div class="asis-acc">${polarBtn('dashimp', String(anio), '📊 Abrir dashboard')}${polarBtn('pantalla', 'pendlog', '🚢 Estatus de importaciones')}</div>`;
+}
+// OC que YA llegaron (fecha de recepción en el período), con proveedor, origen o comprador opcionales
+// (30.09.2026, Piero: "Danfoss que ya llegaron esta semana… que responda con ese filtro de fecha de llegada").
+function polarOCsRecibidas(o){
+  const p = o.p, m = new Map(), abiertas = new Set(pdFilas().filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; }));
+  polarLineasOC().forEach(function(r){
+    if(!r.fRecep || !polarEnPeriodo(r.fRecep, p)) return;
+    if(o.provs && o.provs.length && o.provs.indexOf(r.proveedor) === -1) return;
+    const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden || '');
+    if((o.origen === 'importado' && !imp) || (o.origen === 'nacional' && imp)) return;
+    if(o.persona && pdPersona(r.usuarioCompras) !== o.persona) return;
+    const x = m.get(r.codOrden) || { oc:r.codOrden, prov:r.proveedor || '', f:r.fRecep, n:0, persona:pdPersona(r.usuarioCompras), imp:imp, filas:[] };
+    x.n++; x.filas.push(r); if(r.fRecep > x.f) x.f = r.fRecep; m.set(r.codOrden, x);
+  });
+  const l = [...m.values()].sort(function(a,b){ return b.f - a.f; });
+  const sub = [o.provs && o.provs.length === 1 ? polarCorta(o.provs[0], 34) : '', o.origen === 'importado' ? 'importaciones' : o.origen === 'nacional' ? 'nacionales' : '', o.persona ? (PD_PERSONAS[o.persona] || o.persona) : '', p.label].filter(Boolean).join(' · ');
+  if(!l.length) return `<p>📥 No llegó ninguna OC (${escapeHtml(sub)}).</p>`;
+  const fila = function(x){ const parcial = abiertas.has(x.oc);
+    return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(x.oc.replace(/^000\d-0*/, ''))}</span> · llegó ${rqFecha(x.f).replace(/ \d{4}$/, '')}${x.imp ? ' · 🌎' : ''}</div>
+      <div class="q">${escapeHtml(polarCorta(x.prov, 34))} · ${x.n} ítem${x.n === 1 ? '' : 's'} · <span class="asis-est ${parcial ? 'camino' : 'ok'}">${parcial ? 'falta una parte' : 'completa'}</span> ${polarBtn('oc', x.oc, 'ver')}</div></div>`; };
+  const lineas = l.reduce(function(a, x){ return a + x.n; }, 0);
+  return `<div class="cab">📥 OC que llegaron</div><div class="sub">${escapeHtml(sub)}</div>
+    <div class="asis-kpis"><div><b>${l.length}</b><span>OC</span></div><div><b>${lineas}</b><span>Ítems recibidos</span></div><div><b>${new Set(l.map(function(x){ return x.prov; })).size}</b><span>Proveedores</span></div></div>
+    ${l.slice(0, 8).map(fila).join('')}${polarMas(l, 8, fila, 'OC')}`;
+}
 function polarIntenciones(q, qr, p){
+  // Tiempo pasado ("llegaron", "llegó", "recibimos"): lo que ya llegó, por fecha de recepción.
+  const tal = POLAR.textoTal || qr;
+  const pasado = /\b(llego|llegaron|ya llego|recibi|recibio|recibieron|recibimos|recibida|recibidas|recibido|recibidos|ingreso|ingresaron|entraron|arribaron)\b/.test(tal) && !/por llegar|todavia no|aun no|no (ha|han) llegado|falta/.test(tal);
+  if(pasado && !/\bobra\b|requerimiento|\breq\b|pedido|stock|kardex|almacen general/.test(tal)){
+    const pv = polarProveedoresEn(qr);
+    if(pv.length || /\boc\b|\bocs\b|orden|compra|importac|nacional/.test(tal))
+      return polarOCsRecibidas({ p:p || polarPeriodoDe('esta semana'), provs:pv, origen:/importa/.test(tal) ? 'importado' : (/nacional/.test(tal) ? 'nacional' : ''), persona:polarPersonaEn(q, false) });
+  }
+  if(/importac/.test(q) && /dashboard|tablero|panel|panorama|resumen|reporte|informe|analisis|estadistic|balance|todas las|cuantas|total/.test(q) && !/cuanto tarda|demora/.test(q)
+    && (/dashboard|tablero|panel|panorama|resumen|reporte|informe|analisis|estadistic|balance/.test(q) || (p && p.k === 'anio'))) return polarDashImportacion(p);
   if(/importac|\betd\b|\beta\b|booking|embarc|zarp|en transito/.test(q) && !/cuanto tarda|demora|promedio|gasto|monto/.test(q)
-    && (/\betd\b|\beta\b|booking|embarc|zarp|transito|estatus|status/.test(q) || (/importac/.test(q) && /llega|pendientes|en camino/.test(q) && p))) return polarImportaciones(q, p);
+    && (/\betd\b|\beta\b|booking|embarc|zarp|transito|estatus|status/.test(q) || (/importac/.test(q) && /atras|vencid|retras/.test(q)) || (/importac/.test(q) && /llega|pendientes|en camino/.test(q) && p))) return polarImportaciones(q, p);
   const hoy = new Date();
   const per = polarPersonaEn(q, false);
   const provs = /proveedor|\ba\b|\bde\b|\bcon\b|oc|orden|compr|gast|correo|mail|contacto|ruc|llegar|falta|debe|pendiente|vencid/.test(qr) ? polarProveedoresEn(qr) : [];
