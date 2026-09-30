@@ -13098,17 +13098,26 @@ function polarMisFilas(){
   return RQ.filas.filter(function(r){ return polarMismaPersona(r.responsable, yo); });
 }
 // Solicitante nombrado en la pregunta ("requerimientos de Jordy Acosta").
-function polarSolicitanteEn(q){
-  rqPreparar();
-  const nombres = [...new Set(RQ.filas.map(function(r){ return r.responsable; }).filter(Boolean))];
-  let mejor = null, mejorN = 0;
-  nombres.forEach(function(n){
-    const w = polarNorm(n).split(' ').filter(function(x){ return x.length >= 4; });
-    const k = w.filter(function(x){ return new RegExp('\\b' + x + '\\b').test(q); }).length;
-    if(k >= 2 && k > mejorN){ mejor = n; mejorN = k; }
-  });
-  return mejor;
+// Solicitantes nombrados en la pregunta: basta un nombre o un apellido ("requerimientos de Bruno") y se
+// perdona una letra de tipeo ("abdln" → Abdon). Devuelve los que mejor calzan (30.09.2026, Piero).
+function polarNombresEnPregunta(q){
+  return q.split(' ').filter(function(w){ return /^[a-z]{3,}$/.test(w) && !POLAR_RELLENO.has(w) && POLAR_COMUNES.indexOf(w) === -1 && POLAR_CLAVES.indexOf(w) === -1 && POLAR_MESES.indexOf(w) === -1 && !POLAR_TEMA_RE.test(w); });
 }
+function polarSolicitantesEn(q){
+  rqPreparar();
+  const pal = polarNombresEnPregunta(q);
+  if(!pal.length) return [];
+  const nombres = [...new Set(RQ.filas.map(function(r){ return r.responsable; }).filter(Boolean))];
+  let mejores = [], mejorK = 0;
+  nombres.forEach(function(n){
+    const t = polarNorm(n).split(/[^a-z]+/).filter(function(x){ return x.length >= 3; });
+    const k = pal.filter(function(w){ return t.some(function(x){ return x === w || (w.length >= 5 && x.length >= 4 && polarDist(w, x, 1) <= 1); }); }).length;
+    if(!k) return;
+    if(k > mejorK){ mejores = [n]; mejorK = k; } else if(k === mejorK) mejores.push(n);
+  });
+  return mejores;
+}
+function polarSolicitanteEn(q){ const m = polarSolicitantesEn(q); return m.length === 1 ? m[0] : null; }
 
 // ---------- Estados de un ítem, en las palabras que usa la gente ----------
 const POLAR_ESTADOS = [
@@ -13658,7 +13667,7 @@ function polarConContexto(texto){
   const pideRef = conector || !!polarFocoDe(q) || (palabras.length <= 4 && /\b(excel|kardex|proveedor|guia|reserv\w*|estado|detalle|trazabilidad|correo|precio|consumo|rotacion)\b/.test(q));
   const partes = [];
   let out = texto;
-  const cambiaDato = conector || (!resto.length && palabras.length <= 4);   // solo cambia el período, la persona o el objeto
+  const cambiaDato = conector || (!resto.length && palabras.length <= 4 && !tieneRef);   // solo cambia el período, la persona o el objeto
   if(!tieneTema && C.tema && cambiaDato){ out = C.tema + ' ' + out; partes.push('el mismo tema'); }
   if(!tieneRef && !resto.length && C.ref && pideRef){ out = out + ' ' + C.ref; partes.push(C.refTxt || C.ref); POLAR.usoRef = true; }
   if(!tieneTema && cambiaDato && !per && C.periodo){ out = out + ' ' + C.periodo; partes.push(C.periodo); }
@@ -13785,9 +13794,19 @@ function polarResponder1(texto){
     if(pal.length){ const r = polarEstadoProductos(pal); if(r) return r; }
   }
   // "Requerimientos de <solicitante>" y "mis requerimientos" (quien entró, por su correo).
-  if(/requerimiento|pidio|pidieron|solicitante/.test(q)){
-    const sol = polarSolicitanteEn(q);
-    if(sol){ rqPreparar(); POLAR.nuevoRef = 'requerimientos de ' + polarNorm(sol); POLAR.nuevoRefTxt = 'requerimientos de ' + sol; return polarSobreFilas(RQ.filas.filter(function(r){ return r.responsable === sol; }), q, 'Requerimientos de ' + sol.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }), p); }
+  if(/requerimiento|pidio|pidieron|solicitante|pedido por|pedidos de/.test(q) && !/\bmis?\b|lo que pedi/.test(q)){
+    const sols = polarSolicitantesEn(q), sol = sols.length === 1 ? sols[0] : null;
+    if(sols.length > 1 && sols.length <= 8) return `<p>Encontré ${sols.length} personas con ese nombre. ¿Cuál es?</p><div class="asis-acc">${sols.map(function(n){ return polarBtn('q', 'requerimientos de ' + n.toLowerCase(), escapeHtml(n.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }))); }).join('')}</div>`;
+    // "requerimientos de X" con X que no es nadie: puede ser un cliente/proyecto; si tampoco, se dice.
+    const deCompras = !sol && !soloReqs ? polarPersonaEn(q, true) : null;
+    if(deCompras) return polarPendientesPersona(deCompras, polarFiltrosDe(q));   // "requerimientos de Melissa" (Compras)
+    const nomX = !sol && /requerimientos? (de|del|pedidos por) /.test(qr) ? polarNombresEnPregunta(qr) : [];   // tal cual, sin corregir
+    if(nomX.length){
+      const pn = polarProyectoPorNombre(nomX); if(pn) return pn;
+      POLAR.resultado = 'no encontró';
+      return `<p>No encontré a nadie llamado "<b>${escapeHtml(nomX.join(' '))}</b>" que haya pedido requerimientos, ni un proyecto con ese nombre.</p><p>Prueba con el nombre y apellido tal como figura en Nisira, o con el N° de requerimiento.</p>`;
+    }
+    if(sol){ rqPreparar(); POLAR.nuevoRef = 'requerimientos de ' + polarNorm(sol); POLAR.nuevoRefTxt = 'requerimientos de ' + sol.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }); return polarSobreFilas(RQ.filas.filter(function(r){ return r.responsable === sol; }), q, 'Requerimientos de ' + sol.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }), p); }
   }
   const esMio = /\bmis?\b (requerimiento|requerimientos|pedido|pedidos|obra|obras|cosas|items)|\bmi requerimiento|tengo .*requerimiento|requerimientos? tengo|lo que pedi|me falta|mis pendientes|\bpedi\b/.test(q) || (soloReqs && /requerimiento|pendientes|vencidas|en revision|sin oc|con oc|en almacen|enviado|llego|salio/.test(q));
   if(esMio){
