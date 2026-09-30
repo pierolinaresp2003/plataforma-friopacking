@@ -681,10 +681,8 @@
   .pd-meta{font-size:12px;color:var(--ink-soft);}
   .pd-meta b{color:var(--ink);font-weight:700;}
   .pd-der{margin-left:auto;display:flex;align-items:center;gap:10px;}
-  .pd-fin{border:1px solid var(--border);background:var(--card);color:var(--ink-soft);border-radius:20px;padding:3px 10px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
-  .pd-fin:hover{border-color:var(--brand-2-dark);color:var(--brand-2-dark);} .pd-fin.re:hover{border-color:var(--brand-ink);color:var(--brand-ink);}
   .pd-finlista{margin-top:14px;padding:12px 16px;} .pd-finlista summary{cursor:pointer;font-weight:700;} .pd-finlista small{color:var(--muted);font-weight:500;}
-  .pd-finfila{display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--border);} .pd-finfila .pd-fin{margin-left:auto;}
+  .pd-finfila{display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--border);}
   .pd-items{width:100%;border-collapse:collapse;font-size:12.5px;}
   .pd-items th{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 16px 3px;}
   .pd-items td{padding:6px 16px;border-top:1px solid var(--border);vertical-align:top;}
@@ -1167,11 +1165,6 @@
     .m-sec summary::after{content:"▾";color:var(--muted);margin-left:8px;} .m-sec[open] summary::after{content:"▴";} .m-sec summary span{flex:1;}
     .m-sec-nota{font-size:11px;color:var(--muted);padding:0 14px 6px;}
     .m-fila{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:10px 14px;text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);}
-    .m-fila-w{display:flex;align-items:stretch;border-top:1px solid var(--border);transition:opacity .28s ease, transform .28s ease;} .m-fila-w .m-fila{border-top:0;flex:1;min-width:0;}
-    .m-fila-w.saliendo{opacity:0;transform:translateX(40px);}
-    .m-fin{flex:none;width:46px;border:0;border-left:1px solid var(--border);background:none;color:var(--green);font-size:18px;font-weight:800;cursor:pointer;}
-    .m-fin.re{color:var(--brand-ink);} .m-fin:active{background:var(--surface-2);}
-    .m-pie-nota{font-size:11px;color:var(--muted);text-align:center;margin:10px 8px 4px;}
     .m-fila .t{flex:1;min-width:0;} .m-fila .t b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .m-fila .t small{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
     .m-fila .v{flex-shrink:0;text-align:right;} .m-fila .v b{display:block;font-size:14px;} .m-fila .v small{font-size:10px;color:var(--muted);}
@@ -1322,6 +1315,9 @@
   @keyframes appHojaBaja{from{transform:none;}to{transform:translateY(100%);}}
   @keyframes appFondoSale{from{opacity:1;}to{opacity:0;}}
   @media (max-width:760px){
+    /* La animación mueve la pantalla 34 px de costado: sin recorte el documento se ensanchaba un instante,
+       el celular reacomodaba el zoom y la barra de abajo "se movía". */
+    body{overflow-x:hidden;} .main, .content{overflow-x:clip;}
     #section-inicio.tr-der{animation:appPasoDer .42s cubic-bezier(.22,.8,.2,1);}
     #section-inicio.tr-izq{animation:appPasoIzq .42s cubic-bezier(.22,.8,.2,1);}
     .section.tr-sube{animation:appSubeSuave .45s cubic-bezier(.22,.8,.2,1);}
@@ -1489,7 +1485,7 @@
   <div class="topbar">
     <div class="topbar-crumb">Plataforma de Reportes / <strong>Grupo Friopacking</strong></div>
     <div class="topbar-actions">
-      <label class="btn primary icon-only" for="fileInput" title="Cargar archivos (hasta 6)">📂</label>
+      <label class="btn primary icon-only" for="fileInput" title="Cargar archivos (hasta 7)">📂</label>
       <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple>
       <button class="btn secondary icon-only" id="btnConnect" title="Conectar GitHub">🔑</button>
       <button class="btn secondary icon-only" id="btnPublish" disabled title="Primero carga tu Reporte Maestro.xlsx arriba.">☁</button>
@@ -1515,6 +1511,7 @@
       <li data-key="almacen"><span class="ic">⬜</span> Reporte Almacen.xlsx — no cargado</li>
       <li data-key="proveedores"><span class="ic">⬜</span> DB Proveedores.xlsx — no cargado</li>
       <li data-key="supervisores"><span class="ic">⬜</span> DB Supervisores.xlsx — no cargado</li>
+      <li data-key="ocfin"><span class="ic">⬜</span> OC Finalizadas.xlsx — no cargado</li>
     </ul>
     <p id="status" style="margin-top:8px;">Ningún archivo cargado todavía.</p>
   </div>
@@ -2810,6 +2807,7 @@ function buildSnapshot(){
     proveedores: PROVEEDOR_MAIL || null,
     supervisores: SUPERVISOR_MAIL || null,
     accesos: SUPERVISOR_ROL || null,
+    ocFinalizadas: Object.keys(OC_FIN).length ? OC_FIN : null,   // OC Finalizadas.xlsx (30.09.2026)
     filename: DATA.filename,
     corte: DATA.corte ? DATA.corte.toISOString() : null,
     excluded: DATA.excluded,
@@ -3111,6 +3109,7 @@ function loadFromSnapshot(snap){
   if(snap.proveedores) PROVEEDOR_MAIL = snap.proveedores;
   if(snap.supervisores) SUPERVISOR_MAIL = snap.supervisores;
   if(snap.accesos) SUPERVISOR_ROL = snap.accesos;
+  if(snap.ocFinalizadas) OC_FIN = snap.ocFinalizadas;
   const isLegacyProcesoSnapshot = !(snap.procesoSchemaVersion >= 2);
   if(isLegacyProcesoSnapshot && snap.proceso && snap.proceso.rows && snap.proceso.rows.length){
     console.warn('Snapshot publicado con un formato antiguo de "proceso" (sin procesoSchemaVersion >= 2) — se ignoró el campo "rp" heredado de cada fila y se usó JCENTENO por defecto para el Indicador 1. Vuelve a publicar ("Guardar y compartir") con el archivo actual para actualizar el link.');
@@ -3309,6 +3308,8 @@ loadPublishedSnapshot(false);
 // (el Reporte Maestro real sigue entrando por su propio nombre, que es su vía principal).
 const NOMBRE_DE_OTRO_ARCHIVO = /almac[ée]n|inventario|consulta|pedido.?sin.?req|sinreq/i;
 const FILE_SIGNATURES = [
+  // OC Finalizadas.xlsx (30.09.2026): va primero para que ninguna otra regla lo tome por su nombre de hoja.
+  { key: 'ocfin', label: 'OC Finalizadas.xlsx', match: (name, sheets) => /oc.?finaliz|finalizad|oc.?cerrad/i.test(name) || sheets.some(s=>/finalizad/i.test(s)) },
   { key: 'maestro', label: 'Reporte Maestro.xlsx', match: (name, sheets) => /reporte.?maestro/i.test(name) || (!NOMBRE_DE_OTRO_ARCHIVO.test(name) && sheets.some(s=>s.trim().toLowerCase()==='reporte maestro')) },
   { key: 'consulta', label: 'Consulta.xlsx', match: (name, sheets) => /consulta/i.test(name) || sheets.some(s=>s.trim().toLowerCase()==='consulta') },
   { key: 'almacen', label: 'Reporte Almacen.xlsx', match: (name, sheets) => /almac[ée]n/i.test(name) || /inventario/i.test(name) || sheets.some(s=>/inventario/i.test(s)) || sheets.some(s=>/almac[ée]n/i.test(s)) || sheets.some(s=>/stock/i.test(s)) },
@@ -3348,7 +3349,7 @@ function renderFileList(){
 }
 
 document.getElementById('fileInput').addEventListener('change', async function(e){
-  const files = Array.from(e.target.files || []).slice(0, 6);
+  const files = Array.from(e.target.files || []).slice(0, 8);
   if(!files.length) return;
   setStatus("Leyendo " + files.length + " archivo(s)...");
   let maestroOk = false, maestroSeen = false, readError = null;
@@ -3370,7 +3371,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     }
   }
   lastLoadFiles = parsed.map(p => ({ name: p.file.name, key: p.sig ? p.sig.key : null, error: p.error || null }));
-  const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3, proveedores: 4, supervisores: 5 };
+  const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3, proveedores: 4, supervisores: 5, ocfin: 6 };
   parsed.sort((a,b) => (PROC_ORDER[a.sig && a.sig.key] ?? 9) - (PROC_ORDER[b.sig && b.sig.key] ?? 9));
   for(const { file, wb, sig } of parsed){
     if(sig && sig.key === 'maestro'){
@@ -3390,6 +3391,10 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     } else if(sig && sig.key === 'pedidosinreq'){
       const res = processPedidoSinReq(wb, file.name);
       setFileState('pedidosinreq', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+    } else if(sig && sig.key === 'ocfin'){
+      const res = processOCFinalizadas(wb, file.name);
+      setFileState('ocfin', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+      showPublishBanner((res.ok ? '✅ OC Finalizadas.xlsx: ' : '❌ OC Finalizadas.xlsx: ') + escapeHtml(res.message) + (res.ok ? ' Usa ☁ Guardar y compartir para que lo vean todos.' : ''), !res.ok);
     } else if(sig && sig.key === 'supervisores'){
       const res = processSupervisores(wb, file.name);
       setFileState('supervisores', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
@@ -3408,6 +3413,8 @@ document.getElementById('fileInput').addEventListener('change', async function(e
       setStatus(maestroOk ? "Listo." : "Reporte Maestro.xlsx se cargó pero tuvo un problema — revisa el detalle arriba.", maestroOk ? "ok" : "err");
     } else if(readError){
       setStatus("No se pudo leer uno de los archivos: " + readError.message, "err");
+    } else if(parsed.some(function(x){ return x.sig; })){
+      setStatus("Listo.", "ok");   // se cargó otro archivo (p. ej. OC Finalizadas.xlsx) sin el Maestro: está bien
     } else {
       setStatus("No encontré Reporte Maestro.xlsx entre los archivos seleccionados.", "err");
     }
@@ -11210,8 +11217,9 @@ function rqPasosHtml(r){
 
 function rqVistaTarjetas(cont, filas){
   const todo = filas.slice().sort(function(a,b){ return (b.fReq||0) - (a.fReq||0); });
-  // Supervisor: primero lo que falta; lo que ya llegó a obra queda plegado abajo (29.09.2026, Piero).
-  const soloFalta = typeof APP !== 'undefined' && APP.vista === 'supervisor';
+  // Primero lo que falta; lo que ya llegó a obra queda plegado abajo (29.09.2026, Piero). Desde el
+  // 30.09.2026 en todas las vistas del celular, no solo Supervisor ("igual debe agruparse").
+  const soloFalta = true;
   const listos = soloFalta ? todo.filter(rqItemListo) : [];
   const orden = soloFalta ? todo.filter(function(r){ return !rqItemListo(r); }) : todo;
   // En el celular las tarjetas pesan: de 30 en 30 (cada "ver más" suma otras 30).
@@ -11955,68 +11963,53 @@ function pdOcAbierta(r){
   const f = pdFalta(r);
   return f == null || f > 0;
 }
-// ---------- OC finalizadas a mano (30.09.2026, Piero: "añadir una opción que se guarde sola para
-// finalizar OC que estén pendientes") ----------
-// OC que Nisira sigue mostrando "Pendiente" pero que Compras ya dio por cerradas (llegó lo que iba a
-// llegar, se anuló el saldo, etc.). Se guardan SOLAS: al instante en este equipo y, si hay token de
-// GitHub, en oc-finalizadas.json del repo, que leen todos los que abren el link. Cada OC guarda quién y
-// cuándo; "Reabrir" deja una marca con fecha para que gane el último cambio al juntar equipos.
-const OC_FIN_ARCHIVO = 'oc-finalizadas.json', OC_FIN_LOCAL = 'fp-oc-finalizadas';
+// ---------- OC finalizadas a mano (30.09.2026, Piero: "es mejor que te suba un excel con estas
+// finalizaciones que se harán manuales") ----------
+// OC que Nisira sigue mostrando "Pendiente" pero que Compras ya dio por cerradas. Salen de un Excel
+// propio (OC Finalizadas.xlsx: N° OC · Motivo · Fecha · Responsable) que se carga con los demás y viaja
+// en "Guardar y compartir", así lo ven todos. Sin botones en la app: manda solo el Excel.
 let OC_FIN = {};
-try{ OC_FIN = JSON.parse(localStorage.getItem(OC_FIN_LOCAL) || '{}') || {}; }catch(err){ OC_FIN = {}; }
-function ocFinalizada(cod){ const x = cod && OC_FIN[cod]; return !!(x && x.fin); }
-function ocFinQuien(){ const u = APP && APP.usuario; return (u && (u.nombre || appNombrePorCorreo(u.correo) || u.correo)) || 'PC'; }
-function ocFinJuntar(otro){
-  let cambio = false;
-  Object.keys(otro || {}).forEach(function(k){ const a = OC_FIN[k], b = otro[k]; if(b && (!a || (b.t || '') > (a.t || ''))){ OC_FIN[k] = b; cambio = true; } });
-  return cambio;
-}
-function ocFinGuardarLocal(){ try{ localStorage.setItem(OC_FIN_LOCAL, JSON.stringify(OC_FIN)); }catch(err){} }
+function ocFinalizada(cod){ return !!(cod && OC_FIN[cod]); }
 function ocFinRepintar(){
   try{ if(document.getElementById('section-pendientes').classList.contains('active')) drawPendientes(); }catch(err){}
   try{ if(APP.enInicio) appRenderInicio(); }catch(err){}
 }
-function ocFinalizar(cod, fin){
-  if(!cod) return;
-  OC_FIN[cod] = { fin: !!fin, t: new Date().toISOString(), por: ocFinQuien() };
-  ocFinGuardarLocal(); ocFinRepintar();
-  clearTimeout(ocFinalizar._t); ocFinalizar._t = setTimeout(ocFinSubir, 1200);   // varios clics seguidos → un solo guardado
-  const aviso = (fin ? '✔ OC ' + cod.replace(/^000\d-0*/, '') + ' finalizada' : '↩ OC ' + cod.replace(/^000\d-0*/, '') + ' reabierta') + (getGhToken() ? ' · guardando…' : ' · guardada en este equipo');
-  if(typeof appToast === 'function' && RQ_MOVIL.matches) appToast(aviso); else showPublishBanner(aviso, false);
-}
-async function ocFinSubir(){
-  const token = getGhToken(); if(!token) return;
-  const url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + OC_FIN_ARCHIVO;
-  const h = { 'Authorization':'Bearer ' + token, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' };
-  try{
-    for(let intento = 0; intento < 2; intento++){
-      let sha;
-      const g = await fetch(url + '?ref=' + GH_BRANCH + '&_=' + Date.now(), { headers:h });
-      if(g.ok){ const j = await g.json(); sha = j.sha; try{ if(ocFinJuntar(JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g, ''))))))) ocFinRepintar(); }catch(err){} }
-      else if(g.status !== 404) throw new Error('GitHub respondió ' + g.status);
-      const body = { message:'OC finalizadas a mano (' + new Date().toLocaleString('es-PE') + ')', content: utf8ToBase64(JSON.stringify(OC_FIN, null, 1)), branch: GH_BRANCH };
-      if(sha) body.sha = sha;
-      const put = await fetch(url, { method:'PUT', headers:h, body: JSON.stringify(body) });
-      if(put.ok){ ocFinGuardarLocal(); if(RQ_MOVIL.matches) appToast('✅ Guardado para todos'); else showPublishBanner('✅ OC finalizadas guardadas para todos (' + OC_FIN_ARCHIVO + ').', false); return; }
-      if(put.status !== 409 && put.status !== 422) throw new Error('GitHub respondió ' + put.status);
-    }
-  }catch(err){
-    console.error(err);
-    const t = '⚠ No pude guardar las OC finalizadas en GitHub (' + (err && err.message || err) + '). Quedaron en este equipo; se reintenta al próximo cambio.';
-    if(RQ_MOVIL.matches) appToast('⚠ Quedó guardado solo en este equipo'); else showPublishBanner(t, true);
+function processOCFinalizadas(wb, filename){
+  const s = function(v){ return v == null ? '' : v.toString().trim(); };
+  const hoja = wb.SheetNames.find(function(n){ return /finaliz|cerrad/i.test(n); }) || wb.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { header:1, raw:true, defval:null });
+  let hdr = -1;
+  for(let i = 0; i < Math.min(10, rows.length); i++){
+    if((rows[i] || []).some(function(c){ return /^(n.?\s*)?(oc|orden|orden de compra|cod.?orden|n.? ?oc)$/i.test(sinAcentos(s(c)).replace(/[°º.]/g, '').trim()); })){ hdr = i; break; }
   }
+  const H = hdr === -1 ? [] : rows[hdr];
+  const busca = function(re){ return H.findIndex(function(c){ return re.test(sinAcentos(s(c)).toLowerCase()); }); };
+  const iOC = hdr === -1 ? 0 : busca(/^(n.?\s*)?(oc|orden|orden de compra|cod.?orden|n.? ?oc)\.?$/), iMot = busca(/motivo|comentario|observ|razon/), iF = busca(/fecha/), iR = busca(/responsable|quien|usuario|comprador/);
+  // OC que existen en los datos, para completar "10060" → "0001-0010060" (o 0002 si es importación).
+  const existe = new Set(getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).map(function(r){ return r.codOrden; }).filter(Boolean));
+  const nuevo = {}, dudas = [];
+  for(let r = hdr + 1; r < rows.length; r++){
+    const row = rows[r]; if(!row) continue;
+    const t = s(row[iOC]); if(!t) continue;
+    let cods = [];
+    const m = t.match(/(\d{4})\s*-\s*(\d{1,7})/);
+    if(m) cods = [m[1] + '-' + m[2].padStart(7, '0')];
+    else { const n = t.match(/\d{1,7}/); if(!n) continue;
+      const c1 = '0001-' + n[0].padStart(7, '0'), c2 = '0002-' + n[0].padStart(7, '0');
+      cods = [c1, c2].filter(function(c){ return existe.has(c); }); if(!cods.length) cods = [c1];
+      if(cods.length > 1) dudas.push(n[0]); }
+    const f = iF === -1 ? null : row[iF];
+    cods.forEach(function(c){ nuevo[c] = { motivo: s(iMot === -1 ? '' : row[iMot]), f: f instanceof Date ? f.toISOString().slice(0, 10) : s(f), por: s(iR === -1 ? '' : row[iR]) }; });
+  }
+  const n = Object.keys(nuevo).length;
+  if(!n) return { ok:false, message:'no encontré números de OC (columna "N° OC").' };
+  OC_FIN = nuevo; ocFinRepintar();
+  const fuera = Object.keys(nuevo).filter(function(c){ return existe.size && !existe.has(c); }).length;
+  return { ok:true, message: n + ' OC finalizadas' + (fuera ? ' · ' + fuera + ' no están en el Reporte Maestro/PedidoSinReq' : '') + (dudas.length ? ' · ' + dudas.length + ' número(s) existen como nacional e importación (se cerraron las dos)' : '') + '.' };
 }
-async function ocFinCargar(){
-  if(!/^https?:$/.test(location.protocol)) return;
-  try{
-    const r = await fetch('./' + OC_FIN_ARCHIVO + '?_=' + Date.now());
-    if(!r.ok) return;
-    if(ocFinJuntar(await r.json())){ ocFinGuardarLocal(); ocFinRepintar(); }
-  }catch(err){}
-}
-// Pendiente para Compras: la regla de Nisira (pdOcAbierta) menos lo que se finalizó a mano.
+// Pendiente para Compras: la regla de Nisira (pdOcAbierta) menos lo que el Excel da por finalizado.
 function pdOcPendiente(r){ return pdOcAbierta(r) && !ocFinalizada(r.codOrden); }
-function ocFinLista(){ return Object.keys(OC_FIN).filter(ocFinalizada).map(function(k){ return Object.assign({ oc:k }, OC_FIN[k]); }).sort(function(a,b){ return (b.t || '').localeCompare(a.t || ''); }); }
+function ocFinLista(){ return Object.keys(OC_FIN).map(function(k){ return Object.assign({ oc:k }, OC_FIN[k]); }).sort(function(a,b){ return a.oc.localeCompare(b.oc); }); }
 
 function pdPedidoAbierto(r){
   if(!r.codPedido || r.codOrden) return false;
@@ -12024,7 +12017,11 @@ function pdPedidoAbierto(r){
   return !pedidoCerradoManual({ codPedido:r.codPedido, idProducto:r.idProducto, cantidadPedido:r.cantPedido });
 }
 
-function pdFilas(){
+// Solo cuentan los compradores (los que generan OC, PD_PERSONAS): usuarios de Nisira como "MONITOR" o
+// responsables de pedido que no son de Compras no aparecen (30.09.2026, Piero).
+function pdEsComprador(p){ return !!(p && PD_PERSONAS[p]); }
+function pdFilas(){ return appMemo('pdFilas', pdFilasCalc).slice(); }
+function pdFilasCalc(){
   const out = [];
   getReqRows().forEach(function(r){
     const base = { req: r.codRequerimiento, proyecto: r.proyecto, idProyecto: r.idProyecto,
@@ -12040,7 +12037,7 @@ function pdFilas(){
     if(pdOcPendiente(r)) out.push(Object.assign(base, { tipo:'oc', persona: pdPersona(r.usuarioCompras) }));
     else if(pdPedidoAbierto(r)) out.push(Object.assign(base, { tipo:'ped', persona: pdPersona(r.responsablePedido) }));
   });
-  return out;
+  return out.filter(function(r){ return pdEsComprador(r.persona); });
 }
 
 function pdDiasHtml(r){
@@ -12176,7 +12173,7 @@ function drawPendientes(){
       ? `<span class="pd-num">OC ${escapeHtml(d.k)}</span>
          <span class="rq-est ${d.sinAprobar ? 'espera' : (pdEstadoOC(r0) === 'Llegó parcial' ? 'recibido' : 'camino')}">${pdEstadoOC(r0)}</span>
          <span class="pd-prov">${rqTxt(r0.proveedor)}</span>
-         <span class="pd-der"><span class="pd-meta">Emitida <b>${rqFecha(r0.fOrden)}</b> · Entrega <b>${rqFecha(r0.fCompromiso)}</b></span>${plazo(d)}<button type="button" class="pd-fin" data-ocfin="${escapeHtml(d.k)}" title="Darla por cerrada aunque Nisira la siga mostrando Pendiente">✔ Finalizar</button></span>`
+         <span class="pd-der"><span class="pd-meta">Emitida <b>${rqFecha(r0.fOrden)}</b> · Entrega <b>${rqFecha(r0.fCompromiso)}</b></span>${plazo(d)}</span>`
       : `<span class="pd-num">Pedido ${escapeHtml(d.k)}</span>
          <span class="pd-prov"></span>
          <span class="pd-der"><span class="pd-meta">Pedido el <b>${rqFecha(r0.fPedido)}</b></span>${plazo(d)}</span>`;
@@ -12202,16 +12199,11 @@ function drawPendientes(){
   const mas = visibles.length > PD.tope
     ? `<div class="rq-mas"><button class="btn secondary" type="button" id="pdMas">Ver ${Math.min(40, visibles.length - PD.tope)} más · ${PD.tope} de ${visibles.length}</button></div>` : '';
   const fins = PD.tab === 'oc' ? ocFinLista() : [];
-  const finHtml = fins.length ? `<details class="card pd-finlista"><summary>✔ OC finalizadas a mano · <b>${fins.length}</b> <small>(no cuentan como pendientes)</small></summary>
-      ${fins.map(function(x){ return `<div class="pd-finfila"><span class="pd-num">OC ${escapeHtml(x.oc)}</span><span class="pd-meta">${escapeHtml(x.por || '')} · ${new Date(x.t).toLocaleDateString('es-PE')}</span><button type="button" class="pd-fin re" data-ocre="${escapeHtml(x.oc)}">↩ Reabrir</button></div>`; }).join('')}</details>` : '';
+  const finHtml = fins.length ? `<details class="card pd-finlista"><summary>✔ OC finalizadas (OC Finalizadas.xlsx) · <b>${fins.length}</b> <small>no cuentan como pendientes</small></summary>
+      ${fins.map(function(x){ return `<div class="pd-finfila"><span class="pd-num">OC ${escapeHtml(x.oc)}</span><span class="pd-meta">${escapeHtml([x.motivo, x.por, x.f].filter(Boolean).join(' · ') || '—')}</span></div>`; }).join('')}</details>` : '';
   cont.innerHTML = (tarjetas
     ? `<div class="pd-lista">${tarjetas}</div>${mas}`
     : '<div class="card" style="text-align:center;padding:26px;color:var(--muted);">No hay pendientes con ese filtro.</div>') + finHtml;
-  if(!cont._ocfin){ cont._ocfin = true; cont.addEventListener('click', function(e){
-    const b = e.target.closest('[data-ocfin],[data-ocre]'); if(!b) return;
-    if(b.dataset.ocfin){ if(confirm('¿Finalizar la OC ' + b.dataset.ocfin + '? Deja de contar como pendiente (se puede reabrir).')) ocFinalizar(b.dataset.ocfin, true); }
-    else ocFinalizar(b.dataset.ocre, false);
-  }); }
   const bm = document.getElementById('pdMas');
   if(bm) bm.addEventListener('click', function(){ PD.tope += 40; drawPendientes(); });
 }
@@ -12570,9 +12562,17 @@ function appConstruir(){
     const t = b.dataset.tab;
     if(t === 'polar') return polarAbrir();
     if(t === 'vista') return appAbrirSheet();
-    if(t === 'inicio') return appInicio();
-    if(APP_PANTALLAS[t]) return appInicio(t);
-    irASeccion(t);
+    // Misma pestaña otra vez: solo sube al inicio (no se vuelve a armar la pantalla).
+    if(APP.enInicio && APP.pantalla === (t === 'inicio' ? 'inicio' : t)){ window.scrollTo({ top:0, behavior:'smooth' }); return; }
+    // Primero se marca la pestaña (respuesta inmediata al dedo) y la pantalla se arma en el cuadro
+    // siguiente, cuando el toque ya se pintó.
+    this.querySelectorAll('button[data-tab]').forEach(function(x){ x.classList.toggle('on', x === b && t !== 'polar'); });
+    clearTimeout(appTabEspera);
+    appTabEspera = setTimeout(function(){
+      if(t === 'inicio') return appInicio();
+      if(APP_PANTALLAS[t]) return appInicio(t);
+      irASeccion(t);
+    }, 16);
   });
   document.getElementById('section-inicio').addEventListener('click', appClickInicio);
   document.getElementById('section-inicio').addEventListener('submit', appSubmitInicio);
@@ -12822,7 +12822,7 @@ function appInicio(pantalla){
 }
 
 // Si el link publicado todavía está bajando los datos, el inicio se vuelve a pintar solo cuando llegan.
-let appEsperaDatos = null, appIntentos = 0;
+let appEsperaDatos = null, appIntentos = 0, appTabEspera = null;
 function appHayDatos(){ return getReqRows().length > 0 || !!(ALMACEN_DATA && ALMACEN_DATA.rows && ALMACEN_DATA.rows.length); }
 
 function appSaludo(){
@@ -12832,6 +12832,33 @@ function appSaludo(){
   return s + (n ? ', ' + escapeHtml(n) : '');
 }
 
+// HTML de cada pantalla guardado por su estado (período, filtros, búsqueda): volver a una pestaña es
+// instantáneo. Se vacía solo cuando cambian los datos (appMemo).
+const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
+  pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, avance:function(){ return appAvanceHtml(); } };
+function appPantallaEstado(p){
+  const e = { gasto:[APP_G, APP_CAL], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope], pendcompras:[APP_PC], pendlog:[APP_PL],
+    indicadores:[APP.indPer || 'semana'], avance:[APP.avQ || ''] }[p];
+  return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0);
+}
+function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_PANT_FN[p]); }
+// Mientras nadie toca nada, se adelanta el cálculo de las otras pestañas de a poquito (un trozo por
+// pausa), para que el primer toque también sea rápido.
+function appPrecalentar(){
+  if(!RQ_MOVIL.matches || !appHayDatos() || appPrecalentar._firma === appFirmaDatos() + APP.vista) return;
+  appPrecalentar._firma = appFirmaDatos() + APP.vista;
+  const v = APP.vista, q = [];
+  if(v === 'gerencia' && gerAbierto){
+    ['semana', 'semanaAnt', 'mes'].forEach(function(k){ q.push(function(){ appIndDatos(appIndPeriodo(k).f); }); });
+    appIndTendF(true).forEach(function(x){ q.push(function(){ appIndDatos(x.f); }); });
+    q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appAvanceGrupos(); }, function(){ appPantallaHtml('avance'); }, function(){ appPantallaHtml('gasto'); });
+  } else if(v === 'logistica'){
+    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog', appInicioLogistica); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
+      function(){ appPendLogGrupos(); }, function(){ appPantallaHtml('pendlog'); });
+  }
+  const pausa = window.requestIdleCallback ? function(fn){ requestIdleCallback(fn, { timeout:1500 }); } : function(fn){ setTimeout(fn, 60); };
+  (function sig(){ const fn = q.shift(); if(!fn) return; pausa(function(){ try{ fn(); }catch(err){} sig(); }); })();
+}
 function appRenderInicio(){
   const cont = document.getElementById('section-inicio');
   const v = APP.vista || 'supervisor';
@@ -12851,17 +12878,13 @@ function appRenderInicio(){
     clearTimeout(appEsperaDatos);
     appEsperaDatos = setTimeout(function(){ if(APP.enInicio) appRenderInicio(); }, 1500);
   } else if(APP.pantalla === 'gasto' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog'){
-    const fn = { gasto:appGastoHtml, inventario:appInventarioHtml, pendcompras:appPendComprasHtml, pendlog:appPendLogHtml }[APP.pantalla];
-    cont.innerHTML = fn() + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
+    cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
-  } else if(APP.pantalla === 'indicadores'){
-    cont.innerHTML = appIndicadoresHtml() + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
-    return;
-  } else if(APP.pantalla === 'avance'){
-    cont.innerHTML = appAvanceHtml() + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
+  } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'avance'){
+    cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
-  else if(v === 'logistica') cuerpo = appInicioLogistica();
+  else if(v === 'logistica') cuerpo = appMemo('iniLog', appInicioLogistica);
   else cuerpo = appInicioSupervisor();
   const corte = (DATA && DATA.corte) ? 'Datos al ' + fmtDate(DATA.corte) : '';
   // Supervisor: solo lo que sirve (29.09.2026, Piero: "hay demasiadas cosas, simplifícalo"): buscar su
@@ -12876,13 +12899,15 @@ function appRenderInicio(){
     <div class="ini-chips">${polarChips().map(c=>`<button type="button" data-q="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')}</div>`}
     ${cuerpo}
     ${corte ? `<div class="ini-datos">${corte}</div>` : ''}`;
+  if(hay) setTimeout(appPrecalentar, 600);
 }
 
 // ---------- Avance (Gerencia): qué falta despachar ----------
 // 29.09.2026, Piero: "se ve muy tedioso y con muchos datos; aquí simplemente que salgan los PRY y los req
 // dentro que les falta despachar, del más reciente al más antiguo". Un ítem falta despachar mientras no
 // haya salido completo a obra (rqItemListo); los archivados no cuentan.
-function appAvanceGrupos(){
+function appAvanceGrupos(){ rqPreparar(); return appMemo('avance', appAvanceGruposCalc); }
+function appAvanceGruposCalc(){
   rqPreparar();
   const m = new Map();
   appResumenReqs(RQ.filas).forEach(function(y){        // ya viene del más reciente al más antiguo
@@ -12946,26 +12971,46 @@ function appIndPeriodo(k){
   if(k === 'anio') return { k:k, f:{ anio:c.getUTCFullYear() }, largo:'Año ' + c.getUTCFullYear() };
   return { k:'todo', f:{}, largo:'Todo el período cargado' };
 }
-function appIndDatos(f){
+// ---------- Cálculos una sola vez por versión de los datos (30.09.2026, Piero: "al hacer click en la
+// barra de abajo se buguea y se congela unos segundos") ----------
+// Cada pestaña recalculaba todo (indicadores 7 veces, pendientes, avance…) en cada toque: en un celular
+// eran 0.5–2.7 s congelado. Ahora se calcula una vez y se reusa hasta que cambian los datos (otro Excel,
+// otra publicación, otro OC Finalizadas).
+const APP_MEMO = { firma:'', m:new Map() }, APP_IDS = new WeakMap(); let APP_IDN = 0;
+function appId(o){ if(!o || typeof o !== 'object') return 0; let i = APP_IDS.get(o); if(!i){ i = ++APP_IDN; APP_IDS.set(o, i); } return i; }
+function appFirmaDatos(){
+  const rr = getReqRows();
+  return [appId(DATA), appId(rr), rr.length, appId(typeof PEDIDO_SIN_REQ_ROWS !== 'undefined' ? PEDIDO_SIN_REQ_ROWS : null), (typeof PEDIDO_SIN_REQ_PEND !== 'undefined' && PEDIDO_SIN_REQ_PEND) ? PEDIDO_SIN_REQ_PEND.length : 0,
+    appId(ALMACEN_DATA), appId(GASTO_DATA), appId(OC_FIN), appId(SUPERVISOR_ROL), appId(RQ.filas), gerAbierto ? 1 : 0, new Date().toISOString().slice(0, 10)].join('|');
+}
+function appMemo(clave, fn){
+  const f = appFirmaDatos();
+  if(f !== APP_MEMO.firma){ APP_MEMO.firma = f; APP_MEMO.m.clear(); }
+  if(APP_MEMO.m.has(clave)) return APP_MEMO.m.get(clave);
+  const v = fn(); APP_MEMO.m.set(clave, v); return v;
+}
+function appIndDatos(f){ return appMemo('ind' + JSON.stringify(f || {}), function(){ return appIndDatosCalc(f); }); }
+function appIndDatosCalc(f){
   const r = indConFiltros(f, function(){ return INDICATORS.map(function(ind){ return { ind:ind, st:aggStatsForIndicator(rowsForIndicator(ind), ind) }; }); });
   return Array.isArray(r) ? r : [];
 }
 // Tendencia: % a tiempo de las últimas 6 semanas (si se mira por semana) o de los últimos 6 meses.
-function appIndTendencia(porSemana){
-  const c = appIndCorte(), puntos = [];
+function appIndTendF(porSemana){
+  const c = appIndCorte(), out = [];
   for(let i = 5; i >= 0; i--){
-    let f, etq;
     if(porSemana){
       const ini = isoWeekStart(c); ini.setUTCDate(ini.getUTCDate() - 7 * i);
       const fin = new Date(ini); fin.setUTCDate(fin.getUTCDate() + 6);
-      f = { desde:appIndIso(ini), hasta:appIndIso(fin) }; etq = appIndCorto(ini);
+      out.push({ f:{ desde:appIndIso(ini), hasta:appIndIso(fin) }, etq:appIndCorto(ini) });
     } else {
       const d = new Date(Date.UTC(c.getUTCFullYear(), c.getUTCMonth() - i, 1));
-      f = { anio:d.getUTCFullYear(), mes:d.getUTCMonth() + 1 }; etq = MESES_CORTOS[d.getUTCMonth()];
+      out.push({ f:{ anio:d.getUTCFullYear(), mes:d.getUTCMonth() + 1 }, etq:MESES_CORTOS[d.getUTCMonth()] });
     }
-    puntos.push({ etq:etq, datos:appIndDatos(f) });
   }
-  return puntos;
+  return out;
+}
+function appIndTendencia(porSemana){
+  return appIndTendF(porSemana).map(function(x){ return { etq:x.etq, datos:appIndDatos(x.f) }; });
 }
 function appIndicadoresHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
@@ -13076,7 +13121,8 @@ function appGastoHtml(){
 // compró y un punto por las OC que tenían que llegar ese día (rojo si alguna quedó pendiente). Al tocar un
 // día se ve el detalle: gasto, OC que llegan, requerimientos nuevos y salidas a obra.
 const APP_CAL = { anio:null, mes:null, dia:null };
-function appCalDatos(anio, mes){
+function appCalDatos(anio, mes){ rqPreparar(); return appMemo('cal' + anio + '-' + mes, function(){ return appCalDatosCalc(anio, mes); }); }
+function appCalDatosCalc(anio, mes){
   const dias = {};
   const d0 = new Date(Date.UTC(anio, mes, 1)), d1 = new Date(Date.UTC(anio, mes + 1, 0));
   const k = function(d){ return d.getUTCDate(); };
@@ -13224,8 +13270,8 @@ function appPendComprasHtml(){
   venc.sort(function(a,b){ return b.d - a.d; }); sem.sort(function(a,b){ return a.f - b.f; }); luego.sort(function(a,b){ return (a.f || 9e15) - (b.f || 9e15); });
   const pl = [...peds.values()].sort(function(a,b){ return (a.f || 0) - (b.f || 0); });
   const nom = function(p){ return (PD_PERSONAS[p] || p || '—').split(' ')[0]; };
-  const filaOC = function(o, cls){ return `<div class="m-fila-w"><button type="button" class="m-fila ${cls}" data-q="OC ${escapeHtml(o.oc)}"><span class="t"><b>${escapeHtml(polarCorta(o.prov, 34))}</b><small><span class="mono">${escapeHtml(o.oc.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(nom(o.persona))}${o.oc.indexOf('0002-') === 0 ? ' · 🌎' : ''}</small></span>
-      <span class="v">${cls === 'rojo' ? '<b>' + o.d + ' d.h.</b><small>de atraso</small>' : o.f ? '<b>' + rqFecha(o.f).replace(/ \d{4}$/, '') + '</b><small>llega</small>' : '<b>—</b><small>sin fecha</small>'}</span></button><button type="button" class="m-fin" data-ocfin="${escapeHtml(o.oc)}" aria-label="Finalizar OC">✔</button></div>`; };
+  const filaOC = function(o, cls){ return `<button type="button" class="m-fila ${cls}" data-q="OC ${escapeHtml(o.oc)}"><span class="t"><b>${escapeHtml(polarCorta(o.prov, 34))}</b><small><span class="mono">${escapeHtml(o.oc.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(nom(o.persona))}${o.oc.indexOf('0002-') === 0 ? ' · 🌎' : ''}</small></span>
+      <span class="v">${cls === 'rojo' ? '<b>' + o.d + ' d.h.</b><small>de atraso</small>' : o.f ? '<b>' + rqFecha(o.f).replace(/ \d{4}$/, '') + '</b><small>llega</small>' : '<b>—</b><small>sin fecha</small>'}</span></button>`; };
   const sec = function(ico, tit, cls, lista, fila, abierto){ return lista.length ? `<details class="m-sec ${cls}"${abierto ? ' open' : ''}><summary><span>${ico} ${tit}</span><b>${lista.length}</b></summary>${lista.slice(0, 40).map(fila).join('')}${lista.length > 40 ? `<div class="asis-mas">+ ${lista.length - 40} más</div>` : ''}</details>` : ''; };
   return appChips('pcper', APP_PC.persona, [['', 'Todos ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size]].concat([...personas.keys()].filter(Boolean).sort().map(function(p){ return [p, nom(p)]; })))
     + `<div class="m-resumen"><div class="rojo"><b>${venc.length}</b><span>Vencidas</span></div><div class="ambar"><b>${sem.length}</b><span>Llegan esta semana</span></div><div class="azul"><b>${luego.length}</b><span>Más adelante</span></div><div class="gris"><b>${pl.length}</b><span>Pedidos sin OC</span></div></div>`
@@ -13234,16 +13280,16 @@ function appPendComprasHtml(){
     + sec('🔵', 'Llegan más adelante', 'azul', luego, function(o){ return filaOC(o, 'azul'); }, false)
     + sec('⚪', 'Pedidos sin OC', 'gris', pl, function(p){ return `<button type="button" class="m-fila gris" data-q="pedido ${escapeHtml(p.ped)}"><span class="t"><b>${escapeHtml(polarCorta(p.pry, 34))}</b><small><span class="mono">${escapeHtml(p.ped.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(nom(p.persona))} · ${p.n} ítem${p.n === 1 ? '' : 's'}</small></span><span class="v"><b>${polarDh(p.f).replace('hace ', '')}</b><small>esperando</small></span></button>`; }, false)
     + (!venc.length && !sem.length && !luego.length && !pl.length ? '<div class="ini-card"><div class="ini-vacio">✅ Sin pendientes.</div></div>' : '')
-    + (function(){ const f = ocFinLista(); return f.length ? `<details class="m-sec gris"><summary><span>✔ Finalizadas a mano</span><b>${f.length}</b></summary><div class="m-sec-nota">No cuentan como pendientes. Toca ↩ para reabrir.</div>
-        ${f.map(function(x){ return `<div class="m-fila-w"><div class="m-fila gris"><span class="t"><b>OC ${escapeHtml(x.oc.replace(/^000\d-0*/, ''))}</b><small>${escapeHtml(polarCorta(x.por || '', 22))} · ${new Date(x.t).toLocaleDateString('es-PE')}</small></span></div><button type="button" class="m-fin re" data-ocre="${escapeHtml(x.oc)}" aria-label="Reabrir OC">↩</button></div>`; }).join('')}</details>` : ''; })()
-    + '<div class="m-pie-nota">✔ al costado de una OC = finalizarla (ya no está pendiente aunque Nisira diga lo contrario). Se guarda sola.</div>';
+    + (function(){ const f = ocFinLista(); return f.length ? `<details class="m-sec gris"><summary><span>✔ Finalizadas (Excel)</span><b>${f.length}</b></summary><div class="m-sec-nota">Vienen de OC Finalizadas.xlsx y no cuentan como pendientes.</div>
+        ${f.map(function(x){ return `<button type="button" class="m-fila gris" data-q="OC ${escapeHtml(x.oc)}"><span class="t"><b>OC ${escapeHtml(x.oc.replace(/^000\d-0*/, ''))}</b><small>${escapeHtml(polarCorta([x.motivo, x.por].filter(Boolean).join(' · ') || 'Finalizada', 40))}</small></span><span class="v"><small>${escapeHtml(x.f || '')}</small></span></button>`; }).join('')}</details>` : ''; })();
 }
 
 // ---------- Pendientes de Logística (almacén) ----------
 // Lo que le toca al almacén, no a Compras: revisar requerimientos, despachar lo que ya llegó y completar
 // despachos parciales. Semáforo con las metas de los indicadores (generación de pedido 2 d.h.).
 const APP_PL = { q:'', sec:'rev', tope:15 };
-function appPendLogGrupos(){
+function appPendLogGrupos(){ rqPreparar(); return appMemo('pendlog', appPendLogGruposCalc); }
+function appPendLogGruposCalc(){
   rqPreparar();
   const g = { rev:new Map(), des:new Map(), par:new Map() };
   RQ.filas.forEach(function(r){
@@ -13484,11 +13530,7 @@ function appClickInicio(e){
   if(b.dataset.invmas){ APP_INV.tope += 30; const l = document.getElementById('invLista'); if(l) l.innerHTML = appInvLista(); return; }
   if(b.dataset.invbuscar){ APP_INV.q = b.dataset.invbuscar; APP_INV.sel = b.dataset.invbuscar; return appInicio('inventario'); }
   if(b.dataset.pcper !== undefined){ APP_PC.persona = b.dataset.pcper; return appRenderInicio(); }
-  if(b.dataset.ocfin){ const cod = b.dataset.ocfin; const fila = b.closest('.m-fila-w');
-    if(!confirm('¿Finalizar la OC ' + cod.replace(/^000\d-0*/, '') + '? Deja de salir como pendiente.')) return;
-    if(fila){ fila.classList.add('saliendo'); setTimeout(function(){ ocFinalizar(cod, true); }, 280); } else ocFinalizar(cod, true);
-    return; }
-  if(b.dataset.ocre){ return ocFinalizar(b.dataset.ocre, false); }
+
   if(b.dataset.plsec){ APP_PL.sec = b.dataset.plsec; APP_PL.q = ''; APP_PL.tope = 15; return appRenderInicio(); }
   if(b.dataset.plmas){ APP_PL.tope += 30; const l = document.getElementById('plLista'); if(l) l.innerHTML = appPendLogLista(); return; }
   if(b.dataset.pantalla) return appInicio(b.dataset.pantalla);
@@ -13662,13 +13704,6 @@ function polarAccion(e){
     b.textContent = abrir ? 'Ver menos ▴' : 'Ver los ' + b.dataset.asismas + ' ' + b.dataset.txt + ' restantes ▾';
     if(abrir){ r.classList.remove('asis-entra'); void r.offsetWidth; r.classList.add('asis-entra'); } return; }
   if(b.dataset.asisdet !== undefined) return polarDetAbrir(+b.dataset.asisdet);
-  if(b.dataset.ocfin || b.dataset.ocre){
-    const cod = b.dataset.ocfin || b.dataset.ocre, fin = !!b.dataset.ocfin;
-    if(fin && !confirm('¿Finalizar la OC ' + cod.replace(/^000\d-0*/, '') + '? Deja de salir como pendiente (se puede reabrir).')) return;
-    ocFinalizar(cod, fin); b.disabled = true;
-    return polarBot(fin ? `<p>✔ Listo, la <b>OC ${escapeHtml(cod.replace(/^000\d-0*/, ''))}</b> quedó <b>finalizada</b>: ya no sale en pendientes, calendario ni "por llegar".</p><div class="asis-acc">${polarBtn('ocre', cod, '↩ Deshacer')}</div>`
-      : `<p>↩ La <b>OC ${escapeHtml(cod.replace(/^000\d-0*/, ''))}</b> volvió a pendientes.</p>`);
-  }
   const ir = function(fn){ polarCerrar(); fn(); };
   if(b.dataset.req) return ir(function(){ appAbrirReq(b.dataset.req); });
   if(b.dataset.pry) return ir(function(){ appAbrirProyecto(b.dataset.pry); });
@@ -14751,6 +14786,12 @@ function polarResponder1(texto){
     const lin = function(ico, t, l){ return `<div class="asis-it"><div class="n">${ico} ${t}: <b>${l.length}</b> req.</div>${l.length ? `<div class="s"><small>la más antigua ${l[0].d} d.h. · ${escapeHtml(polarCorta(l[0].pry, 28))} (${escapeHtml(l[0].cod.replace(/^0001-0*/, ''))})</small></div>` : ''}</div>`; };
     return `<div class="cab">🏬 Pendientes de Logística</div>${lin('📝', 'Por revisar', G.rev)}${lin('📦', 'Por despachar', G.des)}${lin('🚚', 'Despacho incompleto', G.par)}<div class="asis-acc">${polarBtn('pantalla', 'pendlog', 'Ver pendientes')}</div>`;
   }
+  if(/finalizad|cerrad[ao]s? a mano|oc cerradas/.test(q)){
+    const f = ocFinLista();
+    if(!f.length) return '<p>No hay OC finalizadas cargadas. Se cargan con <b>OC Finalizadas.xlsx</b> (Cargar archivos) y luego ☁ Guardar y compartir.</p>';
+    const fila = function(x){ return `<div class="asis-item"><div class="d"><span class="mono">OC ${escapeHtml(x.oc.replace(/^000\d-0*/, ''))}</span>${x.f ? ' · ' + escapeHtml(x.f) : ''}</div><div class="q">${escapeHtml([x.motivo, x.por].filter(Boolean).join(' · ') || 'Finalizada')} ${polarBtn('q', 'OC ' + x.oc, 'ver')}</div></div>`; };
+    return `<div class="cab">✔ OC finalizadas</div><div class="sub">OC Finalizadas.xlsx · ${f.length} OC · no cuentan como pendientes</div>${f.slice(0, 6).map(fila).join('')}${polarMas(f, 6, fila, 'OC')}`;
+  }
   if(/pendientes? de compras?|pendientes? del area de compras/.test(q) && !polarPersonaEn(q, true)){
     const pr = appPendientesResumen();
     return `<div class="cab">🛒 Pendientes de Compras</div><div class="asis-kpis"><div><b style="color:var(--red)">${appN(pr.venc)}</b><span>OC vencidas</span></div><div><b>${appN(pr.ocs)}</b><span>OC por llegar</span></div><div><b>${appN(pr.peds)}</b><span>Pedidos sin OC</span></div></div><div class="asis-acc">${polarBtn('pantalla', 'pendcompras', 'Ver pendientes')}</div>`;
@@ -14928,14 +14969,14 @@ function polarOC(cod){
   const f = filas.find(function(r){ return r.fCompromiso; });
   const rec = function(r){ const q = r.cantOrden != null ? r.cantOrden : r.cantidadOrden, x = r.cantRecep != null ? r.cantRecep : r.cantRecepcion; return [q, x || 0]; };
   const venc = f && busdayCount(f.fCompromiso, new Date()) > 0 && !/atendido completo/i.test(est);
-  const fin = ocFinalizada(cod), abierta = filas.some(pdOcAbierta), puede = polarPuede('logistica');
+  const fin = ocFinalizada(cod);
   const filaI = function(r){ const c = rec(r); return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 46))}</div><div class="s"><small>recibido ${polarNum(c[1])} de ${polarNum(c[0])}</small>${r.codRequerimiento ? '<small class="mono">req ' + escapeHtml(r.codRequerimiento.replace(/^0001-0*/, '')) + '</small>' : '<small>pedido directo</small>'}</div></div>`; };
   return `<div class="cab">OC <span class="mono">${escapeHtml(cod.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(polarCorta(f0.proveedor || 'sin proveedor', 32))}</div>
     <div class="sub">${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden).replace(/ \d{4}$/, '') : ''}${f ? ' · entrega ' + rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : ''}${f0.origen === 'importado' ? ' · 🌎 importación' : ''}</div>
-    ${fin ? `<p><span class="asis-est ok">✔ Finalizada a mano</span><small> · ${escapeHtml(OC_FIN[cod].por || '')} · ${new Date(OC_FIN[cod].t).toLocaleDateString('es-PE')}</small></p>` : est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? ' · atrasada' : ''}</span></p>` : ''}
+    ${fin ? `<p><span class="asis-est ok">✔ Finalizada (OC Finalizadas.xlsx)</span>${[OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).length ? '<small> · ' + escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · ')) + '</small>' : ''}</p>` : est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? ' · atrasada' : ''}</span></p>` : ''}
     ${items.slice(0, 5).map(filaI).join('')}
     ${polarMas(items, 5, filaI, 'ítems')}
-    <div class="asis-acc">${puede && (abierta || fin) ? polarBtn(fin ? 'ocre' : 'ocfin', cod, fin ? '↩ Reabrir OC' : '✔ Finalizar OC') : ''}${polarBtn('q', 'proveedor ' + (f0.proveedor || ''), 'Proveedor')}${reqs.slice(0, 2).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r.replace(/^0001-0*/, ''))); }).join('')}</div>`;
+    <div class="asis-acc">${polarBtn('q', 'proveedor ' + (f0.proveedor || ''), 'Proveedor')}${reqs.slice(0, 2).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r.replace(/^0001-0*/, ''))); }).join('')}</div>`;
 }
 function polarPedido(cod){
   const filas = getReqRows().filter(function(r){ return r.codPedido === cod; });
@@ -15388,7 +15429,6 @@ appConstruir();
 
 irASeccion('proceso');
 appArrancar();
-ocFinCargar();
 
 })();
 </script>
