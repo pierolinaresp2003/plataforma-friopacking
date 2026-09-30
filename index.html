@@ -12186,6 +12186,7 @@ function pdFilasCalc(){
     if(pdOcPendiente(r)) out.push(Object.assign(base, { tipo:'oc', persona: pdPersona(r.usuarioCompras) }));
     else if(pdPedidoAbierto(r)) out.push(Object.assign(base, { tipo:'ped', persona: pdPersona(r.responsablePedido) }));
   });
+  out.forEach(function(r){ if(r.tipo === 'oc') r.fCompromiso = ocFechaVale(r.codOrden, r.fCompromiso); });
   return out.filter(function(r){ return pdEsComprador(r.persona); });
 }
 
@@ -13553,12 +13554,16 @@ function ocImportInfo(cod){
       const y = x.get(r.codOrden) || { etd:null, fReal:null, fRef:null };
       if(r.etd && (!y.etd || r.etd < y.etd)) y.etd = r.etd;
       if(r.fEntregaReal && (!y.fReal || r.fEntregaReal > y.fReal)) y.fReal = r.fEntregaReal;
-      const ref = r.fEntregaRef || r.fCompromiso; if(ref && (!y.fRef || ref < y.fRef)) y.fRef = ref;
+      const ref = r.fEntregaRef; if(ref && (!y.fRef || ref < y.fRef)) y.fRef = ref;
       x.set(r.codOrden, y); });
     return x;
   });
   return m.get(cod) || (/^0002-/.test(cod || '') ? { etd:null, fReal:null, fRef:null } : null);
 }
+// En una importación la ParaFechaOrden solo vale como ETA cuando ya hay zarpe (ETD). Sin ETD no se usa:
+// la fecha queda "por definir" (30.09.2026, Piero: "si no existe la entrega de proveedor o zarpe entonces
+// no consideres esa fecha, más bien pon que falta eso por definir").
+function ocFechaVale(cod, f){ const i = ocImportInfo(cod); if(!i) return f; return i.etd && f && f >= i.etd ? f : null; }
 function ocEnTransito(cod){ const i = ocImportInfo(cod); return !!(i && (i.etd || i.fReal)); }
 function appOCDatos(cod){
   const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return r.codOrden === cod; });
@@ -13581,11 +13586,11 @@ function appOCHtml(d){
   const hoy = new Date(), cod = d.cod, corto = cod.replace(/^000\d-0*/, ''), fin = ocFinalizada(cod);
   const n = d.items.length, rec = n - d.pend, pct = n ? Math.round(rec / n * 100) : 0;
   const imp = d.imp;
-  const fPact = imp ? (imp.fRef || d.fComp) : d.fComp;
+  const fPact = imp ? null : d.fComp;   // importación: sin entrega real ni zarpe, la fecha queda por definir
   const atraso = fPact && d.pend && !fin && !(imp && (imp.etd || imp.fReal)) ? busdayCount(fPact, hoy) : 0;
   const est = fin ? ['ok', '✔ Finalizada (OC Finalizadas.xlsx)'] : !d.pend ? ['ok', '✅ Atendida completa'] : d.sinAprobar ? ['espera', '⏳ Sin aprobar']
     : imp ? (imp.etd ? ['camino', '🚢 En tránsito · zarpó el ' + rqFecha(imp.etd)] : imp.fReal ? ['camino', '📦 Lista en fábrica · por zarpar']
-      : atraso > 0 ? ['espera', '⏳ Proveedor atrasado ' + atraso + ' d.h. en la entrega'] : ['camino', '🏭 En fabricación'])
+      : atraso > 0 ? ['espera', '⏳ Proveedor atrasado ' + atraso + ' d.h. en la entrega'] : ['camino', '🏭 En fabricación · entrega por definir'])
     : atraso > 0 ? ['tarde', '⚠️ Atrasada ' + atraso + ' d.h.'] : ['camino', '🚚 En camino'];
   const paso = function(ico, tit, f, ok, extra){ return `<div class="oc-paso ${ok ? 'ok' : 'no'}"><i>${ico}</i><b>${tit}</b><span>${f ? rqFecha(f) : '—'}</span>${extra ? '<small>' + extra + '</small>' : ''}</div>`; };
   const persona = pdPersona(d.f0.usuarioCompras), comp = PD_PERSONAS[persona] || d.f0.usuarioCompras || '—';
@@ -13604,13 +13609,13 @@ function appOCHtml(d){
         <div class="oc-bar"><em style="width:${fin ? 100 : pct}%"></em></div>
         ${d.pend && !fin ? `<small>Falta${d.pend === 1 ? '' : 'n'} <b>${d.pend}</b> línea${d.pend === 1 ? '' : 's'} por llegar</small>` : ''}</div>
       ${imp ? `<div class="oc-pasos cinco">${paso('🧾', 'Emitida', d.fOrden, !!d.fOrden)}${paso('✅', 'Aprobada', d.fAprob, !!d.fAprob, d.sinAprobar ? 'falta aprobar' : '')}
-        ${paso('🏭', 'Entrega del proveedor', imp.fReal || fPact, !!imp.fReal || !d.pend || fin, imp.fReal ? 'ya la entregó' : (fPact ? (atraso > 0 ? 'atrasada ' + atraso + ' d.h.' : 'pactada') : ''))}
-        ${paso('🚢', 'Zarpe (ETD)', imp.etd, !!imp.etd || !d.pend || fin, imp.etd ? '' : (d.pend && !fin ? 'por zarpar' : ''))}
-        ${paso('🏬', 'Llegada a Lurín', d.fRecep, !d.pend || fin, d.fRecep ? (d.pend && !fin ? 'llegó una parte' : '') : 'sin ETA en los datos')}</div>`
+        ${paso('🏭', 'Entrega del proveedor', imp.fReal || fPact, !!imp.fReal || !d.pend || fin, imp.fReal ? 'ya la entregó' : (fPact ? (atraso > 0 ? 'atrasada ' + atraso + ' d.h.' : 'referencial') : 'por definir'))}
+        ${paso('🚢', 'Zarpe (ETD)', imp.etd, !!imp.etd || !d.pend || fin, imp.etd ? '' : (d.pend && !fin ? 'por definir' : ''))}
+        ${paso('🏬', 'Llegada a Lurín', d.fRecep || ocFechaVale(cod, d.fComp), !d.pend || fin, d.fRecep ? (d.pend && !fin ? 'llegó una parte' : '') : (ocFechaVale(cod, d.fComp) ? 'ETA' : 'ETA por definir'))}</div>`
       : `<div class="oc-pasos">${paso('🧾', 'Emitida', d.fOrden, !!d.fOrden)}${paso('✅', 'Aprobada', d.fAprob, !!d.fAprob, d.sinAprobar ? 'falta aprobar' : '')}
         ${paso('📅', 'Entrega pactada', d.fComp, !!d.fComp && (!d.pend || fin), atraso > 0 ? 'vencida hace ' + atraso + ' d.h.' : (d.fComp && d.pend ? (busdayCount(hoy, d.fComp) > 0 ? 'faltan ' + busdayCount(hoy, d.fComp) + ' d.h.' : 'hoy') : ''))}
         ${paso('🏬', d.pend && !fin ? 'Recibida en parte' : 'Recibida', d.fRecep, !d.pend || fin, d.fRecep ? 'última recepción' : '')}</div>`}
-      ${imp && d.pend && !fin ? '<div class="oc-nota">🌎 Importación: la fecha pactada es la <b>entrega del proveedor</b> (cuando la tiene lista), no la llegada a Lurín. Después viene el zarpe (ETD) y la llegada.</div>' : ''}
+      ${imp && d.pend && !fin ? '<div class="oc-nota">🌎 Importación: primero el proveedor la entrega, luego zarpa (ETD) y recién ahí hay ETA de llegada. Lo que todavía no tiene fecha queda <b>por definir</b>.</div>' : ''}
       <div class="oc-datos">${dato('Comprador', escapeHtml(comp))}${dato('Origen', d.f0.origen === 'importado' || /^0002-/.test(cod) ? '🌎 Importación' : '🇵🇪 Nacional')}${dato('Monto', escapeHtml(d.montos))}${dato('Pago', escapeHtml(d.cond))}${dato('Requerimientos', d.reqs.length ? d.reqs.length + '' : 'Pedido directo')}</div>
       ${fin && OC_FIN[cod] && (OC_FIN[cod].motivo || OC_FIN[cod].por) ? `<div class="oc-nota">✔ ${escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · '))}</div>` : ''}
       <div class="oc-tit">Ítems de la OC</div>
@@ -13685,10 +13690,12 @@ function appPendComprasHtml(){
     const imp = o.oc.indexOf('0002-') === 0, tr = ocEnTransito(o.oc);
     let flag = o.est === 'Sin aprobar' ? '<em class="mal">Sin aprobar</em>' : o.est === 'Llegó parcial' ? '<em class="ok">Llegó parcial</em>' : '';
     if(tr) flag += '<em class="ok">🚢 ' + (ocImportInfo(o.oc).etd ? 'En tránsito' : 'Lista, por zarpar') + '</em>';
-    const pie = k === 'venc' ? '⏰ ' + o.d + ' d.h. ' + (imp ? 'de atraso del proveedor' : 'de atraso')
-      : tr ? '🚢 Importación en camino · ver pestaña Logística'
+    const ii = imp ? (ocImportInfo(o.oc) || {}) : {};
+    const pie = imp ? (ii.etd ? (o.f && o.d > 0 ? '⚠️ ETA pasada · todavía no llega a Lurín' : '🚢 Zarpó el ' + appDDMM(ii.etd)) : ii.fReal ? '📦 Lista en fábrica desde ' + appDDMM(ii.fReal) + ' · falta booking' : '🏭 En fabricación · entrega del proveedor por definir')
+      : k === 'venc' ? '⏰ ' + o.d + ' d.h. de atraso'
       : o.f ? (o.d === 0 ? '📅 Vence hoy' : '📅 Faltan ' + (-o.d) + ' d.h.') : '📅 Sin fecha de entrega';
-    return appTarjetaHtml({ cls:S[k][2], n:i + 1, est:EST[k], flag:flag, fecha:(imp ? 'Entrega prov. ' : 'Entrega ') + appDDMM(o.f), codLbl:'OC',
+    const fecha = imp ? (ii.etd ? (o.f ? 'ETA ' + appDDMM(o.f) : 'ETA por definir') : ii.fReal ? 'Zarpe por definir' : 'Entrega por definir') : 'Entrega ' + appDDMM(o.f);
+    return appTarjetaHtml({ cls:S[k][2], n:i + 1, est:EST[k], flag:flag, fecha:fecha, codLbl:'OC',
       cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', polarCorta(appImpNombre(o.prov), 34)], b:['Proyecto', prysTxt(o)],
       pie:pie + ' · ' + o.n + ' ítem' + (o.n === 1 ? '' : 's') + (imp && !tr ? ' · 🌎 importación' : ''), quien:nom(o.persona) });
   };
@@ -13754,7 +13761,7 @@ function appImpDatosCalc(){
   const grupos = new Map();
   ocs.forEach(function(o){
     const i = ocImportInfo(o.oc) || {};
-    o.etd = i.etd || null; o.fReal = i.fReal || null; o.fRef = i.fRef || o.eta;
+    o.etd = i.etd || null; o.fReal = i.fReal || null; o.fRef = i.fRef || null;
     // Sin ETD, ParaFechaOrden todavía es la entrega del proveedor, no una ETA.
     if(!o.etd || (o.eta && o.eta < o.etd)) o.eta = o.etd ? null : o.eta;
     o.k = !o.etd ? 'bk' : dias(o.etd) <= 0 ? 'tr' : 'em';
@@ -13805,8 +13812,7 @@ function appPendLogLista(){
     if(g.k === 'bk'){
       fechas = 'ETD / ETA: pendientes';
       if(g.fReal){ flag = '<em class="ok">Lista en fábrica</em>'; pie = '📦 El proveedor la entregó el ' + ddmm(g.fReal) + ', falta booking'; }
-      else if(g.dRef != null && g.dRef < 0){ flag = '<em class="mal">Proveedor atrasado</em>'; pie = '🏭 Entrega del proveedor pactada ' + ddmm(g.fRef) + ' · ' + (-g.dRef) + ' d. de atraso'; }
-      else pie = '🏭 En fabricación' + (g.fRef ? ' · entrega del proveedor ' + ddmm(g.fRef) : '');
+      else pie = '🏭 En fabricación · entrega del proveedor por definir';
     } else {
       fechas = 'ETD ' + ddmm(g.etd) + ' → ETA ' + (g.eta ? ddmm(g.eta) : 'por confirmar');
       if(g.k === 'tr'){
@@ -15827,14 +15833,15 @@ function polarOC(cod){
     : (pendL.length ? (pendL[0].estadoOrden || est0) : est0);
   items.sort(function(a,b){ return (pdOcAbierta(b) ? 1 : 0) - (pdOcAbierta(a) ? 1 : 0); });
   const reqs = [...new Set(filas.map(function(r){ return r.codRequerimiento; }).filter(Boolean))];
-  const f = filas.find(function(r){ return r.fCompromiso; });
+  const f0c = filas.find(function(r){ return r.fCompromiso; });
+  const f = f0c && ocFechaVale(cod, f0c.fCompromiso) ? f0c : null;
   const rec = function(r){ const q = r.cantOrden != null ? r.cantOrden : r.cantidadOrden, x = r.cantRecep != null ? r.cantRecep : r.cantRecepcion; return [q, x || 0]; };
   const impI = ocImportInfo(cod), enTr = !!(impI && (impI.etd || impI.fReal));
   const venc = f && busdayCount(f.fCompromiso, new Date()) > 0 && !/atendido completo/i.test(est) && !enTr;
   const fin = ocFinalizada(cod);
   const filaI = function(r){ const c = rec(r); return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 46))}</div><div class="s"><small>recibido ${polarNum(c[1])} de ${polarNum(c[0])}</small>${r.codRequerimiento ? '<small class="mono">req ' + escapeHtml(r.codRequerimiento.replace(/^0001-0*/, '')) + '</small>' : '<small>pedido directo</small>'}</div></div>`; };
   return `<div class="cab">OC <span class="mono">${escapeHtml(cod.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(polarCorta(f0.proveedor || 'sin proveedor', 32))}</div>
-    <div class="sub">${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden).replace(/ \d{4}$/, '') : ''}${f ? (impI ? ' · entrega del proveedor ' : ' · entrega ') + rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : ''}${impI && impI.etd ? ' · zarpó ' + rqFecha(impI.etd).replace(/ \d{4}$/, '') : ''}${f0.origen === 'importado' || impI ? ' · 🌎 importación' : ''}${f0.usuarioCompras ? ' · comprador ' + escapeHtml(PD_PERSONAS[pdPersona(f0.usuarioCompras)] || f0.usuarioCompras) : ''}</div>
+    <div class="sub">${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden).replace(/ \d{4}$/, '') : ''}${impI ? (impI.etd ? ' · zarpó ' + rqFecha(impI.etd).replace(/ \d{4}$/, '') + ' · ETA ' + (f ? rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : 'por definir') : impI.fReal ? ' · lista en fábrica ' + rqFecha(impI.fReal).replace(/ \d{4}$/, '') + ' · zarpe por definir' : ' · entrega del proveedor por definir') : (f ? ' · entrega ' + rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : '')}${f0.origen === 'importado' || impI ? ' · 🌎 importación' : ''}${f0.usuarioCompras ? ' · comprador ' + escapeHtml(PD_PERSONAS[pdPersona(f0.usuarioCompras)] || f0.usuarioCompras) : ''}</div>
     ${fin ? `<p><span class="asis-est ok">✔ Finalizada (OC Finalizadas.xlsx)</span>${[OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).length ? '<small> · ' + escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · ')) + '</small>' : ''}</p>` : est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? (impI ? ' · proveedor atrasado' : ' · atrasada') : (enTr && !/atendido completo/i.test(est) ? (impI.etd ? ' · en tránsito' : ' · lista en fábrica') : '')}</span></p>` : ''}
     ${items.slice(0, 5).map(filaI).join('')}
     ${polarMas(items, 5, filaI, 'ítems')}
