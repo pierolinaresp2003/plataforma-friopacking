@@ -2,11 +2,11 @@
 // Primero la red, para que siempre se vea lo último publicado (index.html y data.json.gz); si no hay
 // señal, se abre la última copia guardada en el celular. Solo archivos de este mismo sitio: lo que va a
 // GitHub (Guardar y compartir) y a Google no pasa por aquí.
-const CACHE = 'friopacking-v1';
+const CACHE = 'friopacking-v2';
 self.addEventListener('install', function(e){
   self.skipWaiting();
   // La primera vez se guarda la página misma, para que abra aunque luego no haya señal.
-  e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']); }).catch(function(){}));
+  e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']); }).catch(function(){}));
 });
 self.addEventListener('activate', function(e){
   e.waitUntil(caches.keys().then(function(ks){ return Promise.all(ks.filter(function(k){ return k !== CACHE; }).map(function(k){ return caches.delete(k); })); }).then(function(){ return self.clients.claim(); }));

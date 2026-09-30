@@ -897,21 +897,24 @@
      se va sola cuando llegan los datos. Por si algo falla, a los 12 s se oculta sola igual. */
   .app-splash{display:none;}
   @media (max-width:760px){
-    .app-splash{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
-      background:radial-gradient(130% 80% at 50% 30%,#12318f 0%,#0a1e64 45%,#040c2e 100%);animation:spAuto .5s 12s forwards;}
-    .app-splash .sp-logo{position:relative;width:118px;height:118px;display:grid;place-items:center;margin-bottom:26px;}
-    .app-splash .sp-logo img{width:70px;height:70px;animation:spLogo 1s cubic-bezier(.22,.8,.2,1.25) both;filter:drop-shadow(0 8px 22px rgba(62,198,172,.45));}
+    /* Continúa sin corte la pantalla de arranque de Android (manifest: fondo #0a1e64 y el logo al centro):
+       mismo azul, mismo logo en el mismo lugar, y recién ahí aparecen el anillo, el brillo y el nombre. */
+    .app-splash{position:fixed;inset:0;z-index:200;display:block;color:#fff;background:#0a1e64;animation:spAuto .5s 12s forwards;}
+    .app-splash::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 70% at 50% 45%,rgba(40,90,220,.45) 0%,rgba(10,30,100,0) 60%),radial-gradient(140% 90% at 50% 110%,rgba(4,12,46,.9) 0%,rgba(4,12,46,0) 70%);animation:appFundido 1.2s ease-out both;}
+    .app-splash .sp-logo{position:absolute;left:50%;top:50%;width:132px;height:132px;margin:-66px 0 0 -66px;display:grid;place-items:center;}
+    .app-splash .sp-logo img{width:84px;height:84px;animation:spLogo 1.1s cubic-bezier(.22,.8,.2,1) both;filter:drop-shadow(0 8px 22px rgba(62,198,172,.35));}
     .app-splash .sp-anillo{position:absolute;inset:0;border-radius:50%;
       background:conic-gradient(from 0deg,rgba(62,198,172,0) 0deg,rgba(62,198,172,.9) 300deg,rgba(62,198,172,0) 360deg);
       -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));
       animation:spGira 1.4s linear infinite, appFundido .6s .3s both;}
     .app-splash .sp-halo{position:absolute;inset:14px;border-radius:50%;background:rgba(255,255,255,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);animation:appFundido .8s both;}
-    .app-splash .sp-marca{font-size:24px;font-weight:800;letter-spacing:-.3px;animation:bvEntraSp .8s .25s cubic-bezier(.22,.8,.2,1) both;}
-    .app-splash .sp-sub{margin-top:6px;font-size:13px;opacity:.65;letter-spacing:.08em;text-transform:uppercase;animation:bvEntraSp .8s .4s cubic-bezier(.22,.8,.2,1) both;}
-    .app-splash .sp-pie{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));font-size:11.5px;opacity:.45;animation:appFundido 1s .6s both;}
+    .app-splash .sp-marca{position:absolute;left:0;right:0;top:calc(50% + 88px);text-align:center;font-size:24px;font-weight:800;letter-spacing:-.3px;animation:bvEntraSp .8s .3s cubic-bezier(.22,.8,.2,1) both;}
+    .app-splash .sp-sub{position:absolute;left:0;right:0;top:calc(50% + 122px);text-align:center;font-size:12.5px;opacity:.65;letter-spacing:.08em;text-transform:uppercase;animation:bvEntraSp .8s .45s cubic-bezier(.22,.8,.2,1) both;}
+    .app-splash .sp-pie{position:absolute;left:0;right:0;text-align:center;bottom:calc(34px + env(safe-area-inset-bottom));font-size:11.5px;opacity:.45;animation:appFundido 1s .6s both;}
     .app-splash.fuera{animation:spFuera .55s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none;}
   }
-  @keyframes spLogo{from{opacity:0;transform:scale(.4) rotate(-40deg);}to{opacity:1;transform:none;}}
+  @keyframes spLogo{from{transform:scale(.86);}to{transform:none;}}
+  @media (max-width:760px) and (display-mode: standalone){ html{background:#0a1e64;} }
   @keyframes spGira{to{transform:rotate(360deg);}}
   @keyframes bvEntraSp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
   @keyframes spFuera{to{opacity:0;transform:scale(1.08);visibility:hidden;}}
@@ -1438,7 +1441,8 @@
   <b class="sp-marca">Grupo Friopacking</b><span class="sp-sub">Plataforma de reportes</span>
   <span class="sp-pie">Cargando tu información…</span>
 </div>
-<script>try{ document.getElementById('spLogo').src = document.querySelector('link[rel="icon"]').href; }catch(e){}</script>
+<script>try{ var sl = document.getElementById('spLogo'); sl.onerror = function(){ sl.onerror = null; sl.src = document.querySelector('link[rel="icon"]').href; };
+  sl.src = /^https?:$/.test(location.protocol) ? 'icon-192.png' : document.querySelector('link[rel="icon"]').href; }catch(e){}</script>
 
 <div class="app-shell">
 <aside class="sidebar">
