@@ -1163,7 +1163,7 @@
   .asis-cab .av{width:42px;height:42px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,.35);}
   .asis-cab .tx{flex:1;line-height:1.2;} .asis-cab b{display:block;font-size:15px;} .asis-cab span{font-size:11.5px;opacity:.75;}
   .asis-cab button{background:rgba(255,255,255,.14);border:0;color:#fff;width:36px;height:36px;border-radius:11px;font-size:18px;cursor:pointer;}
-  .asis-chat{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;}
+  .asis-chat{position:relative;flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;-webkit-overflow-scrolling:touch;}
   .asis-msg{max-width:92%;font-size:13.5px;line-height:1.45;color:var(--ink);}
   .asis-msg.yo{align-self:flex-end;background:var(--brand);color:#fff;padding:9px 13px;border-radius:16px 16px 4px 16px;}
   .asis-msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--border);padding:11px 13px;border-radius:16px 16px 16px 4px;box-shadow:var(--shadow);}
@@ -1182,6 +1182,13 @@
   .asis-est.ok{background:var(--green-bg);color:var(--green);} .asis-est.camino,.asis-est.recibido{background:var(--azul-bg);color:var(--brand-ink);}
   .asis-est.espera{background:var(--amber-bg);color:var(--amber-ink);} .asis-est.fuera,.asis-est.tarde{background:var(--red-bg);color:var(--red);}
   .asis-acc{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+  /* Respuestas compactas (30.09.2026) */
+  .asis-avance{margin:8px 0 4px;} .asis-avance i{display:block;height:8px;border-radius:8px;background:var(--surface-2);overflow:hidden;}
+  .asis-avance em{display:block;height:100%;background:var(--brand-2);border-radius:8px;} .asis-avance span{display:block;font-size:12px;color:var(--ink-soft);margin-top:4px;}
+  .asis-it{border-top:1px solid var(--border);padding:7px 0;} .asis-it .n{font-size:12.5px;font-weight:700;line-height:1.3;}
+  .asis-it .s{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:3px;} .asis-it .s .asis-est{margin:0;font-size:10.5px;}
+  .asis-it .s small{font-size:11px;color:var(--muted);font-weight:600;}
+  .asis-mas{margin-top:2px;font-size:11.5px;color:var(--muted);}
   .asis-ul{margin:4px 0 6px;padding-left:18px;} .asis-ul li{margin:2px 0;}
   .asis-nota{font-size:11px;color:var(--muted);margin-top:6px !important;}
   .asis-pensando{color:var(--ink-soft);font-style:italic;}
@@ -12857,11 +12864,20 @@ function polarAbrir(texto){
   else if(!RQ_MOVIL.matches) setTimeout(function(){ document.getElementById('asisInput').focus(); }, 50);
 }
 function polarCerrar(){ document.getElementById('asis').classList.remove('abierto'); }
+// Al responder, el chat se queda en el INICIO de la respuesta (con la pregunta arriba), no al final
+// (30.09.2026, Piero: "debe quedarse la respuesta ahí, sino se va abajo y hay que subir").
+function polarVerInicio(d){
+  const c = document.getElementById('asisChat');
+  const ancla = (d.previousElementSibling && d.previousElementSibling.classList.contains('yo')) ? d.previousElementSibling : d;
+  const top = ancla.offsetTop - 8;
+  c.scrollTop = d.offsetTop + d.offsetHeight - top <= c.clientHeight ? c.scrollHeight : top;
+}
 function polarMsg(html, quien){
   const c = document.getElementById('asisChat');
   const d = document.createElement('div');
   d.className = 'asis-msg ' + quien; d.innerHTML = html;
-  c.appendChild(d); c.scrollTop = c.scrollHeight;
+  c.appendChild(d);
+  if(quien === 'bot') polarVerInicio(d); else c.scrollTop = c.scrollHeight;
 }
 function polarBot(html){ polarMsg(html, 'bot'); }
 function polarEnviar(texto){
@@ -12874,7 +12890,7 @@ function polarEnviar(texto){
     }).catch(function(err){
       let local; try{ local = polarResponder(texto); }catch(e){ local = '<p>No pude contestar esa consulta.</p>'; }
       burbuja.innerHTML = local + '<p class="asis-nota">Respondí en modo básico: la IA no contestó (' + escapeHtml(err && err.message || err) + ').</p>';
-    }).then(function(){ chat.scrollTop = chat.scrollHeight; });
+    }).then(function(){ polarVerInicio(burbuja); });
     return;
   }
   let r;
@@ -13134,13 +13150,13 @@ function polarEstadoEn(q){ for(const e of POLAR_ESTADOS) if(e[0].test(q)) return
 function polarListaReqs(filas, titulo, sub, tope){
   const reqs = appResumenReqs(filas);
   if(!reqs.length) return `<p>${titulo}: no encontré nada${sub ? ' (' + escapeHtml(sub) + ')' : ''}.</p>`;
-  tope = tope || 8;
+  tope = Math.min(tope || 6, 6);
   return `<div class="cab">${titulo}</div>${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ''}
     <p><b>${reqs.length}</b> requerimiento${reqs.length === 1 ? '' : 's'} · ${filas.length} ítem${filas.length === 1 ? '' : 's'}.</p>
     ${reqs.slice(0, tope).map(function(y){
-      return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(y.cod)}</span> · ${rqFecha(y.fReq)} · ${escapeHtml(polarCorta(y.proyecto, 34))}</div>
+      return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(y.cod.replace(/^0001-0*/, ''))}</span> · ${rqFecha(y.fReq).replace(/ \d{4}$/, '')} · ${escapeHtml(polarCorta(y.proyecto, 26))}</div>
         <div class="q">${appChipsEstado(y.est)} ${polarBtn('q', y.cod, 'ver')}</div></div>`;
-    }).join('')}${reqs.length > tope ? `<div class="q" style="margin-top:6px;">…y ${reqs.length - tope} más.</div>` : ''}`;
+    }).join('')}${reqs.length > tope ? `<div class="q asis-mas">+ ${reqs.length - tope} más</div>` : ''}`;
 }
 
 // ---------- Requerimiento: contestar DIRECTO lo que se pregunta ----------
@@ -13223,9 +13239,8 @@ function polarDondeEsta(filas, palabras, quien){
   const hits = polarItemsPorProducto(filas, palabras).sort(function(a,b){ return (b.fReq || 0) - (a.fReq || 0); });
   if(!hits.length) return null;
   return `<div class="cab">"${escapeHtml(palabras.join(' '))}"</div><div class="sub">${escapeHtml(quien)} · ${hits.length} ítem${hits.length === 1 ? '' : 's'}</div>
-    ${hits.slice(0, 6).map(function(r){ const s = rqSituacion(r);
-      return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(r.producto, 60))}</div>
-        <div class="q"><span class="mono">${escapeHtml(r.codRequerimiento)}</span> · ${rqFecha(r.fReq)}<br>${s.ico} <b>${escapeHtml(s.titulo)}</b>${s.detalle ? ' — ' + escapeHtml(s.detalle) : ''} ${polarBtn('q', r.codRequerimiento, 'ver')}</div></div>`; }).join('')}`;
+    ${hits.slice(0, 6).map(function(r){ return polarItemCorto(r, true); }).join('')}
+    ${hits.length > 6 ? `<div class="q asis-mas">+ ${hits.length - 6} más</div>` : ''}`;
 }
 
 // "¿Dónde están los perfiles de Q PACK?": el estado de esos productos en los requerimientos, sin importar
@@ -13255,10 +13270,8 @@ function polarEstadoProductos(palabras, filasBase){
   return `<div class="cab">🔎 "${escapeHtml(prodW.join(' '))}"</div><div class="sub">${nomPry ? escapeHtml(nomPry) + ' · ' : ''}${hits.length} ítem${hits.length === 1 ? '' : 's'} en ${new Set(hits.map(function(r){ return r.codRequerimiento; })).size} requerimiento(s)</div>
     <div class="asis-estados">${appChipsEstado(est)}</div>
     ${pend.length ? `<p><b>⏳ Faltan ${pend.length}</b>${listos ? ` · ✅ ${listos} ya salieron a obra` : ''}</p>` : '<p>✅ Todo ya salió a obra.</p>'}
-    ${ver.map(function(r){ const s = rqSituacion(r);
-      return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(r.producto, 60))}</div>
-        <div class="q"><span class="mono">${escapeHtml(r.codRequerimiento)}</span> · ${rqFecha(r.fReq)} · pidió ${escapeHtml(polarCorta(r.responsable, 24))}<br>${s.ico} <b>${escapeHtml(s.titulo)}</b>${s.detalle ? ' — ' + escapeHtml(s.detalle) : ''} ${polarBtn('q', r.codRequerimiento, 'ver')}</div></div>`; }).join('')}
-    ${(pend.length || hits.length) > 6 ? `<div class="q" style="margin-top:6px;">…y ${(pend.length || hits.length) - 6} más.</div>` : ''}`;
+    ${ver.map(function(r){ return polarItemCorto(r, true); }).join('')}
+    ${(pend.length || hits.length) > 6 ? `<div class="q asis-mas">+ ${(pend.length || hits.length) - 6} más</div>` : ''}`;
 }
 
 // Movimientos de requerimientos en un período: qué se pidió / salió / llegó a obra / llegó al almacén.
@@ -13884,6 +13897,29 @@ function polarResponder1(texto){
   return '<p>No entendí bien la consulta 🤔 Ya la anoté para aprender a responderla.</p>' + polarAyuda();
 }
 
+// Estado de un ítem en UNA línea corta (30.09.2026, Piero: "hay mucha información y se pierde con tanto
+// texto"). El detalle completo (OC, proveedor, guías, fechas) queda en "Ver trazabilidad".
+function polarDh(d){ const n = d ? Math.max(0, busdayCount(d, new Date())) : 0; return n === 0 ? 'hoy' : 'hace ' + n + ' d.h.'; }
+function polarSitCorta(r){
+  const e = r.estadoCalc, um = r.unidad || '';
+  const falta = (r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0) ? polarNum(Math.round((r.cantidad - r.cantSalida) * 100) / 100) + ' ' + um : '';
+  if(e === 'En Revisión') return ['espera', '📝', 'En revisión de almacén', polarDh(r.fReq)];
+  if(e === 'Pedido pendiente') return ['espera', '🛒', 'En Compras, sin OC', polarDh(r.fPedido || r.fReq)];
+  if(e === 'Enviado a pedido — cuenta con OC'){
+    const v = r.fCompromiso && busdayCount(r.fCompromiso, new Date()) > 0;
+    return [v ? 'tarde' : 'camino', '🧾', r.fCompromiso ? 'Llega aprox. ' + rqFecha(r.fCompromiso) : 'Con OC, por llegar', v ? '⚠️ atrasada' : ''];
+  }
+  if(e === 'Recibido en Almacén') return ['recibido', '🏬', 'En almacén, por despachar', polarDh(r.fRecep)];
+  if(e === 'Enviado a Obra') return ['camino', '🚚', falta ? 'Salió en parte · faltan ' + falta : 'Salió a obra', rqFecha(r.fSalida)];
+  if(e === 'Recibido en Obra') return ['ok', '🏗️', 'Recibido en obra', rqFecha(r.fObra)];
+  return ['', '•', e || '—', ''];
+}
+function polarItemCorto(r, conReq){
+  const s = polarSitCorta(r);
+  return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 46))}</div>
+    <div class="s"><span class="asis-est ${s[0]}">${s[1]} ${escapeHtml(s[2])}</span>${s[3] ? '<small>' + escapeHtml(s[3]) + '</small>' : ''}${conReq ? '<small class="mono">' + escapeHtml(r.codRequerimiento) + '</small>' : ''}</div></div>`;
+}
+
 // ---------- Requerimiento ----------
 function polarReq(cod){
   rqPreparar();
@@ -13891,27 +13927,17 @@ function polarReq(cod){
   if(!items.length) return null;
   POLAR.nuevoRef = cod; POLAR.nuevoRefTxt = 'req. ' + cod;
   const r0 = items[0], n = items.length;
-  const obra = items.filter(function(r){ return /obra/i.test(r.estadoCalc || ''); }).length;
-  const incompletos = items.filter(function(r){ return !(r.cantSalida >= r.cantidad) ; }).length;
-  const frase = (obra === n && !incompletos) ? '✅ Todo lo que se pidió ya salió a obra.'
-    : `Van <b>${obra} de ${n}</b> ítems enviados a obra.`;
   const pend = items.filter(function(r){ return !rqItemListo(r); });
-  const listos = n - pend.length;
-  const lista = pend.slice(0, 10).map(function(r){
-    const falta = (r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0) ? ` <b style="color:var(--amber-ink)">(falta ${polarNum(Math.round((r.cantidad - r.cantSalida) * 100) / 100)})</b>` : '';
-    const sit = rqSituacion(r);
-    const extra = `<br>${sit.ico} <b>${escapeHtml(sit.titulo)}</b>${sit.detalle ? ' — ' + escapeHtml(sit.detalle) : ''}${r.via === 'Directo' ? ' · directo del stock' : ''}`;
-    return `<div class="asis-item"><div class="d"><span class="asis-est ${rqClaseEstado(r.estadoCalc)}">${escapeHtml(r.estadoCalc)}</span>${escapeHtml(polarCorta(r.producto, 70))}</div>
-      <div class="q">Pidió ${polarNum(r.cantidad)} ${escapeHtml(r.unidad || '')} · Salió ${polarNum(r.cantSalida)}${falta}${extra}</div></div>`;
-  }).join('');
-  return `<div class="cab">Req. <span class="mono">${escapeHtml(cod)}</span></div>
-    <div class="sub">${escapeHtml(r0.proyecto || '')}<br>Pidió ${escapeHtml(r0.responsable || '—')} · ${rqFecha(r0.fReq)}</div>
-    <p>${frase}</p>
-    <div class="asis-kpis"><div><b>${n}</b><span>Ítems</span></div><div><b>${pend.length}</b><span>Faltan</span></div><div><b>${listos}</b><span>Ya en obra</span></div></div>
-    ${pend.length ? `<p><b>⏳ Lo que todavía falta:</b></p><div class="asis-estados">${appChipsEstado(appResumenReqs(pend)[0].estFalta)}</div>` : '<p>✅ No falta nada: todo lo pedido ya llegó a obra.</p>'}
-    ${lista}${pend.length > 10 ? `<div class="q" style="margin-top:6px;">…y ${pend.length - 10} ítems más por llegar.</div>` : ''}
-    ${pend.length && listos ? `<div class="q" style="margin-top:6px;">✅ ${listos} ítem${listos === 1 ? '' : 's'} ya llegaron a obra.</div>` : ''}
-    <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad completa')}${polarBtn('q', 'excel del req ' + cod, '📥 Excel')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Todo el proyecto') : ''}</div>`;
+  const listos = n - pend.length, pct = n ? Math.round(listos / n * 100) : 0;
+  // Compacto: cabecera, una barra de avance y cada pendiente en una línea (lo más urgente primero).
+  const orden = { 'Enviado a pedido — cuenta con OC':0, 'Pedido pendiente':1, 'En Revisión':2, 'Recibido en Almacén':3, 'Enviado a Obra':4 };
+  const ver = pend.slice().sort(function(a,b){ const o = function(x){ return x.estadoCalc in orden ? orden[x.estadoCalc] : 9; }; return o(a) - o(b); }).slice(0, 5);
+  return `<div class="cab">Req. <span class="mono">${escapeHtml(cod.replace(/^0001-0*/, ''))}</span> · ${escapeHtml(polarCorta(r0.proyecto || '', 34))}</div>
+    <div class="sub">${escapeHtml(polarCorta(r0.responsable || '—', 30))} · ${rqFecha(r0.fReq)}</div>
+    <div class="asis-avance"><i><em style="width:${pct}%"></em></i><span>${pend.length ? `<b>Faltan ${pend.length}</b> de ${n}` : '<b>✅ Todo salió a obra</b>'} · ${listos} en obra</span></div>
+    ${ver.map(function(r){ return polarItemCorto(r); }).join('')}
+    ${pend.length > 5 ? `<div class="q asis-mas">+ ${pend.length - 5} pendientes más</div>` : ''}
+    <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad')}${polarBtn('q', 'excel del req ' + cod, '📥 Excel')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Proyecto') : ''}</div>`;
 }
 
 // ---------- Proyecto ----------
