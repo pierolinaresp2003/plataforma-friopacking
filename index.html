@@ -915,7 +915,7 @@
     .app-tabbar button.polar .i img{width:100%;height:100%;display:block;}
     .app-tabbar button.polar{color:var(--brand-ink);}
     /* Hoja de acciones (lo que antes eran los íconos de la barra de arriba) */
-    .app-sheet-fondo{position:fixed;inset:0;background:rgba(10,20,40,.45);z-index:90;align-items:flex-end;}
+    .app-sheet-fondo{position:fixed;inset:0;background:rgba(10,20,40,.45);z-index:97;align-items:flex-end;}
     .app-sheet-fondo.abierto{display:flex;}
     .app-sheet{background:var(--card);width:100%;border-radius:18px 18px 0 0;padding:8px 16px calc(18px + env(safe-area-inset-bottom));}
     .app-sheet .asa{width:40px;height:4px;border-radius:4px;background:var(--border);margin:4px auto 12px;}
@@ -1137,6 +1137,27 @@
     right:18px;bottom:18px;width:400px;height:min(640px, calc(100vh - 36px));border-radius:18px;border:1px solid var(--border);
     box-shadow:0 18px 50px rgba(10,20,40,.28);overflow:hidden;}
   .asis.abierto{display:flex;}
+  /* Apertura animada (30.09.2026): en la PC el panel sube y crece; en el celular se revela desde abajo
+     como un círculo que se abre, y el oso entra con un rebote. */
+  .asis.abriendo{animation:asisAbrir .38s cubic-bezier(.2,.9,.3,1.15);}
+  .asis.abriendo .asis-cab .av{animation:asisOso .7s .15s both;}
+  .asis.abriendo .asis-cab .tx{animation:asisTexto .45s .25s both;}
+  .asis-msg.asis-entra{animation:asisBurbuja .35s ease-out;}
+  @keyframes asisAbrir{from{opacity:0;transform:translateY(28px) scale(.92);transform-origin:bottom right;}to{opacity:1;transform:none;}}
+  @keyframes asisRevelar{from{clip-path:circle(0% at 50% 100%);}to{clip-path:circle(150% at 50% 100%);}}
+  @keyframes asisOso{0%{opacity:0;transform:scale(.3) rotate(-25deg);}60%{opacity:1;transform:scale(1.18) rotate(8deg);}100%{transform:none;}}
+  @keyframes asisTexto{from{opacity:0;transform:translateX(-10px);}to{opacity:1;transform:none;}}
+  @keyframes asisBurbuja{from{opacity:0;transform:translateY(8px) scale(.97);}to{opacity:1;transform:none;}}
+  @media (max-width:760px){ .asis.abriendo{animation:asisRevelar .5s cubic-bezier(.4,0,.2,1);} }
+  @media (prefers-reduced-motion: reduce){ .asis.abriendo,.asis.abriendo .asis-cab .av,.asis.abriendo .asis-cab .tx,.asis-msg.asis-entra{animation:none;} }
+  #asisMenu{display:none;}
+  @media (max-width:760px){
+    /* Supervisor: sin barra de abajo; Leo ocupa todo, con menú (usuario, tema) y sin cerrar. */
+    body.vista-supervisor .app-tabbar{display:none !important;}
+    body.vista-supervisor #asisMenu{display:block;}
+    body.vista-supervisor #asisCerrar{display:none;}
+    body.vista-supervisor .asis-fab{display:flex;left:50%;right:auto;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));}
+  }
   @media (max-width:760px){ .asis{inset:0;width:auto;height:auto;border-radius:0;border:0;} }
   .asis-cab{display:flex;align-items:center;gap:10px;background:var(--brand);color:#fff;padding:calc(12px + env(safe-area-inset-top)) 14px 12px;}
   .asis-cab .av{width:42px;height:42px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 2px rgba(255,255,255,.35);}
@@ -12124,8 +12145,10 @@ const APP_VISTAS = {
     // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
     // Solo Inicio y Mis req. (29.09.2026, Piero: "para el supervisor solo coloca inicio y mis req"). La vista
     // se cambia desde el botón de arriba y a Polar se le pregunta desde la caja del Inicio.
-    // Polar al centro, entre Inicio y Mis req. (29.09.2026, Piero).
-    tabs:[['inicio','🏠','Inicio'], ['polar'], ['requerimientos','📋','Mis req.']] },
+    // Sin Inicio ni Mis req. (30.09.2026, Piero: "para supervisores de frente que se abra el agente virtual
+    // nada más, y con ese que se consulte todo"): entra directo a Leo. Lo que Leo muestra (un req., un
+    // proyecto) se abre en Requerimientos y el botón flotante lo devuelve a Leo.
+    tabs:[] },
   logistica:  { nombre:'Logística',  ico:'🚚', desc:'Ingresos, salidas, kardex y qué comprar para stock.',
     tabs:[['inicio','🏠','Inicio'], ['alertas','📦','Inventario'], ['polar'], ['pendientes','⏳','Pendientes'], ['vista','👥','Vista']] },
 };
@@ -12216,6 +12239,7 @@ function appConstruir(){
     <button type="button" class="asis-fab" id="asisFab"><img class="i" src="${POLAR_AVATAR}" alt="">Pregúntale a Leo</button>
     <div class="asis" id="asis" role="dialog" aria-label="Asistente Leo">
       <div class="asis-cab"><img class="av" src="${POLAR_AVATAR}" alt="Leo"><div class="tx"><b>Leo</b><span>Asistente de consultas · Friopacking</span></div>
+        <button type="button" id="asisMenu" aria-label="Menú">☰</button>
         <button type="button" id="asisCerrar" aria-label="Cerrar">✕</button></div>
       <div class="asis-chat" id="asisChat"></div>
       <div class="asis-sug" id="asisSug"></div>
@@ -12247,6 +12271,7 @@ function appConstruir(){
   });
   document.getElementById('asisFab').addEventListener('click', function(){ polarAbrir(); });
   document.getElementById('asisCerrar').addEventListener('click', polarCerrar);
+  document.getElementById('asisMenu').addEventListener('click', appAbrirSheet);
   document.getElementById('asisForm').addEventListener('submit', function(e){
     e.preventDefault(); const i = document.getElementById('asisInput'); const t = i.value.trim();
     if(t){ i.value = ''; polarEnviar(t); }
@@ -12337,6 +12362,7 @@ function appElegirVista(v){
   try{ localStorage.setItem('fp-vista', v); }catch(err){}
   document.getElementById('appBienv').classList.remove('abierto');
   appCerrarSheet();
+  polarCerrar();
   appInicio();
   polarSugerencias();
 }
@@ -12365,6 +12391,7 @@ function appSync(seccion, bloqueado){
 }
 
 function appInicio(pantalla){
+  if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(); return; }
   document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
   document.getElementById('section-inicio').classList.add('active');
   APP.enInicio = true;
@@ -12812,11 +12839,19 @@ function polarAbrir(texto){
   const a = document.getElementById('asis');
   a.classList.add('abierto');
   polarSugerencias();
+  // Animación de apertura (30.09.2026, Piero): el panel se abre desde abajo y Leo "llega" escribiendo.
+  a.classList.remove('abriendo'); void a.offsetWidth; a.classList.add('abriendo');
   if(!POLAR.saludo){
     POLAR.saludo = true;
-    polarBot(RQ_MOVIL.matches && APP.vista === 'supervisor'
-      ? `<p>¡Hola! Soy <b>Leo</b> 🐻‍❄️.</p><p>Escríbeme tu <b>N° de requerimiento</b> o tu <b>proyecto</b> (PRY…) y te digo cómo va cada cosa que pediste.</p>`
-      : `<p>¡Hola! Soy <b>Leo</b> 🐻‍❄️, el asistente de la plataforma.</p><p>Escríbeme un <b>N° de requerimiento</b>, un <b>proyecto</b> (PRY…), un <b>código de producto</b> o una <b>OC</b> y te digo cómo va.</p>`);
+    const nom = polarMiNombre() ? polarMiNombre().split(' ')[0] : '';
+    const hola = nom ? '¡Hola, ' + escapeHtml(nom.charAt(0) + nom.slice(1).toLowerCase()) + '!' : '¡Hola!';
+    const saludo = RQ_MOVIL.matches && APP.vista === 'supervisor'
+      ? `<p>${hola} Soy <b>Leo</b> 🐻‍❄️.</p><p>Pregúntame lo que quieras de tus <b>requerimientos</b> y <b>proyectos</b>: cómo van, qué falta, cuándo llega, dónde está un producto…</p><p>Por ejemplo: "mis requerimientos", "¿qué me falta del 23303?" o "¿dónde están los perfiles de Q Pack?".</p>`
+      : `<p>${hola} Soy <b>Leo</b> 🐻‍❄️, el asistente de la plataforma.</p><p>Escríbeme un <b>N° de requerimiento</b>, un <b>proyecto</b> (PRY…), un <b>código de producto</b> o una <b>OC</b> y te digo cómo va.</p>`;
+    polarBot('<p class="asis-pensando">Leo está llegando<span>.</span><span>.</span><span>.</span></p>');
+    const chat = document.getElementById('asisChat'), burbuja = chat.lastElementChild;
+    setTimeout(function(){ burbuja.innerHTML = saludo; burbuja.classList.add('asis-entra'); if(texto) polarEnviar(texto); }, 750);
+    return;
   }
   if(texto) polarEnviar(texto);
   else if(!RQ_MOVIL.matches) setTimeout(function(){ document.getElementById('asisInput').focus(); }, 50);
