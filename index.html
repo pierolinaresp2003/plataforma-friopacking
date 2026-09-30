@@ -1151,6 +1151,10 @@
   @media (max-width:760px){ .asis.abriendo{animation:asisRevelar .5s cubic-bezier(.4,0,.2,1);} }
   @media (prefers-reduced-motion: reduce){ .asis.abriendo,.asis.abriendo .asis-cab .av,.asis.abriendo .asis-cab .tx,.asis-msg.asis-entra{animation:none;} }
   #asisMenu{display:none;}
+  .app-toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(10px);z-index:120;
+    background:rgba(20,28,45,.92);color:#fff;font-size:13px;font-weight:600;padding:10px 16px;border-radius:22px;opacity:0;pointer-events:none;
+    transition:opacity .2s, transform .2s;white-space:nowrap;}
+  .app-toast.ver{opacity:1;transform:translateX(-50%);}
   @media (max-width:760px){
     /* Supervisor: sin barra de abajo; Leo ocupa todo, con menú (usuario, tema) y sin cerrar. */
     body.vista-supervisor .app-tabbar{display:none !important;}
@@ -12291,8 +12295,45 @@ function appConstruir(){
   });
 }
 
+// Botón "atrás" del celular (30.09.2026, Piero: "cuando le doy al botón de retroceder se sale de la
+// aplicación"). Se deja un paso de historial "de guardia": atrás cierra lo que esté abierto (menú, Leo),
+// vuelve al Inicio o a Leo, y recién en la pantalla principal pide tocar otra vez para salir.
+let appAtrasListo = false, appAtrasUltimo = 0;
+function appAtrasGuardia(){ try{ history.pushState({ fpApp:1 }, ''); }catch(err){} }
+function appToast(txt){
+  let t = document.getElementById('appToast');
+  if(!t){ t = document.createElement('div'); t.id = 'appToast'; t.className = 'app-toast'; document.body.appendChild(t); }
+  t.textContent = txt; t.classList.add('ver');
+  clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('ver'); }, 2000);
+}
+function appAtras(){
+  if(!RQ_MOVIL.matches) return false;
+  const sheet = document.getElementById('appSheet'), asis = document.getElementById('asis'), bienv = document.getElementById('appBienv');
+  if(sheet && sheet.classList.contains('abierto')){ appCerrarSheet(); return true; }
+  if(bienv && bienv.classList.contains('abierto')) return false;
+  const sup = APP.vista === 'supervisor', leo = asis && asis.classList.contains('abierto');
+  if(leo) { if(sup) return false; polarCerrar(); return true; }
+  if(sup){ polarAbrir(); return true; }
+  if(!APP.enInicio || APP.pantalla !== 'inicio'){ appInicio(); return true; }
+  return false;
+}
+function appAtrasPreparar(){
+  if(appAtrasListo) return;
+  appAtrasListo = true;
+  appAtrasGuardia();
+  window.addEventListener('popstate', function(){
+    if(!RQ_MOVIL.matches) return;
+    if(appAtras()){ appAtrasGuardia(); return; }
+    if(Date.now() - appAtrasUltimo < 2000){ history.back(); return; }   // segunda vez seguida: sale
+    appAtrasUltimo = Date.now();
+    appToast('Vuelve a tocar atrás para salir');
+    appAtrasGuardia();
+  });
+}
+
 function appArrancar(){
   if(!RQ_MOVIL.matches) return;
+  appAtrasPreparar();
   if(!APP.usuario || !APP.vista) return appBienvenida();
   appInicio();
   if(appNecesitaClave()) appBienvenida(APP.usuario.correo);
@@ -12720,8 +12761,15 @@ function appInicioGerencia(){
     filas.forEach(function(r){ fam.set(r.familia, (fam.get(r.familia) || 0) + (r.montoPEN || 0)); });
     const total = [...fam.values()].reduce(function(a,b){ return a + b; }, 0);
     const top = [...fam.entries()].sort(function(a,b){ return b[1] - a[1]; }).slice(0, 4);
-    gasto = `<div class="ini-gasto"><div><span>🇵🇪 Nacional</span><b>${fmtPEN(mn.soles)}</b><small>${fmtUSD(mn.dolares)}</small></div>
-        <div><span>🌎 Importado</span><b>${fmtUSD(mi.dolares)}</b><small>${mi.soles > 0 ? fmtPEN(mi.soles) : '&nbsp;'}</small></div></div>
+    // Arriba el monto que no es cero (30.09.2026, Piero: "no debe salir el 0 primero si es 0").
+    const montos = function(m, primeroSoles){
+      const a = [[m.soles, fmtPEN(m.soles)], [m.dolares, fmtUSD(m.dolares)]].filter(function(x){ return Math.round(x[0]) !== 0; });
+      if(!primeroSoles) a.reverse();
+      if(!a.length) return `<b>${primeroSoles ? 'S/ 0' : '$ 0'}</b><small>&nbsp;</small>`;
+      return `<b>${a[0][1]}</b><small>${a[1] ? a[1][1] : '&nbsp;'}</small>`;
+    };
+    gasto = `<div class="ini-gasto"><div><span>🇵🇪 Nacional</span>${montos(mn, true)}</div>
+        <div><span>🌎 Importado</span>${montos(mi, false)}</div></div>
       ${top.map(function(f){ const p = total ? f[1] / total * 100 : 0;
         return `<div class="ini-bar"><span>${escapeHtml(f[0] || 'Sin familia')}</span><i><em style="width:${p.toFixed(1)}%"></em></i><b>${p.toFixed(0)}%</b></div>`; }).join('')}
       <button type="button" class="ini-link" data-ir="gasto">Ver concentración de gasto ›</button>`;
@@ -13723,7 +13771,7 @@ function polarSobreFilas(filas, q, quien, p){
   if(/reserv/.test(q)){ const ids = [...new Set(filas.map(function(r){ return r.idProyecto; }))]; if(ids.length === 1) return polarReservadoProyecto(ids[0]); }
   const pend = filas.filter(function(r){ return !rqItemListo(r); });
   if(p) return polarListaReqs(filas.filter(function(r){ return polarEnPeriodo(r.fReq, p); }), '📋 ' + quien, 'Pedidos en ' + p.label, 8);
-  if(/todos|todas|historial|completo/.test(q)) return polarListaReqs(filas, '📋 ' + quien, 'Todos los requerimientos', 8);
+  if(/historial|completo|incluso|tambien los (listos|entregados|que ya)/.test(q)) return polarListaReqs(filas, '📋 ' + quien, 'Todos los requerimientos', 8);
   return pend.length ? polarListaReqs(pend, '⏳ ' + quien, 'Lo que todavía falta, del más reciente al más antiguo', 8)
     : `<p>✅ ${escapeHtml(quien)}: no falta nada, todo salió a obra.</p>`;
 }
@@ -13821,9 +13869,25 @@ function polarResponder1(texto){
     }
     if(sol){ rqPreparar(); POLAR.nuevoRef = 'requerimientos de ' + polarNorm(sol); POLAR.nuevoRefTxt = 'requerimientos de ' + sol.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }); return polarSobreFilas(RQ.filas.filter(function(r){ return r.responsable === sol; }), q, 'Requerimientos de ' + sol.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }), p); }
   }
-  const esMio = /\bmis?\b (requerimiento|requerimientos|pedido|pedidos|obra|obras|cosas|items)|\bmi requerimiento|tengo .*requerimiento|requerimientos? tengo|lo que pedi|me falta|mis pendientes|\bpedi\b/.test(q) || (soloReqs && /requerimiento|pendientes|vencidas|en revision|sin oc|con oc|en almacen|enviado|llego|salio/.test(q));
+  // "Mis…" explícito, o implícito en la vista Supervisor. Implícito solo vale si quien pregunta tiene
+  // requerimientos a su nombre; si no (por ejemplo Gerencia mirando como supervisor), se contesta con
+  // todos (30.09.2026: "¿qué salió a obra esta semana?" respondía "no encontré requerimientos a tu nombre").
+  const esMioExpl = /\bmis?\b (requerimiento|requerimientos|pedido|pedidos|obra|obras|cosas|items)|\bmi requerimiento|tengo .*requerimiento|requerimientos? tengo|lo que pedi|me falta|mis pendientes|\bpedi\b/.test(q);
+  if(/\bde todos\b|todos los requerimientos/.test(q) && /requerimiento|pendientes|salio|llego|vencidas|revision|sin oc|con oc|almacen/.test(q)){
+    rqPreparar(); const evA = polarEventoDe(q);
+    return evA ? polarEventos(RQ.filas, evA, p || polarPeriodoDe('esta semana')) : polarSobreFilas(RQ.filas, q, 'Todos los requerimientos', p);
+  }
+  const esMioImpl = soloReqs && /requerimiento|pendientes|vencidas|en revision|sin oc|con oc|en almacen|enviado|llego|salio/.test(q);
+  const misFilas = (esMioExpl || esMioImpl) ? polarMisFilas() : null;
+  const esMio = esMioExpl || (esMioImpl && misFilas && misFilas.length);
+  if(esMioImpl && !esMio){
+    rqPreparar();
+    const evT = polarEventoDe(q);
+    if(evT) return polarEventos(RQ.filas, evT, p || polarPeriodoDe('esta semana'));
+    return polarSobreFilas(RQ.filas, q, 'Todos los requerimientos', p);
+  }
   if(esMio){
-    const mias = polarMisFilas();
+    const mias = misFilas;
     if(mias && mias.length){
       POLAR.nuevoRef = 'mis requerimientos'; POLAR.nuevoRefTxt = 'tus requerimientos';
       const pal = polarPalabrasProducto(q);
@@ -13835,7 +13899,7 @@ function polarResponder1(texto){
       }
       return polarSobreFilas(mias, q, 'Tus requerimientos', p);
     }
-    if(mias) return `<p>No encontré requerimientos pedidos a tu nombre (${escapeHtml(polarMiNombre())}).</p><p>Escríbeme el N° de requerimiento o el proyecto y te digo cómo va.</p>`;
+    if(mias) return `<p>No encontré requerimientos pedidos a tu nombre (${escapeHtml(polarMiNombre())}).</p><p>Escríbeme el N° de requerimiento o el proyecto, o mira lo de todos:</p><div class="asis-acc">${polarBtn('q', (qr.replace(/\bmis?\b|\bme\b|lo que pedi/g, ' ').replace(/\s+/g, ' ').trim() || 'requerimientos pendientes') + ' de todos', 'Ver de todos')}</div>`;
     return '<p>Claro. Escríbeme el <b>N° de tu requerimiento</b> (por ejemplo <span class="mono">23303</span>) o el <b>código de tu proyecto</b> (PRY…).</p>';
   }
   if(!soloReqs && /almacen|kardex/.test(q) && /(ingres|entr|llego|llegaron|recib|salio|salida|despach)/.test(q) && !/requerimiento|obra/.test(q)) return polarMovimientosAlmacen(p || polarPeriodoDe('esta semana'), /(salio|salida|despach)/.test(q) ? 'out' : 'in');
