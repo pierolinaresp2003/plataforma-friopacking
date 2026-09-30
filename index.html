@@ -1179,6 +1179,10 @@
     .imp-tabs button.imp-bk{border-top-color:#f59a2e;} .imp-tabs button.imp-bk b{color:#d97a0c;}
     .imp-linea{position:relative;padding-left:14px;margin-bottom:10px;}
     .imp-linea::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:2px;background:var(--border);}
+    .imp-card{cursor:pointer;} .imp-card:hover{box-shadow:0 4px 16px rgba(10,30,100,.14);}
+    .ind-card[data-clic]{cursor:pointer;} .ind-ver{margin-top:8px;font-size:12px;font-weight:700;color:var(--brand-ink);}
+    .m-tiles button{font:inherit;color:inherit;text-align:left;border:0;cursor:pointer;}
+    .m-lista{padding:0 !important;overflow:hidden;} .m-lista .m-fila:first-child{border-top:0;}
     .imp-card{position:relative;background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px 9px 14px;margin-bottom:9px;border-left:5px solid #1fb5a3;}
     .imp-card::before{content:"";position:absolute;left:-19px;top:12px;width:9px;height:9px;border-radius:50%;background:var(--card);border:2px solid #1fb5a3;}
     .imp-card.em{border-left-color:#3565d9;} .imp-card.em::before{border-color:#3565d9;}
@@ -12810,15 +12814,22 @@ function appAtrasPreparar(){
 // pantalla ancha: contenido centrado, barra de abajo flotante, Leo como panel a la derecha (o al centro,
 // para el supervisor) y el menú ☰ centrado. Nada del celular cambia.
 const APP_PC_CSS = `
-  body.app-pc{padding-bottom:120px;}
+  body.app-pc{padding-bottom:70px;}
   body.app-pc .app-top{padding-left:32px;padding-right:32px;}
   body.app-pc .content{max-width:none;margin:0;width:100%;box-sizing:border-box;padding:22px 32px 40px;}
   body.app-pc .imp-linea{display:grid;grid-template-columns:repeat(auto-fill, minmax(440px, 1fr));gap:10px;padding-left:0;}
   body.app-pc .imp-linea::before, body.app-pc .imp-card::before{display:none;}
   body.app-pc .imp-card{margin-bottom:0;} body.app-pc .imp-corte{grid-column:1 / -1;}
-  body.app-pc .app-tabbar{left:50%;right:auto;bottom:18px;width:min(640px, calc(100% - 32px));transform:translateX(-50%);border-radius:24px;
-    box-shadow:0 14px 40px rgba(10,30,100,.18);padding-bottom:6px;}
-  body.app-pc .app-tabbar button{cursor:pointer;} body.app-pc .app-tabbar button:hover{color:var(--brand-ink);}
+  body.app-pc .app-tabbar{left:0;right:0;bottom:0;width:auto;transform:none;border-radius:0;align-items:center;
+    background:var(--brand);border-top:0;box-shadow:0 -6px 20px rgba(10,30,100,.22);padding:5px 32px;}
+  body.app-pc .app-tabbar button{cursor:pointer;flex-direction:row;justify-content:center;gap:8px;font-size:13px;padding:7px 0;border-radius:10px;
+    color:rgba(255,255,255,.72);margin:0 6px;}
+  body.app-pc .app-tabbar button .i{font-size:17px;filter:none;opacity:.85;}
+  body.app-pc .app-tabbar button:hover{color:#fff;background:rgba(255,255,255,.08);}
+  body.app-pc .app-tabbar button.on{color:#fff;background:rgba(62,198,172,.22);box-shadow:inset 0 -3px 0 var(--brand-2);}
+  body.app-pc .app-tabbar button.polar{color:#fff;}
+  body.app-pc .app-tabbar button.polar .i{width:40px;height:40px;margin-top:-16px;border-color:var(--brand);}
+  body.app-pc{padding-bottom:70px;}
   body.app-pc .asis{inset:16px 16px 16px auto;width:460px;height:auto;border-radius:22px;border:1px solid var(--border);box-shadow:0 24px 60px rgba(10,20,40,.3);}
   body.app-pc.vista-supervisor .asis{inset:0;width:auto;border-radius:0;border:0;box-shadow:none;}
   body.app-pc.vista-supervisor .asis-cab, body.app-pc.vista-supervisor .asis-chat, body.app-pc.vista-supervisor .asis-sug, body.app-pc.vista-supervisor .asis-pie{
@@ -13225,6 +13236,27 @@ function appIndTendF(porSemana){
 function appIndTendencia(porSemana){
   return appIndTendF(porSemana).map(function(x){ return { etq:x.etq, datos:appIndDatos(x.f) }; });
 }
+// Detalle de un indicador: cada caso del período, primero los que se pasaron de la meta.
+function appIndDetalle(clave){
+  const p = clave.split('|'), ind = INDICATORS.find(function(i){ return i.key === p[0]; }); if(!ind) return;
+  const per = appIndPeriodo(p[1] || 'semana'), tx = APP_IND_TXT[ind.key], porOC = INDICADORES_POR_OC.indexOf(ind.key) !== -1;
+  const filas = indConFiltros(per.f, function(){ return filasPorOC(rowsForIndicator(ind).filter(function(r){ return r.camino === ind.camino; }), ind).filter(function(r){ return r[ind.key] != null; }); });
+  if(!Array.isArray(filas)) return appToast('No pude leer ese indicador.');
+  filas.forEach(function(r){ r._c = indCumple(ind, r); });
+  filas.sort(function(a,b){ return (a._c === false ? 0 : 1) - (b._c === false ? 0 : 1) || b[ind.key] - a[ind.key]; });
+  const fuera = filas.filter(function(r){ return r._c === false; }).length;
+  const nom = function(u){ return (PD_PERSONAS[pdPersona(u)] || u || '').split(' ')[0]; };
+  const fila = function(r){
+    const cls = r._c === false ? 'rojo' : r._c ? 'verde' : '', dd = (Math.round(r[ind.key] * 10) / 10) + ' d.h.', est = r._c === false ? 'fuera de meta' : r._c ? 'a tiempo' : '';
+    return porOC ? appFilaHtml('data-oc="' + escapeHtml(r.codOrden || '') + '"', cls, polarCorta(appImpNombre(r.proveedor), 40), 'OC ' + escapeHtml((r.codOrden || '').replace(/^000\d-0*/, '')) + (r.usuarioCompras ? ' · ' + escapeHtml(nom(r.usuarioCompras)) : '') + (r.proyecto ? ' · ' + escapeHtml(polarCorta(appImpNombre(r.proyecto), 28)) : ''), dd, est)
+      : appFilaHtml('data-ocreq="' + escapeHtml(r.codRequerimiento || '') + '"', cls, polarCorta(r.producto || '', 44), 'Req ' + escapeHtml((r.codRequerimiento || '').replace(/^0001-0*/, '')) + (r.proyecto ? ' · ' + escapeHtml(polarCorta(appImpNombre(r.proyecto), 30)) : ''), dd, est);
+  };
+  const tope = 200;
+  appListaAbrir(escapeHtml(tx.corto), escapeHtml(per.largo), `<div class="oc-hero"><div class="oc-num"><b>${filas.length}</b> caso${filas.length === 1 ? '' : 's'} · <b class="${fuera ? 'rojo' : ''}">${fuera}</b> fuera de meta</div>
+      <small>${escapeHtml(tx.que)} Meta: ${ind.meta != null ? ind.meta + ' días hábiles' : 'plazo pactado con el proveedor'}. Toca un caso para ver su detalle.</small></div>
+    <div class="ini-card m-lista">${filas.length ? filas.slice(0, tope).map(fila).join('') : '<div class="ini-vacio">Sin casos en este período.</div>'}</div>
+    ${filas.length > tope ? '<div class="m-sec-nota">Se muestran los primeros ' + tope + ' (primero los fuera de meta).</div>' : ''}`);
+}
 function appIndicadoresHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
   const k = APP.indPer || 'semana', per = appIndPeriodo(k), datos = appIndDatos(per.f);
@@ -13240,7 +13272,7 @@ function appIndicadoresHtml(){
       const v = t.datos[i] ? t.datos[i].st.cumplePct : null;
       return `<div class="ind-t"><i><em class="${appIndClase(v)}" style="height:${v == null ? 0 : Math.max(4, Math.round(v))}%"></em></i><b>${v == null ? '—' : Math.round(v) + '%'}</b><small>${t.etq}</small></div>`;
     }).join('');
-    return `<div class="ini-card ind-card ${cls}">
+    return `<div class="ini-card ind-card ${cls}" data-clic="1" data-inddet="${ind.key}|${k}">
       <div class="ind-top"><span class="ind-area">${ind.areaLabel}</span><span class="ind-est ${cls}">${appIndEstado(pct)}</span></div>
       <div class="ind-nom">${escapeHtml(tx.corto)}</div>
       <div class="ind-que">${escapeHtml(tx.que)}</div>
@@ -13253,6 +13285,7 @@ function appIndicadoresHtml(){
         : '<div class="ini-vacio">No hay casos terminados en este período.</div>'}
       <div class="ind-sub">% a tiempo · ${porSemana ? 'últimas 6 semanas' : 'últimos 6 meses'}</div>
       <div class="ind-tend">${barras}</div>
+      ${st.n ? '<div class="ind-ver">Ver los ' + st.n + ' casos ›</div>' : ''}
     </div>`;
   }).join('');
   return `<div class="ind-chips">${chips}</div>
@@ -13326,7 +13359,24 @@ function appGastoHtml(){
         <div class="m-cols">${meses.map(function(m){ return `<div><i><em style="height:${Math.max(3, m[1] / maxM * 100).toFixed(0)}%"></em></i><b>${m[1] ? appUSD(m[1]).replace('$ ', '$') : '—'}</b><small>${m[0]}</small></div>`; }).join('')}</div></div>
       ${filas.length ? `<div class="ini-card"><div class="ini-card-tit">🧩 ${APP_G.fam ? 'Dentro de la familia' : '¿En qué se gasta?'} <small>${APP_G.fam ? '' : 'toca una familia'}</small></div>
         ${appBarras(fams.slice(0, 7), total, APP_G.fam ? null : function(f){ return 'data-gfam="' + escapeHtml(f[0]) + '"'; })}</div>
-      <div class="ini-card"><div class="ini-card-tit">🏭 ¿A quién le compramos?</div>${appBarras(provs.slice(0, 6), total)}</div>` : ''}`;
+      <div class="ini-card"><div class="ini-card-tit">🏭 ¿A quién le compramos? <small>toca un proveedor</small></div>${appBarras(provs.slice(0, 10), total, function(f){ return 'data-gprov="' + escapeHtml(f[0]) + '"'; })}</div>` : ''}`;
+}
+// OC y productos de un proveedor en el período y filtros de Gasto.
+function appGastoProv(prov){
+  const per = appGastoPeriodo(APP_G.per), n = polarNorm(prov);
+  const g = appGastoFilas(per, APP_G.orig, APP_G.fam).filter(function(r){ return r.proveedor === prov; });
+  const total = g.reduce(function(a, r){ return a + (r.montoPEN || 0); }, 0);
+  const prods = appAgrupar(g, 'producto');
+  const ocs = new Map();
+  polarLineasOC().forEach(function(r){
+    if(polarNorm(r.proveedor) !== n || (per && !polarEnPeriodo(r.fOrden, per))) return;
+    const o = ocs.get(r.codOrden) || { oc:r.codOrden, f:r.fOrden, n:0, pend:false, pry:new Set(), u:r.usuarioCompras }; o.n++; if(pdOcPendiente(r)) o.pend = true; if(r.proyecto) o.pry.add(appImpNombre(r.proyecto)); ocs.set(r.codOrden, o);
+  });
+  const lo = [...ocs.values()].sort(function(a,b){ return (b.f || 0) - (a.f || 0); });
+  appListaAbrir(escapeHtml(polarCorta(appImpNombre(prov), 40)), escapeHtml(per ? per.label : 'todo lo cargado'), `<div class="oc-hero"><div class="oc-num"><b>${appUSD(total)}</b> · ${lo.length} OC</div><small>Toca una OC para ver cómo va.</small></div>
+    <div class="oc-tit">Órdenes de compra</div><div class="ini-card m-lista">${lo.length ? lo.slice(0, 150).map(function(o){
+      return appFilaHtml('data-oc="' + escapeHtml(o.oc) + '"', o.pend ? 'ambar' : 'verde', 'OC ' + o.oc.replace(/^000\d-0*/, ''), escapeHtml(polarCorta([...o.pry].join(' · ') || 'Sin proyecto', 44)), o.pend ? 'Pendiente' : 'Atendida', (o.f ? rqFecha(o.f) : '') + ' · ' + o.n + ' ítem' + (o.n === 1 ? '' : 's')); }).join('') : '<div class="ini-vacio">No encontré OC de este proveedor en el período.</div>'}</div>
+    <div class="oc-tit">Qué se le compró</div><div class="ini-card">${appBarras(prods.slice(0, 12), total)}</div>`);
 }
 
 // ---------- Calendario (Gerencia) ----------
@@ -13348,6 +13398,28 @@ function appCalDatosCalc(anio, mes){
   rqPreparar();
   RQ.filas.forEach(function(r){ if(en(r.fReq)) dia(k(r.fReq)).reqs.add(r.codRequerimiento); if(en(r.fSalida)) dia(k(r.fSalida)).sal.add(r.codRequerimiento); });
   return dias;
+}
+// Detalle de lo que pasó un día del calendario (gasto por proveedor, OC que llegaban, req. nuevos, salidas).
+function appCalDetalle(tipo){
+  const a = APP_CAL.anio, m = APP_CAL.mes, d = APP_CAL.dia, x = appCalDatos(a, m)[d];
+  const fecha = d + ' de ' + POLAR_MESES[m] + ' ' + a;
+  if(!x) return appToast('No hay movimientos ese día.');
+  if(tipo === 'gasto'){
+    const g = ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){ return r.anio === a && r.mes === m + 1 && r.dia === d; });
+    const prov = appAgrupar(g, 'proveedor'), tot = g.reduce(function(s, r){ return s + (r.montoPEN || 0); }, 0);
+    return appListaAbrir('💰 Gasto del día', fecha, `<div class="oc-hero"><div class="oc-num"><b>${appUSD(tot)}</b> · ${g.length} líneas</div><small>Toca un proveedor para ver sus OC.</small></div>
+      <div class="ini-card">${appBarras(prov.slice(0, 20), tot, function(f){ return 'data-q="compras a ' + escapeHtml(f[0]) + '"'; })}</div>`);
+  }
+  if(tipo === 'ocs'){
+    const info = new Map(); polarLineasOC().forEach(function(r){ if(x.ocs.has(r.codOrden) && !info.has(r.codOrden)) info.set(r.codOrden, r); });
+    const l = [...x.ocs].sort(function(p, q){ return (x.pend.has(q) ? 1 : 0) - (x.pend.has(p) ? 1 : 0); });
+    return appListaAbrir('🧾 OC que llegaban', fecha, `<div class="ini-card m-lista">${l.map(function(o){ const r = info.get(o) || {};
+      return appFilaHtml('data-oc="' + escapeHtml(o) + '"', x.pend.has(o) ? 'rojo' : 'verde', polarCorta(appImpNombre(r.proveedor), 40), 'OC ' + escapeHtml(o.replace(/^000\d-0*/, '')) + (r.proyecto ? ' · ' + escapeHtml(polarCorta(appImpNombre(r.proyecto), 30)) : ''), x.pend.has(o) ? 'Pendiente' : 'Llegó', ''); }).join('')}</div>`);
+  }
+  const cods = tipo === 'reqs' ? x.reqs : x.sal;
+  const g = new Map(); rqPreparar(); RQ.filas.forEach(function(r){ if(!cods.has(r.codRequerimiento)) return; const y = g.get(r.codRequerimiento) || { r:r, n:0, falta:0 }; y.n++; if(!rqItemListo(r)) y.falta++; g.set(r.codRequerimiento, y); });
+  return appListaAbrir(tipo === 'reqs' ? '📝 Requerimientos nuevos' : '🚚 Salidas a obra', fecha, `<div class="ini-card m-lista">${[...g.values()].map(function(y){
+    return appFilaHtml('data-ocreq="' + escapeHtml(y.r.codRequerimiento) + '"', y.falta ? 'ambar' : 'verde', polarCorta(appImpNombre(y.r.proyecto), 40), 'Req ' + escapeHtml(y.r.codRequerimiento.replace(/^0001-0*/, '')) + ' · ' + escapeHtml(polarCorta(y.r.responsable || '', 22)) + ' · ' + y.n + ' ítem' + (y.n === 1 ? '' : 's'), y.falta ? 'Faltan ' + y.falta : 'Completo', ''); }).join('')}</div>`);
 }
 function appRefrescarCal(){ const c = document.getElementById('iniCal'); if(c) c.innerHTML = appCalendarioHtml(); }
 function appCalendarioHtml(){
@@ -13373,8 +13445,8 @@ function appCalendarioHtml(){
       <div class="m-cal-dias">${celdas}</div>
       <div class="m-cal-ley"><span><i class="g2"></i>gasto del día</span><span><i class="pt"></i>OC por llegar</span><span><i class="pt rojo"></i>OC pendiente</span></div>
       <div class="m-cal-det"><b>${fecha.getUTCDate()} de ${POLAR_MESES[m]}</b>
-        <div class="m-tiles"><div><span>💰 Gasto</span><b>${x.gasto ? appUSD(x.gasto) : '—'}</b></div><div><span>🧾 OC que llegan</span><b>${x.ocs.size}${x.pend.size ? ` <small class="rojo">${x.pend.size} pend.</small>` : ''}</b></div>
-          <div><span>📝 Req. nuevos</span><b>${x.reqs.size}</b></div><div><span>🚚 Salidas a obra</span><b>${x.sal.size}</b></div></div>
+        <div class="m-tiles"><button type="button" data-caldet="gasto"><span>💰 Gasto ›</span><b>${x.gasto ? appUSD(x.gasto) : '—'}</b></button><button type="button" data-caldet="ocs"><span>🧾 OC que llegan ›</span><b>${x.ocs.size}${x.pend.size ? ` <small class="rojo">${x.pend.size} pend.</small>` : ''}</b></button>
+          <button type="button" data-caldet="reqs"><span>📝 Req. nuevos ›</span><b>${x.reqs.size}</b></button><button type="button" data-caldet="sal"><span>🚚 Salidas a obra ›</span><b>${x.sal.size}</b></button></div>
         ${x.pend.size ? `<div class="asis-acc">${[...x.pend].slice(0, 4).map(function(o){ return `<button type="button" data-oc="${escapeHtml(o)}">OC ${escapeHtml(o.replace(/^000\d-0*/, ''))}</button>`; }).join('')}</div>` : ''}
       </div></div>`;
 }
@@ -13546,14 +13618,32 @@ function appOCHtml(d){
       <div class="oc-acc"><button type="button" data-ocleo="${escapeHtml(cod)}">🐻‍❄️ Preguntar a Leo</button><button type="button" data-ocprov="${escapeHtml(d.f0.proveedor || '')}">🏭 Proveedor y correo</button></div>
     </div>`;
 }
-function appOCAbrir(cod){
+function appOCAbrir(cod, desdeLista){
   const d = appOCDatos(cod), el = document.getElementById('appOC');
   if(!d){ appToast('No encontré la OC ' + cod); return; }
-  el.innerHTML = appOCHtml(d);
+  if(!desdeLista) el._pila = null;
+  appPanelMostrar(appOCHtml(d));
+}
+// Panel de pantalla completa (el mismo de la OC) para cualquier detalle: casos de un indicador, OC de un
+// proveedor, lo de un día del calendario… (30.09.2026, Piero: "que se pueda ver todo"). Desde una lista se
+// entra a una OC y "‹" vuelve a la lista.
+function appListaAbrir(titulo, sub, cuerpo){
+  const el = document.getElementById('appOC'); el._pila = null;
+  appPanelMostrar(`<div class="oc-cab"><button type="button" class="atras" data-occerrar="1" aria-label="Volver">‹</button>
+      <div class="tx"><b>${titulo}</b><span>${sub || ''}</span></div></div><div class="oc-cuerpo">${cuerpo}</div>`);
+}
+function appFilaHtml(attr, cls, t, st, v, sv){
+  return `<button type="button" class="m-fila ${cls || ''}" ${attr}><span class="t"><b>${escapeHtml(t || '—')}</b><small>${st || ''}</small></span><span class="v"><b>${v || ''}</b><small>${sv || ''}</small></span></button>`;
+}
+function appPanelMostrar(html){
+  const el = document.getElementById('appOC');
+  el.innerHTML = html;
   clearTimeout(el._cierre); el.classList.remove('cerrando'); el.classList.add('abierto'); el.scrollTop = 0;
   if(!el._ok){ el._ok = true; el.addEventListener('click', function(e){
     const b = e.target.closest('button'); if(!b) return;
-    if(b.dataset.occerrar) return appOCCerrar();
+    if(b.dataset.occerrar){ if(el._pila){ el.innerHTML = el._pila; el._pila = null; el.scrollTop = 0; return; } return appOCCerrar(); }
+    if(b.dataset.oc){ el._pila = el.innerHTML; return appOCAbrir(b.dataset.oc, true); }
+    if(b.dataset.q){ appOCCerrar(); return polarAbrir(b.dataset.q); }
     if(b.dataset.ocreq){ appOCCerrar(); polarCerrar(true); return appAbrirReq(b.dataset.ocreq); }
     if(b.dataset.ocleo){ appOCCerrar(); return polarAbrir('OC ' + b.dataset.ocleo); }
     if(b.dataset.ocprov){ appOCCerrar(); return polarAbrir('correo de ' + b.dataset.ocprov); }
@@ -13695,7 +13785,7 @@ function appImpNombre(t){
 // Tarjeta de la línea de tiempo (importaciones y pendientes de Compras, 30.09.2026).
 // t = { cls, n, est, flag, fecha, codLbl, cods:[[texto, atributos]], a:[etiqueta, valor], b:[etiqueta, valor], pie, quien }
 function appTarjetaHtml(t){
-  return `<div class="imp-card ${t.cls}">
+  return `<div class="imp-card ${t.cls}" data-clic="1" ${t.cods.length ? t.cods[0][1] : ''}>
       <div class="imp-top"><span class="imp-n">#${String(t.n).padStart(2, '0')}</span><span class="imp-est">${t.est}</span>${t.flag || ''}<span class="imp-fechas">${t.fecha}</span></div>
       <div class="imp-ocs"><small>${t.codLbl}</small>${t.cods.map(function(c){ return `<button type="button" ${c[1]}>${escapeHtml(c[0])}</button>`; }).join('<i>·</i>')}</div>
       <div class="imp-grid"><div><small>${t.a[0]}</small><b>${escapeHtml(t.a[1] || '—')}</b></div><div><small>${t.b[0]}</small><b>${escapeHtml(t.b[1] || '—')}</b></div></div>
@@ -13860,7 +13950,7 @@ function appInicioGerencia(){
     const per = appIndPeriodo('semana'), datos = appIndDatos(per.f);
     kpis = `<div class="ind-per-txt">${escapeHtml(per.largo)}</div>` + datos.map(function(d){
       const pct = d.st.cumplePct, cls = appIndClase(pct);
-      return `<button type="button" class="ind-fila" data-pantalla="indicadores">
+      return `<button type="button" class="ind-fila" data-inddet="${d.ind.key}|semana">
         <span class="t"><b>${escapeHtml(APP_IND_TXT[d.ind.key].corto)}</b><small>${d.st.n ? d.st.n + ' caso' + (d.st.n === 1 ? '' : 's') + ' · demora prom. ' + d.st.promedio.toFixed(1) + ' días háb.' : 'Sin casos esta semana'}</small></span>
         <span class="p ${cls}">${pct == null ? '—' : Math.round(pct) + '%'}<small>${pct == null ? '' : 'a tiempo'}</small></span></button>`;
     }).join('') + '<button type="button" class="ini-link" data-pantalla="indicadores">Ver indicadores ›</button>';
@@ -13933,7 +14023,10 @@ function appNormReq(t){
   return (d.length >= 3 && d.length <= 7) ? '0001-' + d.padStart(7, '0') : String(t || '').trim();
 }
 function appClickInicio(e){
-  const b = e.target.closest('button'); if(!b || b.type === 'submit') return;
+  const b = e.target.closest('button, [data-clic]'); if(!b || b.type === 'submit') return;
+  if(b.dataset.inddet) return appIndDetalle(b.dataset.inddet);
+  if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
+  if(b.dataset.caldet) return appCalDetalle(b.dataset.caldet);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
   if(b.dataset.req) return appAbrirReq(b.dataset.req);
@@ -14347,7 +14440,7 @@ const POLAR_CLAVES = ('requerimiento requerimientos proyecto proyectos stock kar
   + 'orden ordenes compra compras proveedor proveedores almacen obra obras salida salidas ingreso ingresos movimiento movimientos '
   + 'cliente codigo producto productos llego llegada entrega estado estados solicitud archivo reporte resumen transito camino '
   + 'importacion nacional importado importados rotacion trazabilidad supervisor responsable despacho despachado recibido').split(' ');
-const POLAR_COMUNES = ('req reqs consultar quiero ver acabar acaban acabara acabaran agotar agotan agotado agotados vencen vencer vencimiento vencimientos llegar lleguen llegue emitio emitieron emitidas items comparado comparacion compara comparame aprobar aprobado aprobada aprobacion urgente urgentes urgencias prioridad prioridades importaciones importacion venden vende proveen atrasada atrasadas atrasado vencida vencidas proveedores novedades despachar despachado despachados despacho despachos revisar revision incompleto incompletos hola gracias ayuda puedes muestrame dime quiero necesito saber todo todos todas como cuanto cuantos cuantas '
+const POLAR_COMUNES = ('booking etd eta zarpe zarpa zarpo zarpan embarque embarques embarcar transito estatus req reqs consultar quiero ver acabar acaban acabara acabaran agotar agotan agotado agotados vencen vencer vencimiento vencimientos llegar lleguen llegue emitio emitieron emitidas items comparado comparacion compara comparame aprobar aprobado aprobada aprobacion urgente urgentes urgencias prioridad prioridades importaciones importacion venden vende proveen atrasada atrasadas atrasado vencida vencidas proveedores novedades despachar despachado despachados despacho despachos revisar revision incompleto incompletos hola gracias ayuda puedes muestrame dime quiero necesito saber todo todos todas como cuanto cuantos cuantas '
   + 'donde cuando esta estan este esto esos esas para pero tiene tienen tengo hace hacer sobre entre desde hasta cual cuales quien '
   + 'favor porfa buenas buenos dias tardes noches bien mucho poco algo nada solo tambien ahora semana numero mismo otra otro cada '
   + 'puede podria quisiera sale salio fueron sido tienes hay queda quedan falta faltan pedi pedimos mande mandamos llega llegan '
@@ -14497,7 +14590,10 @@ function polarPeriodoDe(q){
   let m = 0;
   POLAR_MESES.forEach(function(n, i){ if(new RegExp('\\b' + n + '\\b').test(q) || (i === 8 && /\bsetiembre\b/.test(q))) m = i + 1; });
   if(m){
-    const anio = a ? Number(a[1]) : (m > c.getUTCMonth() + 1 ? c.getUTCFullYear() - 1 : c.getUTCFullYear());
+    // "importaciones con etd octubre" (30.09.2026): un mes que todavía no llega es de ESTE año cuando se
+    // pregunta por algo que va a pasar (llegadas, zarpes, entregas); si no, del año pasado.
+    const futuro = /\b(etd|eta|zarp|embarc|booking|transito|llega|llegan|llegara|pendientes|entrega|vence|vencen|programad)/.test(q);
+    const anio = a ? Number(a[1]) : (m > c.getUTCMonth() + 1 && !futuro ? c.getUTCFullYear() - 1 : c.getUTCFullYear());
     return P(mes(anio, m), POLAR_MESES[m - 1] + ' ' + anio, 'mes');
   }
   if(/este ano|este anio|del ano|en el ano|anual/.test(q)) return P([new Date(Date.UTC(c.getUTCFullYear(), 0, 1)), new Date(Date.UTC(c.getUTCFullYear(), 11, 31))], 'el año ' + c.getUTCFullYear(), 'anio');
@@ -14871,7 +14967,31 @@ function polarUrgente(){
     <div class="asis-it"><div class="n">⚠️ <b>${appN(sin)}</b> productos para reponer sin stock</div><div class="s">${polarBtn('q', 'que hay que reponer', 'ver')}</div></div>
     ${top.length ? '<p style="margin-top:8px"><b>OC más atrasadas:</b></p>' + top.slice(0, 3).join('') : ''}`;
 }
+// Estatus de importaciones (30.09.2026): en tránsito / por embarcar / pendiente booking, y por ETD o ETA de
+// un período ("importaciones con etd octubre", "qué importaciones llegan esta semana", "qué está en booking").
+function polarImportaciones(q, p){
+  const L = appImpDatos(), todas = L.tr.concat(L.em, L.bk);
+  let l = todas, que = 'abiertas';
+  if(/booking|sin etd|por reservar/.test(q)){ l = L.bk; que = 'pendiente booking'; }
+  else if(/por embarcar|embarc|por zarpar/.test(q)){ l = L.em; que = 'por embarcar'; }
+  else if(/transito|navegando|zarparon|en camino/.test(q)){ l = L.tr; que = 'en tránsito'; }
+  const porEtd = /\betd\b|zarp|embarc/.test(q), porEta = /\beta\b|llega|llegan|arrib/.test(q);
+  if(p){
+    l = l.filter(function(g){ const f = porEtd ? g.etd : (porEta ? g.eta : (g.eta || g.etd || g.fRef)); return f && polarEnPeriodo(f, p); });
+    que += (porEtd ? ' · ETD ' : porEta ? ' · ETA ' : ' · ') + p.label;
+  }
+  const ddmm = appDDMM, n = l.reduce(function(s, g){ return s + g.ocs.length; }, 0);
+  if(!l.length) return `<p>🌎 No hay importaciones ${escapeHtml(que)}.</p><div class="asis-acc">${polarBtn('pantalla', 'pendlog', '🚢 Ver estatus de importaciones')}</div>`;
+  const fila = function(g){ const est = { tr:'🚢 En tránsito', em:'🛳️ Por embarcar', bk:'⏳ Pend. booking' }[g.k];
+    return `<div class="asis-item"><div class="d"><span class="mono">${g.ocs.map(function(o){ return o.replace(/^0002-0*/, ''); }).join(' · ')}</span> · ${escapeHtml(polarCorta(appImpNombre(g.prov), 30))}</div>
+      <div class="q">${est} · ${g.etd ? 'ETD ' + ddmm(g.etd) + ' → ETA ' + (g.eta ? ddmm(g.eta) : 'por confirmar') : (g.fReal ? 'lista en fábrica ' + ddmm(g.fReal) : 'entrega prov. ' + ddmm(g.fRef))} ${polarBtn('q', 'OC ' + g.ocs[0], 'ver')}</div></div>`; };
+  return `<div class="cab">🌎 Importaciones ${escapeHtml(que)}</div><div class="sub">${l.length} embarque${l.length === 1 ? '' : 's'} · ${n} OC</div>
+    ${l.slice(0, 8).map(fila).join('')}${polarMas(l, 8, fila, 'embarques')}
+    <div class="asis-acc">${polarBtn('pantalla', 'pendlog', '🚢 Ver estatus de importaciones')}</div>`;
+}
 function polarIntenciones(q, qr, p){
+  if(/importac|\betd\b|\beta\b|booking|embarc|zarp|en transito/.test(q) && !/cuanto tarda|demora|promedio|gasto|monto/.test(q)
+    && (/\betd\b|\beta\b|booking|embarc|zarp|transito|estatus|status/.test(q) || (/importac/.test(q) && /llega|pendientes|en camino/.test(q) && p))) return polarImportaciones(q, p);
   const hoy = new Date();
   const per = polarPersonaEn(q, false);
   const provs = /proveedor|\ba\b|\bde\b|\bcon\b|oc|orden|compr|gast|correo|mail|contacto|ruc|llegar|falta|debe|pendiente|vencid/.test(qr) ? polarProveedoresEn(qr) : [];
@@ -15303,6 +15423,17 @@ function polarSobreFilas(filas, q, quien, p){
     if(/donde|que paso/.test(q)) return `<p>No encontré "${escapeHtml(pal.join(' '))}" en ${escapeHtml(quien.toLowerCase())}.</p>`;
   }
   if(/reserv/.test(q)){ const ids = [...new Set(filas.map(function(r){ return r.idProyecto; }))]; if(ids.length === 1) return polarReservadoProyecto(ids[0]); }
+  // Un producto dentro del grupo ("qué cables faltan de Bomarea"): los ítems de ese producto que todavía faltan.
+  const nPry = new Set(filas.map(function(r){ return String(r.idProyecto || '').replace(/\D/g, '').replace(/^20\d\d0*/, ''); }));
+  const palG = pal.filter(function(w){ return !/^pry\d/.test(w) && !(/^\d+$/.test(w) && nPry.has(w.replace(/^0+/, ''))) && !polarContiene(polarNorm(quien), w); });
+  const hitsG = polarItemsPorProducto(filas, palG);
+  if(hitsG.length){
+    const fal = hitsG.filter(function(r){ return !rqItemListo(r); }).sort(function(a,b){ return (b.fReq || 0) - (a.fReq || 0); });
+    const f2 = function(r){ return polarItemCorto(r, true); };
+    return fal.length ? `<div class="cab">⏳ "${escapeHtml(palG.join(' '))}" que falta</div><div class="sub">${escapeHtml(quien)} · ${fal.length} de ${hitsG.length} ítem${hitsG.length === 1 ? '' : 's'}</div>
+      ${fal.slice(0, 6).map(f2).join('')}${polarMas(fal, 6, f2, 'ítems')}<div class="asis-acc">${polarVerTodoBtn(fal, '"' + palG.join(' ') + '" que falta · ' + quien)}</div>`
+      : `<p>✅ ${escapeHtml(quien)}: todo lo de "${escapeHtml(palG.join(' '))}" (${hitsG.length} ítem${hitsG.length === 1 ? '' : 's'}) ya salió a obra.</p>`;
+  }
   const pend = filas.filter(function(r){ return !rqItemListo(r); });
   if(p) return polarListaReqs(filas.filter(function(r){ return polarEnPeriodo(r.fReq, p); }), '📋 ' + quien, 'Pedidos en ' + p.label, 8);
   if(/historial|completo|incluso|tambien los (listos|entregados|que ya)/.test(q)) return polarListaReqs(filas, '📋 ' + quien, 'Todos los requerimientos', 8);
@@ -15340,6 +15471,7 @@ function polarResponder1(texto){
   const quiereProducto = (/stock|kardex|consumo|consume|rotacion|precio|costo|cuesta|movimiento|ingresos de|salidas de/.test(q) || /(a que|a quien|que|cual) proveedor|quien(es)? nos (vende|provee)|a quien le (compramos|compran)|donde (compramos|se compra)/.test(qr)) && !/requerimiento|\boc\b|\bpedido\b|proyecto|\bpry\b/.test(q);
 
   if(/excel|exporta|descarg|xlsx/.test(q)) return polarExportar(q, T);
+  if(!soloReqs && /\bbooking\b|\betd\b|\beta\b|embarc|zarp/.test(q) && !/cuanto tarda|demora|promedio|\boc\s*\d/.test(q)) return polarImportaciones(q, p);
   const prod = T.match(/\b\d{12}\b/);
   if(prod){ if(soloReqs) return fueraDeAlcance; return /precio|costo|proveedor|a quien/.test(q) ? (polarComprasDeProducto([prod[0]], /precio|costo/.test(q) ? 'precio' : 'prov') || polarProducto(prod[0])) : polarProducto(prod[0]); }
 
@@ -15349,7 +15481,8 @@ function polarResponder1(texto){
     rqPreparar();
     const filas = RQ.filas.filter(function(r){ return r.idProyecto === id; });
     POLAR.nuevoRef = id; POLAR.nuevoRefTxt = id;
-    if(filas.length && (/vencidas|atras|retras|demor|reserv|en revision|sin oc|con oc|en almacen|enviado|salio|llego|donde/.test(q) || p)){
+    const palPry = polarPalabrasProducto(q).filter(function(w){ return !/^pry\d/.test(w) && !(/^\d+$/.test(w) && id.replace(/\D/g, '').replace(/^20\d\d0*/, '') === w.replace(/^0+/, '')) && !polarContiene(polarNorm(filas.length ? filas[0].proyecto : ''), w); });
+    if(filas.length && (/vencidas|atras|retras|demor|reserv|en revision|sin oc|con oc|en almacen|enviado|salio|llego|donde/.test(q) || p || polarItemsPorProducto(filas, palPry).length)){
       return polarSobreFilas(filas, q, (filas[0].proyecto || id), p);
     }
     return polarProyecto(id);
