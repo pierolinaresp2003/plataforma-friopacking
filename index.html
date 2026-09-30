@@ -681,6 +681,10 @@
   .pd-meta{font-size:12px;color:var(--ink-soft);}
   .pd-meta b{color:var(--ink);font-weight:700;}
   .pd-der{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .pd-fin{border:1px solid var(--border);background:var(--card);color:var(--ink-soft);border-radius:20px;padding:3px 10px;font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .pd-fin:hover{border-color:var(--brand-2-dark);color:var(--brand-2-dark);} .pd-fin.re:hover{border-color:var(--brand-ink);color:var(--brand-ink);}
+  .pd-finlista{margin-top:14px;padding:12px 16px;} .pd-finlista summary{cursor:pointer;font-weight:700;} .pd-finlista small{color:var(--muted);font-weight:500;}
+  .pd-finfila{display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--border);} .pd-finfila .pd-fin{margin-left:auto;}
   .pd-items{width:100%;border-collapse:collapse;font-size:12.5px;}
   .pd-items th{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:7px 16px 3px;}
   .pd-items td{padding:6px 16px;border-top:1px solid var(--border);vertical-align:top;}
@@ -891,6 +895,29 @@
      El asistente (asis-) sí existe en los dos, en la PC como panel lateral.
      =================================================================================== */
   .app-top,.app-tabbar,.app-sheet-fondo,.app-bienv,#section-inicio{display:none;}
+  /* Pantalla de arranque (30.09.2026): se ve desde el primer instante al abrir la app en el celular y
+     se va sola cuando llegan los datos. Por si algo falla, a los 12 s se oculta sola igual. */
+  .app-splash{display:none;}
+  @media (max-width:760px){
+    .app-splash{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;
+      background:radial-gradient(130% 80% at 50% 30%,#12318f 0%,#0a1e64 45%,#040c2e 100%);animation:spAuto .5s 12s forwards;}
+    .app-splash .sp-logo{position:relative;width:118px;height:118px;display:grid;place-items:center;margin-bottom:26px;}
+    .app-splash .sp-logo img{width:70px;height:70px;animation:spLogo 1s cubic-bezier(.22,.8,.2,1.25) both;filter:drop-shadow(0 8px 22px rgba(62,198,172,.45));}
+    .app-splash .sp-anillo{position:absolute;inset:0;border-radius:50%;
+      background:conic-gradient(from 0deg,rgba(62,198,172,0) 0deg,rgba(62,198,172,.9) 300deg,rgba(62,198,172,0) 360deg);
+      -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));mask:radial-gradient(farthest-side,transparent calc(100% - 3px),#000 calc(100% - 2px));
+      animation:spGira 1.4s linear infinite, appFundido .6s .3s both;}
+    .app-splash .sp-halo{position:absolute;inset:14px;border-radius:50%;background:rgba(255,255,255,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);animation:appFundido .8s both;}
+    .app-splash .sp-marca{font-size:24px;font-weight:800;letter-spacing:-.3px;animation:bvEntraSp .8s .25s cubic-bezier(.22,.8,.2,1) both;}
+    .app-splash .sp-sub{margin-top:6px;font-size:13px;opacity:.65;letter-spacing:.08em;text-transform:uppercase;animation:bvEntraSp .8s .4s cubic-bezier(.22,.8,.2,1) both;}
+    .app-splash .sp-pie{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));font-size:11.5px;opacity:.45;animation:appFundido 1s .6s both;}
+    .app-splash.fuera{animation:spFuera .55s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none;}
+  }
+  @keyframes spLogo{from{opacity:0;transform:scale(.4) rotate(-40deg);}to{opacity:1;transform:none;}}
+  @keyframes spGira{to{transform:rotate(360deg);}}
+  @keyframes bvEntraSp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  @keyframes spFuera{to{opacity:0;transform:scale(1.08);visibility:hidden;}}
+  @keyframes spAuto{to{opacity:0;visibility:hidden;}}
   @media (max-width:760px){
     .app-shell > .sidebar, .main > .topbar{display:none !important;}
     body{padding-bottom:calc(74px + env(safe-area-inset-bottom));}
@@ -971,6 +998,48 @@
     .bv-acceso{margin:9px 2px 0;font-size:13.5px;color:#bff3e8;} .bv-acceso b{color:#3ec6ac;} .bv-acceso small{opacity:.75;}
     .bv-err{background:rgba(240,102,95,.2);border:1px solid rgba(240,102,95,.5);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:700;margin:12px 0 0;}
     .bv-entrar{display:block;width:100%;margin-top:18px;background:#3ec6ac;color:#06123f;border:0;border-radius:14px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;}
+    /* ---------- Entrada profesional (30.09.2026, Piero: "se ve muy beta, debe ser algo profesional con
+       animación fluida") ---------- fondo con luces que se mueven lento, tarjeta de vidrio y cada
+       elemento entra en cascada; al entrar, la pantalla se desvanece y el inicio llega por partes. */
+    .app-bienv{background:#050f36;overflow-x:hidden;}
+    .app-bienv::before,.app-bienv::after{content:"";position:fixed;width:120vw;height:120vw;border-radius:50%;pointer-events:none;z-index:0;}
+    .app-bienv::before{top:-55vw;left:-40vw;background:radial-gradient(circle,rgba(62,198,172,.35) 0%,rgba(62,198,172,0) 62%);animation:bvLuz1 16s ease-in-out infinite alternate;}
+    .app-bienv::after{bottom:-60vw;right:-45vw;background:radial-gradient(circle,rgba(40,90,220,.55) 0%,rgba(40,90,220,0) 62%);animation:bvLuz2 19s ease-in-out infinite alternate;}
+    @keyframes bvLuz1{to{transform:translate(18vw,22vw) scale(1.15);}}
+    @keyframes bvLuz2{to{transform:translate(-16vw,-18vw) scale(1.1);}}
+    .app-bienv .bv-in{position:relative;z-index:1;min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;padding:calc(34px + env(safe-area-inset-top)) 22px calc(28px + env(safe-area-inset-bottom));}
+    .bv-marca{display:flex;flex-direction:column;align-items:center;margin-bottom:26px;}
+    .bv-icono{width:84px;height:84px;border-radius:26px;display:grid;place-items:center;background:linear-gradient(145deg,rgba(255,255,255,.16),rgba(255,255,255,.04));
+      border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.2);margin-bottom:18px;}
+    .bv-icono img{width:56px;height:56px;}
+    .app-bienv .bv-in h1{font-size:27px;letter-spacing:-.5px;}
+    .app-bienv .bv-in > p, .bv-marca p{margin:6px 0 0;font-size:14px;opacity:.72;}
+    .bv-tarjeta{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);border-radius:24px;padding:6px 18px 20px;
+      -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 24px 60px rgba(0,0,0,.35);}
+    .app-bienv .bv-inp{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);transition:border-color .2s, box-shadow .2s, background .2s;}
+    .app-bienv .bv-inp:focus{outline:none;border-color:#3ec6ac;background:rgba(255,255,255,.12);box-shadow:0 0 0 4px rgba(62,198,172,.18);}
+    .app-bienv .bv-entrar{position:relative;background:linear-gradient(135deg,#46d3b8,#2fa48d);color:#04112f;box-shadow:0 10px 26px rgba(62,198,172,.35);
+      transition:transform .15s ease, box-shadow .2s, opacity .2s;}
+    .app-bienv .bv-entrar:active{transform:scale(.97);box-shadow:0 5px 14px rgba(62,198,172,.3);}
+    .app-bienv .bv-entrar.cargando{color:transparent;pointer-events:none;}
+    .app-bienv .bv-entrar.cargando::after{content:"";position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+      border:3px solid rgba(4,17,47,.25);border-top-color:#04112f;animation:bvGira .7s linear infinite;}
+    @keyframes bvGira{to{transform:rotate(360deg);}}
+    .app-bienv .bv-acceso{animation:appSubeSuave .35s cubic-bezier(.22,.8,.2,1);}
+    .app-bienv .bv-clave:not([hidden]){animation:appSubeSuave .4s cubic-bezier(.22,.8,.2,1);}
+    .app-bienv .bv-err:not([hidden]){animation:bvSacude .4s ease;}
+    @keyframes bvSacude{20%,60%{transform:translateX(-6px);}40%,80%{transform:translateX(6px);}}
+    .app-bienv .bv-in .bv-nota{margin-top:20px;opacity:.5;font-size:11.5px;line-height:1.45;}
+    .bv-pie{margin-top:14px;font-size:11px;opacity:.38;letter-spacing:.04em;}
+    /* Cascada de entrada */
+    .app-bienv.abierto .bv-marca, .app-bienv.abierto .bv-tarjeta, .app-bienv.abierto .bv-nota, .app-bienv.abierto .bv-pie{animation:bvEntra .8s cubic-bezier(.22,.8,.2,1) both;}
+    .app-bienv.abierto .bv-icono{animation:bvIcono 1s cubic-bezier(.22,.8,.2,1.2) both;}
+    .app-bienv.abierto .bv-tarjeta{animation-delay:.14s;} .app-bienv.abierto .bv-nota{animation-delay:.26s;} .app-bienv.abierto .bv-pie{animation-delay:.34s;}
+    @keyframes bvEntra{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:none;}}
+    @keyframes bvIcono{from{opacity:0;transform:scale(.6) rotate(-30deg);}to{opacity:1;transform:none;}}
+    .app-bienv.saliendo{animation:bvSale .5s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none;}
+    @keyframes bvSale{to{opacity:0;transform:scale(1.06);}}
+
     .app-sheet-usr{padding:4px 4px 12px;border-bottom:1px solid var(--border);margin-bottom:12px;}
     .app-sheet-usr b{display:block;font-size:16px;color:var(--ink);} .app-sheet-usr span{font-size:12px;color:var(--ink-soft);}
     /* Bloques del inicio */
@@ -1098,6 +1167,11 @@
     .m-sec summary::after{content:"▾";color:var(--muted);margin-left:8px;} .m-sec[open] summary::after{content:"▴";} .m-sec summary span{flex:1;}
     .m-sec-nota{font-size:11px;color:var(--muted);padding:0 14px 6px;}
     .m-fila{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:10px 14px;text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);}
+    .m-fila-w{display:flex;align-items:stretch;border-top:1px solid var(--border);transition:opacity .28s ease, transform .28s ease;} .m-fila-w .m-fila{border-top:0;flex:1;min-width:0;}
+    .m-fila-w.saliendo{opacity:0;transform:translateX(40px);}
+    .m-fin{flex:none;width:46px;border:0;border-left:1px solid var(--border);background:none;color:var(--green);font-size:18px;font-weight:800;cursor:pointer;}
+    .m-fin.re{color:var(--brand-ink);} .m-fin:active{background:var(--surface-2);}
+    .m-pie-nota{font-size:11px;color:var(--muted);text-align:center;margin:10px 8px 4px;}
     .m-fila .t{flex:1;min-width:0;} .m-fila .t b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .m-fila .t small{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
     .m-fila .v{flex-shrink:0;text-align:right;} .m-fila .v b{display:block;font-size:14px;} .m-fila .v small{font-size:10px;color:var(--muted);}
@@ -1219,16 +1293,62 @@
   /* Apertura animada (30.09.2026): en la PC el panel sube y crece; en el celular se revela desde abajo
      como un círculo que se abre, y el oso entra con un rebote. */
   .asis.abriendo{animation:asisAbrir .38s cubic-bezier(.2,.9,.3,1.15);}
-  .asis.abriendo .asis-cab .av{animation:asisOso .7s .15s both;}
-  .asis.abriendo .asis-cab .tx{animation:asisTexto .45s .25s both;}
-  .asis-msg.asis-entra{animation:asisBurbuja .35s ease-out;}
+  .asis.abriendo .asis-cab .av{animation:asisOso .8s .2s both;}
+  .asis.abriendo .asis-cab .tx{animation:asisTexto .55s .3s both;}
+  .asis-msg.asis-entra{animation:asisBurbuja .45s cubic-bezier(.22,.8,.2,1);}
   @keyframes asisAbrir{from{opacity:0;transform:translateY(28px) scale(.92);transform-origin:bottom right;}to{opacity:1;transform:none;}}
   @keyframes asisRevelar{from{clip-path:circle(0% at 50% 100%);}to{clip-path:circle(150% at 50% 100%);}}
   @keyframes asisOso{0%{opacity:0;transform:scale(.3) rotate(-25deg);}60%{opacity:1;transform:scale(1.18) rotate(8deg);}100%{transform:none;}}
   @keyframes asisTexto{from{opacity:0;transform:translateX(-10px);}to{opacity:1;transform:none;}}
   @keyframes asisBurbuja{from{opacity:0;transform:translateY(8px) scale(.97);}to{opacity:1;transform:none;}}
-  @media (max-width:760px){ .asis.abriendo{animation:asisRevelar .5s cubic-bezier(.4,0,.2,1);} }
-  @media (prefers-reduced-motion: reduce){ .asis.abriendo,.asis.abriendo .asis-cab .av,.asis.abriendo .asis-cab .tx,.asis-msg.asis-entra{animation:none;} }
+  @media (max-width:760px){
+    .asis.abriendo{animation:asisSube .5s cubic-bezier(.22,.8,.2,1);}
+    .asis.abriendo.suave{animation:appFundido .45s ease-out;}
+    .asis.cerrando{animation:asisBaja .34s cubic-bezier(.4,0,.8,.4) forwards;pointer-events:none;}
+  }
+  @keyframes asisSube{from{transform:translateY(100%);}to{transform:none;}}
+  @keyframes asisBaja{from{transform:none;}to{transform:translateY(100%);}}
+  /* ---------- Movimiento tipo app (30.09.2026, Piero: "las animaciones son algo rápidas y a veces se
+     bugean las pantallas sobre otras… que sea como un app de celular") ----------
+     Una sola curva para todo (entra rápido y frena suave), duraciones de 0.3–0.5 s y cada capa con su
+     salida animada: nada aparece ni desaparece de golpe encima de otra pantalla. */
+  @keyframes appFundido{from{opacity:0;}to{opacity:1;}}
+  @keyframes appPasoDer{from{opacity:0;transform:translateX(34px);}to{opacity:1;transform:none;}}
+  @keyframes appPasoIzq{from{opacity:0;transform:translateX(-34px);}to{opacity:1;transform:none;}}
+  @keyframes appSubeSuave{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
+  @keyframes appEntraDer{from{transform:translateX(100%);}to{transform:none;}}
+  @keyframes appSaleDer{from{transform:none;}to{transform:translateX(100%);}}
+  @keyframes appHojaSube{from{transform:translateY(100%);}to{transform:none;}}
+  @keyframes appHojaBaja{from{transform:none;}to{transform:translateY(100%);}}
+  @keyframes appFondoSale{from{opacity:1;}to{opacity:0;}}
+  @media (max-width:760px){
+    #section-inicio.tr-der{animation:appPasoDer .42s cubic-bezier(.22,.8,.2,1);}
+    #section-inicio.tr-izq{animation:appPasoIzq .42s cubic-bezier(.22,.8,.2,1);}
+    .section.tr-sube{animation:appSubeSuave .45s cubic-bezier(.22,.8,.2,1);}
+    /* Primera entrada al inicio: las tarjetas llegan una tras otra. */
+    #section-inicio.tr-entrada > *{animation:appSubeSuave .6s cubic-bezier(.22,.8,.2,1) both;}
+    #section-inicio.tr-entrada > *:nth-child(2){animation-delay:.08s;} #section-inicio.tr-entrada > *:nth-child(3){animation-delay:.16s;}
+    #section-inicio.tr-entrada > *:nth-child(4){animation-delay:.24s;} #section-inicio.tr-entrada > *:nth-child(n+5){animation-delay:.32s;}
+    .app-top.tr-entrada{animation:appFundido .5s ease-out both;}
+    .app-tabbar.tr-entrada{animation:appHojaSube .6s .15s cubic-bezier(.22,.8,.2,1) both;}
+    /* Hoja de abajo (menú ☰): el fondo se oscurece y la hoja sube; al cerrar, baja. */
+    .app-sheet-fondo.abierto{animation:appFundido .28s ease-out;}
+    .app-sheet-fondo.abierto .app-sheet{animation:appHojaSube .42s cubic-bezier(.22,.8,.2,1);}
+    .app-sheet-fondo.cerrando{animation:appFondoSale .3s ease-in forwards;pointer-events:none;}
+    .app-sheet-fondo.cerrando .app-sheet{animation:appHojaBaja .3s cubic-bezier(.4,0,.8,.4) forwards;}
+    /* Toques: respuesta inmediata al dedo. */
+    .app-tabbar button{transition:transform .18s ease, color .2s;} .app-tabbar button:active{transform:scale(.9);}
+    .app-tabbar button.on .i{animation:appIcono .45s cubic-bezier(.22,.8,.2,1.4);}
+    .ini-card, .m-fila, .m-prod-cab, .asis-msg button{-webkit-tap-highlight-color:transparent;}
+    .m-fila:active, .m-prod-cab:active{background:var(--surface-2);}
+  }
+  @keyframes appIcono{0%{transform:scale(.7);}60%{transform:scale(1.15);}100%{transform:none;}}
+  @media (prefers-reduced-motion: reduce){
+    .asis.abriendo,.asis.abriendo .asis-cab .av,.asis.abriendo .asis-cab .tx,.asis-msg.asis-entra,.asis.cerrando,
+    #section-inicio.tr-der,#section-inicio.tr-izq,.section.tr-sube,#section-inicio.tr-entrada > *,.app-top.tr-entrada,.app-tabbar.tr-entrada,
+    .app-sheet-fondo.abierto,.app-sheet-fondo.abierto .app-sheet,.app-sheet-fondo.cerrando,.app-sheet-fondo.cerrando .app-sheet,
+    .asis-det.abierto,.asis-det.cerrando,.app-splash *,.app-bienv *{animation:none !important;}
+  }
   #asisMenu{display:none;}
   .app-toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(10px);z-index:120;
     background:rgba(20,28,45,.92);color:#fff;font-size:13px;font-weight:600;padding:10px 16px;border-radius:22px;opacity:0;pointer-events:none;
@@ -1272,6 +1392,28 @@
   .asis-it .s{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin-top:3px;} .asis-it .s .asis-est{margin:0;font-size:10.5px;}
   .asis-it .s small{font-size:11px;color:var(--muted);font-weight:600;}
   .asis-mas{margin-top:2px;font-size:11.5px;color:var(--muted);}
+  .asis-mas-btn{display:block;width:100%;margin-top:8px;padding:9px 12px;border:1px dashed var(--border);border-radius:12px;background:var(--surface-2, #f3f5f9);color:var(--brand-ink);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;}
+  .asis-resto.asis-entra{animation:asisBurbuja .4s ease-out;}
+  .asis-todo{background:var(--brand) !important;color:#fff !important;border-color:var(--brand) !important;}
+  .asis-det{position:absolute;inset:0;z-index:5;background:var(--bg);display:none;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .asis-det > *{flex-shrink:0;}
+  .asis-det.abierto{display:flex;animation:appEntraDer .38s cubic-bezier(.22,.8,.2,1);}
+  .asis-det.cerrando{animation:appSaleDer .28s cubic-bezier(.4,0,.6,1) forwards;}
+  .asis-det-cab{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;background:var(--brand);color:#fff;padding:calc(12px + env(safe-area-inset-top)) 12px 12px;}
+  .asis-det-cab .atras{background:rgba(255,255,255,.14);border:0;color:#fff;width:38px;height:38px;border-radius:12px;font-size:26px;line-height:1;cursor:pointer;}
+  .asis-det-cab .tx{flex:1;min-width:0;} .asis-det-cab .tx b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .asis-det-cab .tx span{font-size:11.5px;opacity:.75;}
+  .asis-det-cab .xls{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:20px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+  .asis-det-bus{padding:12px 12px 4px;} .asis-det-bus input{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:14px;padding:11px 14px;font:inherit;font-size:14px;background:var(--card);color:var(--ink);}
+  .asis-det-chips{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;scrollbar-width:none;} .asis-det-chips::-webkit-scrollbar{display:none;}
+  .asis-det-chips button{flex:none;border:1px solid var(--border);background:var(--card);color:var(--ink-soft);border-radius:20px;padding:6px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+  .asis-det-chips button.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .asis-det-lista{padding:4px 12px calc(20px + env(safe-area-inset-bottom));}
+  .asis-det-g{background:var(--card);border-radius:16px;box-shadow:var(--shadow);margin:10px 0;overflow:hidden;}
+  .asis-det-gcab{display:flex;align-items:center;gap:8px;width:100%;border:0;background:var(--surface-2, #f3f5f9);padding:10px 14px;font:inherit;text-align:left;cursor:pointer;color:var(--ink);}
+  .asis-det-gcab .mono{font-weight:800;font-size:14px;} .asis-det-gcab .p{flex:1;min-width:0;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .asis-det-gcab .f{font-size:11.5px;color:var(--muted);}
+  .asis-det-quien{font-size:11px;color:var(--muted);padding:6px 14px 2px;}
+  .asis-det-it{padding:8px 14px;border-top:1px solid var(--border);} .asis-det-it .n{font-size:13px;font-weight:600;line-height:1.3;}
+  .asis-det-it .s{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;} .asis-det-it .s small{font-size:11px;color:var(--muted);}
   .asis-ul{margin:4px 0 6px;padding-left:18px;} .asis-ul li{margin:2px 0;}
   .asis-nota{font-size:11px;color:var(--muted);margin-top:6px !important;}
   .asis-pensando{color:var(--ink-soft);font-style:italic;}
@@ -1295,6 +1437,12 @@
 </style>
 </head>
 <body>
+<div class="app-splash" id="appSplash" aria-hidden="true">
+  <div class="sp-logo"><i class="sp-halo"></i><i class="sp-anillo"></i><img id="spLogo" alt=""></div>
+  <b class="sp-marca">Grupo Friopacking</b><span class="sp-sub">Plataforma de reportes</span>
+  <span class="sp-pie">Cargando tu información…</span>
+</div>
+<script>try{ document.getElementById('spLogo').src = document.querySelector('link[rel="icon"]').href; }catch(e){}</script>
 
 <div class="app-shell">
 <aside class="sidebar">
@@ -11807,6 +11955,69 @@ function pdOcAbierta(r){
   const f = pdFalta(r);
   return f == null || f > 0;
 }
+// ---------- OC finalizadas a mano (30.09.2026, Piero: "añadir una opción que se guarde sola para
+// finalizar OC que estén pendientes") ----------
+// OC que Nisira sigue mostrando "Pendiente" pero que Compras ya dio por cerradas (llegó lo que iba a
+// llegar, se anuló el saldo, etc.). Se guardan SOLAS: al instante en este equipo y, si hay token de
+// GitHub, en oc-finalizadas.json del repo, que leen todos los que abren el link. Cada OC guarda quién y
+// cuándo; "Reabrir" deja una marca con fecha para que gane el último cambio al juntar equipos.
+const OC_FIN_ARCHIVO = 'oc-finalizadas.json', OC_FIN_LOCAL = 'fp-oc-finalizadas';
+let OC_FIN = {};
+try{ OC_FIN = JSON.parse(localStorage.getItem(OC_FIN_LOCAL) || '{}') || {}; }catch(err){ OC_FIN = {}; }
+function ocFinalizada(cod){ const x = cod && OC_FIN[cod]; return !!(x && x.fin); }
+function ocFinQuien(){ const u = APP && APP.usuario; return (u && (u.nombre || appNombrePorCorreo(u.correo) || u.correo)) || 'PC'; }
+function ocFinJuntar(otro){
+  let cambio = false;
+  Object.keys(otro || {}).forEach(function(k){ const a = OC_FIN[k], b = otro[k]; if(b && (!a || (b.t || '') > (a.t || ''))){ OC_FIN[k] = b; cambio = true; } });
+  return cambio;
+}
+function ocFinGuardarLocal(){ try{ localStorage.setItem(OC_FIN_LOCAL, JSON.stringify(OC_FIN)); }catch(err){} }
+function ocFinRepintar(){
+  try{ if(document.getElementById('section-pendientes').classList.contains('active')) drawPendientes(); }catch(err){}
+  try{ if(APP.enInicio) appRenderInicio(); }catch(err){}
+}
+function ocFinalizar(cod, fin){
+  if(!cod) return;
+  OC_FIN[cod] = { fin: !!fin, t: new Date().toISOString(), por: ocFinQuien() };
+  ocFinGuardarLocal(); ocFinRepintar();
+  clearTimeout(ocFinalizar._t); ocFinalizar._t = setTimeout(ocFinSubir, 1200);   // varios clics seguidos → un solo guardado
+  const aviso = (fin ? '✔ OC ' + cod.replace(/^000\d-0*/, '') + ' finalizada' : '↩ OC ' + cod.replace(/^000\d-0*/, '') + ' reabierta') + (getGhToken() ? ' · guardando…' : ' · guardada en este equipo');
+  if(typeof appToast === 'function' && RQ_MOVIL.matches) appToast(aviso); else showPublishBanner(aviso, false);
+}
+async function ocFinSubir(){
+  const token = getGhToken(); if(!token) return;
+  const url = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + OC_FIN_ARCHIVO;
+  const h = { 'Authorization':'Bearer ' + token, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' };
+  try{
+    for(let intento = 0; intento < 2; intento++){
+      let sha;
+      const g = await fetch(url + '?ref=' + GH_BRANCH + '&_=' + Date.now(), { headers:h });
+      if(g.ok){ const j = await g.json(); sha = j.sha; try{ if(ocFinJuntar(JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g, ''))))))) ocFinRepintar(); }catch(err){} }
+      else if(g.status !== 404) throw new Error('GitHub respondió ' + g.status);
+      const body = { message:'OC finalizadas a mano (' + new Date().toLocaleString('es-PE') + ')', content: utf8ToBase64(JSON.stringify(OC_FIN, null, 1)), branch: GH_BRANCH };
+      if(sha) body.sha = sha;
+      const put = await fetch(url, { method:'PUT', headers:h, body: JSON.stringify(body) });
+      if(put.ok){ ocFinGuardarLocal(); if(RQ_MOVIL.matches) appToast('✅ Guardado para todos'); else showPublishBanner('✅ OC finalizadas guardadas para todos (' + OC_FIN_ARCHIVO + ').', false); return; }
+      if(put.status !== 409 && put.status !== 422) throw new Error('GitHub respondió ' + put.status);
+    }
+  }catch(err){
+    console.error(err);
+    const t = '⚠ No pude guardar las OC finalizadas en GitHub (' + (err && err.message || err) + '). Quedaron en este equipo; se reintenta al próximo cambio.';
+    if(RQ_MOVIL.matches) appToast('⚠ Quedó guardado solo en este equipo'); else showPublishBanner(t, true);
+  }
+}
+async function ocFinCargar(){
+  if(!/^https?:$/.test(location.protocol)) return;
+  try{
+    const r = await fetch('./' + OC_FIN_ARCHIVO + '?_=' + Date.now());
+    if(!r.ok) return;
+    if(ocFinJuntar(await r.json())){ ocFinGuardarLocal(); ocFinRepintar(); }
+  }catch(err){}
+}
+// Pendiente para Compras: la regla de Nisira (pdOcAbierta) menos lo que se finalizó a mano.
+function pdOcPendiente(r){ return pdOcAbierta(r) && !ocFinalizada(r.codOrden); }
+function ocFinLista(){ return Object.keys(OC_FIN).filter(ocFinalizada).map(function(k){ return Object.assign({ oc:k }, OC_FIN[k]); }).sort(function(a,b){ return (b.t || '').localeCompare(a.t || ''); }); }
+
 function pdPedidoAbierto(r){
   if(!r.codPedido || r.codOrden) return false;
   if(String(r.estadoPedido||'').trim().toLowerCase() !== 'pendiente') return false;
@@ -11821,12 +12032,12 @@ function pdFilas(){
       fPedido: r.fPedido, cantPedido: r.cantPedido, codOrden: r.codOrden, estadoOrden: r.estadoOrden,
       proveedor: r.proveedor, cantOrden: r.cantOrden, cantRecep: r.cantRecep, fOrden: r.fOrden,
       fCompromiso: r.fCompromiso };
-    if(pdOcAbierta(r)) out.push(Object.assign({ tipo:'oc', persona: pdPersona(r.usuarioCompras) }, base));
+    if(pdOcPendiente(r)) out.push(Object.assign({ tipo:'oc', persona: pdPersona(r.usuarioCompras) }, base));
     else if(pdPedidoAbierto(r)) out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, base));
   });
   PEDIDO_SIN_REQ_PEND.forEach(function(r){
     const base = Object.assign({ req:'', proyecto:'Pedido directo (sin requerimiento)', idProyecto:'' }, r);
-    if(pdOcAbierta(r)) out.push(Object.assign(base, { tipo:'oc', persona: pdPersona(r.usuarioCompras) }));
+    if(pdOcPendiente(r)) out.push(Object.assign(base, { tipo:'oc', persona: pdPersona(r.usuarioCompras) }));
     else if(pdPedidoAbierto(r)) out.push(Object.assign(base, { tipo:'ped', persona: pdPersona(r.responsablePedido) }));
   });
   return out;
@@ -11965,7 +12176,7 @@ function drawPendientes(){
       ? `<span class="pd-num">OC ${escapeHtml(d.k)}</span>
          <span class="rq-est ${d.sinAprobar ? 'espera' : (pdEstadoOC(r0) === 'Llegó parcial' ? 'recibido' : 'camino')}">${pdEstadoOC(r0)}</span>
          <span class="pd-prov">${rqTxt(r0.proveedor)}</span>
-         <span class="pd-der"><span class="pd-meta">Emitida <b>${rqFecha(r0.fOrden)}</b> · Entrega <b>${rqFecha(r0.fCompromiso)}</b></span>${plazo(d)}</span>`
+         <span class="pd-der"><span class="pd-meta">Emitida <b>${rqFecha(r0.fOrden)}</b> · Entrega <b>${rqFecha(r0.fCompromiso)}</b></span>${plazo(d)}<button type="button" class="pd-fin" data-ocfin="${escapeHtml(d.k)}" title="Darla por cerrada aunque Nisira la siga mostrando Pendiente">✔ Finalizar</button></span>`
       : `<span class="pd-num">Pedido ${escapeHtml(d.k)}</span>
          <span class="pd-prov"></span>
          <span class="pd-der"><span class="pd-meta">Pedido el <b>${rqFecha(r0.fPedido)}</b></span>${plazo(d)}</span>`;
@@ -11990,9 +12201,17 @@ function drawPendientes(){
   }).join('');
   const mas = visibles.length > PD.tope
     ? `<div class="rq-mas"><button class="btn secondary" type="button" id="pdMas">Ver ${Math.min(40, visibles.length - PD.tope)} más · ${PD.tope} de ${visibles.length}</button></div>` : '';
-  cont.innerHTML = tarjetas
+  const fins = PD.tab === 'oc' ? ocFinLista() : [];
+  const finHtml = fins.length ? `<details class="card pd-finlista"><summary>✔ OC finalizadas a mano · <b>${fins.length}</b> <small>(no cuentan como pendientes)</small></summary>
+      ${fins.map(function(x){ return `<div class="pd-finfila"><span class="pd-num">OC ${escapeHtml(x.oc)}</span><span class="pd-meta">${escapeHtml(x.por || '')} · ${new Date(x.t).toLocaleDateString('es-PE')}</span><button type="button" class="pd-fin re" data-ocre="${escapeHtml(x.oc)}">↩ Reabrir</button></div>`; }).join('')}</details>` : '';
+  cont.innerHTML = (tarjetas
     ? `<div class="pd-lista">${tarjetas}</div>${mas}`
-    : '<div class="card" style="text-align:center;padding:26px;color:var(--muted);">No hay pendientes con ese filtro.</div>';
+    : '<div class="card" style="text-align:center;padding:26px;color:var(--muted);">No hay pendientes con ese filtro.</div>') + finHtml;
+  if(!cont._ocfin){ cont._ocfin = true; cont.addEventListener('click', function(e){
+    const b = e.target.closest('[data-ocfin],[data-ocre]'); if(!b) return;
+    if(b.dataset.ocfin){ if(confirm('¿Finalizar la OC ' + b.dataset.ocfin + '? Deja de contar como pendiente (se puede reabrir).')) ocFinalizar(b.dataset.ocfin, true); }
+    else ocFinalizar(b.dataset.ocre, false);
+  }); }
   const bm = document.getElementById('pdMas');
   if(bm) bm.addEventListener('click', function(){ PD.tope += 40; drawPendientes(); });
 }
@@ -12165,6 +12384,7 @@ function irASeccion(seccion){
   document.querySelector('.topbar-crumb').innerHTML =
     MODULOS[modActivo].nombre + ' / <strong>' + (bloqueado ? 'Acceso restringido' : MODULOS[modActivo].secciones[seccion]) + '</strong>';
   appSync(seccion, bloqueado);   // app del celular: encabezado y barra de abajo
+  if(RQ_MOVIL.matches && APP.vista && APP.vista !== 'supervisor') appAnim(document.getElementById(bloqueado ? 'gerLock' : ('section-' + seccion)), 'tr-sube', 700);
 
   if(bloqueado){ const c = document.getElementById('gerClave'); if(c){ c.value = ''; c.focus(); } return; }
   if(seccion === 'certificados') drawCertificados();
@@ -12336,6 +12556,7 @@ function appConstruir(){
         <button type="button" id="asisMenu" aria-label="Menú">☰</button>
         <button type="button" id="asisCerrar" aria-label="Cerrar">✕</button></div>
       <div class="asis-chat" id="asisChat"></div>
+      <div class="asis-det" id="asisDet"></div>
       <div class="asis-sug" id="asisSug"></div>
       <form class="asis-pie" id="asisForm" autocomplete="off">
         <input type="text" id="asisInput" placeholder="Escribe tu consulta…" enterkeyhint="send">
@@ -12382,6 +12603,9 @@ function appConstruir(){
     if(t){ i.value = ''; polarEnviar(t); }
   });
   document.getElementById('asisChat').addEventListener('click', polarAccion);
+  document.getElementById('asisDet').addEventListener('click', polarDetClick);
+  document.getElementById('asisDet').addEventListener('input', function(e){ if(e.target.id !== 'asisDetBusca') return;
+    clearTimeout(polarDetClick._t); const v = e.target.value; polarDetClick._t = setTimeout(function(){ POLAR_DET.q = v; POLAR_DET.tope = 40; polarDetPintar(); }, 200); });
   document.getElementById('asisSug').addEventListener('click', polarAccion);
   if(RQ_MOVIL.addEventListener) RQ_MOVIL.addEventListener('change', function(){
     if(!RQ_MOVIL.matches && APP.enInicio) irASeccion('proceso');
@@ -12406,6 +12630,7 @@ function appAtras(){
   if(sheet && sheet.classList.contains('abierto')){ appCerrarSheet(); return true; }
   if(bienv && bienv.classList.contains('abierto')) return false;
   const sup = APP.vista === 'supervisor', leo = asis && asis.classList.contains('abierto');
+  if(leo && polarDetCerrar()) return true;
   if(leo) { if(sup) return false; polarCerrar(); return true; }
   if(sup){ polarAbrir(); return true; }
   if(!APP.enInicio || APP.pantalla !== 'inicio'){ appInicio(); return true; }
@@ -12426,18 +12651,47 @@ function appAtrasPreparar(){
 }
 
 function appArrancar(){
-  if(!RQ_MOVIL.matches) return;
+  if(!RQ_MOVIL.matches){ appSplashFuera(); return; }
   appAtrasPreparar();
-  if(!APP.usuario || !APP.vista) return appBienvenida();
+  if(!APP.usuario || !APP.vista){ appBienvenida(); return appSplashFuera(); }
   appInicio();
-  if(appNecesitaClave()) appBienvenida(APP.usuario.correo);
+  if(appNecesitaClave()){ appBienvenida(APP.usuario.correo); return appSplashFuera(); }
+  appSplashEsperar();
+}
+// Pantalla de arranque: se queda hasta que llegan los datos (máx. 9 s) y al irse el inicio entra en
+// cascada; así no se ve "Cargando…" ni la pantalla armándose por partes.
+function appSplashFuera(){
+  const sp = document.getElementById('appSplash');
+  if(!sp || sp.classList.contains('fuera')) return;
+  const minimo = 1100 - (performance.now ? performance.now() : 0);
+  setTimeout(function(){
+    sp.classList.add('fuera');
+    setTimeout(function(){ sp.style.display = 'none'; }, 600);
+  }, Math.max(0, minimo));
+  return Math.max(0, minimo);
+}
+function appSplashEsperar(){
+  const t0 = Date.now();
+  (function mira(){
+    if(!appHayDatos() && Date.now() - t0 < 9000) return setTimeout(mira, 150);
+    if(appHayDatos() && APP.enInicio){ clearTimeout(appEsperaDatos); appRenderInicio(); }
+    const espera = appSplashFuera() || 0;
+    setTimeout(function(){
+      if(APP.vista === 'supervisor'){ const a = document.getElementById('asis'); a.classList.remove('abriendo', 'suave'); void a.offsetWidth; a.classList.add('abriendo', 'suave'); setTimeout(function(){ a.classList.remove('abriendo', 'suave'); }, 1300); }
+      else { appAnim(document.getElementById('section-inicio'), 'tr-entrada', 1400); appAnim(document.querySelector('.app-top'), 'tr-entrada', 900); appAnim(document.getElementById('appTabbar'), 'tr-entrada', 1000); }
+    }, espera + 120);
+  })();
 }
 
 // Con correoFijo: el usuario ya existe en este celular y solo falta la clave (no guardó su acceso).
 function appBienvenida(correoFijo){
   const b = document.getElementById('appBienv');
-  b.innerHTML = `<div class="bv-in"><img src="${appLogo()}" alt="Grupo Friopacking" class="bv-logo">
-    <h1>Plataforma de reportes</h1><p>Grupo Friopacking · ${correoFijo ? 'ingresa tu clave para entrar' : 'crea tu usuario para entrar'}</p>
+  const icono = (document.querySelector('link[rel="icon"]') || {}).href || appLogo();
+  b.classList.remove('saliendo');
+  b.innerHTML = `<div class="bv-in">
+    <div class="bv-marca"><div class="bv-icono"><img src="${icono}" alt=""></div>
+      <h1>${correoFijo ? 'Hola de nuevo' : 'Bienvenido'}</h1><p>Grupo Friopacking · ${correoFijo ? 'ingresa tu clave para entrar' : 'Plataforma de reportes'}</p></div>
+    <div class="bv-tarjeta">
     <form class="bv-form" id="bvForm" autocomplete="off">
       <label class="bv-lbl" for="bvCorreo">Correo corporativo</label>
       <input type="email" id="bvCorreo" class="bv-inp" placeholder="usuario@friopacking.pe" autocomplete="email" inputmode="email" autocapitalize="off" enterkeyhint="next">
@@ -12450,11 +12704,12 @@ function appBienvenida(correoFijo){
       <p class="bv-err" id="bvErr" hidden></p>
       <button type="submit" class="bv-entrar">Entrar</button>
       ${correoFijo ? '<button type="button" class="bv-otro" id="bvOtro">Usar otro correo</button>' : ''}
-    </form>
-    <p class="bv-nota">Tu correo define qué vistas puedes usar: los supervisores entran directo; Logística y Gerencia piden además la clave. El usuario queda guardado en este celular; para cambiarlo, usa el botón de arriba a la derecha → Cambiar de usuario.</p></div>`;
+    </form></div>
+    <p class="bv-nota">Entra con tu correo corporativo. Supervisores entran directo; Logística y Gerencia usan además su clave.</p>
+    <p class="bv-pie">GRUPO FRIOPACKING · ${new Date().getFullYear()}</p></div>`;
   b.classList.add('abierto');
   b.onclick = null;
-  const err = function(t){ const e = document.getElementById('bvErr'); e.textContent = t; e.hidden = !t; };
+  const err = function(t){ const e = document.getElementById('bvErr'); e.textContent = t; e.hidden = true; if(t){ void e.offsetWidth; e.hidden = false; } };
   // Sin nombre (29.09.2026, Piero: "no es necesario colocar nombre y apellido"): sale de DB Supervisores.
   const correo = document.getElementById('bvCorreo');
   // Si la base de accesos todavía no llegó con los datos, al que ya tiene usuario se le respeta su tipo.
@@ -12486,7 +12741,8 @@ function appBienvenida(correoFijo){
     try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); if(tipo !== 'supervisor') sessionStorage.setItem(APP_SESION, '1'); }catch(er){}
     if(tipo === 'gerencia'){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(er){} }
     pass.value = '';
-    appElegirVista(tipo);
+    const bt = document.querySelector('#bvForm .bv-entrar'); if(bt) bt.classList.add('cargando');
+    setTimeout(function(){ appElegirVista(tipo); }, 420);   // un respiro para que se vea que está entrando
   };
 }
 
@@ -12502,9 +12758,14 @@ function appElegirVista(v){
   if(appVistasPermitidas().indexOf(v) === -1) return;
   APP.vista = v;
   try{ localStorage.setItem('fp-vista', v); }catch(err){}
-  document.getElementById('appBienv').classList.remove('abierto');
+  const bv = document.getElementById('appBienv');
+  if(bv.classList.contains('abierto')){
+    bv.classList.add('saliendo');
+    setTimeout(function(){ bv.classList.remove('abierto', 'saliendo'); }, 500);
+    APP.entrada = true;                       // el inicio llega en cascada detrás del login que se va
+  }
   appCerrarSheet();
-  polarCerrar();
+  polarCerrar(true);
   appInicio();
   polarSugerencias();
 }
@@ -12532,8 +12793,17 @@ function appSync(seccion, bloqueado){
   if(RQ_MOVIL.matches) window.scrollTo(0, 0);
 }
 
+// Reproduce una animación de entrada (quita y vuelve a poner la clase) y la limpia al terminar.
+function appAnim(el, cls, ms){
+  if(!el) return;
+  ['tr-der', 'tr-izq', 'tr-sube', 'tr-entrada'].forEach(function(c){ el.classList.remove(c); });
+  void el.offsetWidth; el.classList.add(cls);
+  clearTimeout(el._tr); el._tr = setTimeout(function(){ el.classList.remove(cls); }, ms || 900);
+}
 function appInicio(pantalla){
-  if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(); return; }
+  if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(undefined, true); APP.entrada = false; return; }
+  const tabs = ((APP_VISTAS[APP.vista] || APP_VISTAS.supervisor).tabs || []).map(function(t){ return t[0]; });
+  const antes = APP.enInicio ? APP.pantalla : null, nueva = APP_PANTALLAS[pantalla] ? pantalla : 'inicio';
   document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
   document.getElementById('section-inicio').classList.add('active');
   APP.enInicio = true;
@@ -12544,6 +12814,11 @@ function appInicio(pantalla){
   appPintarBarra(APP.pantalla);
   appRenderInicio();
   window.scrollTo(0, 0);
+  if(RQ_MOVIL.matches){
+    const sec = document.getElementById('section-inicio');
+    if(APP.entrada){ APP.entrada = false; appAnim(sec, 'tr-entrada', 1400); appAnim(document.querySelector('.app-top'), 'tr-entrada', 900); appAnim(document.getElementById('appTabbar'), 'tr-entrada', 1000); }
+    else if(antes !== nueva) appAnim(sec, antes && tabs.indexOf(nueva) < tabs.indexOf(antes) ? 'tr-izq' : 'tr-der', 600);
+  }
 }
 
 // Si el link publicado todavía está bajando los datos, el inicio se vuelve a pintar solo cuando llegan.
@@ -12810,7 +13085,7 @@ function appCalDatos(anio, mes){
   ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.anio === anio && r.mes === mes + 1) dia(r.dia).gasto += r.montoPEN || 0; });
   // Pendiente = la misma regla de Compras → Pendientes, mirando la línea misma (antes se cruzaba con
   // pdFilas y se perdían OC abiertas que no tienen requerimiento en el Reporte Maestro).
-  polarLineasOC().forEach(function(r){ if(en(r.fCompromiso)){ const x = dia(k(r.fCompromiso)); x.ocs.add(r.codOrden); if(pdOcAbierta(r)) x.pend.add(r.codOrden); } });
+  polarLineasOC().forEach(function(r){ if(en(r.fCompromiso)){ const x = dia(k(r.fCompromiso)); x.ocs.add(r.codOrden); if(pdOcPendiente(r)) x.pend.add(r.codOrden); } });
   rqPreparar();
   RQ.filas.forEach(function(r){ if(en(r.fReq)) dia(k(r.fReq)).reqs.add(r.codRequerimiento); if(en(r.fSalida)) dia(k(r.fSalida)).sal.add(r.codRequerimiento); });
   return dias;
@@ -12949,8 +13224,8 @@ function appPendComprasHtml(){
   venc.sort(function(a,b){ return b.d - a.d; }); sem.sort(function(a,b){ return a.f - b.f; }); luego.sort(function(a,b){ return (a.f || 9e15) - (b.f || 9e15); });
   const pl = [...peds.values()].sort(function(a,b){ return (a.f || 0) - (b.f || 0); });
   const nom = function(p){ return (PD_PERSONAS[p] || p || '—').split(' ')[0]; };
-  const filaOC = function(o, cls){ return `<button type="button" class="m-fila ${cls}" data-q="OC ${escapeHtml(o.oc)}"><span class="t"><b>${escapeHtml(polarCorta(o.prov, 34))}</b><small><span class="mono">${escapeHtml(o.oc.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(nom(o.persona))}${o.oc.indexOf('0002-') === 0 ? ' · 🌎' : ''}</small></span>
-      <span class="v">${cls === 'rojo' ? '<b>' + o.d + ' d.h.</b><small>de atraso</small>' : o.f ? '<b>' + rqFecha(o.f).replace(/ \d{4}$/, '') + '</b><small>llega</small>' : '<b>—</b><small>sin fecha</small>'}</span></button>`; };
+  const filaOC = function(o, cls){ return `<div class="m-fila-w"><button type="button" class="m-fila ${cls}" data-q="OC ${escapeHtml(o.oc)}"><span class="t"><b>${escapeHtml(polarCorta(o.prov, 34))}</b><small><span class="mono">${escapeHtml(o.oc.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(nom(o.persona))}${o.oc.indexOf('0002-') === 0 ? ' · 🌎' : ''}</small></span>
+      <span class="v">${cls === 'rojo' ? '<b>' + o.d + ' d.h.</b><small>de atraso</small>' : o.f ? '<b>' + rqFecha(o.f).replace(/ \d{4}$/, '') + '</b><small>llega</small>' : '<b>—</b><small>sin fecha</small>'}</span></button><button type="button" class="m-fin" data-ocfin="${escapeHtml(o.oc)}" aria-label="Finalizar OC">✔</button></div>`; };
   const sec = function(ico, tit, cls, lista, fila, abierto){ return lista.length ? `<details class="m-sec ${cls}"${abierto ? ' open' : ''}><summary><span>${ico} ${tit}</span><b>${lista.length}</b></summary>${lista.slice(0, 40).map(fila).join('')}${lista.length > 40 ? `<div class="asis-mas">+ ${lista.length - 40} más</div>` : ''}</details>` : ''; };
   return appChips('pcper', APP_PC.persona, [['', 'Todos ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size]].concat([...personas.keys()].filter(Boolean).sort().map(function(p){ return [p, nom(p)]; })))
     + `<div class="m-resumen"><div class="rojo"><b>${venc.length}</b><span>Vencidas</span></div><div class="ambar"><b>${sem.length}</b><span>Llegan esta semana</span></div><div class="azul"><b>${luego.length}</b><span>Más adelante</span></div><div class="gris"><b>${pl.length}</b><span>Pedidos sin OC</span></div></div>`
@@ -12958,7 +13233,10 @@ function appPendComprasHtml(){
     + sec('🟠', 'Llegan esta semana', 'ambar', sem, function(o){ return filaOC(o, 'ambar'); }, true)
     + sec('🔵', 'Llegan más adelante', 'azul', luego, function(o){ return filaOC(o, 'azul'); }, false)
     + sec('⚪', 'Pedidos sin OC', 'gris', pl, function(p){ return `<button type="button" class="m-fila gris" data-q="pedido ${escapeHtml(p.ped)}"><span class="t"><b>${escapeHtml(polarCorta(p.pry, 34))}</b><small><span class="mono">${escapeHtml(p.ped.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(nom(p.persona))} · ${p.n} ítem${p.n === 1 ? '' : 's'}</small></span><span class="v"><b>${polarDh(p.f).replace('hace ', '')}</b><small>esperando</small></span></button>`; }, false)
-    + (!venc.length && !sem.length && !luego.length && !pl.length ? '<div class="ini-card"><div class="ini-vacio">✅ Sin pendientes.</div></div>' : '');
+    + (!venc.length && !sem.length && !luego.length && !pl.length ? '<div class="ini-card"><div class="ini-vacio">✅ Sin pendientes.</div></div>' : '')
+    + (function(){ const f = ocFinLista(); return f.length ? `<details class="m-sec gris"><summary><span>✔ Finalizadas a mano</span><b>${f.length}</b></summary><div class="m-sec-nota">No cuentan como pendientes. Toca ↩ para reabrir.</div>
+        ${f.map(function(x){ return `<div class="m-fila-w"><div class="m-fila gris"><span class="t"><b>OC ${escapeHtml(x.oc.replace(/^000\d-0*/, ''))}</b><small>${escapeHtml(polarCorta(x.por || '', 22))} · ${new Date(x.t).toLocaleDateString('es-PE')}</small></span></div><button type="button" class="m-fin re" data-ocre="${escapeHtml(x.oc)}" aria-label="Reabrir OC">↩</button></div>`; }).join('')}</details>` : ''; })()
+    + '<div class="m-pie-nota">✔ al costado de una OC = finalizarla (ya no está pendiente aunque Nisira diga lo contrario). Se guarda sola.</div>';
 }
 
 // ---------- Pendientes de Logística (almacén) ----------
@@ -13206,6 +13484,11 @@ function appClickInicio(e){
   if(b.dataset.invmas){ APP_INV.tope += 30; const l = document.getElementById('invLista'); if(l) l.innerHTML = appInvLista(); return; }
   if(b.dataset.invbuscar){ APP_INV.q = b.dataset.invbuscar; APP_INV.sel = b.dataset.invbuscar; return appInicio('inventario'); }
   if(b.dataset.pcper !== undefined){ APP_PC.persona = b.dataset.pcper; return appRenderInicio(); }
+  if(b.dataset.ocfin){ const cod = b.dataset.ocfin; const fila = b.closest('.m-fila-w');
+    if(!confirm('¿Finalizar la OC ' + cod.replace(/^000\d-0*/, '') + '? Deja de salir como pendiente.')) return;
+    if(fila){ fila.classList.add('saliendo'); setTimeout(function(){ ocFinalizar(cod, true); }, 280); } else ocFinalizar(cod, true);
+    return; }
+  if(b.dataset.ocre){ return ocFinalizar(b.dataset.ocre, false); }
   if(b.dataset.plsec){ APP_PL.sec = b.dataset.plsec; APP_PL.q = ''; APP_PL.tope = 15; return appRenderInicio(); }
   if(b.dataset.plmas){ APP_PL.tope += 30; const l = document.getElementById('plLista'); if(l) l.innerHTML = appPendLogLista(); return; }
   if(b.dataset.pantalla) return appInicio(b.dataset.pantalla);
@@ -13248,6 +13531,7 @@ function appAbrirSheet(){
     <h4>Usuario</h4>
     <button type="button" data-usuario="salir"><span>🚪</span>Cambiar de usuario</button>`;
   const fondo = document.getElementById('appSheet');
+  clearTimeout(fondo._cierre); fondo.classList.remove('cerrando');
   fondo.classList.add('abierto');
   fondo.onclick = function(e){
     if(e.target === fondo) return appCerrarSheet();
@@ -13273,7 +13557,13 @@ function appInstalar(){
     : '<ol><li>Ábrela en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b> (arriba a la derecha).</li><li>Elige <b>Instalar app</b> (o <b>Agregar a la pantalla principal</b>).</li></ol>';
   document.getElementById('appSheetIn').innerHTML = `<div class="asa"></div><h4>Instalar la app</h4><div class="app-instalar">${pasos}<p class="nota">Queda con el ícono de Friopacking, se abre a pantalla completa y se actualiza sola.</p></div>`;
 }
-function appCerrarSheet(){ document.getElementById('appSheet').classList.remove('abierto'); }
+function appCerrarSheet(){
+  const f = document.getElementById('appSheet');
+  if(!f.classList.contains('abierto')) return;
+  if(!RQ_MOVIL.matches){ f.classList.remove('abierto'); return; }
+  f.classList.add('cerrando');
+  clearTimeout(f._cierre); f._cierre = setTimeout(function(){ f.classList.remove('abierto', 'cerrando'); }, 300);
+}
 
 // ===================================================================================================
 // POLAR — asistente de consultas (29.09.2026). Contesta con la data que ya está cargada en la página,
@@ -13298,12 +13588,16 @@ function polarSugerencias(){
   const s = document.getElementById('asisSug'); if(!s) return;
   s.innerHTML = polarChips().concat(['¿Qué puedes hacer?']).map(function(c){ return `<button type="button" data-q="${escapeHtml(c)}">${escapeHtml(c)}</button>`; }).join('');
 }
-function polarAbrir(texto){
+function polarAbrir(texto, suave){
   const a = document.getElementById('asis');
+  const yaAbierto = a.classList.contains('abierto') && !a.classList.contains('cerrando');
+  clearTimeout(a._cierre); a.classList.remove('cerrando');
   a.classList.add('abierto');
   polarSugerencias();
-  // Animación de apertura (30.09.2026, Piero): el panel se abre desde abajo y Leo "llega" escribiendo.
-  a.classList.remove('abriendo'); void a.offsetWidth; a.classList.add('abriendo');
+  // Animación de apertura: sube como una hoja (o aparece suave cuando es la pantalla principal del
+  // supervisor). Si ya estaba abierto no se repite: eso era lo que hacía "saltar" una pantalla sobre otra.
+  if(!yaAbierto){ a.classList.remove('abriendo', 'suave'); void a.offsetWidth; a.classList.add('abriendo'); if(suave) a.classList.add('suave');
+    clearTimeout(a._abre); a._abre = setTimeout(function(){ a.classList.remove('abriendo', 'suave'); }, 1300); }
   if(!POLAR.saludo){
     POLAR.saludo = true;
     const nom = polarMiNombre() ? polarMiNombre().split(' ')[0] : '';
@@ -13319,7 +13613,14 @@ function polarAbrir(texto){
   if(texto) polarEnviar(texto);
   else if(!RQ_MOVIL.matches) setTimeout(function(){ document.getElementById('asisInput').focus(); }, 50);
 }
-function polarCerrar(){ document.getElementById('asis').classList.remove('abierto'); }
+function polarCerrar(inmediato){
+  const a = document.getElementById('asis');
+  if(!a.classList.contains('abierto')) return;
+  try{ polarDetCerrar(); }catch(err){}
+  if(inmediato || !RQ_MOVIL.matches){ a.classList.remove('abierto', 'abriendo', 'cerrando'); return; }
+  a.classList.remove('abriendo'); a.classList.add('cerrando');
+  clearTimeout(a._cierre); a._cierre = setTimeout(function(){ a.classList.remove('abierto', 'cerrando'); }, 340);
+}
 // Al responder, el chat se queda en el INICIO de la respuesta (con la pregunta arriba), no al final
 // (30.09.2026, Piero: "debe quedarse la respuesta ahí, sino se va abajo y hay que subir").
 function polarVerInicio(d){
@@ -13357,6 +13658,17 @@ function polarEnviar(texto){
 function polarAccion(e){
   const b = e.target.closest('button'); if(!b) return;
   if(b.dataset.q) return polarEnviar(b.dataset.q);
+  if(b.dataset.asismas){ const r = b.previousElementSibling, abrir = r.hidden; r.hidden = !abrir;
+    b.textContent = abrir ? 'Ver menos ▴' : 'Ver los ' + b.dataset.asismas + ' ' + b.dataset.txt + ' restantes ▾';
+    if(abrir){ r.classList.remove('asis-entra'); void r.offsetWidth; r.classList.add('asis-entra'); } return; }
+  if(b.dataset.asisdet !== undefined) return polarDetAbrir(+b.dataset.asisdet);
+  if(b.dataset.ocfin || b.dataset.ocre){
+    const cod = b.dataset.ocfin || b.dataset.ocre, fin = !!b.dataset.ocfin;
+    if(fin && !confirm('¿Finalizar la OC ' + cod.replace(/^000\d-0*/, '') + '? Deja de salir como pendiente (se puede reabrir).')) return;
+    ocFinalizar(cod, fin); b.disabled = true;
+    return polarBot(fin ? `<p>✔ Listo, la <b>OC ${escapeHtml(cod.replace(/^000\d-0*/, ''))}</b> quedó <b>finalizada</b>: ya no sale en pendientes, calendario ni "por llegar".</p><div class="asis-acc">${polarBtn('ocre', cod, '↩ Deshacer')}</div>`
+      : `<p>↩ La <b>OC ${escapeHtml(cod.replace(/^000\d-0*/, ''))}</b> volvió a pendientes.</p>`);
+  }
   const ir = function(fn){ polarCerrar(); fn(); };
   if(b.dataset.req) return ir(function(){ appAbrirReq(b.dataset.req); });
   if(b.dataset.pry) return ir(function(){ appAbrirProyecto(b.dataset.pry); });
@@ -13366,6 +13678,81 @@ function polarAccion(e){
   if(b.dataset.pantalla) return ir(function(){ if(RQ_MOVIL.matches) appInicio(b.dataset.pantalla); else irASeccion(b.dataset.pantalla === 'indicadores' ? 'proceso' : 'requerimientos'); });
 }
 const polarBtn = (attr, val, txt)=> `<button type="button" data-${attr}="${escapeHtml(val)}">${txt}</button>`;
+
+// ---------- Ver TODO, no uno por uno (30.09.2026, Piero: "cómo puedo hacer para ver tooodo ese detalle? no 1 x 1") ----------
+// 1) "+ N más" ahora es un botón que despliega el resto ahí mismo.
+function polarMas(lista, desde, fn, txt){
+  if(!lista || lista.length <= desde) return '';
+  const resto = lista.length - desde, tope = 300;
+  return `<div class="asis-resto" hidden>${lista.slice(desde, desde + tope).map(fn).join('')}${resto > tope ? `<div class="asis-mas">… y ${resto - tope} más: usa "Ver todo el detalle" o el Excel.</div>` : ''}</div>`
+    + `<button type="button" class="asis-mas-btn" data-asismas="${resto}" data-txt="${escapeHtml(txt || '')}">Ver los ${resto} ${escapeHtml(txt || '')} restantes ▾</button>`;
+}
+// 2) "Ver todo el detalle": una pantalla completa con TODOS los ítems, agrupados por requerimiento, con
+//    buscador, filtro por estado y Excel.
+POLAR.det = [];
+function polarVerTodoBtn(filas, titulo){
+  if(!filas || !filas.length) return '';
+  POLAR.det.push({ filas:filas, titulo:titulo || 'Detalle' });
+  return `<button type="button" class="asis-todo" data-asisdet="${POLAR.det.length - 1}">📋 Ver todo el detalle · ${filas.length} ítem${filas.length === 1 ? '' : 's'}</button>`;
+}
+const POLAR_DET = { i:-1, q:'', est:'', tope:40 };
+function polarDetAbrir(i){
+  const d = POLAR.det[i]; if(!d) return;
+  POLAR_DET.i = i; POLAR_DET.q = ''; POLAR_DET.est = ''; POLAR_DET.tope = 40;
+  const el = document.getElementById('asisDet');
+  el.innerHTML = `<div class="asis-det-cab"><button type="button" class="atras" data-detcerrar="1" aria-label="Volver">‹</button>
+      <div class="tx"><b>${escapeHtml(polarCorta(d.titulo, 44))}</b><span>${d.filas.length} ítems · ${new Set(d.filas.map(function(r){ return r.codRequerimiento; })).size} requerimientos</span></div>
+      <button type="button" class="xls" data-detxls="1">📥 Excel</button></div>
+    <div class="asis-det-bus"><input type="search" id="asisDetBusca" placeholder="🔍 Buscar producto, req. o proyecto" autocomplete="off"></div>
+    <div class="asis-det-chips" id="asisDetChips"></div>
+    <div class="asis-det-lista" id="asisDetLista"></div>`;
+  polarDetPintar();
+  el.classList.remove('cerrando'); el.classList.add('abierto');
+  el.scrollTop = 0;
+}
+function polarDetCerrar(){
+  const el = document.getElementById('asisDet');
+  if(!el.classList.contains('abierto')) return false;
+  el.classList.add('cerrando');
+  setTimeout(function(){ el.classList.remove('abierto', 'cerrando'); }, 280);
+  return true;
+}
+function polarDetPintar(){
+  const d = POLAR.det[POLAR_DET.i]; if(!d) return;
+  const q = polarNorm(POLAR_DET.q || '');
+  let l = d.filas.filter(function(r){
+    if(!q) return true;
+    const t = polarNorm([r.codRequerimiento, r.producto, r.idProducto, r.proyecto, r.responsable, r.codOrden, r.proveedor].join(' '));
+    return q.split(' ').filter(Boolean).every(function(w){ return t.indexOf(w) !== -1 || polarCompacto(t).indexOf(polarCompacto(w)) !== -1; });
+  });
+  const cuenta = {}; l.forEach(function(r){ cuenta[r.estadoCalc || '—'] = (cuenta[r.estadoCalc || '—'] || 0) + 1; });
+  const nombres = {}; APP_ESTADOS.forEach(function(e){ nombres[e[0]] = e[1]; });
+  document.getElementById('asisDetChips').innerHTML = [['', 'Todos ' + l.length]].concat(Object.keys(cuenta).sort(function(a,b){ return cuenta[b] - cuenta[a]; }).map(function(k){ return [k, (nombres[k] || k) + ' ' + cuenta[k]]; }))
+    .map(function(c){ return `<button type="button" class="${POLAR_DET.est === c[0] ? 'on' : ''}" data-detest="${escapeHtml(c[0])}">${escapeHtml(c[1])}</button>`; }).join('');
+  if(POLAR_DET.est) l = l.filter(function(r){ return (r.estadoCalc || '—') === POLAR_DET.est; });
+  const grupos = new Map();
+  l.forEach(function(r){ const k = r.codRequerimiento || '—'; if(!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(r); });
+  const gs = [...grupos.entries()].sort(function(a,b){ return (b[1][0].fReq || 0) - (a[1][0].fReq || 0); });
+  const html = gs.slice(0, POLAR_DET.tope).map(function(g){
+    const r0 = g[1][0];
+    return `<div class="asis-det-g"><button type="button" class="asis-det-gcab" data-detq="${escapeHtml(g[0])}">
+        <span class="mono">${escapeHtml(String(g[0]).replace(/^0001-0*/, ''))}</span><span class="p">${escapeHtml(polarCorta(r0.proyecto || '', 30))}</span><span class="f">${rqFecha(r0.fReq).replace(/ \d{4}$/, '')}</span></button>
+      <div class="asis-det-quien">${escapeHtml(polarCorta(r0.responsable || '', 36))} · ${g[1].length} ítem${g[1].length === 1 ? '' : 's'}</div>
+      ${g[1].map(function(r){ const st = polarSitCorta(r);
+        return `<div class="asis-det-it"><div class="n">${escapeHtml(r.producto || r.idProducto || '')}</div>
+          <div class="s"><span class="asis-est ${st[0]}">${st[1]} ${escapeHtml(st[2])}</span><small>${polarNum(r.cantidad)} ${escapeHtml(r.unidad || '')}${st[3] ? ' · ' + escapeHtml(st[3]) : ''}</small></div></div>`; }).join('')}</div>`;
+  }).join('');
+  document.getElementById('asisDetLista').innerHTML = (html || '<div class="ini-vacio">Nada con ese filtro.</div>')
+    + (gs.length > POLAR_DET.tope ? `<button type="button" class="asis-mas-btn" data-detmas="1">Ver ${Math.min(40, gs.length - POLAR_DET.tope)} requerimientos más · ${POLAR_DET.tope} de ${gs.length}</button>` : '');
+}
+function polarDetClick(e){
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.dataset.detcerrar) return polarDetCerrar();
+  if(b.dataset.detxls){ const d = POLAR.det[POLAR_DET.i]; if(d) polarExcelReqs(d.filas, d.titulo, ''); return; }
+  if(b.dataset.detest !== undefined){ POLAR_DET.est = b.dataset.detest; POLAR_DET.tope = 40; return polarDetPintar(); }
+  if(b.dataset.detmas){ POLAR_DET.tope += 40; return polarDetPintar(); }
+  if(b.dataset.detq){ polarDetCerrar(); setTimeout(function(){ polarEnviar(b.dataset.detq); }, 150); }
+}
 
 function polarAyuda(){
   if(RQ_MOVIL.matches && APP.vista === 'supervisor') return `<p>Puedo ayudarte con:</p>
@@ -13607,12 +13994,13 @@ function polarListaReqs(filas, titulo, sub, tope){
   const reqs = appResumenReqs(filas);
   if(!reqs.length) return `<p>${titulo}: no encontré nada${sub ? ' (' + escapeHtml(sub) + ')' : ''}.</p>`;
   tope = Math.min(tope || 6, 6);
+  const fila = function(y){
+    return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(y.cod.replace(/^0001-0*/, ''))}</span> · ${rqFecha(y.fReq).replace(/ \d{4}$/, '')} · ${escapeHtml(polarCorta(y.proyecto, 26))}</div>
+      <div class="q">${appChipsEstado(y.est)} ${polarBtn('q', y.cod, 'ver')}</div></div>`; };
   return `<div class="cab">${titulo}</div>${sub ? `<div class="sub">${escapeHtml(sub)}</div>` : ''}
     <p><b>${reqs.length}</b> requerimiento${reqs.length === 1 ? '' : 's'} · ${filas.length} ítem${filas.length === 1 ? '' : 's'}.</p>
-    ${reqs.slice(0, tope).map(function(y){
-      return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(y.cod.replace(/^0001-0*/, ''))}</span> · ${rqFecha(y.fReq).replace(/ \d{4}$/, '')} · ${escapeHtml(polarCorta(y.proyecto, 26))}</div>
-        <div class="q">${appChipsEstado(y.est)} ${polarBtn('q', y.cod, 'ver')}</div></div>`;
-    }).join('')}${reqs.length > tope ? `<div class="q asis-mas">+ ${reqs.length - tope} más</div>` : ''}`;
+    ${reqs.slice(0, tope).map(fila).join('')}${polarMas(reqs, tope, fila, 'requerimientos')}
+    <div class="asis-acc">${polarVerTodoBtn(filas, String(titulo).replace(/<[^>]*>/g, ''))}</div>`;
 }
 
 // ---------- Requerimiento: contestar DIRECTO lo que se pregunta ----------
@@ -13700,7 +14088,7 @@ function polarDondeEsta(filas, palabras, quien){
   if(!hits.length) return null;
   return `<div class="cab">"${escapeHtml(palabras.join(' '))}"</div><div class="sub">${escapeHtml(quien)} · ${hits.length} ítem${hits.length === 1 ? '' : 's'}</div>
     ${hits.slice(0, 6).map(function(r){ return polarItemCorto(r, true); }).join('')}
-    ${hits.length > 6 ? `<div class="q asis-mas">+ ${hits.length - 6} más</div>` : ''}`;
+    ${polarMas(hits, 6, function(r){ return polarItemCorto(r, true); }, 'ítems')}`;
 }
 
 // "¿Dónde están los perfiles de Q PACK?": el estado de esos productos en los requerimientos, sin importar
@@ -13726,12 +14114,13 @@ function polarEstadoProductos(palabras, filasBase){
   const pend = hits.filter(function(r){ return !rqItemListo(r); }).sort(function(a,b){ return (b.fReq || 0) - (a.fReq || 0); });
   const listos = hits.length - pend.length;
   const est = {}; hits.forEach(function(r){ est[r.estadoCalc || '—'] = (est[r.estadoCalc || '—'] || 0) + 1; });
-  const ver = (pend.length ? pend : hits.slice().sort(function(a,b){ return (b.fReq || 0) - (a.fReq || 0); })).slice(0, 6);
+  const lista = pend.length ? pend : hits.slice().sort(function(a,b){ return (b.fReq || 0) - (a.fReq || 0); }), ver = lista.slice(0, 6);
   return `<div class="cab">🔎 "${escapeHtml(prodW.join(' '))}"</div><div class="sub">${nomPry ? escapeHtml(nomPry) + ' · ' : ''}${hits.length} ítem${hits.length === 1 ? '' : 's'} en ${new Set(hits.map(function(r){ return r.codRequerimiento; })).size} requerimiento(s)</div>
     <div class="asis-estados">${appChipsEstado(est)}</div>
     ${pend.length ? `<p><b>⏳ Faltan ${pend.length}</b>${listos ? ` · ✅ ${listos} ya salieron a obra` : ''}</p>` : '<p>✅ Todo ya salió a obra.</p>'}
     ${ver.map(function(r){ return polarItemCorto(r, true); }).join('')}
-    ${(pend.length || hits.length) > 6 ? `<div class="q asis-mas">+ ${(pend.length || hits.length) - 6} más</div>` : ''}`;
+    ${polarMas(lista, 6, function(r){ return polarItemCorto(r, true); }, pend.length ? 'pendientes' : 'ítems')}
+    <div class="asis-acc">${polarVerTodoBtn(hits, '"' + prodW.join(' ') + '"')}</div>`;
 }
 
 // Movimientos de requerimientos en un período: qué se pidió / salió / llegó a obra / llegó al almacén.
@@ -14176,7 +14565,7 @@ function polarSobreFilas(filas, q, quien, p){
   if(/vencidas|atras|demor|retras|tarde|urgente/.test(q)) return polarAtrasados(filas, quien);
   if(/\bllega|\bllegan|llegara/.test(q) && p){
     const l = filas.filter(function(r){ return !rqItemListo(r) && r.estadoCalc === 'Enviado a pedido — cuenta con OC' && polarEnPeriodo(r.fCompromiso, p); });
-    return l.length ? `<div class="cab">🧾 Llega ${escapeHtml(p.label)}</div><div class="sub">${escapeHtml(quien)} · ${l.length} ítem${l.length === 1 ? '' : 's'}</div>${l.slice(0, 6).map(function(r){ return polarItemCorto(r, true); }).join('')}${l.length > 6 ? `<div class="q asis-mas">+ ${l.length - 6} más</div>` : ''}`
+    return l.length ? `<div class="cab">🧾 Llega ${escapeHtml(p.label)}</div><div class="sub">${escapeHtml(quien)} · ${l.length} ítem${l.length === 1 ? '' : 's'}</div>${l.slice(0, 6).map(function(r){ return polarItemCorto(r, true); }).join('')}${polarMas(l, 6, function(r){ return polarItemCorto(r, true); }, 'ítems')}`
       : `<p>No hay nada con OC que llegue ${escapeHtml(p.label)} (${escapeHtml(quien.toLowerCase())}).</p>`;
   }
   if(ev) return polarEventos(filas, ev, p || polarPeriodoDe('esta semana'));
@@ -14423,12 +14812,12 @@ function polarReq(cod){
   const listos = n - pend.length, pct = n ? Math.round(listos / n * 100) : 0;
   // Compacto: cabecera, una barra de avance y cada pendiente en una línea (lo más urgente primero).
   const orden = { 'Enviado a pedido — cuenta con OC':0, 'Pedido pendiente':1, 'En Revisión':2, 'Recibido en Almacén':3, 'Enviado a Obra':4 };
-  const ver = pend.slice().sort(function(a,b){ const o = function(x){ return x.estadoCalc in orden ? orden[x.estadoCalc] : 9; }; return o(a) - o(b); }).slice(0, 5);
+  const base = pend.slice().sort(function(a,b){ const o = function(x){ return x.estadoCalc in orden ? orden[x.estadoCalc] : 9; }; return o(a) - o(b); }), ver = base.slice(0, 5);
   return `<div class="cab">Req. <span class="mono">${escapeHtml(cod.replace(/^0001-0*/, ''))}</span> · ${escapeHtml(polarCorta(r0.proyecto || '', 34))}</div>
     <div class="sub">${escapeHtml(polarCorta(r0.responsable || '—', 30))} · ${rqFecha(r0.fReq)}</div>
     <div class="asis-avance"><i><em style="width:${pct}%"></em></i><span>${pend.length ? `<b>Faltan ${pend.length}</b> de ${n}` : '<b>✅ Todo salió a obra</b>'} · ${listos} en obra</span></div>
     ${ver.map(function(r){ return polarItemCorto(r); }).join('')}
-    ${pend.length > 5 ? `<div class="q asis-mas">+ ${pend.length - 5} pendientes más</div>` : ''}
+    ${polarMas(base, 5, function(r){ return polarItemCorto(r); }, 'pendientes')}
     <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad')}${polarBtn('q', 'excel del req ' + cod, '📥 Excel')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Proyecto') : ''}</div>`;
 }
 
@@ -14445,11 +14834,12 @@ function polarResumenProyecto(filas, idPry){
   const reqs = appResumenReqs(filas);
   const pendReqs = reqs.filter(function(y){ return y.faltan > 0; });
   const faltan = pendReqs.reduce(function(a, y){ return a + y.faltan; }, 0), n = filas.length, pct = n ? Math.round((n - faltan) / n * 100) : 0;
+  const filaR = function(y){ return `<div class="asis-it"><div class="n"><span class="mono">${escapeHtml(y.cod.replace(/^0001-0*/, ''))}</span> · ${rqFecha(y.fReq).replace(/ \d{4}$/, '')} · faltan ${y.faltan} de ${y.n}</div><div class="s">${appChipsEstado(y.estFalta)} ${polarBtn('q', y.cod, 'ver')}</div></div>`; };
   return `<div class="cab">${escapeHtml(polarCorta(filas[0].proyecto || idPry, 40))}</div><div class="sub"><span class="mono">${escapeHtml(idPry)}</span> · ${reqs.length} req.</div>
     <div class="asis-avance"><i><em style="width:${pct}%"></em></i><span>${faltan ? `<b>Faltan ${faltan} ítems</b> en ${pendReqs.length} req.` : '<b>✅ Todo salió a obra</b>'} · ${pct}% atendido</span></div>
-    ${pendReqs.slice(0, 5).map(function(y){ return `<div class="asis-it"><div class="n"><span class="mono">${escapeHtml(y.cod.replace(/^0001-0*/, ''))}</span> · ${rqFecha(y.fReq).replace(/ \d{4}$/, '')} · faltan ${y.faltan} de ${y.n}</div><div class="s">${appChipsEstado(y.estFalta)} ${polarBtn('q', y.cod, 'ver')}</div></div>`; }).join('')}
-    ${pendReqs.length > 5 ? `<div class="q asis-mas">+ ${pendReqs.length - 5} requerimientos más</div>` : ''}
-    <div class="asis-acc">${polarBtn('pry', idPry, 'Ver en Requerimientos')}${polarBtn('q', 'excel del proyecto ' + idPry, '📥 Excel')}</div>`;
+    ${pendReqs.slice(0, 5).map(filaR).join('')}
+    ${polarMas(pendReqs, 5, filaR, 'requerimientos')}
+    <div class="asis-acc">${faltan ? polarVerTodoBtn(filas.filter(function(r){ return !rqItemListo(r); }), 'Pendientes · ' + (filas[0].proyecto || idPry)) : ''}${polarBtn('pry', idPry, 'Ver en Requerimientos')}${polarBtn('q', 'excel del proyecto ' + idPry, '📥 Excel')}</div>`;
 }
 function polarProyectoPorNombre(palabras){
   if(!palabras.length) return null;
@@ -14538,12 +14928,14 @@ function polarOC(cod){
   const f = filas.find(function(r){ return r.fCompromiso; });
   const rec = function(r){ const q = r.cantOrden != null ? r.cantOrden : r.cantidadOrden, x = r.cantRecep != null ? r.cantRecep : r.cantRecepcion; return [q, x || 0]; };
   const venc = f && busdayCount(f.fCompromiso, new Date()) > 0 && !/atendido completo/i.test(est);
+  const fin = ocFinalizada(cod), abierta = filas.some(pdOcAbierta), puede = polarPuede('logistica');
+  const filaI = function(r){ const c = rec(r); return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 46))}</div><div class="s"><small>recibido ${polarNum(c[1])} de ${polarNum(c[0])}</small>${r.codRequerimiento ? '<small class="mono">req ' + escapeHtml(r.codRequerimiento.replace(/^0001-0*/, '')) + '</small>' : '<small>pedido directo</small>'}</div></div>`; };
   return `<div class="cab">OC <span class="mono">${escapeHtml(cod.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(polarCorta(f0.proveedor || 'sin proveedor', 32))}</div>
     <div class="sub">${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden).replace(/ \d{4}$/, '') : ''}${f ? ' · entrega ' + rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : ''}${f0.origen === 'importado' ? ' · 🌎 importación' : ''}</div>
-    ${est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? ' · atrasada' : ''}</span></p>` : ''}
-    ${items.slice(0, 5).map(function(r){ const c = rec(r); return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 46))}</div><div class="s"><small>recibido ${polarNum(c[1])} de ${polarNum(c[0])}</small>${r.codRequerimiento ? '<small class="mono">req ' + escapeHtml(r.codRequerimiento.replace(/^0001-0*/, '')) + '</small>' : '<small>pedido directo</small>'}</div></div>`; }).join('')}
-    ${items.length > 5 ? `<div class="q asis-mas">+ ${items.length - 5} ítems más</div>` : ''}
-    <div class="asis-acc">${polarBtn('q', 'proveedor ' + (f0.proveedor || ''), 'Proveedor')}${reqs.slice(0, 2).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r.replace(/^0001-0*/, ''))); }).join('')}</div>`;
+    ${fin ? `<p><span class="asis-est ok">✔ Finalizada a mano</span><small> · ${escapeHtml(OC_FIN[cod].por || '')} · ${new Date(OC_FIN[cod].t).toLocaleDateString('es-PE')}</small></p>` : est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? ' · atrasada' : ''}</span></p>` : ''}
+    ${items.slice(0, 5).map(filaI).join('')}
+    ${polarMas(items, 5, filaI, 'ítems')}
+    <div class="asis-acc">${puede && (abierta || fin) ? polarBtn(fin ? 'ocre' : 'ocfin', cod, fin ? '↩ Reabrir OC' : '✔ Finalizar OC') : ''}${polarBtn('q', 'proveedor ' + (f0.proveedor || ''), 'Proveedor')}${reqs.slice(0, 2).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r.replace(/^0001-0*/, ''))); }).join('')}</div>`;
 }
 function polarPedido(cod){
   const filas = getReqRows().filter(function(r){ return r.codPedido === cod; });
@@ -14996,6 +15388,7 @@ appConstruir();
 
 irASeccion('proceso');
 appArrancar();
+ocFinCargar();
 
 })();
 </script>
