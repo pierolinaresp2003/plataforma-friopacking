@@ -12808,8 +12808,9 @@ function appCalDatos(anio, mes){
   const en = function(d){ return d && d >= d0 && d <= d1; };
   const dia = function(n){ return dias[n] = dias[n] || { gasto:0, ocs:new Set(), pend:new Set(), reqs:new Set(), sal:new Set() }; };
   ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.anio === anio && r.mes === mes + 1) dia(r.dia).gasto += r.montoPEN || 0; });
-  const abiertas = new Set(pdFilas().filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; }));
-  polarLineasOC().forEach(function(r){ if(en(r.fCompromiso)){ const x = dia(k(r.fCompromiso)); x.ocs.add(r.codOrden); if(abiertas.has(r.codOrden)) x.pend.add(r.codOrden); } });
+  // Pendiente = la misma regla de Compras → Pendientes, mirando la línea misma (antes se cruzaba con
+  // pdFilas y se perdían OC abiertas que no tienen requerimiento en el Reporte Maestro).
+  polarLineasOC().forEach(function(r){ if(en(r.fCompromiso)){ const x = dia(k(r.fCompromiso)); x.ocs.add(r.codOrden); if(pdOcAbierta(r)) x.pend.add(r.codOrden); } });
   rqPreparar();
   RQ.filas.forEach(function(r){ if(en(r.fReq)) dia(k(r.fReq)).reqs.add(r.codRequerimiento); if(en(r.fSalida)) dia(k(r.fSalida)).sal.add(r.codRequerimiento); });
   return dias;
