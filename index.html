@@ -1030,6 +1030,9 @@
     .app-bienv .bv-clave:not([hidden]){animation:appSubeSuave .4s cubic-bezier(.22,.8,.2,1);}
     .app-bienv .bv-err:not([hidden]){animation:bvSacude .4s ease;}
     @keyframes bvSacude{20%,60%{transform:translateX(-6px);}40%,80%{transform:translateX(6px);}}
+    .bv-alta{margin-top:12px;animation:appSubeSuave .4s cubic-bezier(.22,.8,.2,1);} .bv-alta p{margin:0 2px 10px;font-size:13.5px;line-height:1.4;opacity:.9;}
+    .bv-alta a{display:block;text-align:center;text-decoration:none;border-radius:14px;padding:13px;font-size:15px;font-weight:800;margin-top:8px;}
+    .bv-wsp{background:#25d366;color:#05301a;} .bv-tel{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);color:#fff;}
     .app-bienv .bv-in .bv-nota{margin-top:20px;opacity:.5;font-size:11.5px;line-height:1.45;}
     .bv-pie{margin-top:14px;font-size:11px;opacity:.38;letter-spacing:.04em;}
     /* Cascada de entrada */
@@ -12725,6 +12728,7 @@ function appBienvenida(correoFijo){
         <label class="bv-recordar"><input type="checkbox" id="bvRecordar"> Guardar mi acceso en este celular <small>(no volver a pedir la clave)</small></label>
       </div>
       <p class="bv-err" id="bvErr" hidden></p>
+      <div class="bv-alta" id="bvAlta" hidden></div>
       <button type="submit" class="bv-entrar">Entrar</button>
       ${correoFijo ? '<button type="button" class="bv-otro" id="bvOtro">Usar otro correo</button>' : ''}
     </form></div>
@@ -12732,7 +12736,7 @@ function appBienvenida(correoFijo){
     <p class="bv-pie">GRUPO FRIOPACKING · ${new Date().getFullYear()}</p></div>`;
   b.classList.add('abierto');
   b.onclick = null;
-  const err = function(t){ const e = document.getElementById('bvErr'); e.textContent = t; e.hidden = true; if(t){ void e.offsetWidth; e.hidden = false; } };
+  const err = function(t){ const e = document.getElementById('bvErr'); e.textContent = t; e.hidden = true; if(t){ void e.offsetWidth; e.hidden = false; } const a = document.getElementById('bvAlta'); if(a) a.hidden = true; };
   // Sin nombre (29.09.2026, Piero: "no es necesario colocar nombre y apellido"): sale de DB Supervisores.
   const correo = document.getElementById('bvCorreo');
   // Si la base de accesos todavía no llegó con los datos, al que ya tiene usuario se le respeta su tipo.
@@ -12755,7 +12759,18 @@ function appBienvenida(correoFijo){
   document.getElementById('bvForm').onsubmit = function(e){
     e.preventDefault();
     const c = correo.value.trim().toLowerCase(), tipo = tipoDe(c);
-    if(!tipo) return err(appCorreoValido(c) ? 'Tu correo no está registrado en la plataforma. Pide a Logística que te agregue.' : 'Usa tu correo corporativo (@friopacking.pe o @grupofriopacking.pe).');
+    if(!tipo){
+      if(!appCorreoValido(c)) return err('Usa tu correo corporativo (@friopacking.pe o @grupofriopacking.pe).');
+      // Correo corporativo que no está en DB Supervisores (30.09.2026, Piero): se ofrece escribir por
+      // WhatsApp al 913 922 131 con el mensaje ya armado para que lo agreguen a la base de usuarios.
+      err('Tu correo no está registrado todavía.');
+      const msg = 'Hola, quiero acceso a la App de Logística de Grupo Friopacking. Mi correo es ' + c + '. ¿Me pueden agregar a la base de usuarios?';
+      document.getElementById('bvAlta').innerHTML = `<p>Para que te agreguen a la base de usuarios, comunícate al <b>913 922 131</b>:</p>
+        <a class="bv-wsp" href="https://wa.me/51913922131?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">💬 Escribir por WhatsApp</a>
+        <a class="bv-tel" href="tel:+51913922131">📞 Llamar al 913 922 131</a>`;
+      document.getElementById('bvAlta').hidden = false;
+      return;
+    }
     const pass = document.getElementById('bvPass');
     if(tipo !== 'supervisor' && fpHuella(pass.value) !== APP_LLAVE){ pass.select(); return err('Clave incorrecta.'); }
     const recordar = tipo !== 'supervisor' && document.getElementById('bvRecordar').checked;
