@@ -1432,6 +1432,18 @@
   .asis-pie input{flex:1;min-width:0;border:1px solid var(--border);background:var(--input-bg);color:var(--ink);border-radius:22px;padding:11px 15px;
     font-size:15px;outline:0;font-family:inherit;}
   .asis-pie input:focus{border-color:var(--brand-2);}
+  .asis-pie .asis-mic{background:var(--surface-2);color:var(--brand-ink);display:grid;place-items:center;transition:transform .15s, background .2s;}
+  .asis-pie .asis-mic:active{transform:scale(.92);}
+  .asis-pie .asis-mic.on{background:#e5484d;color:#fff;animation:micLate 1.2s ease-in-out infinite;}
+  @keyframes micLate{0%{box-shadow:0 0 0 0 rgba(229,72,77,.5);}70%{box-shadow:0 0 0 14px rgba(229,72,77,0);}100%{box-shadow:0 0 0 0 rgba(229,72,77,0);}}
+  .asis-escucha{position:absolute;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:6;display:flex;align-items:center;gap:12px;background:var(--brand);color:#fff;
+    border-radius:18px;padding:14px 16px;box-shadow:0 12px 30px rgba(10,30,100,.35);animation:appSubeSuave .3s cubic-bezier(.22,.8,.2,1);cursor:pointer;}
+  .asis-escucha b{font-size:15px;} .asis-escucha small{margin-left:auto;font-size:11.5px;opacity:.75;}
+  .asis-escucha .ondas{display:flex;align-items:center;gap:3px;height:22px;} .asis-escucha .ondas i{width:4px;height:8px;border-radius:3px;background:#3ec6ac;animation:micOnda .9s ease-in-out infinite;}
+  .asis-escucha .ondas i:nth-child(2){animation-delay:.12s;} .asis-escucha .ondas i:nth-child(3){animation-delay:.24s;} .asis-escucha .ondas i:nth-child(4){animation-delay:.36s;} .asis-escucha .ondas i:nth-child(5){animation-delay:.48s;}
+  @keyframes micOnda{0%,100%{height:6px;}50%{height:22px;}}
+  .asis-callar{display:block;margin-top:8px;border:0;background:var(--surface-2);color:var(--brand-ink);border-radius:14px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+  .asis-msg.bot.hablando{box-shadow:0 0 0 2px var(--brand-2), var(--shadow);}
   .asis-pie button{border:0;background:var(--brand-2);color:#08281f;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;}
 </style>
 </head>
@@ -12023,7 +12035,9 @@ function pdPedidoAbierto(r){
 
 // Solo cuentan los compradores (los que generan OC, PD_PERSONAS): usuarios de Nisira como "MONITOR" o
 // responsables de pedido que no son de Compras no aparecen (30.09.2026, Piero).
-function pdEsComprador(p){ return !!(p && PD_PERSONAS[p]); }
+// Sin Katherine ni Javier (30.09.2026, Piero): ya no generan OC.
+const PD_NO_COMPRADORES = { KALBUJAR:1, JCENTENO:1 };
+function pdEsComprador(p){ return !!(p && PD_PERSONAS[p] && !PD_NO_COMPRADORES[p]); }
 function pdFilas(){ return appMemo('pdFilas', pdFilasCalc).slice(); }
 function pdFilasCalc(){
   const out = [];
@@ -12556,7 +12570,9 @@ function appConstruir(){
       <div class="asis-sug" id="asisSug"></div>
       <form class="asis-pie" id="asisForm" autocomplete="off">
         <input type="text" id="asisInput" placeholder="Escribe tu consulta…" enterkeyhint="send">
+        <button type="button" class="asis-mic" id="asisMic" aria-label="Hablarle a Leo" hidden><svg viewBox="0 0 24 24" width="22" height="22"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
         <button type="submit" aria-label="Enviar">➤</button></form>
+      <div class="asis-escucha" id="asisEscucha" hidden><span class="ondas"><i></i><i></i><i></i><i></i><i></i></span><b>Te escucho…</b><small>Toca aquí cuando termines</small></div>
     </div>`);
 
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
@@ -12602,6 +12618,9 @@ function appConstruir(){
   document.getElementById('asisFab').addEventListener('click', function(){ polarAbrir(); });
   document.getElementById('asisCerrar').addEventListener('click', polarCerrar);
   document.getElementById('asisMenu').addEventListener('click', appAbrirSheet);
+  if(polarVozSoportada()){ const mic = document.getElementById('asisMic'); mic.hidden = false; mic.addEventListener('click', polarVozIniciar);
+    document.getElementById('asisEscucha').addEventListener('click', function(){ if(POLAR_VOZ.rec) try{ POLAR_VOZ.rec.stop(); }catch(err){} }); }
+  try{ window.speechSynthesis && speechSynthesis.getVoices(); }catch(err){}   // carga las voces por adelantado
   document.getElementById('asisForm').addEventListener('submit', function(e){
     e.preventDefault(); const i = document.getElementById('asisInput'); const t = i.value.trim();
     if(t){ i.value = ''; polarEnviar(t); }
@@ -13683,8 +13702,8 @@ function polarMsg(html, quien){
   if(quien === 'bot') polarVerInicio(d); else c.scrollTop = c.scrollHeight;
 }
 function polarBot(html){ polarMsg(html, 'bot'); }
-function polarEnviar(texto){
-  polarMsg(escapeHtml(texto), 'yo');
+function polarEnviar(texto, porVoz){
+  polarMsg((porVoz ? '🎤 ' : '') + escapeHtml(texto), 'yo');
   if(POLAR_IA_URL && appHayDatos()){
     polarBot('<p class="asis-pensando">Leo está pensando<span>.</span><span>.</span><span>.</span></p>');
     const chat = document.getElementById('asisChat'), burbuja = chat.lastElementChild;
@@ -13699,7 +13718,90 @@ function polarEnviar(texto){
   let r;
   try{ r = polarResponder(texto); }catch(err){ POLAR.resultado = 'error'; r = '<p>Uy, tuve un problema leyendo esa consulta. Intenta de nuevo con un N° de requerimiento o un código.</p>'; }
   polarBot(r);
+  if(porVoz) polarHablar(document.getElementById('asisChat').lastElementChild);
   if(POLAR.resultado && POLAR.resultado !== 'ok') polarAnotar(texto, POLAR.resultado, POLAR.entendido);
+}
+
+// ---------- Leo por voz (30.09.2026, Piero: "que se pueda grabar la voz y cuando le grabes un audio te
+// responda hablando una breve respuesta y te muestre igual la respuesta escrita") ----------
+// Gratis y sin servidor propio: el dictado y la voz son los del propio celular (Web Speech API de
+// Chrome/Safari). La respuesta completa queda escrita; en voz solo va lo esencial (el titular y la
+// primera línea), en palabras que se entiendan al oírlas.
+const POLAR_VOZ = { rec:null, oyendo:false, texto:'' };
+function polarVozSoportada(){ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+function polarVozIniciar(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if(!SR) return;
+  try{ window.speechSynthesis && speechSynthesis.cancel(); }catch(err){}
+  if(POLAR_VOZ.oyendo){ try{ POLAR_VOZ.rec.stop(); }catch(err){} return; }
+  const rec = new SR(); POLAR_VOZ.rec = rec; POLAR_VOZ.texto = '';
+  rec.lang = 'es-PE'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  const input = document.getElementById('asisInput'), ui = document.getElementById('asisEscucha'), mic = document.getElementById('asisMic');
+  rec.onstart = function(){ POLAR_VOZ.oyendo = true; ui.hidden = false; mic.classList.add('on'); input.value = ''; input.placeholder = 'Te escucho…'; };
+  rec.onresult = function(e){
+    let t = ''; for(let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+    POLAR_VOZ.texto = t; input.value = t;
+  };
+  rec.onerror = function(e){
+    if(e.error === 'not-allowed' || e.error === 'service-not-allowed') appToast('Activa el permiso del micrófono para hablarle a Leo');
+    else if(e.error === 'no-speech') appToast('No te escuché. Toca 🎤 e intenta de nuevo');
+    else if(e.error !== 'aborted') appToast('No pude usar el micrófono (' + e.error + ')');
+  };
+  rec.onend = function(){
+    POLAR_VOZ.oyendo = false; ui.hidden = true; mic.classList.remove('on'); input.placeholder = 'Escribe tu consulta…';
+    const t = (POLAR_VOZ.texto || '').trim(); input.value = '';
+    if(t) polarEnviar(t.charAt(0).toUpperCase() + t.slice(1), true);
+  };
+  try{ rec.start(); }catch(err){ appToast('No pude usar el micrófono'); }
+}
+// Resumen para decir en voz alta: titular + primera línea útil, sin emojis ni siglas raras.
+function polarTextoParaVoz(burbuja){
+  if(!burbuja) return '';
+  const q = function(sel){ const el = burbuja.querySelector(sel); return el ? el.innerText.trim() : ''; };
+  let partes = [];
+  const cab = q('.cab');
+  if(cab){
+    partes.push(cab);
+    const sub = q('.sub'); if(sub) partes.push(sub);
+    const av = q('.asis-avance span') || q('p');
+    if(av) partes.push(av);
+  } else {
+    burbuja.querySelectorAll('p').forEach(function(p){ if(partes.length < 2 && !p.classList.contains('asis-nota')) partes.push(p.innerText.trim()); });
+  }
+  // Si con eso no se dice nada concreto (solo el título), se agregan los primeros datos de la lista.
+  if(partes.join(' ').length < 90){
+    const extra = [];
+    burbuja.querySelectorAll('.asis-kpis > div, .asis-it, .asis-item').forEach(function(el){ if(extra.length < 1) extra.push(el.innerText.replace(/\s*\n\s*/g, ', ').replace(/,?\s*ver\s*$/i, '').trim()); });
+    partes = partes.concat(extra);
+  }
+  let t = partes.filter(Boolean).join('. ');
+  const MES = { ene:'enero', feb:'febrero', mar:'marzo', abr:'abril', may:'mayo', jun:'junio', jul:'julio', ago:'agosto', sep:'setiembre', set:'setiembre', oct:'octubre', nov:'noviembre', dic:'diciembre' };
+  t = t.replace(/\b(\d{1,2}) (ene|feb|mar|abr|may|jun|jul|ago|sep|set|oct|nov|dic)\.?(?= |,|\)|$)/gi, function(m, d, mm){ return d + ' de ' + MES[mm.toLowerCase()]; })
+    .replace(/\s[–-]\s/g, ' al ').replace(/[()]/g, '');
+  t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu, '')
+    .replace(/\bS\/\s?([\d.,]+)/g, '$1 soles').replace(/(US)?\$\s?([\d.,]+)/g, '$2 dólares')
+    .replace(/\b000\d-0*(\d+)/g, '$1').replace(/\bPRY\d{4}-0*(\d+)/g, 'proyecto $1')
+    .replace(/(\d)\s?d\.h\./g, '$1 días hábiles').replace(/\bd\.h\./g, 'días hábiles')
+    .replace(/\bOC\b/g, 'O C').replace(/(\d+)\s?req\./gi, '$1 requerimientos').replace(/\breq\./gi, 'requerimiento').replace(/\b\d{9,}\b,?/g, '').replace(/[^\s,.]*…/g, '').replace(/:\./g, ':').replace(/\bUND\b/g, 'unidades')
+    .replace(/[·•|]/g, ', ').replace(/,(\s*,)+/g, ',').replace(/"/g, '').replace(/\s+/g, ' ').replace(/\s+([,.])/g, '$1').replace(/\.\s*\./g, '.').trim();
+  if(t.length > 210){ const corte = t.slice(0, 210), i = Math.max(corte.lastIndexOf('. '), corte.lastIndexOf(', ')); t = (i > 90 ? corte.slice(0, i) : corte) + '.'; }
+  return t;
+}
+function polarHablar(burbuja){
+  if(!('speechSynthesis' in window)) return;
+  const t = polarTextoParaVoz(burbuja); if(!t) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t);
+    const voces = speechSynthesis.getVoices(), pref = ['es-PE', 'es-419', 'es-US', 'es-MX', 'es-ES', 'es'];
+    let voz = null; for(const l of pref){ voz = voces.find(function(v){ return v.lang && v.lang.replace('_', '-').toLowerCase().indexOf(l.toLowerCase()) === 0; }); if(voz) break; }
+    if(voz) u.voice = voz; u.lang = voz ? voz.lang : 'es-PE'; u.rate = 1.04; u.pitch = 1;
+    burbuja.classList.add('hablando');
+    const aviso = document.createElement('button'); aviso.type = 'button'; aviso.className = 'asis-callar'; aviso.textContent = '🔊 Leo está hablando · tocar para callar';
+    aviso.onclick = function(){ speechSynthesis.cancel(); };
+    burbuja.appendChild(aviso);
+    u.onend = u.onerror = function(){ burbuja.classList.remove('hablando'); if(aviso.parentNode) aviso.remove(); };
+    speechSynthesis.speak(u);
+  }catch(err){}
 }
 function polarAccion(e){
   const b = e.target.closest('button'); if(!b) return;
@@ -14966,9 +15068,16 @@ function polarOC(cod){
   if(!filas.length) return null;
   POLAR.nuevoRef = 'oc ' + cod; POLAR.nuevoRefTxt = 'OC ' + cod;
   const f0 = filas.find(function(r){ return r.proveedor; }) || filas[0];
-  const est = (filas.find(function(r){ return r.estadoOrden; }) || {}).estadoOrden || '';
   const vistos = new Set();
   const items = filas.filter(function(r){ const k = r.idProducto + '|' + (r.codRequerimiento || ''); if(vistos.has(k)) return false; vistos.add(k); return true; });
+  // El estado va por LÍNEA en Nisira (30.09.2026, Piero con la OC 0002-0001777: decía "Atendido Completo"
+  // porque se tomaba la primera línea, y una de sus 13 líneas seguía "Pendiente"). Si alguna línea sigue
+  // abierta, se dice cuántas faltan y esas van primero.
+  const pendL = items.filter(pdOcAbierta);
+  const est0 = (filas.find(function(r){ return r.estadoOrden; }) || {}).estadoOrden || '';
+  const est = pendL.length && pendL.length < items.length ? 'Pendiente · falta' + (pendL.length === 1 ? '' : 'n') + ' ' + pendL.length + ' de ' + items.length + ' ítems'
+    : (pendL.length ? (pendL[0].estadoOrden || est0) : est0);
+  items.sort(function(a,b){ return (pdOcAbierta(b) ? 1 : 0) - (pdOcAbierta(a) ? 1 : 0); });
   const reqs = [...new Set(filas.map(function(r){ return r.codRequerimiento; }).filter(Boolean))];
   const f = filas.find(function(r){ return r.fCompromiso; });
   const rec = function(r){ const q = r.cantOrden != null ? r.cantOrden : r.cantidadOrden, x = r.cantRecep != null ? r.cantRecep : r.cantRecepcion; return [q, x || 0]; };
