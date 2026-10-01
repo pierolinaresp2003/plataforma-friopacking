@@ -13703,7 +13703,7 @@ function appPendComprasHtml(){
     let flag = o.est === 'Sin aprobar' ? '<em class="mal">Sin aprobar</em>' : o.est === 'Llegó parcial' ? '<em class="ok">Llegó parcial</em>' : '';
     if(tr) flag += '<em class="ok">🚢 ' + (ocImportInfo(o.oc).etd ? 'En tránsito' : 'Lista, por zarpar') + '</em>';
     const ii = imp ? (ocImportInfo(o.oc) || {}) : {};
-    const pie = imp ? (ii.etd ? (o.f && o.d > 0 ? '⚠️ ETA pasada · todavía no llega a Lurín' : '🚢 Zarpó el ' + appDDMM(ii.etd)) : ii.fReal ? '📦 Lista en fábrica desde ' + appDDMM(ii.fReal) + ' · falta booking' : '🏭 En fabricación · entrega del proveedor ' + (ii.fRef ? 'estimada ' + appDDMM(ii.fRef) : 'por definir'))
+    const pie = imp ? (ii.etd ? (o.f && o.d > 0 ? '⚠️ ETA pasada · todavía no llega a Lurín' : '🚢 Zarpó el ' + appDDMM(ii.etd)) : ii.fReal ? '📦 Lista en fábrica desde ' + appDDMM(ii.fReal) + ' · todavía sin ETD' : '🏭 En fabricación · entrega del proveedor ' + (ii.fRef ? 'estimada ' + appDDMM(ii.fRef) : 'por definir'))
       : k === 'venc' ? '⏰ ' + o.d + ' d.h. de atraso'
       : o.f ? (o.d === 0 ? '📅 Vence hoy' : '📅 Faltan ' + (-o.d) + ' d.h.') : '📅 Sin fecha de entrega';
     const fecha = imp ? (ii.etd ? (o.f ? 'ETA ' + appDDMM(o.f) : 'ETA por definir') : ii.fReal ? 'Zarpe por definir' : (ii.fRef ? 'Entrega est. ' + appDDMM(ii.fRef) : 'Entrega por definir')) : (o.f ? 'Entrega ' + appDDMM(o.f) : 'Sin fecha');
@@ -13751,7 +13751,7 @@ function appPendLogGruposCalc(){
 // ---------- Dashboard de importaciones del año (30.09.2026, Piero: "quiero un dashboard de todas las
 // importaciones de este año 2026") ----------
 // Todas las OC de importación emitidas en el año (Reporte Maestro + PedidoSinReq): cuántas, cuánto, a quién,
-// en qué estado van (llegó / en tránsito / por embarcar / pendiente booking), por mes y cuánto tardan.
+// en qué estado van (llegó / en tránsito / por zarpar / en fabricación), por mes y cuánto tardan.
 function appDashImpDatos(anio, cli){ return appMemo('dashimp' + anio + '|' + (cli || ''), function(){
   const hoy = polarDia(new Date()), est = new Map(), L = appImpDatos(), m = new Map();
   ['tr', 'em', 'bk'].forEach(function(k){ L[k].forEach(function(g){ g.ocs.forEach(function(o){ est.set(o, k); }); }); });
@@ -13771,12 +13771,12 @@ function appDashImpDatos(anio, cli){ return appMemo('dashimp' + anio + '|' + (cl
   ocs.forEach(function(o){
     if(ocFinalizada(o.oc)) o.k = 'fin';
     else if(!o.abierta) o.k = 'ok';
-    else o.k = est.get(o.oc) || (function(){ const i = ocImportInfo(o.oc) || {}; return !i.etd ? 'bk' : (polarDia(i.etd) <= hoy ? 'tr' : 'em'); })();
+    else o.k = est.get(o.oc) || (function(){ const i = ocImportInfo(o.oc) || {}; return !i.etd ? (i.fReal ? 'em' : 'bk') : (polarDia(i.etd) <= hoy ? 'tr' : 'em'); })();
     o.dias = o.k === 'ok' && o.fRecep ? Math.round((polarDia(o.fRecep) - polarDia(o.f)) / 864e5) : null;
   });
   return ocs;
 }); }
-const APP_DASH_EST = { ok:['✅', 'Llegaron a Lurín', 'verde'], tr:['🚢', 'En tránsito', 'azul'], em:['🛳️', 'Por embarcar', 'azul'], bk:['⏳', 'Pendiente booking', 'ambar'], fin:['✔', 'Finalizadas (Excel)', 'gris'] };
+const APP_DASH_EST = { ok:['✅', 'Llegaron a Lurín', 'verde'], tr:['🚢', 'En tránsito', 'azul'], em:['🛳️', 'Por zarpar', 'azul'], bk:['🏭', 'En fabricación', 'ambar'], fin:['✔', 'Finalizadas (Excel)', 'gris'] };
 function appDashImpResumen(anio, cli){
   const ocs = appDashImpDatos(anio, cli), tot = ocs.reduce(function(a, o){ return a + o.pen; }, 0);
   const cuenta = {}; ocs.forEach(function(o){ cuenta[o.k] = (cuenta[o.k] || 0) + 1; });
@@ -13795,7 +13795,7 @@ function appDashImport(anio, cli){
   const maxM = Math.max.apply(null, meses.map(function(x){ return x[2]; }).concat([1]));
   const orden = ['ok', 'tr', 'em', 'bk', 'fin'].filter(function(k){ return R.cuenta[k]; });
   const filaOC = function(o){ const i = ocImportInfo(o.oc) || {}, e = APP_DASH_EST[o.k];
-    const v = o.k === 'ok' ? (o.fRecep ? 'llegó ' + appDDMM(o.fRecep) : 'llegó') : o.k === 'tr' ? 'ETD ' + appDDMM(i.etd) : o.k === 'em' ? 'zarpa ' + appDDMM(i.etd) : o.k === 'bk' ? (i.fReal ? 'lista en fábrica' : (i.fRef ? 'entrega est. ' + appDDMM(i.fRef) : 'por definir')) : '';
+    const v = o.k === 'ok' ? (o.fRecep ? 'llegó ' + appDDMM(o.fRecep) : 'llegó') : o.k === 'tr' ? 'ETD ' + appDDMM(i.etd) : o.k === 'em' ? (i.etd ? 'zarpa ' + appDDMM(i.etd) : 'entregada ' + appDDMM(i.fReal)) : o.k === 'bk' ? (i.fRef ? 'entrega est. ' + appDDMM(i.fRef) : 'por definir') : '';
     return appFilaHtml('data-oc="' + escapeHtml(o.oc) + '"', e[2], polarCorta(appImpNombre(o.prov), 38), 'OC ' + escapeHtml(o.oc.replace(/^0002-0*/, '')) + ' · ' + appDDMM(o.f) + ' · ' + escapeHtml(nom(o.persona).split(' ')[0]) + (o.prys.size ? ' · ' + escapeHtml(polarCorta([...o.prys].join(' · '), 30)) : ''), appUSD(o.pen), v); };
   appListaAbrir('📊 Importaciones ' + anio + (cli ? ' · ' + escapeHtml(polarCorta(cli, 28)) : ''), ocs.length + ' OC emitidas' + (cli ? ' con ítems del cliente' : '') + ' · datos al ' + rqFecha(appIndCorte()), `
     <div class="ini-card m-total"><span>Monto total (equivalente en dólares)</span><b>${appUSD(R.tot)}</b><small>${ocs.length} OC · ${R.prov} proveedores · ${ocs.reduce(function(a, o){ return a + o.filas.length; }, 0)} líneas</small>
@@ -13817,9 +13817,11 @@ function appDashImport(anio, cli){
 // Pedido de Piero: la pestaña Logística muestra el estatus de las importaciones abiertas, como las
 // infografías del Control Tower. Solo con datos de Nisira: ETD = zarpe; ParaFechaOrden = ETA cuando ya
 // hay booking (Nisira la reemplaza por la ETA); antes de eso es la entrega del proveedor.
-//   🟢 En tránsito  → ya zarpó (ETD ≤ hoy)          · ordenado por ETA
-//   🔵 Por embarcar → ETD programado a futuro        · ordenado por ETD
-//   🟠 Pend. booking → sin ETD todavía               · ordenado por entrega del proveedor
+//   🟢 En tránsito    → ya zarpó (ETD ≤ hoy)                                  · ordenado por ETA
+//   🔵 Por zarpar     → ETD a futuro, o el proveedor ya la entregó y sin ETD  · ordenado por fecha
+//   🟠 En fabricación → el proveedor todavía no la entrega (F. Entrega Ref)   · ordenado por fecha estimada
+// No hay dato de booking en Nisira, así que no se habla de "pendiente booking" (01.10.2026, Piero: "solo
+// céntrate en considerar si tienen ya la fecha del proveedor, si están con ETD o con ETA").
 // OC del mismo proveedor con el mismo ETD y ETA van en una sola tarjeta (así vienen consolidadas).
 function appImpDatos(){ return appMemo('impStatus', appImpDatosCalc); }
 function appImpDatosCalc(){
@@ -13841,9 +13843,9 @@ function appImpDatosCalc(){
     o.etd = i.etd || null; o.fReal = i.fReal || null; o.fRef = i.fRef || null;
     // Sin ETD, ParaFechaOrden todavía es la entrega del proveedor, no una ETA.
     if(!o.etd || (o.eta && o.eta < o.etd)) o.eta = o.etd ? null : o.eta;
-    o.k = !o.etd ? 'bk' : dias(o.etd) <= 0 ? 'tr' : 'em';
-    const clave = [o.k, o.prov, o.etd ? +o.etd : '', o.k === 'bk' ? o.oc : (o.eta ? +o.eta : '')].join('|');
-    const g = grupos.get(clave) || { k:o.k, prov:o.prov, etd:o.etd, eta:o.k === 'bk' ? null : o.eta, fReal:null, fRef:null, ocs:[], prys:new Set(), prods:new Map(), personas:new Set(), parcial:false };
+    o.k = !o.etd ? (o.fReal ? 'em' : 'bk') : dias(o.etd) <= 0 ? 'tr' : 'em';
+    const clave = [o.k, o.prov, o.etd ? +o.etd : '', !o.etd ? o.oc : (o.eta ? +o.eta : '')].join('|');
+    const g = grupos.get(clave) || { k:o.k, prov:o.prov, etd:o.etd, eta:o.etd ? o.eta : null, fReal:null, fRef:null, ocs:[], prys:new Set(), prods:new Map(), personas:new Set(), parcial:false };
     g.ocs.push(o.oc); o.prys.forEach(function(x){ g.prys.add(x); }); o.prods.forEach(function(v, x){ g.prods.set(x, 1); });
     g.personas.add(o.persona); g.parcial = g.parcial || o.parcial;
     if(o.fReal && (!g.fReal || o.fReal > g.fReal)) g.fReal = o.fReal;
@@ -13855,13 +13857,13 @@ function appImpDatosCalc(){
   const f = function(d){ return d ? +d : 9e15; };
   // Primero las que llegan (ETA de hoy en adelante); al final las de ETA ya pasada sin ingreso a Lurín.
   L.tr.sort(function(a,b){ return ((a.dEta != null && a.dEta < 0) - (b.dEta != null && b.dEta < 0)) || f(a.eta) - f(b.eta); });
-  L.em.sort(function(a,b){ return f(a.etd) - f(b.etd); });
+  L.em.sort(function(a,b){ return f(a.etd || a.fReal) - f(b.etd || b.fReal); });
   L.bk.sort(function(a,b){ return f(a.fReal || a.fRef) - f(b.fReal || b.fRef); });
   let n = 0; ['tr', 'em', 'bk'].forEach(function(k){ L[k].forEach(function(g){ g.n = ++n; }); });
   return L;
 }
-const APP_IMP_SEC = { tr:['🚢', 'En tránsito', 'Ya zarpó · ordenado por la ETA más próxima'], em:['🛳️', 'Por embarcar', 'ETD programado · ordenado por el ETD más próximo'],
-  bk:['⏳', 'Pendiente booking', 'Sin ETD confirmado · requiere seguimiento'] };
+const APP_IMP_SEC = { tr:['🚢', 'En tránsito', 'Ya zarpó (ETD) · ordenado por la ETA más próxima'], em:['🛳️', 'Por zarpar', 'ETD programado, o el proveedor ya la entregó y falta el ETD'],
+  bk:['🏭', 'En fabricación', 'El proveedor todavía no la entrega · ordenado por la fecha estimada'] };
 function appImpNombre(t){
   return String(t || '').replace(/\b(S\.?\s?A\.?\s?C\.?|S\.?\s?A\.?\s?S\.?|S\.?\s?A\.?|S\.?\s?R\.?\s?L\.?|E\.?\s?I\.?\s?R\.?\s?L\.?|SOCIEDAD ANONIMA( CERRADA)?|CO\.?,?\s?LTD\.?|LIMITED|LTDA\.?|S\.P\.A\.?|INC\.?|GMBH|CORPORATION)(?=\s|$|[.,])/gi, '')
     .replace(/[.,\s]+$/, '').replace(/\s{2,}/g, ' ').trim();
@@ -13887,9 +13889,11 @@ function appPendLogLista(){
     const prys = [...g.prys].map(appImpNombre);
     let fechas, flag = '', pie = '';
     if(g.k === 'bk'){
-      fechas = 'ETD / ETA: pendientes';
-      if(g.fReal){ flag = '<em class="ok">Lista en fábrica</em>'; pie = '📦 El proveedor la entregó el ' + ddmm(g.fReal) + ', falta booking'; }
-      else pie = '🏭 En fabricación · entrega del proveedor ' + (g.fRef ? 'estimada ' + ddmm(g.fRef) : 'por definir');
+      fechas = g.fRef ? 'Entrega est. ' + ddmm(g.fRef) : 'Entrega por definir';
+      pie = '🏭 El proveedor todavía no la entrega' + (g.fRef ? (g.dRef != null && g.dRef < 0 ? ' · la fecha estimada ya pasó' : ' · estimada para el ' + ddmm(g.fRef)) : '');
+    } else if(!g.etd){
+      fechas = 'Entregada ' + ddmm(g.fReal) + ' → ETD por definir';
+      flag = '<em class="ok">Lista en fábrica</em>'; pie = '📦 El proveedor la entregó el ' + ddmm(g.fReal) + ' · todavía sin ETD';
     } else {
       fechas = 'ETD ' + ddmm(g.etd) + ' → ETA ' + (g.eta ? ddmm(g.eta) : 'por confirmar');
       if(g.k === 'tr'){
@@ -14526,7 +14530,7 @@ const POLAR_CLAVES = ('requerimiento requerimientos proyecto proyectos stock kar
   + 'orden ordenes compra compras proveedor proveedores almacen obra obras salida salidas ingreso ingresos movimiento movimientos '
   + 'cliente codigo producto productos llego llegada entrega estado estados solicitud archivo reporte resumen transito camino '
   + 'importacion nacional importado importados rotacion trazabilidad supervisor responsable despacho despachado recibido').split(' ');
-const POLAR_COMUNES = ('dashboard tablero panorama reporte informe analisis estadisticas balance booking etd eta zarpe zarpa zarpo zarpan embarque embarques embarcar transito estatus req reqs consultar quiero ver acabar acaban acabara acabaran agotar agotan agotado agotados vencen vencer vencimiento vencimientos llegar lleguen llegue emitio emitieron emitidas items comparado comparacion compara comparame aprobar aprobado aprobada aprobacion urgente urgentes urgencias prioridad prioridades importaciones importacion venden vende proveen atrasada atrasadas atrasado vencida vencidas proveedores novedades despachar despachado despachados despacho despachos revisar revision incompleto incompletos hola gracias ayuda puedes muestrame dime quiero necesito saber todo todos todas como cuanto cuantos cuantas '
+const POLAR_COMUNES = ('zarpar fabricacion fabricando embarcado embarcada dashboard tablero panorama reporte informe analisis estadisticas balance booking etd eta zarpe zarpa zarpo zarpan embarque embarques embarcar transito estatus req reqs consultar quiero ver acabar acaban acabara acabaran agotar agotan agotado agotados vencen vencer vencimiento vencimientos llegar lleguen llegue emitio emitieron emitidas items comparado comparacion compara comparame aprobar aprobado aprobada aprobacion urgente urgentes urgencias prioridad prioridades importaciones importacion venden vende proveen atrasada atrasadas atrasado vencida vencidas proveedores novedades despachar despachado despachados despacho despachos revisar revision incompleto incompletos hola gracias ayuda puedes muestrame dime quiero necesito saber todo todos todas como cuanto cuantos cuantas '
   + 'donde cuando esta estan este esto esos esas para pero tiene tienen tengo hace hacer sobre entre desde hasta cual cuales quien '
   + 'favor porfa buenas buenos dias tardes noches bien mucho poco algo nada solo tambien ahora semana numero mismo otra otro cada '
   + 'puede podria quisiera sale salio fueron sido tienes hay queda quedan falta faltan pedi pedimos mande mandamos llega llegan '
@@ -15067,14 +15071,15 @@ function polarUrgente(){
     <div class="asis-it"><div class="n">⚠️ <b>${appN(sin)}</b> productos para reponer sin stock</div><div class="s">${polarBtn('q', 'que hay que reponer', 'ver')}</div></div>
     ${top.length ? '<p style="margin-top:8px"><b>OC más atrasadas:</b></p>' + top.slice(0, 3).join('') : ''}`;
 }
-// Estatus de importaciones (30.09.2026): en tránsito / por embarcar / pendiente booking, y por ETD o ETA de
+// Estatus de importaciones (30.09.2026): en tránsito / por zarpar / en fabricación, y por ETD o ETA de
 // un período ("importaciones con etd octubre", "qué importaciones llegan esta semana", "qué está en booking").
 function polarImportaciones(q, p){
   const L = appImpDatos(), todas = L.tr.concat(L.em, L.bk);
   let l = todas, que = 'abiertas';
   if(/atras|vencid|retras/.test(q)){ l = L.tr.filter(function(g){ return g.dEta != null && g.dEta < 0; }); que = 'con ETA pasada (todavía no llegan a Lurín)'; }
-  else if(/booking|sin etd|por reservar/.test(q)){ l = L.bk; que = 'pendiente booking'; }
-  else if(/por embarcar|embarc|por zarpar/.test(q)){ l = L.em; que = 'por embarcar'; }
+  else if(/booking|sin etd|por reservar|lista en fabrica|ya (la )?entrego/.test(q)){ l = L.em.filter(function(g){ return !g.etd; }); que = 'que el proveedor ya entregó y todavía no tienen ETD'; }
+  else if(/fabricac|con el proveedor|no (la )?entrega/.test(q)){ l = L.bk; que = 'en fabricación (el proveedor todavía no las entrega)'; }
+  else if(/por embarcar|embarc|por zarpar/.test(q)){ l = L.em; que = 'por zarpar'; }
   else if(/transito|navegando|zarparon|en camino/.test(q)){ l = L.tr; que = 'en tránsito'; }
   const porEtd = /\betd\b|zarp|embarc/.test(q), porEta = /\beta\b|llega|llegan|arrib/.test(q);
   if(p){
@@ -15083,9 +15088,9 @@ function polarImportaciones(q, p){
   }
   const ddmm = appDDMM, n = l.reduce(function(s, g){ return s + g.ocs.length; }, 0);
   if(!l.length) return `<p>🌎 No hay importaciones ${escapeHtml(que)}.</p><div class="asis-acc">${polarBtn('pantalla', 'pendlog', '🚢 Ver estatus de importaciones')}</div>`;
-  const fila = function(g){ const est = { tr:'🚢 En tránsito', em:'🛳️ Por embarcar', bk:'⏳ Pend. booking' }[g.k];
+  const fila = function(g){ const est = { tr:'🚢 En tránsito', em:'🛳️ Por zarpar', bk:'🏭 En fabricación' }[g.k];
     return `<div class="asis-item"><div class="d"><span class="mono">${g.ocs.map(function(o){ return o.replace(/^0002-0*/, ''); }).join(' · ')}</span> · ${escapeHtml(polarCorta(appImpNombre(g.prov), 30))}</div>
-      <div class="q">${est} · ${g.etd ? 'ETD ' + ddmm(g.etd) + ' → ETA ' + (g.eta ? ddmm(g.eta) : 'por confirmar') : (g.fReal ? 'lista en fábrica ' + ddmm(g.fReal) : 'entrega prov. ' + ddmm(g.fRef))} ${polarBtn('q', 'OC ' + g.ocs[0], 'ver')}</div></div>`; };
+      <div class="q">${est} · ${g.etd ? 'ETD ' + ddmm(g.etd) + ' → ETA ' + (g.eta ? ddmm(g.eta) : 'por confirmar') : (g.fReal ? 'entregada ' + ddmm(g.fReal) + ' · ETD por definir' : (g.fRef ? 'entrega est. ' + ddmm(g.fRef) : 'entrega por definir'))} ${polarBtn('q', 'OC ' + g.ocs[0], 'ver')}</div></div>`; };
   return `<div class="cab">🌎 Importaciones ${escapeHtml(que)}</div><div class="sub">${l.length} embarque${l.length === 1 ? '' : 's'} · ${n} OC</div>
     ${l.slice(0, 8).map(fila).join('')}${polarMas(l, 8, fila, 'embarques')}
     <div class="asis-acc">${polarBtn('pantalla', 'pendlog', '🚢 Ver estatus de importaciones')}</div>`;
@@ -15190,7 +15195,7 @@ function polarIntenciones(q, qr, p){
   // "importaciones de Sun Fruits": reporte de ese cliente.
   if(/importac/.test(q) && !/cuanto tarda|demora|promedio/.test(q)){ const cl = polarClienteImport(POLAR.textoTal || qr); if(cl.length === 1) return polarDashImportacion(p, cl[0]); }
   if(/importac|\betd\b|\beta\b|booking|embarc|zarp|en transito/.test(q) && !/cuanto tarda|demora|promedio|gasto|monto/.test(q)
-    && (/\betd\b|\beta\b|booking|embarc|zarp|transito|estatus|status/.test(q) || (/importac/.test(q) && /atras|vencid|retras/.test(q)) || (/importac/.test(q) && /llega|pendientes|en camino/.test(q) && p))) return polarImportaciones(q, p);
+    && (/\betd\b|\beta\b|booking|embarc|zarp|transito|estatus|status|fabricac|lista en fabrica/.test(q) || (/importac/.test(q) && /atras|vencid|retras/.test(q)) || (/importac/.test(q) && /llega|pendientes|en camino/.test(q) && p))) return polarImportaciones(q, p);
   const hoy = new Date();
   const per = polarPersonaEn(q, false);
   const provs = /proveedor|\ba\b|\bde\b|\bcon\b|oc|orden|compr|gast|correo|mail|contacto|ruc|llegar|falta|debe|pendiente|vencid/.test(qr) ? polarProveedoresEn(qr) : [];
