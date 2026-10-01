@@ -15056,6 +15056,41 @@ function polarCuandoLlegaProducto(pal){
     return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 48))}</div><div class="s"><span class="asis-est ${v ? 'tarde' : 'camino'}">${r.fCompromiso ? (v ? 'debía llegar ' : 'llega ') + rqFecha(r.fCompromiso) : 'sin fecha'}</span><small>OC ${escapeHtml(r.codOrden.replace(/^000\d-0*/, ''))} · ${escapeHtml(polarCorta(r.proveedor || '', 24))}${r.req ? ' · req ' + escapeHtml(r.req.replace(/^0001-0*/, '')) : ''}</small></div></div>`; };
   return `<div class="cab">🚚 Cuándo llega "${escapeHtml(pal.join(' '))}"</div><div class="sub">${hits.length} línea${hits.length === 1 ? '' : 's'} con OC abierta</div>${hits.slice(0, 5).map(fila).join('')}${polarMas(hits, 5, fila, 'líneas')}`;
 }
+// "¿En qué OC está el cemento Thorgen?", "OC de Upgrade Industrial": busca en TODAS las OC (abiertas,
+// atendidas y finalizadas) por producto o proveedor, para ubicar el número de OC (01.10.2026, Piero: "si
+// no sé el número de la OC voy a buscar el nombre del producto o el proveedor").
+function polarBuscarOCs(o){
+  o = o || {};
+  const pal = (o.pal || []).filter(function(w){ return !/^(oc|ocs|orden|ordenes|compra|compras|esta|estan|esa|ese|que|cual|del|las|los|numero|proveedor|producto|item|items|busca|buscar)$/.test(w); });
+  if(!pal.length && !(o.provs && o.provs.length)) return null;
+  const ocs = new Map();
+  getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){
+    if(!r.codOrden) return;
+    if(o.provs && o.provs.length && o.provs.indexOf(r.proveedor) === -1) return;
+    if(o.persona && pdPersona(r.usuarioCompras) !== o.persona) return;
+    if(o.p && !polarEnPeriodo(r.fOrden, o.p)) return;
+    const x = ocs.get(r.codOrden) || { oc:r.codOrden, prov:r.proveedor || '', f:r.fOrden || null, persona:pdPersona(r.usuarioCompras), abierta:false, prods:new Set(), ok:!pal.length };
+    if(r.fOrden && (!x.f || r.fOrden < x.f)) x.f = r.fOrden;
+    if(!x.prov && r.proveedor) x.prov = r.proveedor;
+    if(pdOcAbierta(r)) x.abierta = true;
+    if(pal.length){ const d = polarNorm((r.producto || '') + ' ' + (r.idProducto || '')).replace(/[-\/]+/g, ' ');
+      if(pal.every(function(w){ return polarContiene(d, w); })){ x.ok = true; x.prods.add(r.producto || r.idProducto || ''); } }
+    ocs.set(r.codOrden, x);
+  });
+  const l = [...ocs.values()].filter(function(x){ return x.ok; }).sort(function(a,b){ return (b.f || 0) - (a.f || 0); });
+  if(!l.length) return null;
+  const corto = function(c){ return c.replace(/^000\d-0*/, ''); };
+  const est = function(x){ return ocFinalizada(x.oc) ? '<span class="asis-est ok">finalizada</span>' : !x.abierta ? '<span class="asis-est ok">atendida</span>'
+    : ocEnTransito(x.oc) ? '<span class="asis-est camino">🚢 en tránsito</span>' : '<span class="asis-est camino">pendiente</span>'; };
+  const fila = function(x){ const pr = [...x.prods];
+    return `<div class="asis-item"><div class="d">OC <span class="mono">${escapeHtml(corto(x.oc))}</span> · ${escapeHtml(polarCorta(x.prov, 34))}</div>
+      <div class="q">${est(x)} ${x.f ? 'emitida ' + rqFecha(x.f) : ''}${pr.length ? ' · ' + escapeHtml(polarCorta(pr[0], 44)) + (pr.length > 1 ? ' +' + (pr.length - 1) : '') : ''} ${polarBtn('q', 'OC ' + x.oc, 'ver')}</div></div>`; };
+  const que = [pal.length ? '"' + pal.join(' ') + '"' : '', o.provs && o.provs.length === 1 ? o.provs[0] : ''].filter(Boolean).join(' · ');
+  const nAb = l.filter(function(x){ return x.abierta && !ocFinalizada(x.oc); }).length;
+  const cab = l.length === 1 ? `<p>Es la <b>OC ${escapeHtml(corto(l[0].oc))}</b> de ${escapeHtml(l[0].prov.replace(/\.$/, ''))}.</p>` : `<p><b>${l.length}</b> OC${nAb ? ` · <b>${nAb}</b> pendientes` : ''} · ${l.length - nAb} atendidas.</p>`;
+  return `<div class="cab">🔎 OC con ${escapeHtml(que)}</div><div class="sub">${o.p ? 'emitidas ' + escapeHtml(o.p.label) : 'todas: pendientes y atendidas'}</div>${cab}
+    ${l.slice(0, 6).map(fila).join('')}${polarMas(l, 6, fila, 'OC')}`;
+}
 // Lo urgente del día, en un vistazo.
 function polarUrgente(){
   const hoy = new Date(), pr = appPendientesResumen(), G = appPendLogGrupos();
@@ -15222,7 +15257,8 @@ function polarIntenciones(q, qr, p){
     if(/correo|mail|contacto|telefono|ruc|datos/.test(q)) return provs.length === 1 ? polarProveedor(provs[0], 'correo')
       : `<p>Hay ${provs.length} proveedores con ese nombre. ¿De cuál?</p><div class="asis-acc">${provs.map(function(n){ return polarBtn('q', 'correo de ' + n, escapeHtml(polarCorta(n, 34))); }).join('')}</div>`;
     if(/vencid|atras/.test(q)) return polarOCsLista({ provs:provs, venc:true, persona:per });
-    if(/falta|llegar|llega|pendiente|debe|abiertas|por llegar|\boc\b|ordenes/.test(q)) return polarOCsLista({ provs:provs, persona:per, p:p });
+    if(/falta|llegar|llega|pendiente|debe|abiertas|por llegar/.test(q)) return polarOCsLista({ provs:provs, persona:per, p:p });
+    if(/\boc\b|ordenes/.test(q)) return polarBuscarOCs({ provs:provs, persona:per, p:p, pal:palP.filter(function(w){ return !provs.some(function(n){ return polarNorm(n).indexOf(w) !== -1; }); }) }) || polarOCsLista({ provs:provs, persona:per, p:p });
     if(/gast|compr|monto|cuanto/.test(q) && polarPuede('gerencia')) return polarGastoFiltrado(q + ' proveedor', p);
     return provs.length === 1 ? polarProveedor(provs[0], '') : `<p>Hay ${provs.length} proveedores con ese nombre. ¿Cuál?</p><div class="asis-acc">${provs.map(function(n){ return polarBtn('q', 'proveedor ' + n, escapeHtml(polarCorta(n, 34))); }).join('')}</div>`;
   }
@@ -15863,6 +15899,10 @@ function polarResponder1(texto){
 
   const palabras = polarPalabrasProducto(q);
   if(!quiereProducto){ const pn = polarProyectoPorNombre(palabras); if(pn) return pn; }
+  // Producto o proveedor que no está en el kardex (o se pregunta por la OC): se busca en todas las OC.
+  const exactoKdx = palabras.length && ALMACEN_DATA && ALMACEN_DATA.rows && ALMACEN_DATA.rows.some(function(r){ const d = polarNorm(r.descripcion); return palabras.every(function(w){ return polarContiene(d, w); }); });
+  if(!quiereProducto && (!exactoKdx || /\boc\b|orden/.test(q))){ const bo = polarBuscarOCs({ pal:palabras, p:p }) || polarBuscarOCs({ pal:polarPalabrasProducto(qr), p:p }); if(bo) return bo;
+    if(!exactoKdx){ const pv = polarProveedoresEn(qr); if(pv.length >= 1 && pv.length <= 4){ const bp = polarBuscarOCs({ provs:pv, p:p }); if(bp) return bp; } } }
   const pr = polarBuscarProducto(palabras);
   if(pr) return pr;
   if(quiereProducto){ POLAR.resultado = 'no encontró'; return `<p>No encontré productos con "${escapeHtml(palabras.join(' '))}". Prueba con el código de 12 dígitos o con otra palabra de la descripción.</p>`; }
