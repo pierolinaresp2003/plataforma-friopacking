@@ -13740,11 +13740,12 @@ function appPendLogGruposCalc(){
 // importaciones de este año 2026") ----------
 // Todas las OC de importación emitidas en el año (Reporte Maestro + PedidoSinReq): cuántas, cuánto, a quién,
 // en qué estado van (llegó / en tránsito / por embarcar / pendiente booking), por mes y cuánto tardan.
-function appDashImpDatos(anio){ return appMemo('dashimp' + anio, function(){
+function appDashImpDatos(anio, cli){ return appMemo('dashimp' + anio + '|' + (cli || ''), function(){
   const hoy = polarDia(new Date()), est = new Map(), L = appImpDatos(), m = new Map();
   ['tr', 'em', 'bk'].forEach(function(k){ L[k].forEach(function(g){ g.ocs.forEach(function(o){ est.set(o, k); }); }); });
   polarLineasOC().forEach(function(r){
     if(!(r.origen === 'importado' || /^0002-/.test(r.codOrden || '')) || !r.fOrden || r.fOrden.getUTCFullYear() !== anio) return;
+    if(cli && appImpNombre(r.proyecto || '') !== cli) return;   // reporte de un cliente: solo sus líneas
     const o = m.get(r.codOrden) || { oc:r.codOrden, prov:r.proveedor || '', persona:pdPersona(r.usuarioCompras), f:r.fOrden, pen:0, filas:[], abierta:false, fRecep:null, prys:new Set(), pryPen:new Map() };
     const lbl = monedaLabel(r.moneda), mo = r.montoNativo || 0, pen = lbl === 'S/' ? mo : mo * (TIPO_CAMBIO[lbl] || TIPO_CAMBIO.USD);
     o.pen += pen; o.filas.push(r);
@@ -13764,17 +13765,17 @@ function appDashImpDatos(anio){ return appMemo('dashimp' + anio, function(){
   return ocs;
 }); }
 const APP_DASH_EST = { ok:['✅', 'Llegaron a Lurín', 'verde'], tr:['🚢', 'En tránsito', 'azul'], em:['🛳️', 'Por embarcar', 'azul'], bk:['⏳', 'Pendiente booking', 'ambar'], fin:['✔', 'Finalizadas (Excel)', 'gris'] };
-function appDashImpResumen(anio){
-  const ocs = appDashImpDatos(anio), tot = ocs.reduce(function(a, o){ return a + o.pen; }, 0);
+function appDashImpResumen(anio, cli){
+  const ocs = appDashImpDatos(anio, cli), tot = ocs.reduce(function(a, o){ return a + o.pen; }, 0);
   const cuenta = {}; ocs.forEach(function(o){ cuenta[o.k] = (cuenta[o.k] || 0) + 1; });
   const d = ocs.map(function(o){ return o.dias; }).filter(function(x){ return x != null && x >= 0; }).sort(function(a,b){ return a - b; });
   return { ocs:ocs, tot:tot, cuenta:cuenta, prov:new Set(ocs.map(function(o){ return o.prov; })).size,
     prom:d.length ? Math.round(d.reduce(function(a,b){ return a + b; }, 0) / d.length) : null, med:d.length ? d[Math.floor(d.length / 2)] : null, nd:d.length };
 }
-function appDashImport(anio){
+function appDashImport(anio, cli){
   anio = anio || appIndCorte().getUTCFullYear();
-  const R = appDashImpResumen(anio), ocs = R.ocs;
-  if(!ocs.length) return appToast('No hay importaciones emitidas en ' + anio + '.');
+  const R = appDashImpResumen(anio, cli), ocs = R.ocs;
+  if(!ocs.length) return appToast('No hay importaciones emitidas en ' + anio + (cli ? ' para ' + cli : '') + '.');
   const grupo = function(campo){ const g = new Map(); ocs.forEach(function(o){ (o[campo] instanceof Set ? [...o[campo]] : [o[campo] || '—']).forEach(function(k){ g.set(k, (g.get(k) || 0) + o.pen); }); }); return [...g.entries()].sort(function(a,b){ return b[1] - a[1]; }); };
   const nom = function(p){ return PD_PERSONAS[p] || p || '—'; };
   const hasta = anio === appIndCorte().getUTCFullYear() ? appIndCorte().getUTCMonth() : 11;
@@ -13784,7 +13785,7 @@ function appDashImport(anio){
   const filaOC = function(o){ const i = ocImportInfo(o.oc) || {}, e = APP_DASH_EST[o.k];
     const v = o.k === 'ok' ? (o.fRecep ? 'llegó ' + appDDMM(o.fRecep) : 'llegó') : o.k === 'tr' ? 'ETD ' + appDDMM(i.etd) : o.k === 'em' ? 'zarpa ' + appDDMM(i.etd) : o.k === 'bk' ? (i.fReal ? 'lista en fábrica' : 'por definir') : '';
     return appFilaHtml('data-oc="' + escapeHtml(o.oc) + '"', e[2], polarCorta(appImpNombre(o.prov), 38), 'OC ' + escapeHtml(o.oc.replace(/^0002-0*/, '')) + ' · ' + appDDMM(o.f) + ' · ' + escapeHtml(nom(o.persona).split(' ')[0]) + (o.prys.size ? ' · ' + escapeHtml(polarCorta([...o.prys].join(' · '), 30)) : ''), appUSD(o.pen), v); };
-  appListaAbrir('📊 Importaciones ' + anio, ocs.length + ' OC emitidas · datos al ' + rqFecha(appIndCorte()), `
+  appListaAbrir('📊 Importaciones ' + anio + (cli ? ' · ' + escapeHtml(polarCorta(cli, 28)) : ''), ocs.length + ' OC emitidas' + (cli ? ' con ítems del cliente' : '') + ' · datos al ' + rqFecha(appIndCorte()), `
     <div class="ini-card m-total"><span>Monto total (equivalente en dólares)</span><b>${appUSD(R.tot)}</b><small>${ocs.length} OC · ${R.prov} proveedores · ${ocs.reduce(function(a, o){ return a + o.filas.length; }, 0)} líneas</small>
       <div class="m-tiles">${orden.map(function(k){ const e = APP_DASH_EST[k]; return `<div><span>${e[0]} ${e[1]}</span><b>${R.cuenta[k]}</b></div>`; }).join('')}</div></div>
     <div class="ini-card"><div class="ini-card-tit">📅 OC emitidas por mes</div>
@@ -14096,7 +14097,7 @@ function appNormReq(t){
 function appClickInicio(e){
   const b = e.target.closest('button, [data-clic]'); if(!b || b.type === 'submit') return;
   if(b.dataset.inddet) return appIndDetalle(b.dataset.inddet);
-  if(b.dataset.dashimp) return appDashImport(+b.dataset.dashimp);
+  if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
   if(b.dataset.caldet) return appCalDetalle(b.dataset.caldet);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
@@ -14130,8 +14131,8 @@ function appSubmitInicio(e){
   if(!q) return;
   if(f.dataset.form === 'polar') return polarAbrir(q);
   if(f.dataset.form === 'req'){
-    const pry = q.toUpperCase().match(/PRY\s*-?\s*(\d{4})\s*-?\s*(\d{1,7})/);
-    if(pry) return appAbrirProyecto('PRY' + pry[1] + '-' + pry[2].padStart(7, '0'));
+    const pry = polarCodProyecto(q);
+    if(pry) return appAbrirProyecto(pry);
     if(/\d{3,}/.test(q)) return appAbrirReq(appNormReq(q));
     return appAbrirReq(q);   // texto: el buscador del módulo también encuentra por nombre de proyecto
   }
@@ -14392,7 +14393,7 @@ function polarAccion(e){
     b.textContent = abrir ? 'Ver menos ▴' : 'Ver los ' + b.dataset.asismas + ' ' + b.dataset.txt + ' restantes ▾';
     if(abrir){ r.classList.remove('asis-entra'); void r.offsetWidth; r.classList.add('asis-entra'); } return; }
   if(b.dataset.asisdet !== undefined) return polarDetAbrir(+b.dataset.asisdet);
-  if(b.dataset.dashimp) return appDashImport(+b.dataset.dashimp);
+  if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
   const ir = function(fn){ polarCerrar(); fn(); };
   if(b.dataset.req) return ir(function(){ appAbrirReq(b.dataset.req); });
@@ -14602,6 +14603,18 @@ function polarEntender(texto){
   return q.replace(/\s+/g, ' ').trim();
 }
 // "proyecto 36" → el PRY que termina en 0000036 (el más reciente si hay de varios años).
+// Código de proyecto escrito en la consulta: PRY2026-0000036, PRD2026-0000043, PRG…, ALM… (1.10.2026,
+// Piero: "PRD2026-0000043 sí existe"). Devuelve el código tal como está en los datos, o null.
+function polarCodProyecto(T){
+  const m = String(T || '').toUpperCase().match(/\b([A-Z]{3})\s*-?\s*(20\d{2})\s*-?\s*(\d{1,7})\b/);
+  if(!m) return null;
+  const id = m[1] + m[2] + '-' + m[3].padStart(7, '0');
+  rqPreparar();
+  const ids = new Set(RQ.filas.map(function(r){ return r.idProyecto; }));
+  // Existe tal cual → ese. Si no existe pero tiene forma de proyecto (PR…), igual se usa y quien lo
+  // recibe dice que no tiene requerimientos. Otro prefijo de 3 letras que no existe no es proyecto.
+  return ids.has(id) || /^PR/.test(m[1]) ? id : null;
+}
 function polarProyectoPorNumero(num){
   rqPreparar();
   const fin = '-' + String(num).padStart(7, '0');
@@ -15063,9 +15076,31 @@ function polarImportaciones(q, p){
     ${l.slice(0, 8).map(fila).join('')}${polarMas(l, 8, fila, 'embarques')}
     <div class="asis-acc">${polarBtn('pantalla', 'pendlog', '🚢 Ver estatus de importaciones')}</div>`;
 }
-function polarDashImportacion(p){
-  const anio = p && p.desde ? p.desde.getUTCFullYear() : appIndCorte().getUTCFullYear(), R = appDashImpResumen(anio);
-  if(!R.ocs.length) return `<p>No hay importaciones emitidas en ${anio}.</p>`;
+// Cliente/proyecto nombrado en una pregunta de importaciones ("importaciones de Sun Fruits").
+function polarClienteImport(qr){
+  const ruido = /^(importacion|importaciones|importados?|reporte|reportes|sobre|para|del|los|las|que|tiene|tienen|dashboard|resumen|informe|analisis|todas|todos|este|esta|ano|anio|cliente|proyecto|proyectos|estado|estatus|como|van|vamos|dame|quiero|ver|oc|ocs|llegan|llegaron|pendientes|transito|booking|embarcar)$/;
+  const pal = qr.replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter(function(w){ return w.length >= 3 && !ruido.test(w) && !/^\d+$/.test(w) && POLAR_MESES.indexOf(w) === -1; });
+  if(!pal.length) return [];
+  const nombres = new Set();
+  polarLineasOC().forEach(function(r){ if(r.proyecto && (r.origen === 'importado' || /^0002-/.test(r.codOrden || '')) && !/^pedido directo|sin proyecto/i.test(r.proyecto)) nombres.add(appImpNombre(r.proyecto)); });
+  const hits = [];
+  nombres.forEach(function(n){ const d = polarNorm(n); const k = pal.filter(function(w){ return polarContiene(d, w); }).length; if(k && k >= Math.min(2, pal.length)) hits.push([n, k]); });
+  return hits.sort(function(a,b){ return b[1] - a[1]; }).filter(function(h, i, a){ return h[1] === a[0][1]; }).map(function(h){ return h[0]; });
+}
+function polarDashImportacion(p, cli){
+  const anio = p && p.desde ? p.desde.getUTCFullYear() : appIndCorte().getUTCFullYear(), R = appDashImpResumen(anio, cli);
+  if(!R.ocs.length) return `<p>No hay importaciones emitidas en ${anio}${cli ? ' para <b>' + escapeHtml(cli) + '</b>' : ''}.</p>`;
+  if(cli){
+    const abiertas = R.ocs.filter(function(o){ return o.k !== 'ok' && o.k !== 'fin'; }).sort(function(a,b){ return a.f - b.f; });
+    const fila = function(o){ const i = ocImportInfo(o.oc) || {};
+      return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(o.oc.replace(/^0002-0*/, ''))}</span> · ${escapeHtml(polarCorta(appImpNombre(o.prov), 30))}</div><div class="q">${APP_DASH_EST[o.k][0]} ${APP_DASH_EST[o.k][1]} · ${i.etd ? 'ETD ' + appDDMM(i.etd) : (i.fReal ? 'lista en fábrica' : 'entrega por definir')} · ${appUSD(o.pen)} ${polarBtn('q', 'OC ' + o.oc, 'ver')}</div></div>`; };
+    return `<div class="cab">📊 Importaciones ${anio} · ${escapeHtml(polarCorta(cli, 34))}</div><div class="sub">OC de importación con ítems de este cliente</div>
+      <div class="asis-kpis"><div><b>${R.ocs.length}</b><span>OC</span></div><div><b>${appUSD(R.tot)}</b><span>Monto del cliente (eq. $)</span></div><div><b>${R.prov}</b><span>Proveedores</span></div></div>
+      ${['ok', 'tr', 'em', 'bk', 'fin'].map(function(k){ return R.cuenta[k] ? `<div class="asis-item"><div class="d">${APP_DASH_EST[k][0]} ${APP_DASH_EST[k][1]}</div><div class="q"><b>${R.cuenta[k]}</b> OC</div></div>` : ''; }).join('')}
+      ${abiertas.length ? '<p><b>Por llegar:</b></p>' + abiertas.slice(0, 6).map(fila).join('') + polarMas(abiertas, 6, fila, 'OC') : '<p>✅ Todo lo importado para este cliente ya llegó a Lurín.</p>'}
+      ${R.prom != null ? `<p>Las que llegaron tardaron <b>${R.prom} días</b> en promedio.</p>` : ''}
+      <div class="asis-acc">${polarBtn('dashimp', anio + '|' + cli, '📊 Abrir dashboard del cliente')}</div>`;
+  }
   const e = function(k){ return R.cuenta[k] ? `<div class="asis-item"><div class="d">${APP_DASH_EST[k][0]} ${APP_DASH_EST[k][1]}</div><div class="q"><b>${R.cuenta[k]}</b> OC</div></div>` : ''; };
   return `<div class="cab">📊 Importaciones ${anio}</div><div class="sub">OC de importación emitidas en el año</div>
     <div class="asis-kpis"><div><b>${R.ocs.length}</b><span>OC</span></div><div><b>${appUSD(R.tot)}</b><span>Monto (eq. $)</span></div><div><b>${R.prov}</b><span>Proveedores</span></div></div>
@@ -15137,7 +15172,9 @@ function polarIntenciones(q, qr, p){
       return polarOCsRecibidas({ p:p || polarPeriodoDe('esta semana'), provs:pv, origen:/importa/.test(tal) ? 'importado' : (/nacional/.test(tal) ? 'nacional' : ''), persona:polarPersonaEn(q, false) });
   }
   if(/importac/.test(q) && /dashboard|tablero|panel|panorama|resumen|reporte|informe|analisis|estadistic|balance|todas las|cuantas|total/.test(q) && !/cuanto tarda|demora/.test(q)
-    && (/dashboard|tablero|panel|panorama|resumen|reporte|informe|analisis|estadistic|balance/.test(q) || (p && p.k === 'anio'))) return polarDashImportacion(p);
+    && (/dashboard|tablero|panel|panorama|resumen|reporte|informe|analisis|estadistic|balance/.test(q) || (p && p.k === 'anio'))) return polarDashImportacion(p, polarClienteImport(POLAR.textoTal || qr)[0] || '');
+  // "importaciones de Sun Fruits": reporte de ese cliente.
+  if(/importac/.test(q) && !/cuanto tarda|demora|promedio/.test(q)){ const cl = polarClienteImport(POLAR.textoTal || qr); if(cl.length === 1) return polarDashImportacion(p, cl[0]); }
   if(/importac|\betd\b|\beta\b|booking|embarc|zarp|en transito/.test(q) && !/cuanto tarda|demora|promedio|gasto|monto/.test(q)
     && (/\betd\b|\beta\b|booking|embarc|zarp|transito|estatus|status/.test(q) || (/importac/.test(q) && /atras|vencid|retras/.test(q)) || (/importac/.test(q) && /llega|pendientes|en camino/.test(q) && p))) return polarImportaciones(q, p);
   const hoy = new Date();
@@ -15519,7 +15556,7 @@ function polarConContexto(texto){
   const conector = /^(y|e|pero|ahora|tambien|ademas|entonces|osea|o sea)\b/.test(q) || /\b(eso|esos|esas|ese|esa|su|sus|mismo|misma|ahi|alli|aquel)\b/.test(q);
   if(!conector && palabras.length > 5) return texto;
   if(/^(hola|gracias|ok|listo|ayuda)\b/.test(q)) return texto;
-  const tieneRef = /\b\d{3,}\b|PRY/.test(T);
+  const tieneRef = /\b\d{3,}\b|PR[YDG]\d/.test(T);
   const persona = polarPersonaEn(q, true), per = polarPeriodoDe(q);
   const personaPal = persona ? polarNorm(PD_PERSONAS[persona] || persona).split(' ').concat([persona.toLowerCase()]) : [];
   const resto = palabras.filter(function(w){ return !POLAR_RELLENO.has(w) && !POLAR_TEMA_RE.test(w) && POLAR_MESES.indexOf(w) === -1 && !/^\d+$/.test(w) && personaPal.indexOf(w) === -1 && POLAR_COMUNES.indexOf(w) === -1; });
@@ -15638,8 +15675,8 @@ function polarResponder1(texto){
     }
     return polarProyecto(id);
   };
-  const pry = T.match(/PRY\s*-?\s*(\d{4})\s*-?\s*(\d{1,7})/);
-  if(pry) return sobrePry('PRY' + pry[1] + '-' + pry[2].padStart(7, '0'));
+  const pry = polarCodProyecto(T);
+  if(pry) return sobrePry(pry);
 
   const esOC = /\boc\b/.test(q), esPed = /\bpedido\b/.test(q) && !/pedidos? sin oc/.test(q), esPry = /\b(proyecto|obra|pry)\b/.test(q) && (!/requerimiento/.test(q) || /\b(proyecto|pry)\s*\d/.test(q));
   const doc = T.match(/\b(\d{4})\s*-\s*(\d{3,7})\b/);
@@ -16218,13 +16255,13 @@ function polarFiltrosDe(q){
 }
 // ---------- Exportar desde el modo de reglas ----------
 function polarExportar(q, T){
-  const pry = T.match(/PRY\s*-?\s*(\d{4})\s*-?\s*(\d{1,7})/);
+  const pryId = polarCodProyecto(T);
   const doc = T.match(/\b(\d{4})\s*-\s*(\d{3,7})\b/);
   const bare = T.match(/\b(\d{3,7})\b/);
   rqPreparar();
   const hecho = function(n){ return `<p>📥 Listo, descargué <b>${escapeHtml(n)}</b>.</p><p class="q">Trae una hoja de resumen con el estado de cada cosa y otra con el detalle ítem por ítem.</p>`; };
-  if(pry){
-    const id = 'PRY' + pry[1] + '-' + pry[2].padStart(7, '0');
+  if(pryId){
+    const id = pryId;
     const filas = RQ.filas.filter(function(r){ return r.idProyecto === id; });
     if(!filas.length) return `<p>No encontré requerimientos del proyecto <b class="mono">${escapeHtml(id)}</b>.</p>`;
     return hecho(polarExcelReqs(filas, (filas[0].proyecto || id) + ' ' + id, 'Proyecto ' + id));
@@ -16274,8 +16311,8 @@ function polarExportar(q, T){
 function polarIdProyecto(consulta){
   rqPreparar();
   const T = String(consulta || '').toUpperCase();
-  const m = T.match(/PRY\s*-?\s*(\d{4})\s*-?\s*(\d{1,7})/);
-  if(m) return { id: 'PRY' + m[1] + '-' + m[2].padStart(7, '0') };
+  const m = polarCodProyecto(T);
+  if(m) return { id: m };
   const pal = polarNorm(consulta).split(' ').filter(function(w){ return w.length >= 3; });
   const ids = new Map();
   RQ.filas.forEach(function(r){ const n = polarNorm(r.proyecto); if(r.idProyecto && pal.length && pal.every(function(w){ return n.indexOf(w) !== -1; }) && !ids.has(r.idProyecto)) ids.set(r.idProyecto, r.proyecto); });
