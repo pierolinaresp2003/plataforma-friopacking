@@ -1502,6 +1502,9 @@
   .asis-det-it .s{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;} .asis-det-it .s small{font-size:11px;color:var(--muted);}
   .asis-ul{margin:4px 0 6px;padding-left:18px;} .asis-ul li{margin:2px 0;}
   .asis-nota{font-size:11px;color:var(--muted);margin-top:6px !important;}
+  .kdx-homol{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;}
+  .kdx-homol > span{background:var(--surface-2, #f1f4f7);border-radius:8px;padding:4px 8px;}
+  .kdx-homol small{display:block;font-size:11px;color:var(--muted);}
   .asis-cal{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--muted);}
   .asis-cal button{font:inherit;font-size:14px;line-height:1;background:var(--surface-2, #f1f4f7);border:0;border-radius:999px;padding:5px 9px;cursor:pointer;}
   .asis-pensando{color:var(--ink-soft);font-style:italic;}
@@ -6162,6 +6165,15 @@ function drawKardex(){
   document.getElementById('kardexTitle').textContent = 'Kardex — ' + producto.codigo
     + (producto.nCodigos>1 ? ' (' + producto.nCodigos + ' códigos homologados)' : '');
   document.getElementById('kardexSub').textContent = (producto.descripcion||'').trim();
+  // Qué códigos están homologados y el stock de cada uno (01.10.2026, Piero: "dejarme ver ahí qué códigos son").
+  if(producto.nCodigos > 1){
+    const fmtS = v => Number(v || 0).toLocaleString('es-PE', {maximumFractionDigits:2});
+    const mm = producto.miembros || (producto.codigos || []).map(c => ({ codigo:c }));
+    document.getElementById('kardexSub').insertAdjacentHTML('beforeend', '<div class="kdx-homol"><b>Códigos homologados:</b> '
+      + mm.map(m => '<span><b class="mono">' + escapeHtml(m.codigo) + '</b>' + (m.codigo === producto.codigo ? ' (principal)' : '')
+        + (m.lima != null ? ' · Lima ' + fmtS(m.lima) + ' · Trujillo ' + fmtS(m.trujillo) + ' · Ica ' + fmtS(m.ica) : '')
+        + (m.descripcion && m.descripcion.trim() !== (producto.descripcion || '').trim() ? '<small>' + escapeHtml(m.descripcion) + '</small>' : '') + '</span>').join('') + '</div>');
+  }
   drawKardexMovs(producto);
   const fmt2 = v => v==null ? '—' : Number(v).toLocaleString('es-PE', {maximumFractionDigits:2});
 
