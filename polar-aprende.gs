@@ -12,7 +12,7 @@
  * Qué se guarda: fecha, vista (supervisor / logística / gerencia), la pregunta tal cual,
  * cómo la entendió Leo después de corregir tipeo y sinónimos, el motivo (respondió / no entendió /
  * no encontró / 👍 le sirvió / 👎 respuesta incorrecta), la fecha de los datos y un resumen de la respuesta.
- * No se guarda quién preguntó ni ningún dato de la empresa.
+ * Desde el 01.10.2026 también se guarda quién preguntó (correo y nombre), a pedido de Piero.
  */
 
 const HOJA = 'Preguntas';
@@ -26,14 +26,15 @@ function doPost(e) {
     let hoja = libro.getSheetByName(HOJA);
     if (!hoja) {
       hoja = libro.insertSheet(HOJA);
-      hoja.appendRow(['Fecha', 'Vista', 'Pregunta', 'Cómo la entendió Leo', 'Motivo', 'Datos al', '¿Ya se le enseñó?', 'Respuesta de Leo']);
+      hoja.appendRow(['Fecha', 'Vista', 'Pregunta', 'Cómo la entendió Leo', 'Motivo', 'Datos al', '¿Ya se le enseñó?', 'Respuesta de Leo', 'Usuario']);
       hoja.setFrozenRows(1);
       hoja.setColumnWidths(1, 1, 150); hoja.setColumnWidth(3, 380); hoja.setColumnWidth(4, 320);
     }
-    // Hojas creadas con la versión anterior: se agrega la columna H.
-    if (!hoja.getRange('H1').getValue()) {
+    // Hojas creadas con versiones anteriores: se agregan las columnas H e I.
+    if (!hoja.getRange('H1').getValue() || !hoja.getRange('I1').getValue()) {
       hoja.getRange('H1').setValue('Respuesta de Leo'); hoja.setColumnWidth(8, 420);
-      hoja.getRange('A1:H1').setFontWeight('bold').setBackground('#0a1e64').setFontColor('#ffffff');
+      hoja.getRange('I1').setValue('Usuario'); hoja.setColumnWidth(9, 260);
+      hoja.getRange('A1:I1').setFontWeight('bold').setBackground('#0a1e64').setFontColor('#ffffff');
     }
     // Freno simple: como máximo 2,000 filas nuevas por día.
     const props = PropertiesService.getScriptProperties();
@@ -46,6 +47,7 @@ function doPost(e) {
       Utilities.formatDate(new Date(), 'America/Lima', 'yyyy-MM-dd HH:mm'),
       String(d.vista || ''), pregunta, String(d.entendido || '').slice(0, 300),
       String(d.motivo || ''), String(d.datos || ''), '', String(d.respuesta || '').slice(0, 400),
+      String(d.usuario || '').slice(0, 120),
     ]);
     return salida({ ok: true });
   } catch (err) {

@@ -14656,7 +14656,9 @@ function polarAnotar(texto, motivo, entendido, respuesta){
   try{
     fetch(POLAR_APRENDE_URL, { method:'POST', mode:'no-cors',
       body: JSON.stringify({ pregunta:String(texto).slice(0, 300), entendido:String(entendido || '').slice(0, 300), motivo:motivo, vista:polarVista(),
-        respuesta:String(respuesta || '').slice(0, 400), datos:(DATA && DATA.corte) ? fmtDate(DATA.corte) : '' }) }).catch(function(){});
+        respuesta:String(respuesta || '').slice(0, 400), datos:(DATA && DATA.corte) ? fmtDate(DATA.corte) : '',
+        // Quién preguntó (01.10.2026, pedido de Piero): correo con que entró y su nombre si se conoce.
+        usuario:[(APP.usuario && APP.usuario.correo) || '', polarMiNombre() || ''].filter(Boolean).join(' · ') }) }).catch(function(){});
   }catch(err){}
 }
 function polarResumenBurbuja(b){ return b ? String(b.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 400) : ''; }
