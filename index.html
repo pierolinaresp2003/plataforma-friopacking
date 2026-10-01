@@ -15097,7 +15097,37 @@ function polarOCsRecibidas(o){
     <div class="asis-kpis"><div><b>${l.length}</b><span>OC</span></div><div><b>${lineas}</b><span>Ítems recibidos</span></div><div><b>${new Set(l.map(function(x){ return x.prov; })).size}</b><span>Proveedores</span></div></div>
     ${l.slice(0, 8).map(fila).join('')}${polarMas(l, 8, fila, 'OC')}`;
 }
+// OC abiertas agrupadas (30.09.2026, Piero: "oc pendientes" → "por proyectos").
+function polarOCsAgrupadas(campo, persona, origen){
+  const hoy = new Date(), g = new Map(), vistos = new Set();
+  pdFilas().forEach(function(r){
+    if(r.tipo !== 'oc' || (persona && r.persona !== persona)) return;
+    const imp = /^0002-/.test(r.codOrden || '');
+    if((origen === 'importado' && !imp) || (origen === 'nacional' && imp)) return;
+    const k = campo === 'proveedor' ? (r.proveedor || '(sin proveedor)') : campo === 'comprador' ? (PD_PERSONAS[r.persona] || r.persona || '—')
+      : (!r.proyecto || /^pedido directo|sin proyecto/i.test(r.proyecto) ? 'Stock / sin proyecto' : r.proyecto);
+    const id = k + '|' + r.codOrden; if(vistos.has(id)) return; vistos.add(id);
+    const x = g.get(k) || { k:k, n:0, venc:0 }; x.n++;
+    if(r.fCompromiso && busdayCount(r.fCompromiso, hoy) > 0 && !ocEnTransito(r.codOrden)) x.venc++;
+    g.set(k, x);
+  });
+  const l = [...g.values()].sort(function(a,b){ return b.n - a.n; });
+  const tit = { proyecto:'proyecto', proveedor:'proveedor', comprador:'comprador' }[campo], tits = { proyecto:'proyectos', proveedor:'proveedores', comprador:'compradores' }[campo];
+  if(!l.length) return '<p>✅ No hay OC pendientes.</p>';
+  const fila = function(x){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(x.k, 46))}</div><div class="q"><b>${x.n}</b> OC${x.venc ? ` · <span class="asis-est tarde">${x.venc} vencida${x.venc === 1 ? '' : 's'}</span>` : ''}${campo === 'proveedor' ? ' ' + polarBtn('q', 'oc pendientes de ' + x.k, 'ver') : ''}</div></div>`; };
+  const tot = new Set(pdFilas().filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; })).size;
+  return `<div class="cab">🚚 OC pendientes por ${tit}</div><div class="sub">${[persona ? PD_PERSONAS[persona] || persona : '', origen === 'importado' ? 'importaciones' : origen === 'nacional' ? 'nacionales' : ''].filter(Boolean).join(' · ') || 'Todo Compras'} · ${l.length} ${l.length === 1 ? tit : tits}</div>
+    ${l.slice(0, 10).map(fila).join('')}${polarMas(l, 10, fila, tits)}
+    ${campo === 'proyecto' ? '<p class="asis-nota">Una OC con ítems de varios proyectos cuenta en cada uno.</p>' : ''}`;
+}
 function polarIntenciones(q, qr, p){
+  if(/\boc\b|\bocs\b|ordenes|compras/.test(qr + ' ' + q) && /pendient|por llegar|abiertas|vencid|faltan|por entregar/.test(q) && /por (proyectos?|clientes?|obras?|proveedor(es)?|comprador(es)?)|agrupad/.test(qr)){
+    const campo = /proveedor/.test(qr) ? 'proveedor' : /comprador/.test(qr) ? 'comprador' : 'proyecto';
+    return polarOCsAgrupadas(campo, polarPersonaEn(q, false), /importa/.test(q) ? 'importado' : (/nacional/.test(q) ? 'nacional' : ''));
+  }
+  // "¿Cuántas OC faltan entregar / quedan?": las OC abiertas (no las emitidas).
+  if(/\boc\b|\bocs\b|ordenes/.test(qr) && /faltan|por entregar|quedan|falta (entregar|llegar)/.test(qr) && !/aprob/.test(qr) && !polarProveedoresEn(qr).length)
+    return polarOCsLista({ persona:polarPersonaEn(q, false), p:p, origen:/importa/.test(q) ? 'importado' : (/nacional/.test(q) ? 'nacional' : null) });
   // Tiempo pasado ("llegaron", "llegó", "recibimos"): lo que ya llegó, por fecha de recepción.
   const tal = POLAR.textoTal || qr;
   const pasado = /\b(llego|llegaron|ya llego|recibi|recibio|recibieron|recibimos|recibida|recibidas|recibido|recibidos|ingreso|ingresaron|entraron|arribaron)\b/.test(tal) && !/por llegar|todavia no|aun no|no (ha|han) llegado|falta/.test(tal);
@@ -15482,6 +15512,9 @@ function polarConContexto(texto){
   POLAR.siguiendo = ''; POLAR.usoRef = false;
   if(!C) return texto;
   const q = polarEntender(texto), T = String(texto).toUpperCase();
+  if(/^(y )?(por|agrupad[oa]s? por|separad[oa]s? por|dividid[oa]s? por) (proyectos?|clientes?|obras?|proveedor(es)?|comprador(es)?)$/.test(polarNorm(texto).replace(/[¿?¡!.,]+/g, '').trim()) && C.tema){
+    POLAR.siguiendo = C.tema; return C.tema + ' ' + texto;
+  }
   const palabras = q.split(' ').filter(Boolean);
   const conector = /^(y|e|pero|ahora|tambien|ademas|entonces|osea|o sea)\b/.test(q) || /\b(eso|esos|esas|ese|esa|su|sus|mismo|misma|ahi|alli|aquel)\b/.test(q);
   if(!conector && palabras.length > 5) return texto;
@@ -15636,6 +15669,13 @@ function polarResponder1(texto){
     return `<p>No encontré el ${esOC ? 'OC' : (esPed ? 'pedido' : 'requerimiento')} <b class="mono">${escapeHtml(num)}</b> en los datos cargados.</p><p>Revisa el número o prueba con el código completo, por ejemplo <span class="mono">0001-0023303</span>.</p>`;
   }
 
+  const mReqDe = qr.match(/\b(?:req|reqs|requerimientos?)\s+(pendientes|abiertos|por atender|atrasados|vencidos|sin atender)\s+(?:de|del)\s+(.+)$/);
+  if(mReqDe && !/\bmis?\b/.test(qr) && !/^(despach|compra|almacen|revision|obra|aprobac|entrega|salida|oc\b|pedido)/.test(mReqDe[2])){
+    const r2 = polarResponder1('requerimientos de ' + mReqDe[2]);
+    if(POLAR.resultado === 'ok' && !/^(atrasados|vencidos)$/.test(mReqDe[1])) return r2;
+    if(POLAR.resultado === 'ok') return polarResponder1('requerimientos de ' + mReqDe[2] + ' atrasados');
+    POLAR.resultado = 'ok';
+  }
   if(!soloReqs){ const ri = polarIntenciones(q, qr, p); if(ri) return ri; }
   // Estado de productos ("¿dónde están los perfiles de Q PACK?"): de todos, no solo lo que pidió quien pregunta.
   const miExplicito = /\bmis?\b|lo que pedi|\bpedi\b|que pedimos|me falta/.test(q);
@@ -15755,7 +15795,7 @@ function polarResponder1(texto){
   }
   if(/(que|cuales|cuantas?) (oc )?(llega|llegan|llegara|llegaran|vence|vencen)/.test(q) && p && !/obra|requerimiento/.test(q)) return polarOCsPorLlegar(p, /importa/.test(q) ? 'importado' : null, polarPersonaEn(q, true));
   const persona = polarPersonaEn(q);
-  if(/(emiti|emitio|emitieron|generaron|genero|hizo|hicieron|compro|compraron|saco|sacaron).*\boc\b|\boc\b.*(emiti|emitio|emitieron|generad|genero|hech|hizo)|cuantas oc|que (compro|compraron|compre)|compras de (esta|la|este|el)/.test(qr)) return polarOCsEmitidas(persona || polarPersonaEn(q, true), p);
+  if(!/falta|pendient|por llegar|por entregar|quedan|abiertas|vencid/.test(qr) && /(emiti|emitio|emitieron|generaron|genero|hizo|hicieron|compro|compraron|saco|sacaron).*\boc\b|\boc\b.*(emiti|emitio|emitieron|generad|genero|hech|hizo)|cuantas oc|que (compro|compraron|compre)|compras de (esta|la|este|el)/.test(qr)) return polarOCsEmitidas(persona || polarPersonaEn(q, true), p);
   const origen = /importa/.test(q) ? 'importado' : (/nacional/.test(q) ? 'nacional' : null);
   if((/\boc\b|importa|ordenes|compras/.test(q) && /pendiente|llega|camino|transito|entrega|vencen|vence/.test(q) && (origen || (p && p.k !== 'mes' && p.k !== 'anio'))) || (/importa/.test(q) && !/gasto|tarda|demora|tiempo|indicador/.test(q))) return polarOCsPorLlegar(p, origen, persona || polarPersonaEn(q, true));
   if(/reponer|comprar para stock|a pedir/.test(q)) return polarReponer();
