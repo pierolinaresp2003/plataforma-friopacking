@@ -11399,7 +11399,8 @@ function rqVistaTarjetas(cont, filas){
   const listos = soloFalta ? todo.filter(rqItemListo) : [];
   const orden = soloFalta ? todo.filter(function(r){ return !rqItemListo(r); }) : todo;
   // En el celular las tarjetas pesan: de 30 en 30 (cada "ver más" suma otras 30).
-  const ver = orden.slice(0, Math.round(RQ.tope / RQ_PASO * 30));
+  // Todo a la vista, sin "Ver 30 más" (05.10.2026, Piero: "siempre mostrar todo completo... para todo el app").
+  const ver = orden;
   const reqs = [...new Set(todo.map(function(r){ return r.codRequerimiento; }))];
   const unSoloReq = reqs.length === 1;
   const pryUnico = !unSoloReq && todo.length && todo.every(function(r){ return r.idProyecto === todo[0].idProyecto; });
@@ -11420,7 +11421,7 @@ function rqVistaTarjetas(cont, filas){
       <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>${faltaTxt}
     </div>` : '');
 
-  const listosVer = listos.slice(0, 60);
+  const listosVer = listos;
   RQ.tarjetas = ver.concat(listosVer);
   const tarjeta = function(r, iTarjeta){
     const refRecep = r.cantPedido != null ? r.cantPedido : r.cantOrden;
@@ -11461,8 +11462,11 @@ function rqVistaTarjetas(cont, filas){
   if(det) det.addEventListener('toggle', function(){
     if(!det.open || det.dataset.listo) return;
     det.dataset.listo = '1';
-    det.lastElementChild.innerHTML = listosVer.map(function(r, k){ return tarjeta(r, ver.length + k); }).join('')
-      + (listos.length > listosVer.length ? `<div class="rqm-tip">…y ${listos.length - listosVer.length} ítems más. Busca el N° de requerimiento para verlos.</div>` : '');
+    // Pueden ser miles: se agregan por tandas para que la pantalla no se congele (05.10.2026).
+    const caja = det.lastElementChild; let k0 = 0;
+    (function tanda(){ if(!caja.isConnected || k0 >= listosVer.length) return;
+      caja.insertAdjacentHTML('beforeend', listosVer.slice(k0, k0 + 150).map(function(r, k){ return tarjeta(r, ver.length + k0 + k); }).join(''));
+      k0 += 150; setTimeout(tanda, 0); })();
   });
   if(!cont.dataset.pasos){
     cont.dataset.pasos = '1';
@@ -13216,6 +13220,7 @@ function appRenderInicio(){
     appEsperaDatos = setTimeout(function(){ if(APP.enInicio) appRenderInicio(); }, 1500);
   } else if(APP.pantalla === 'gasto' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
+    if(APP.pantalla === 'inventario') setTimeout(appInvCompletar, 0);
     return;
   } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'avance'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
@@ -13590,7 +13595,7 @@ function appInvIndice(){
   return APP_INV.cache;
 }
 const APP_INV_EST = { sin:['rojo','Sin stock'], reponer:['ambar','Reponer'], ok:['verde','OK'], sinmov:['gris','Sin movimiento'], nada:['gris','Sin uso'] };
-function appInvLista(){
+function appInvFiltrada(){
   const idx = appInvIndice().items, q = polarNorm(APP_INV.q || '');
   let l;
   if(q){
@@ -13603,9 +13608,28 @@ function appInvLista(){
     l.sort(f === 'reponer' ? function(a,b){ return (a.cob == null ? 99 : a.cob) - (b.cob == null ? 99 : b.cob) || b.cons - a.cons; }
       : f === 'sinmov' ? function(a,b){ return b.tot - a.tot; } : function(a,b){ return b.cons - a.cons || b.tot - a.tot; });
   }
-  if(!l.length) return `<div class="ini-vacio">${q ? 'Ningún producto con "' + escapeHtml(APP_INV.q) + '".' : 'Nada en este grupo. ✅'}</div>`;
-  return l.slice(0, APP_INV.tope).map(appInvTarjeta).join('')
-    + (l.length > APP_INV.tope ? `<button type="button" class="ini-link" data-invmas="1">Ver más (${appN(l.length - APP_INV.tope)} restantes) ›</button>` : '');
+  return l;
+}
+// Todo a la vista, sin "Ver más" (05.10.2026, Piero). Son hasta ~4,000 productos: se pintan los primeros
+// al instante y el resto se agrega solo, por tandas, para que el celular no se congele.
+const APP_INV_PRIMEROS = 80;
+function appInvLista(){
+  const l = appInvFiltrada();
+  if(!l.length) return `<div class="ini-vacio">${APP_INV.q ? 'Ningún producto con "' + escapeHtml(APP_INV.q) + '".' : 'Nada en este grupo. ✅'}</div>`;
+  setTimeout(appInvCompletar, 0);
+  return l.slice(0, APP_INV_PRIMEROS).map(appInvTarjeta).join('') + (l.length > APP_INV_PRIMEROS ? '<div id="invResto"></div>' : '');
+}
+function appInvCompletar(){
+  const el = document.getElementById('invResto');
+  if(!el || el.dataset.lleno) return;
+  el.dataset.lleno = '1';
+  const resto = appInvFiltrada().slice(APP_INV_PRIMEROS);
+  let i = 0;
+  (function tanda(){
+    if(!el.isConnected || i >= resto.length) return;
+    el.insertAdjacentHTML('beforeend', resto.slice(i, i + 250).map(appInvTarjeta).join(''));
+    i += 250; setTimeout(tanda, 0);
+  })();
 }
 function appInvTarjeta(x){
   const r = x.r, um = escapeHtml(r.unidad || ''), est = APP_INV_EST[x.e] || ['gris', ''];
@@ -13823,7 +13847,7 @@ function appPendComprasHtml(soloLista){
   };
   // Buscador general (05.10.2026, Piero): OC, pedido, req., código, producto, proveedor o proyecto, en
   // todos los estados a la vez. Una OC sale completa si cualquiera de sus ítems coincide.
-  const q = polarNorm(APP_PC.q || ''), tope = q ? Math.max(60, APP_PC.tope || 20) : (APP_PC.tope || 20);
+  const q = polarNorm(APP_PC.q || ''), tope = Infinity;   // todo a la vista (05.10.2026)
   const pasa = function(r){ const t = polarNorm([r.codOrden, r.codPedido, r.req, r.idProducto, r.producto, r.proveedor, r.proyecto].join(' '));
     return q.split(' ').filter(Boolean).every(function(w){ return t.indexOf(w) !== -1 || polarCompacto(t).indexOf(polarCompacto(w)) !== -1; }); };
   const ocHit = new Set(); if(q) filas.forEach(function(r){ if(r.tipo === 'oc' && pasa(r)) ocHit.add(r.codOrden); });
@@ -14089,7 +14113,7 @@ function appPendLogLista(){
   };
   const claves = q ? ['tr', 'em', 'bk'] : [APP_PL.sec];
   const html = claves.map(function(k){
-    const l = filtra(L[k] || []), c = APP_IMP_SEC[k], tope = q ? 60 : APP_PL.tope;
+    const l = filtra(L[k] || []), c = APP_IMP_SEC[k], tope = Infinity;   // todo a la vista (05.10.2026)
     if(q && !l.length) return '';
     return `<div class="m-pl-tit imp-${k}"><span>${c[0]} ${c[1]}</span><b>${l.length}</b></div><div class="m-sec-nota">${c[2]}</div>`
       + (l.length ? '<div class="imp-linea">' + l.slice(0, tope).map(function(g, i, a){
@@ -14308,8 +14332,11 @@ function appClickInicio(e){
   if(b.dataset.calmes){ APP_CAL.mes += Number(b.dataset.calmes); if(APP_CAL.mes < 0){ APP_CAL.mes = 11; APP_CAL.anio--; } if(APP_CAL.mes > 11){ APP_CAL.mes = 0; APP_CAL.anio++; } APP_CAL.dia = 1; return appRefrescarCal(); }
   if(b.dataset.cal){ APP_CAL.dia = Number(b.dataset.cal); return appRefrescarCal(); }
   if(b.dataset.invf !== undefined){ APP_INV.f = b.dataset.invf; APP_INV.q = ''; APP_INV.tope = 30; APP_INV.sel = ''; return appRenderInicio(); }
-  if(b.dataset.invsel){ APP_INV.sel = APP_INV.sel === b.dataset.invsel ? '' : b.dataset.invsel; const l = document.getElementById('invLista'); if(l) l.innerHTML = appInvLista(); return; }
-  if(b.dataset.invmas){ APP_INV.tope += 30; const l = document.getElementById('invLista'); if(l) l.innerHTML = appInvLista(); return; }
+  // Abrir o cerrar un producto repinta solo esa tarjeta: la lista completa son miles.
+  if(b.dataset.invsel){ const antes = APP_INV.sel; APP_INV.sel = antes === b.dataset.invsel ? '' : b.dataset.invsel;
+    const idx = appInvIndice().items, pinta = function(cod){ if(!cod) return; const x = idx.find(function(y){ return y.r.codigo === cod; });
+      const bt = document.querySelector('#invLista [data-invsel="' + CSS.escape(cod) + '"]'), card = bt && bt.closest('.m-prod'); if(x && card) card.outerHTML = appInvTarjeta(x); };
+    pinta(antes); if(APP_INV.sel && APP_INV.sel !== antes) pinta(APP_INV.sel); return; }
   if(b.dataset.invbuscar){ APP_INV.q = b.dataset.invbuscar; APP_INV.sel = b.dataset.invbuscar; return appInicio('inventario'); }
   if(b.dataset.pcper !== undefined){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; return appRenderInicio(); }
   if(b.dataset.pcsec){ APP_PC.sec = b.dataset.pcsec; APP_PC.q = ''; APP_PC.tope = 20; return appRenderInicio(); }
@@ -14657,7 +14684,7 @@ function polarDetPintar(){
   const grupos = new Map();
   l.forEach(function(r){ const k = r.codRequerimiento || '—'; if(!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(r); });
   const gs = [...grupos.entries()].sort(function(a,b){ return (b[1][0].fReq || 0) - (a[1][0].fReq || 0); });
-  const html = gs.slice(0, POLAR_DET.tope).map(function(g){
+  const html = gs.map(function(g){   // todo a la vista (05.10.2026)
     const r0 = g[1][0];
     return `<div class="asis-det-g"><button type="button" class="asis-det-gcab" data-detq="${escapeHtml(g[0])}">
         <span class="mono">${escapeHtml(String(g[0]).replace(/^0001-0*/, ''))}</span><span class="p">${escapeHtml(polarCorta(r0.proyecto || '', 30))}</span><span class="f">${rqFecha(r0.fReq).replace(/ \d{4}$/, '')}</span></button>
@@ -14666,8 +14693,7 @@ function polarDetPintar(){
         return `<div class="asis-det-it"><div class="n">${escapeHtml(r.producto || r.idProducto || '')}</div>
           <div class="s"><span class="asis-est ${st[0]}">${st[1]} ${escapeHtml(st[2])}</span><small>${polarNum(r.cantidad)} ${escapeHtml(r.unidad || '')}${st[3] ? ' · ' + escapeHtml(st[3]) : ''}</small></div></div>`; }).join('')}</div>`;
   }).join('');
-  document.getElementById('asisDetLista').innerHTML = (html || '<div class="ini-vacio">Nada con ese filtro.</div>')
-    + (gs.length > POLAR_DET.tope ? `<button type="button" class="asis-mas-btn" data-detmas="1">Ver ${Math.min(40, gs.length - POLAR_DET.tope)} requerimientos más · ${POLAR_DET.tope} de ${gs.length}</button>` : '');
+  document.getElementById('asisDetLista').innerHTML = html || '<div class="ini-vacio">Nada con ese filtro.</div>';
 }
 function polarDetClick(e){
   const b = e.target.closest('button'); if(!b) return;
