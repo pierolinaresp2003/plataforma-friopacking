@@ -2971,7 +2971,7 @@ function buildSnapshot(){
         ep: r.estadoPedido, co: r.codOrden, uc: r.usuarioCompras, eo: r.estadoOrden,
         fo: isoDay(r.fOrden), fb: isoDay(r.fAprob), fx: isoDay(r.fCompromiso), fc: isoDay(r.fRecep),
         qo: r.cantOrden, qr: r.cantRecep, g: r.guia, fx2: r.factura,
-        fs: isoDay(r.fSalida), qs: r.cantSalida, gs: r.docSalida,
+        fs: isoDay(r.fSalida), qs: r.cantSalida, gs: r.docSalida, so: r.sedeSalida || '',
         fob: isoDay(r.fObra), qob: r.cantObra, gob: r.docObra,
       })),
       // Pedidos directos de PedidoSinReq.xlsx (04.09.2026 ronda 37) — OC que Reporte Maestro.xlsx nunca
@@ -3272,7 +3272,7 @@ function loadFromSnapshot(snap){
       fOrden: fromIsoDay(r.fo), fAprob: fromIsoDay(r.fb), fCompromiso: fromIsoDay(r.fx), fRecep: fromIsoDay(r.fc),
       cantOrden: (r.qo!=null ? r.qo : null), cantRecep: (r.qr!=null ? r.qr : null),
       guia: r.g || '', factura: r.fx2 || '',
-      fSalida: fromIsoDay(r.fs), cantSalida: (r.qs!=null ? r.qs : null), docSalida: r.gs || '',
+      fSalida: fromIsoDay(r.fs), cantSalida: (r.qs!=null ? r.qs : null), docSalida: r.gs || '', sedeSalida: r.so || rqSedeDe('', r.gs),
       fObra: fromIsoDay(r.fob), cantObra: (r.qob!=null ? r.qob : null), docObra: r.gob || '',
     })) : [],
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
@@ -3601,6 +3601,9 @@ function processWorkbook(wb, filename){
     guiaAlmacen: findCol(headerRow, ["GUIA (ALMACÉN)","GUIA (ALMACEN)","Guia Almacen"]),
     facturaProv: findCol(headerRow, ["REGISTRO FACTURA PROVISIÓN","REGISTRO FACTURA PROVISION"]),
     docOrigen: findCol(headerRow, ["DocumentoDeOrigen"]),
+    // Desde qué sede salió el material (05.10.2026, Piero: REQ 23300 atendido desde Trujillo).
+    sucOrigen: findCol(headerRow, ["SucursalOrigen"]),
+    almOrigen: findCol(headerRow, ["AlmacenDeOrigen"]),
     cantidadSalida: findCol(headerRow, ["CantidadSalida"]),
     docDestino: findCol(headerRow, ["DocumentoDeDestino"]),
     cantidadIngreso: findCol(headerRow, ["Ingreso"]),
@@ -3848,6 +3851,7 @@ function processWorkbook(wb, filename){
         // Salida del ALMACÉN hacia la obra.
         fSalida, cantSalida: numOrNull(col.cantidadSalida!==-1 ? r[col.cantidadSalida] : null),
         docSalida: txt(col.docOrigen),
+        sedeSalida: rqSedeDe(txt(col.sucOrigen) + ' ' + txt(col.almOrigen), txt(col.docOrigen)),
         // Recepción EN OBRA: el ingreso al almacén del proyecto, con su guía de recepción (GRC).
         fObra: col.fechaIngreso!==-1 ? parseExcelDate(r[col.fechaIngreso]) : null,
         cantObra: numOrNull(col.cantidadIngreso!==-1 ? r[col.cantidadIngreso] : null),
@@ -11031,6 +11035,19 @@ function rqEstadoReal(r){
   return /revisi/.test(sinAcentos(String(r.estado||'')).toLowerCase()) ? 'En Revisión' : (r.estado || '—');
 }
 
+// Sede desde donde salió el material: por la sucursal/almacén de origen y, si no viene (datos publicados
+// antes del 05.10.2026), por la serie de la guía: T001 = Ica, T002 = Lima (Lurín), T003 = Trujillo
+// (verificado contra el Reporte Maestro: las 9,284 salidas calzan así).
+function rqSedeDe(suc, guia){
+  const t = sinAcentos(String(suc || '')).toUpperCase();
+  if(/TRUJILLO/.test(t)) return 'Trujillo';
+  if(/\bICA\b/.test(t)) return 'Ica';
+  if(/LIMA|LURIN|ARENADO/.test(t)) return 'Lima';
+  const m = String(guia || '').match(/\bT00([123])-/);
+  return m ? ({ '1':'Ica', '2':'Lima', '3':'Trujillo' })[m[1]] : '';
+}
+function rqDesde(r){ return r && r.sedeSalida ? ' · desde ' + r.sedeSalida : ''; }
+
 // Por dónde se atendió la línea: "Directo" si el material salió del stock del almacén sin pasar por
 // una OC, "Pedido" si pasó por Compras. Un mismo requerimiento+producto puede tener las dos cosas
 // —una parte se despacha de stock y el resto se compra— y Nisira las trae como filas separadas
@@ -11067,7 +11084,7 @@ function rqPartesHtml(r){
   const n = (v)=> v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
   const um = r.unidad ? ' ' + escapeHtml(r.unidad) : '';
   return `<div class="rqm-partes">
-      <div><i>🏬</i><span><b>${n(r.cantSalida)}${um}</b> ${r.cantSalida === 1 ? 'salió' : 'salieron'} del stock${r.docSalida ? ' · ' + escapeHtml(r.docSalida) : ''}${r.fSalida ? ' · ' + rqFecha(r.fSalida) : ''}</span></div>
+      <div><i>🏬</i><span><b>${n(r.cantSalida)}${um}</b> ${r.cantSalida === 1 ? 'salió' : 'salieron'} del stock${r.sedeSalida ? ' de ' + escapeHtml(r.sedeSalida) : ''}${r.docSalida ? ' · ' + escapeHtml(r.docSalida) : ''}${r.fSalida ? ' · ' + rqFecha(r.fSalida) : ''}</span></div>
       <div class="ped"><i>🛒</i><span><b>${n(r.cantPedido)}${um}</b> enviadas a pedido ${escapeHtml(r.codPedido)} · ${escapeHtml(rqPartePedidoTxt(r))}${r.responsablePedido ? ' · ' + escapeHtml(r.responsablePedido) : ''}</span></div>
     </div>`;
 }
@@ -11121,7 +11138,7 @@ function rqFundirContinuaciones(rows){
     fundidas.add(r);
     if(r.codOrden !== padre.codOrden) (padre.ocsExtra = padre.ocsExtra || []).push(r.codOrden);
     ['cantOrden','cantRecep','cantSalida','cantObra'].forEach(function(c){ padre[c] = suma(padre[c], r[c]); });
-    ['fRecep','fSalida','fObra','guia','factura','docSalida','docObra'].forEach(function(c){ if(!padre[c] && r[c]) padre[c] = r[c]; });
+    ['fRecep','fSalida','fObra','guia','factura','docSalida','sedeSalida','docObra'].forEach(function(c){ if(!padre[c] && r[c]) padre[c] = r[c]; });
   });
   return copias.filter(function(r){ return !fundidas.has(r); });
 }
@@ -11163,6 +11180,7 @@ function rqRepartirSalida(rows){
         if(r[campo] != null && r !== fuente){
           if(!r['f' + que]) r['f' + que] = fuente['f' + que];
           if(!r['doc' + que]) r['doc' + que] = fuente['doc' + que];
+          if(que === 'Salida' && !r.sedeSalida) r.sedeSalida = fuente.sedeSalida;
         }
       });
     });
@@ -11278,7 +11296,7 @@ function rqSituacion(r){
   }
   if(e === 'Enviado a Obra'){
     const falta = (r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0) ? ' · faltan ' + n(Math.round((r.cantidad - r.cantSalida) * 100) / 100) + um + (r.partido ? ', están en pedido' : ' por despachar') : '';
-    return { ico:'🚚', cls:'ok', titulo:'Salió a obra' + (r.fSalida ? ' el ' + rqFecha(r.fSalida) : ''), detalle:(r.docSalida ? 'Guía ' + r.docSalida : '') + falta + (r.fSalida ? ' · en camino o por confirmar en obra' : '') };
+    return { ico:'🚚', cls:'ok', titulo:'Salió a obra' + (r.fSalida ? ' el ' + rqFecha(r.fSalida) : ''), detalle:(r.docSalida ? 'Guía ' + r.docSalida : '') + rqDesde(r) + falta + (r.fSalida ? ' · en camino o por confirmar en obra' : '') };
   }
   if(e === 'Recibido en Almacén')
     return { ico:'🏬', cls:'recibido', titulo:'En almacén, por despachar', detalle:'Llegó ' + (r.fRecep ? 'el ' + rqFecha(r.fRecep) + ' (' + rqHace(r.fRecep) + ')' : 'al almacén') + (r.proveedor ? ' · compra a ' + r.proveedor : '') };
@@ -11336,7 +11354,7 @@ function rqPasoDetalle(r, j){
   if(j === 4){
     if(!r.fSalida) return { ico:'🚚', cls:'espera', titulo:'Todavía no sale del almacén', lineas: lin((r.cantRecep > 0 || r.fRecep) ? 'Ya está en almacén, por despachar.' : '') };
     const falta = (r.cantidad != null && r.cantSalida != null && r.cantidad - r.cantSalida > 0) ? 'Faltan ' + n(Math.round((r.cantidad - r.cantSalida) * 100) / 100) + um + ' por despachar' : '';
-    return { ico:'🚚', cls:'ok', titulo:'Salió a obra el ' + rqFecha(r.fSalida), lineas: lin('Cantidad despachada: ' + n(r.cantSalida) + um, r.docSalida ? 'Guía de salida: ' + r.docSalida : '', falta) };
+    return { ico:'🚚', cls:'ok', titulo:'Salió a obra el ' + rqFecha(r.fSalida), lineas: lin('Cantidad despachada: ' + n(r.cantSalida) + um, r.sedeSalida ? 'Despachado desde: ' + r.sedeSalida : '', r.docSalida ? 'Guía de salida: ' + r.docSalida : '', falta) };
   }
   const enObra = r.fObra || (r.cantObra != null && r.cantObra > 0);
   if(!enObra) return { ico:'🏗️', cls:'espera', titulo:'Todavía no se confirma en obra', lineas: lin(r.fSalida ? 'Salió el ' + rqFecha(r.fSalida) + ': falta que obra registre la recepción.' : '') };
@@ -11389,11 +11407,14 @@ function rqVistaTarjetas(cont, filas){
 
   // Cabecera del requerimiento (o del proyecto), una sola vez, cuando todo lo que se ve es de uno solo.
   const r0 = todo[0];
+  // Cruce con stock en camino sin REQ (05.10.2026, Piero): solo al ver UN requerimiento.
+  const cruce = unSoloReq ? rqCruceLibre(orden) : [], cruceDe = new Map(cruce.map(function(c){ return [c.r, c]; }));
   const faltaTxt = soloFalta ? `<div class="rqm-falta">${orden.length ? '⏳ Faltan <b>' + orden.length + '</b> de ' + todo.length + ' ítems' : '✅ Todo ya llegó a obra'}</div>` : '';
   const cab = unSoloReq ? `<div class="rqm-cab">
       <div class="rqm-cab-top"><span class="rqm-num">${escapeHtml(r0.codRequerimiento)}</span><span class="rqm-fecha">${rqFecha(r0.fReq)}</span></div>
       <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>
       <div class="rqm-resp">Pidió <b>${rqTxt(r0.responsable)}</b> · ${todo.length} ítem${todo.length === 1 ? '' : 's'}</div>${faltaTxt}
+      ${cruce.length ? `<div class="rqm-falta">📦 <b>${cruce.length}</b> ítem${cruce.length === 1 ? '' : 's'} con stock en camino sin REQ (ver en la tarjeta)</div>` : ''}
     </div>` : (soloFalta && pryUnico ? `<div class="rqm-cab">
       <div class="rqm-cab-top"><span class="rqm-num">${escapeHtml(r0.idProyecto || '')}</span><span class="rqm-fecha">${reqs.length} req.</span></div>
       <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>${faltaTxt}
@@ -11405,7 +11426,7 @@ function rqVistaTarjetas(cont, filas){
     const refRecep = r.cantPedido != null ? r.cantPedido : r.cantOrden;
     const docs = [
       r.codOrden ? 'OC ' + escapeHtml(r.codOrden) + (r.ocsExtra ? ' · ' + r.ocsExtra.map(escapeHtml).join(' · ') : '') : '',
-      r.docSalida ? 'Salida ' + escapeHtml(r.docSalida) + (r.fSalida ? ' · ' + rqFecha(r.fSalida) : '') : '',
+      r.docSalida ? 'Salida ' + escapeHtml(r.docSalida) + (r.fSalida ? ' · ' + rqFecha(r.fSalida) : '') + (r.cantSalida != null ? ' · ' + n(r.cantSalida) + ' ' + escapeHtml(r.unidad || '') : '') + escapeHtml(rqDesde(r)) : '',
       r.docObra ? 'Obra ' + escapeHtml(r.docObra) + (r.fObra ? ' · ' + rqFecha(r.fObra) : '') : '',
     ].filter(Boolean);
     return `<div class="rqm-card" data-i="${iTarjeta}">
@@ -11424,6 +11445,7 @@ function rqVistaTarjetas(cont, filas){
         <div><span>En obra</span><b>${rqCant(r.cantObra, r.cantSalida)}</b></div>
       </div>
       ${rqPartesHtml(r)}
+      ${rqLibreHtml(cruceDe.get(r))}
       ${docs.length ? `<div class="rqm-docs">${docs.join('<br>')}</div>` : ''}
     </div>`;
   };
@@ -11491,7 +11513,7 @@ function rqVistaItem(cont, filas){
       <td>${rqTxt(r.factura)}</td>
       <td class="num g">${rqCant(r.cantSalida, r.cantidad)}</td>
       <td>${rqFecha(r.fSalida)}</td>
-      <td>${rqTxt(r.docSalida)}</td>
+      <td>${rqTxt(r.docSalida)}${r.sedeSalida ? '<br><small>desde ' + escapeHtml(r.sedeSalida) + '</small>' : ''}</td>
       <td class="num g">${rqCant(r.cantObra, r.cantSalida)}</td>
       <td>${rqFecha(r.fObra)}</td>
       <td>${rqTxt(r.docObra)}</td>
@@ -11499,7 +11521,8 @@ function rqVistaItem(cont, filas){
   }).join('');
   // Dos filas de encabezado: arriba el tramo del proceso, abajo la columna. Así se lee de izquierda a
   // derecha en el mismo orden en que las cosas pasan de verdad (25.09.2026, pedido de Piero).
-  cont.innerHTML = `<div class="card table-card rq-scroll"><table class="rq-tabla">
+  const unReq = ver.length && ver.every(function(r){ return r.codRequerimiento === ver[0].codRequerimiento; });
+  cont.innerHTML = (unReq ? rqLibreTablaHtml(rqCruceLibre(orden)) : '') + `<div class="card table-card rq-scroll"><table class="rq-tabla">
       <thead>
         <tr class="rq-grupos">
           <th colspan="10" class="t1">1 · Requerimiento</th>
@@ -11656,6 +11679,81 @@ function trTransitoDe(codigo, codigos){
     const fa = a.fCompromiso || a.fOrden, fb = b.fCompromiso || b.fOrden;
     return (fa ? +fa : 0) - (fb ? +fb : 0);
   });
+}
+
+// ---------- Stock en camino NO comprometido (05.10.2026, Piero) ----------
+// Regla: una compra o importación en camino está DISPONIBLE solo si no tiene requerimiento relacionado
+// (pedidos directos de PedidoSinReq.xlsx). Si tiene REQ ya tiene dueño y no se ofrece a otro.
+// Estado y llegada con las mismas reglas de Importaciones: sin zarpe (ETD) la ETA queda por definir.
+function ocLlegadaInfo(oc, fComp, sinAp){
+  const hoy = new Date(), i = ocImportInfo(oc);
+  if(i){
+    const eta = ocFechaVale(oc, fComp);
+    const est = sinAp ? ['espera', '⏳ OC sin aprobar'] : (i.etd && i.etd <= hoy) ? ['camino', '🚢 En tránsito'] : (i.etd || i.fReal) ? ['camino', '🛳️ Por zarpar'] : ['espera', '🏭 En fabricación'];
+    return { eta:eta, etaTxt: eta ? rqFecha(eta) : 'por definir' + (i.fRef ? ' (entrega est. ' + rqFecha(i.fRef) + ')' : ''), est:est, imp:true };
+  }
+  const d = fComp ? busdayCount(fComp, hoy) : null;
+  return { eta:fComp || null, etaTxt: fComp ? rqFecha(fComp) : 'por definir', imp:false,
+    est: sinAp ? ['espera', '⏳ OC sin aprobar'] : (d != null && d > 0) ? ['tarde', '⚠️ Atrasada ' + d + ' d.h.'] : ['camino', '🚚 En camino'] };
+}
+function caminoLibre(){
+  return appMemo('caminoLibre', function(){
+    const m = new Map();
+    (PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){
+      if(!r.codOrden || r.codRequerimiento || !pdOcPendiente(r)) return;
+      const q = Math.round(((r.cantidadOrden || 0) - Math.max(0, r.cantRecepcion || 0)) * 100) / 100;
+      if(!(q > 0)) return;
+      const k = r.codOrden + '|' + r.idProducto;
+      const y = m.get(k) || { cod:r.idProducto, desc:r.producto || '', um:r.unidad || '', oc:r.codOrden, prov:r.proveedor || '', q:0, fComp:r.fCompromiso || null, sinAp:false };
+      y.q = Math.round((y.q + q) * 100) / 100;
+      if(/sin aprobar/i.test(r.estadoOrden || '')) y.sinAp = true;
+      if(r.fCompromiso && (!y.fComp || r.fCompromiso < y.fComp)) y.fComp = r.fCompromiso;
+      m.set(k, y);
+    });
+    return [...m.values()].map(function(y){ y.lleg = ocLlegadaInfo(y.oc, y.fComp, y.sinAp); return y; })
+      .sort(function(a,b){ return (a.lleg.eta || 9e15) - (b.lleg.eta || 9e15); });
+  });
+}
+// Lo libre en camino de un código (y de sus códigos homologados).
+function caminoLibreDe(codigo){
+  const p = rqStockDe(codigo), cods = p && p.codigos && p.codigos.length ? p.codigos : [codigo];
+  return caminoLibre().filter(function(y){ return cods.indexOf(y.cod) !== -1; });
+}
+// Ítems pendientes de un requerimiento que podrían atenderse con stock en camino sin REQ.
+function rqCruceLibre(filas){
+  const out = [];
+  (filas || []).forEach(function(r){
+    if(rqItemListo(r) || /^(Archivado|Recibido en Almac)/.test(r.estadoCalc || '')) return;
+    const falta = Math.round(((r.cantidad || 0) - (r.cantSalida || 0)) * 100) / 100;
+    if(!(falta > 0)) return;
+    const l = caminoLibreDe(r.idProducto);
+    if(!l.length) return;
+    const tot = Math.round(l.reduce(function(a, y){ return a + y.q; }, 0) * 100) / 100;
+    out.push({ r:r, falta:falta, libres:l, total:tot, cubre: tot >= falta - 0.001 });
+  });
+  return out;
+}
+function rqCubreTxt(q, falta){ return q >= falta - 0.001 ? ['ok', '✅ Cubre total'] : ['espera', '◐ Cubre parcial']; }
+// Dentro de la tarjeta del ítem (celular).
+function rqLibreHtml(c){
+  if(!c) return '';
+  const n = function(v){ return Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
+  const ct = rqCubreTxt(c.total, c.falta);
+  return `<div class="rqm-partes">${c.libres.slice(0, 3).map(function(y){
+      return `<div class="ped"><i>📦</i><span><b>${n(y.q)} ${escapeHtml(y.um)}</b> en camino sin REQ · OC ${escapeHtml(y.oc)} · ${escapeHtml(polarCorta(y.prov, 30))} · ETA ${escapeHtml(y.lleg.etaTxt)} · ${escapeHtml(y.lleg.est[1])}</span></div>`; }).join('')}
+      <div><i>${ct[1].slice(0, 1)}</i><span><b>${ct[1].slice(2)}</b>: ${n(c.total)} por llegar para ${n(c.falta)} ${escapeHtml(c.r.unidad || '')} que faltan${c.libres.length > 3 ? ' · ' + (c.libres.length - 3) + ' OC más' : ''}</span></div></div>`;
+}
+// Cuadro del requerimiento (PC): una fila por OC libre que coincide con un código pedido.
+function rqLibreTablaHtml(cruce){
+  if(!cruce.length) return '';
+  const filas = [];
+  cruce.forEach(function(c){ c.libres.forEach(function(y){ const ct = rqCubreTxt(y.q, c.falta);
+    filas.push(`<tr><td><span class="cod">${escapeHtml(c.r.idProducto)}</span>${y.cod !== c.r.idProducto ? '<br><small>homologado ' + escapeHtml(y.cod) + '</small>' : ''}</td><td class="desc">${rqTxt(c.r.producto)}</td>
+      <td class="num">${rqNum(c.r.cantidad)} ${rqTxt(c.r.unidad)}<br><small>faltan ${rqNum(c.falta)}</small></td><td class="num"><b>${rqNum(y.q)}</b> ${escapeHtml(y.um)}</td>
+      <td class="g">${escapeHtml(y.oc)}</td><td class="desc">${escapeHtml(y.prov)}</td><td>${escapeHtml(y.lleg.etaTxt)}</td>
+      <td><span class="asis-est ${y.lleg.est[0]}">${escapeHtml(y.lleg.est[1])}</span></td><td><span class="asis-est ${ct[0]}">${ct[1]}</span></td></tr>`); }); });
+  return `<details class="card table-card rq-scroll"><summary class="rqm-tip">📦 <b>Stock en camino disponible: ${cruce.length} ítem${cruce.length === 1 ? '' : 's'}</b> de este requerimiento se pueden atender con compras o importaciones sin REQ relacionado (pedidos directos). Si una OC tiene REQ, ya está comprometida y no se muestra. <b>Ver ›</b></summary>
+    <table class="rq-tabla"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Solicitado</th><th class="num">Por llegar</th><th>OC</th><th>Proveedor</th><th>ETA / llegada</th><th>Estado</th><th>¿Cubre?</th></tr></thead><tbody>${filas.join('')}</tbody></table></details>`;
 }
 
 function trPasosDe(oc){
@@ -15091,6 +15189,34 @@ function polarBuscarOCs(o){
   return `<div class="cab">🔎 OC con ${escapeHtml(que)}</div><div class="sub">${o.p ? 'emitidas ' + escapeHtml(o.p.label) : 'todas: pendientes y atendidas'}</div>${cab}
     ${l.slice(0, 6).map(fila).join('')}${polarMas(l, 6, fila, 'OC')}`;
 }
+// "¿Qué hay en camino sin requerimiento?": compras e importaciones en tránsito o por llegar que no
+// tienen REQ relacionado (05.10.2026, Piero). Se cruza con los requerimientos pendientes del mismo código.
+function polarCaminoLibre(pal, origen, soloTransito){
+  rqPreparar();
+  let l = caminoLibre();
+  if(origen) l = l.filter(function(y){ return y.lleg.imp === (origen === 'importado'); });
+  if(pal && pal.length) l = l.filter(function(y){ const d = polarNorm(y.desc + ' ' + y.cod + ' ' + y.prov); return pal.every(function(w){ return polarContiene(d, w); }); });
+  if(origen === 'importado' && soloTransito) l = l.filter(function(y){ return /tr[aá]nsito/.test(y.lleg.est[1]); });
+  const que = [origen === 'importado' ? (soloTransito ? 'importaciones en tránsito' : 'importaciones') : origen === 'nacional' ? 'nacionales' : '', pal && pal.length ? '"' + pal.join(' ') + '"' : ''].filter(Boolean).join(' · ');
+  if(!l.length) return `<p>📦 No hay stock en camino sin requerimiento${que ? ' (' + escapeHtml(que) + ')' : ''}.</p>`;
+  // Quién lo está pidiendo: requerimientos pendientes con el mismo código (o homologado).
+  const dem = new Map();
+  (RQ.filas || []).forEach(function(r){
+    if(rqItemListo(r) || /^(Archivado|Recibido en Almac)/.test(r.estadoCalc || '')) return;
+    const f = (r.cantidad || 0) - (r.cantSalida || 0); if(!(f > 0)) return;
+    const p = rqStockDe(r.idProducto), cods = p && p.codigos && p.codigos.length ? p.codigos : [r.idProducto];
+    cods.forEach(function(c){ const x = dem.get(c) || new Set(); x.add(r.codRequerimiento); dem.set(c, x); });
+  });
+  const conDem = l.filter(function(y){ return dem.has(y.cod); }).length;
+  l = l.slice().sort(function(a,b){ return (dem.has(b.cod) ? 1 : 0) - (dem.has(a.cod) ? 1 : 0); });   // primero lo que ya piden en un REQ
+  const fila = function(y){ const d = dem.get(y.cod);
+    return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(y.desc, 52))} <span class="mono">${escapeHtml(y.cod)}</span></div>
+      <div class="q"><b>${polarNum(y.q)} ${escapeHtml(y.um)}</b> · OC ${escapeHtml(y.oc.replace(/^000\d-0*/, ''))} · ${escapeHtml(polarCorta(y.prov, 28))} · ETA ${escapeHtml(y.lleg.etaTxt)} <span class="asis-est ${y.lleg.est[0]}">${escapeHtml(y.lleg.est[1])}</span>${d ? ` · 📋 lo pide${d.size === 1 ? ' el req ' + escapeHtml([...d][0].replace(/^0001-0*/, '')) : 'n ' + d.size + ' req.'}` : ''} ${polarBtn('q', 'OC ' + y.oc, 'ver')}</div></div>`; };
+  return `<div class="cab">📦 Stock en camino sin requerimiento</div><div class="sub">${que ? escapeHtml(que) + ' · ' : ''}pedidos directos: disponibles para atender cualquier REQ</div>
+    <div class="asis-kpis"><div><b>${l.length}</b><span>Líneas</span></div><div><b>${new Set(l.map(function(y){ return y.oc; })).size}</b><span>OC</span></div><div><b>${conDem}</b><span>Piden en REQ</span></div></div>
+    <p>Si una OC tiene REQ relacionado ya está comprometida y no sale aquí.</p>
+    ${l.slice(0, 8).map(fila).join('')}${polarMas(l, 8, fila, 'líneas')}`;
+}
 // Lo urgente del día, en un vistazo.
 function polarUrgente(){
   const hoy = new Date(), pr = appPendientesResumen(), G = appPendLogGrupos();
@@ -15208,6 +15334,9 @@ function polarOCsAgrupadas(campo, persona, origen){
     ${campo === 'proyecto' ? '<p class="asis-nota">Una OC con ítems de varios proyectos cuenta en cada uno.</p>' : ''}`;
 }
 function polarIntenciones(q, qr, p){
+  // Stock en camino no comprometido (sin REQ relacionado).
+  if(/no comprometid|sin comprometer|libre|sin req|sin requerimiento|sin dueno|pedidos? directos?|disponible/.test(qr) && /camino|transito|por llegar|llega|proxim|importac|pedidos? directos?|\boc\b|compras?/.test(qr) && !/excel|requerimientos? pendientes/.test(qr))
+    return polarCaminoLibre(polarPalabrasProducto(qr).filter(function(w){ return !/^(stock|camino|transito|llegar|llega|llegan|proximo|proximos|proximas|comprometido|comprometidos|comprometida|comprometidas|comprometer|libre|libres|disponible|disponibles|requerimiento|requerimientos|req|pedido|pedidos|directo|directos|importacion|importaciones|compra|compras|nacional|nacionales|material|materiales|producto|productos|viene|vienen|hay|tenemos|que|cuales|reporte|sin|dueno|esta|estan|oc|ocs|ningun|ninguno|relacionado)$/.test(w); }), /importa/.test(qr) ? 'importado' : (/nacional/.test(qr) ? 'nacional' : null), /transito/.test(qr));
   if(/\boc\b|\bocs\b|ordenes|compras/.test(qr + ' ' + q) && /pendient|por llegar|abiertas|vencid|faltan|por entregar/.test(q) && /por (proyectos?|clientes?|obras?|proveedor(es)?|comprador(es)?)|agrupad/.test(qr)){
     const campo = /proveedor/.test(qr) ? 'proveedor' : /comprador/.test(qr) ? 'comprador' : 'proyecto';
     return polarOCsAgrupadas(campo, polarPersonaEn(q, false), /importa/.test(q) ? 'importado' : (/nacional/.test(q) ? 'nacional' : ''));
@@ -15925,7 +16054,7 @@ function polarSitCorta(r){
   if(e === 'Recibido en Almacén') return ['recibido', '🏬', 'En almacén, por despachar', polarDh(r.fRecep)];
   if(r.partido && !(r.cantRecep > 0 || r.fRecep))
     return [r.codOrden ? 'camino' : 'espera', '🛒', polarNum(r.cantPedido) + ' ' + um + (r.codOrden ? ' con OC ' + r.codOrden : ' en Compras, sin OC'), polarNum(r.cantSalida) + (r.cantSalida === 1 ? ' ya salió' : ' ya salieron') + ' del stock'];
-  if(e === 'Enviado a Obra') return ['camino', '🚚', falta ? 'Salió en parte · faltan ' + falta : 'Salió a obra', rqFecha(r.fSalida)];
+  if(e === 'Enviado a Obra') return ['camino', '🚚', falta ? 'Salió en parte · faltan ' + falta : 'Salió a obra', rqFecha(r.fSalida) + rqDesde(r)];
   if(e === 'Recibido en Obra') return ['ok', '🏗️', 'Recibido en obra', rqFecha(r.fObra)];
   return ['', '•', e || '—', ''];
 }
@@ -15952,6 +16081,10 @@ function polarReq(cod){
     <div class="asis-avance"><i><em style="width:${pct}%"></em></i><span>${pend.length ? `<b>Faltan ${pend.length}</b> de ${n}` : '<b>✅ Todo salió a obra</b>'} · ${listos} en obra</span></div>
     ${ver.map(function(r){ return polarItemCorto(r); }).join('')}
     ${polarMas(base, 5, function(r){ return polarItemCorto(r); }, 'pendientes')}
+    ${(function(){ const cr = rqCruceLibre(pend); if(!cr.length) return '';
+      return `<p><b>📦 Stock en camino sin REQ</b> que puede atender ${cr.length} ítem${cr.length === 1 ? '' : 's'}:</p>` + cr.slice(0, 4).map(function(c){ const y = c.libres[0], ct = rqCubreTxt(c.total, c.falta);
+        return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(c.r.producto, 46))} <span class="mono">${escapeHtml(c.r.idProducto)}</span></div>
+          <div class="q">Pidió ${polarNum(c.r.cantidad)} · faltan ${polarNum(c.falta)} · por llegar <b>${polarNum(c.total)} ${escapeHtml(y.um)}</b> · OC ${escapeHtml(y.oc.replace(/^000\d-0*/, ''))}${c.libres.length > 1 ? ' +' + (c.libres.length - 1) : ''} · ${escapeHtml(polarCorta(y.prov, 26))} · ETA ${escapeHtml(y.lleg.etaTxt)} <span class="asis-est ${y.lleg.est[0]}">${escapeHtml(y.lleg.est[1])}</span> <span class="asis-est ${ct[0]}">${ct[1]}</span></div></div>`; }).join('') + (cr.length > 4 ? `<div class="q">…y ${cr.length - 4} más en "Ver trazabilidad".</div>` : ''); })()}
     <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad')}${polarBtn('q', 'excel del req ' + cod, '📥 Excel')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Proyecto') : ''}</div>`;
 }
 
