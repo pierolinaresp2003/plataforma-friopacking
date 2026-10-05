@@ -13762,6 +13762,7 @@ function appPanelMostrar(html){
     if(b.dataset.ocreq){ appOCCerrar(); polarCerrar(true); return appAbrirReq(b.dataset.ocreq); }
     if(b.dataset.ocleo){ appOCCerrar(); return polarAbrir('OC ' + b.dataset.ocleo); }
     if(b.dataset.ocprov){ appOCCerrar(); return polarAbrir('correo de ' + b.dataset.ocprov); }
+    if(b.dataset.ocpdf) return appPanelPdf();
   }); }
 }
 function appOCCerrar(){
@@ -13894,6 +13895,7 @@ function appDashImport(anio, cli){
     const v = o.k === 'ok' ? (o.fRecep ? 'llegó ' + appDDMM(o.fRecep) : 'llegó') : o.k === 'tr' ? 'ETD ' + appDDMM(i.etd) : o.k === 'em' ? (i.etd ? 'zarpa ' + appDDMM(i.etd) : 'entregada ' + appDDMM(i.fReal)) : o.k === 'bk' ? (i.fRef ? 'entrega est. ' + appDDMM(i.fRef) : 'por definir') : '';
     return appFilaHtml('data-oc="' + escapeHtml(o.oc) + '"', e[2], polarCorta(appImpNombre(o.prov), 38), 'OC ' + escapeHtml(o.oc.replace(/^0002-0*/, '')) + ' · ' + appDDMM(o.f) + ' · ' + escapeHtml(nom(o.persona).split(' ')[0]) + (o.prys.size ? ' · ' + escapeHtml(polarCorta([...o.prys].join(' · '), 30)) : ''), appUSD(o.pen), v); };
   appListaAbrir('📊 Importaciones ' + anio + (cli ? ' · ' + escapeHtml(polarCorta(cli, 28)) : ''), ocs.length + ' OC emitidas' + (cli ? ' con ítems del cliente' : '') + ' · datos al ' + rqFecha(appIndCorte()), `
+    <button type="button" class="ini-link" data-ocpdf="1">📄 Exportar a PDF</button>
     <div class="ini-card m-total"><span>Monto total (equivalente en dólares)</span><b>${appUSD(R.tot)}</b><small>${ocs.length} OC · ${R.prov} proveedores · ${ocs.reduce(function(a, o){ return a + o.filas.length; }, 0)} líneas</small>
       <div class="m-tiles">${orden.map(function(k){ const e = APP_DASH_EST[k]; return `<div><span>${e[0]} ${e[1]}</span><b>${R.cuenta[k]}</b></div>`; }).join('')}</div></div>
     <div class="ini-card"><div class="ini-card-tit">📅 OC emitidas por mes</div>
@@ -13907,6 +13909,68 @@ function appDashImport(anio, cli){
     <div class="oc-tit">Todas las OC por estado</div>
     ${orden.map(function(k){ const e = APP_DASH_EST[k], l = ocs.filter(function(o){ return o.k === k; }).sort(function(a,b){ return b.f - a.f; });
       return `<details class="m-sec ${e[2]}"${k === 'tr' ? ' open' : ''}><summary><span>${e[0]} ${e[1]}</span><b>${l.length}</b></summary>${l.map(filaOC).join('')}</details>`; }).join('')}`);
+}
+
+// ---------- Exportar a PDF el dashboard abierto (05.10.2026, Piero: "que el asistente dé la opción de
+// exportar a PDF cuando cree un dashboard") ----------
+// Se fotografía el panel completo (html2canvas, ya cargado) y se arma un A4 con jsPDF, que se carga solo
+// la primera vez que alguien exporta. Sale tal como se ve (las secciones que estén abiertas) y las páginas
+// se cortan entre tarjetas o filas, no por la mitad de una.
+let APP_JSPDF = null;
+function appCargarJsPdf(){
+  if(window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+  if(!APP_JSPDF) APP_JSPDF = new Promise(function(ok, mal){
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = function(){ window.jspdf && window.jspdf.jsPDF ? ok(window.jspdf.jsPDF) : mal(new Error('jsPDF')); };
+    s.onerror = function(){ APP_JSPDF = null; mal(new Error('jsPDF')); };
+    document.head.appendChild(s);
+  });
+  return APP_JSPDF;
+}
+async function appPanelPdf(){
+  const el = document.getElementById('appOC');
+  if(!el || !el.classList.contains('abierto')) return;
+  if(typeof html2canvas !== 'function'){ appToast('No se pudo preparar el PDF: revisa tu conexión.'); return; }
+  // Sin emojis: la letra del PDF no los tiene y en el nombre del archivo estorban.
+  const tit = ((el.querySelector('.oc-cab .tx b') || {}).textContent || 'Dashboard').replace(/[^\u0020-\u00ff·–]+/g, '').replace(/\s+/g, ' ').trim() || 'Dashboard';
+  appToast('Preparando el PDF…');
+  try{
+    const JsPDF = await appCargarJsPdf();
+    const ancho = 760, escala = 2, cortes = [];
+    const fondo = getComputedStyle(el).backgroundColor || '#ffffff';
+    const canvas = await html2canvas(el, { backgroundColor: fondo, scale: escala, windowWidth: ancho, windowHeight: Math.max(el.scrollHeight + 400, 1200),
+      onclone: function(doc){
+        const c = doc.getElementById('appOC');
+        c.style.cssText += ';position:absolute;left:0;top:0;right:auto;bottom:auto;width:' + ancho + 'px;height:auto;max-height:none;overflow:visible;transform:none;box-shadow:none;animation:none;';
+        c.querySelectorAll('[data-ocpdf], .oc-cab .atras').forEach(function(b){ b.remove(); });
+        // Dónde se puede cortar la página: al empezar cada tarjeta, sección o fila.
+        const y0 = c.getBoundingClientRect().top;
+        c.querySelectorAll('.oc-cuerpo > *, details > *, .m-fila, .m-bar, .ini-card > *').forEach(function(x){ cortes.push(Math.round((x.getBoundingClientRect().top - y0) * escala)); });
+      } });
+    cortes.push(canvas.height); cortes.sort(function(a,b){ return a - b; });
+    const pdf = new JsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
+    const mx = 10, w = 190, hPag = 277 - 8, pxMm = canvas.width / w, maxPx = Math.floor(hPag * pxMm);
+    const paginas = [];
+    let y = 0;
+    while(y < canvas.height - 2){
+      let fin = Math.min(canvas.height, y + maxPx);
+      if(fin < canvas.height){ const ok = cortes.filter(function(c){ return c > y + maxPx * 0.4 && c <= fin; }); if(ok.length) fin = ok[ok.length - 1]; }
+      paginas.push([y, fin]); y = fin;
+    }
+    const hoy = rqFecha(new Date());
+    paginas.forEach(function(p, i){
+      if(i) pdf.addPage();
+      const c = document.createElement('canvas'); c.width = canvas.width; c.height = p[1] - p[0];
+      const cx = c.getContext('2d'); cx.fillStyle = fondo; cx.fillRect(0, 0, c.width, c.height);
+      cx.drawImage(canvas, 0, p[0], canvas.width, c.height, 0, 0, canvas.width, c.height);
+      pdf.addImage(c.toDataURL('image/jpeg', 0.85), 'JPEG', mx, mx, w, c.height / pxMm);
+      pdf.setFontSize(8); pdf.setTextColor(120);
+      pdf.text('Grupo Friopacking · ' + tit + ' · generado el ' + hoy, mx, 292);
+      pdf.text('Página ' + (i + 1) + ' de ' + paginas.length, 200, 292, { align:'right' });
+    });
+    pdf.save(tit.replace(/[^A-Za-z0-9áéíóúüñÁÉÍÓÚÜÑ ,_-]+/g, ' ').replace(/\s+/g, ' ').trim() + '.pdf');
+  }catch(err){ appToast('No se pudo generar el PDF. Inténtalo de nuevo.'); }
 }
 
 // ---------- Estatus de importaciones (reemplaza Pendientes de Logística, 30.09.2026) ----------
@@ -14210,6 +14274,7 @@ function appClickInicio(e){
   const b = e.target.closest('button, [data-clic]'); if(!b || b.type === 'submit') return;
   if(b.dataset.inddet) return appIndDetalle(b.dataset.inddet);
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
+  if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
   if(b.dataset.caldet) return appCalDetalle(b.dataset.caldet);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
@@ -14506,6 +14571,7 @@ function polarAccion(e){
     if(abrir){ r.classList.remove('asis-entra'); void r.offsetWidth; r.classList.add('asis-entra'); } return; }
   if(b.dataset.asisdet !== undefined) return polarDetAbrir(+b.dataset.asisdet);
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
+  if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
   const ir = function(fn){ polarCerrar(); fn(); };
   if(b.dataset.req) return ir(function(){ appAbrirReq(b.dataset.req); });
@@ -15277,14 +15343,14 @@ function polarDashImportacion(p, cli){
       ${['ok', 'tr', 'em', 'bk', 'fin'].map(function(k){ return R.cuenta[k] ? `<div class="asis-item"><div class="d">${APP_DASH_EST[k][0]} ${APP_DASH_EST[k][1]}</div><div class="q"><b>${R.cuenta[k]}</b> OC</div></div>` : ''; }).join('')}
       ${abiertas.length ? '<p><b>Por llegar:</b></p>' + abiertas.slice(0, 6).map(fila).join('') + polarMas(abiertas, 6, fila, 'OC') : '<p>✅ Todo lo importado para este cliente ya llegó a Lurín.</p>'}
       ${R.prom != null ? `<p>Las que llegaron tardaron <b>${R.prom} días</b> en promedio.</p>` : ''}
-      <div class="asis-acc">${polarBtn('dashimp', anio + '|' + cli, '📊 Abrir dashboard del cliente')}</div>`;
+      <div class="asis-acc">${polarBtn('dashimp', anio + '|' + cli, '📊 Abrir dashboard del cliente')}${polarBtn('dashpdf', anio + '|' + cli, '📄 Exportar PDF')}</div>`;
   }
   const e = function(k){ return R.cuenta[k] ? `<div class="asis-item"><div class="d">${APP_DASH_EST[k][0]} ${APP_DASH_EST[k][1]}</div><div class="q"><b>${R.cuenta[k]}</b> OC</div></div>` : ''; };
   return `<div class="cab">📊 Importaciones ${anio}</div><div class="sub">OC de importación emitidas en el año</div>
     <div class="asis-kpis"><div><b>${R.ocs.length}</b><span>OC</span></div><div><b>${appUSD(R.tot)}</b><span>Monto (eq. $)</span></div><div><b>${R.prov}</b><span>Proveedores</span></div></div>
     ${['ok', 'tr', 'em', 'bk', 'fin'].map(e).join('')}
     ${R.prom != null ? `<p>Tardaron en llegar <b>${R.prom} días</b> en promedio (mediana ${R.med}).</p>` : ''}
-    <div class="asis-acc">${polarBtn('dashimp', String(anio), '📊 Abrir dashboard')}${polarBtn('pantalla', 'pendlog', '🚢 Estatus de importaciones')}</div>`;
+    <div class="asis-acc">${polarBtn('dashimp', String(anio), '📊 Abrir dashboard')}${polarBtn('dashpdf', String(anio), '📄 Exportar PDF')}${polarBtn('pantalla', 'pendlog', '🚢 Estatus de importaciones')}</div>`;
 }
 // OC que YA llegaron (fecha de recepción en el período), con proveedor, origen o comprador opcionales
 // (30.09.2026, Piero: "Danfoss que ya llegaron esta semana… que responda con ese filtro de fecha de llegada").
@@ -15840,6 +15906,8 @@ function polarResponder1(texto){
   const p = polarPeriodoDe(q), foco = polarFocoDe(qr);
   const quiereProducto = (/stock|kardex|consumo|consume|rotacion|precio|costo|cuesta|movimiento|ingresos de|salidas de/.test(q) || /(a que|a quien|que|cual) proveedor|quien(es)? nos (vende|provee)|a quien le (compramos|compran)|donde (compramos|se compra)/.test(qr)) && !/requerimiento|\boc\b|\bpedido\b|proyecto|\bpry\b/.test(q);
 
+  // "Dashboard de importaciones en PDF": el dashboard con su botón 📄 Exportar PDF (05.10.2026).
+  if(!soloReqs && /\bpdf\b/.test(qr) && /importac|dashboard|tablero/.test(qr)) return polarDashImportacion(polarPeriodoDe(q), polarClienteImport(qr)[0] || '');
   if(/excel|exporta|descarg|xlsx/.test(q)) return polarExportar(q, T);
   if(!soloReqs && /\bbooking\b|\betd\b|\beta\b|embarc|zarp/.test(q) && !/cuanto tarda|demora|promedio|\boc\s*\d/.test(q)) return polarImportaciones(q, p);
   const prod = T.match(/\b\d{12}\b/);
