@@ -13810,17 +13810,21 @@ function appPendComprasHtml(){
       cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', polarCorta(appImpNombre(o.prov), 34)], b:['Proyecto', prysTxt(o)],
       pie:pie + ' · ' + o.n + ' ítem' + (o.n === 1 ? '' : 's') + (imp && !tr ? ' · 🌎 importación' : ''), quien:nom(o.persona) });
   };
-  const cardPed = function(p, i){
-    return appTarjetaHtml({ cls:'pd', n:i + 1, est:'Sin OC', fecha:'Desde ' + appDDMM(p.f), codLbl:'Pedido',
-      cods:[[p.ped.replace(/^000\d-0*/, ''), 'data-q="pedido ' + escapeHtml(p.ped) + '"']], a:['Proyecto', prysTxt(p)], b:['Ítems', String(p.n)],
-      pie:'⏳ Esperando ' + polarDh(p.f).replace('hace ', ''), quien:nom(p.persona) });
-  };
   const tile = function(k){ const x = S[k]; return `<button type="button" class="pc-${x[2]}${APP_PC.sec === k ? ' sel' : ''}" data-pcsec="${k}"><b>${x[3].length}</b><span>${x[1]}</span></button>`; };
-  const x = S[APP_PC.sec], l = x[3], tope = APP_PC.tope || 20;
+  // Pedidos sin OC como listado: una fila por SKU, el pedido más antiguo primero (05.10.2026, Piero).
+  const items = filas.filter(function(r){ return r.tipo !== 'oc'; }).sort(function(a,b){ return ((a.fPedido || 0) - (b.fPedido || 0)) || String(a.codPedido).localeCompare(String(b.codPedido)); });
+  const filaSku = function(r){
+    const pry = /^pedido directo/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : appImpNombre(r.proyecto || '');
+    return appFilaHtml('data-q="pedido ' + escapeHtml(r.codPedido) + '"', 'gris', r.producto || r.idProducto,
+      '<span class="mono">' + escapeHtml(r.idProducto || '') + '</span> · Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.req ? ' · Req ' + escapeHtml(r.req.replace(/^000\d-0*/, '')) : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 34)) : ''),
+      r.cantPedido != null ? appN(r.cantPedido) + ' ' + escapeHtml(r.unidad || '') : '—', 'desde ' + appDDMM(r.fPedido) + ' · ' + polarDh(r.fPedido) + ' · ' + escapeHtml(nom(r.persona)));
+  };
+  const x = S[APP_PC.sec], l = APP_PC.sec === 'ped' ? items : x[3], tope = APP_PC.tope || 20;
   return appChips('pcper', APP_PC.persona, [['', 'Todos ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size]].concat([...personas.keys()].filter(Boolean).sort().map(function(p){ return [p, nom(p)]; })))
     + `<div class="m-resumen m-pl-tabs imp-tabs">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}</div>`
-    + `<div class="m-pl-tit"><span>${x[0]} ${x[1]}</span><b>${l.length}</b></div><div class="m-sec-nota">${x[4]}</div>`
-    + (l.length ? '<div class="imp-linea">' + l.slice(0, tope).map(function(o, i){ return APP_PC.sec === 'ped' ? cardPed(o, i) : cardOC(o, i, APP_PC.sec); }).join('') + '</div>' : '<div class="ini-vacio">✅ Nada en este estado.</div>')
+    + `<div class="m-pl-tit"><span>${x[0]} ${x[1]}</span><b>${APP_PC.sec === 'ped' ? pl.length + ' pedidos · ' + items.length + ' ítems' : l.length}</b></div><div class="m-sec-nota">${x[4]}</div>`
+    + (!l.length ? '<div class="ini-vacio">✅ Nada en este estado.</div>' : APP_PC.sec === 'ped' ? '<div class="ini-card">' + l.slice(0, tope).map(filaSku).join('') + '</div>'
+      : '<div class="imp-linea">' + l.slice(0, tope).map(function(o, i){ return cardOC(o, i, APP_PC.sec); }).join('') + '</div>')
     + (l.length > tope ? `<button type="button" class="ini-link" data-pcmas="1">Ver más (${appN(l.length - tope)} restantes) ›</button>` : '');
 }
 
