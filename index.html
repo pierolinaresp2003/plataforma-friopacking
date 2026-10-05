@@ -1183,6 +1183,7 @@
     .ind-card[data-clic]{cursor:pointer;} .ind-ver{margin-top:8px;font-size:12px;font-weight:700;color:var(--brand-ink);}
     .m-tiles button{font:inherit;color:inherit;text-align:left;border:0;cursor:pointer;}
     .m-lista{padding:0 !important;overflow:hidden;} .m-lista .m-fila:first-child{border-top:0;}
+    .imp-card, .m-prod, .rqm-card{content-visibility:auto;contain-intrinsic-size:auto 150px;}
     .imp-card{position:relative;background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px 9px 14px;margin-bottom:9px;border-left:5px solid #1fb5a3;}
     .imp-card::before{content:"";position:absolute;left:-19px;top:12px;width:9px;height:9px;border-radius:50%;background:var(--card);border:2px solid #1fb5a3;}
     .imp-card.em{border-left-color:#3565d9;} .imp-card.em::before{border-color:#3565d9;}
@@ -12932,22 +12933,31 @@ function appAtrasPreparar(){
 // para el supervisor) y el menú ☰ centrado. Nada del celular cambia.
 const APP_PC_CSS = `
   body.app-pc .app-top{padding-left:32px;padding-right:32px;}
-  body.app-pc .content{max-width:none;margin:0;width:100%;box-sizing:border-box;padding:22px 32px 40px;}
+  body.app-pc .content{max-width:none;margin:0;width:100%;box-sizing:border-box;padding:22px 32px 110px;}
   body.app-pc .imp-linea{display:grid;grid-template-columns:repeat(auto-fill, minmax(440px, 1fr));gap:10px;padding-left:0;}
   body.app-pc .imp-linea::before, body.app-pc .imp-card::before{display:none;}
   body.app-pc .imp-card{margin-bottom:0;} body.app-pc .imp-corte{grid-column:1 / -1;}
   /* PC: la barra de abajo pasa a un menú lateral a la izquierda y Leo queda como burbuja flotante circular a
      la derecha (05.10.2026, Piero). En el celular sigue la barra de abajo. */
-  body.app-pc .app-tabbar{top:0;bottom:0;left:0;right:auto;width:220px;transform:none;border-radius:0;display:flex;flex-direction:column;
-    align-items:stretch;justify-content:flex-start;gap:4px;background:var(--brand);border-top:0;box-shadow:6px 0 20px rgba(10,30,100,.18);
-    padding:84px 12px 20px;overflow-y:auto;}
-  body.app-pc .app-tabbar button{cursor:pointer;flex-direction:row;justify-content:flex-start;gap:12px;font-size:14px;padding:12px 14px;border-radius:12px;
-    color:rgba(255,255,255,.75);margin:0;text-align:left;}
-  body.app-pc .app-tabbar button .i{font-size:18px;filter:none;opacity:.9;width:22px;text-align:center;}
-  body.app-pc .app-tabbar button:hover{color:#fff;background:rgba(255,255,255,.08);}
-  body.app-pc .app-tabbar button.on{color:#fff;background:rgba(62,198,172,.22);box-shadow:inset 3px 0 0 var(--brand-2);}
+  body.app-pc .app-tabbar{top:0;bottom:0;left:0;right:auto;width:232px;transform:none;border-radius:0;display:flex;flex-direction:column;
+    align-items:stretch;justify-content:flex-start;gap:2px;background:linear-gradient(180deg,#0b2170 0%,#081a58 100%);border-top:0;
+    box-shadow:4px 0 18px rgba(10,30,100,.16);padding:0 14px 20px;overflow-y:auto;}
+  body.app-pc .app-side-logo{display:flex;align-items:center;height:64px;margin:0 -14px 14px;padding:0 22px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;}
+  body.app-pc .app-side-logo img{height:30px;width:auto;}
+  body.app-pc .app-side-tit{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);padding:6px 14px 8px;}
+  body.app-pc .app-tabbar button{cursor:pointer;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;font-size:14px;font-weight:700;
+    padding:11px 14px;border-radius:12px;color:rgba(255,255,255,.72);margin:0;text-align:left;transition:background .15s, color .15s;}
+  body.app-pc .app-tabbar button .i{font-size:18px;filter:none;opacity:.9;width:24px;text-align:center;}
+  body.app-pc .app-tabbar button:hover{color:#fff;background:rgba(255,255,255,.07);}
+  body.app-pc .app-tabbar button.on{color:#fff;background:rgba(62,198,172,.2);box-shadow:inset 3px 0 0 var(--brand-2);}
+  body.app-pc .app-tabbar button.on .i{animation:none;}
+  body.app-pc .app-top{height:64px;box-sizing:border-box;padding-top:0;padding-bottom:0;}
+  body.app-pc .app-top .app-logo{display:none;}
+  /* Cambio de pestaña en la PC: un fundido corto en vez del deslizamiento del celular. */
+  body.app-pc #section-inicio.tr-der, body.app-pc #section-inicio.tr-izq{animation:appPcFunde .16s ease-out;}
+  @keyframes appPcFunde{from{opacity:.35;}to{opacity:1;}}
   body.app-pc .app-tabbar button.polar{display:none;}
-  body.app-pc{padding-left:220px;}
+  body.app-pc{padding-left:232px;}
   body.app-pc.vista-supervisor{padding-left:0;} body.app-pc.vista-supervisor .app-tabbar{display:none;}
   body.app-pc .asis-fab{display:flex;right:28px;bottom:28px;width:68px;height:68px;padding:0;border-radius:50%;font-size:0;gap:0;justify-content:center;
     background:var(--brand);border:3px solid #fff;box-shadow:0 10px 28px rgba(10,30,100,.4);transition:transform .2s ease, box-shadow .2s ease;}
@@ -13121,7 +13131,7 @@ function appPintarBarra(activa){
   const barra = document.getElementById('appTabbar');
   barra.style.gridTemplateColumns = 'repeat(' + v.tabs.length + ',1fr)';
   Object.keys(APP_VISTAS).forEach(function(k){ document.body.classList.toggle('vista-' + k, k === (APP.vista || 'supervisor')); });
-  barra.innerHTML = v.tabs.map(function(t){
+  barra.innerHTML = (APP_EN_PC ? `<div class="app-side-logo"><img src="${appLogo()}" alt="Grupo Friopacking"></div><div class="app-side-tit">${escapeHtml(v.nombre)}</div>` : '') + v.tabs.map(function(t){
     if(t[0] === 'polar') return '<button type="button" class="polar" data-tab="polar"><span class="i"><img src="' + POLAR_AVATAR + '" alt=""></span>Leo</button>';
     return `<button type="button" data-tab="${t[0]}" class="${t[0] === activa ? 'on' : ''}"><span class="i">${t[1]}</span>${t[2]}</button>`;
   }).join('');
@@ -13617,7 +13627,7 @@ function appInvFiltrada(){
 }
 // Todo a la vista, sin "Ver más" (05.10.2026, Piero). Son hasta ~4,000 productos: se pintan los primeros
 // al instante y el resto se agrega solo, por tandas, para que el celular no se congele.
-const APP_INV_PRIMEROS = 80;
+const APP_INV_PRIMEROS = 40;
 function appInvLista(){
   const l = appInvFiltrada();
   if(!l.length) return `<div class="ini-vacio">${APP_INV.q ? 'Ningún producto con "' + escapeHtml(APP_INV.q) + '".' : 'Nada en este grupo. ✅'}</div>`;
@@ -13632,8 +13642,8 @@ function appInvCompletar(){
   let i = 0;
   (function tanda(){
     if(!el.isConnected || i >= resto.length) return;
-    el.insertAdjacentHTML('beforeend', resto.slice(i, i + 250).map(appInvTarjeta).join(''));
-    i += 250; setTimeout(tanda, 0);
+    el.insertAdjacentHTML('beforeend', resto.slice(i, i + 150).map(appInvTarjeta).join(''));
+    i += 150; (window.requestIdleCallback || function(f){ return setTimeout(f, 16); })(tanda);
   })();
 }
 function appInvTarjeta(x){
