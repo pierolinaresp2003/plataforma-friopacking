@@ -12732,7 +12732,12 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 // Gerencia y Logística piden la clave del módulo Gerencial). Se guarda solo en ese celular: la plataforma
 // es una página estática, no hay un servidor con la lista de usuarios. Qué vistas ve cada tipo:
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
-const APP_ACCESO = { gerencia:['gerencia','logistica','supervisor'], logistica:['logistica','supervisor'], supervisor:['supervisor'] };
+// Supervisor también ve Gerencia, pero sin precios ni montos (05.10.2026, Piero: "que tengan acceso a
+// consultar eso, pero que no vean nada de precios"): sin la pestaña Gasto, sin gasto en el Inicio ni en el
+// calendario y sin monto ni condición de pago en el detalle de una OC. No necesita la clave gerencial.
+const APP_ACCESO = { gerencia:['gerencia','logistica','supervisor'], logistica:['logistica','supervisor'], supervisor:['supervisor','gerencia'] };
+function appSinPrecios(){ return !!(APP.usuario && APP.usuario.tipo === 'supervisor'); }
+function appGerOk(){ return gerAbierto || appSinPrecios(); }
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
 // y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
 // solo entran los correos que están ahí. Los de Supervisor entran directo; Logística y Gerencial ponen la
@@ -13112,7 +13117,8 @@ function appElegirVista(v){
 }
 
 function appPintarBarra(activa){
-  const v = APP_VISTAS[APP.vista] || APP_VISTAS.supervisor;
+  const v0 = APP_VISTAS[APP.vista] || APP_VISTAS.supervisor;
+  const v = appSinPrecios() ? Object.assign({}, v0, { tabs:v0.tabs.filter(function(t){ return t[0] !== 'gasto'; }) }) : v0;
   const barra = document.getElementById('appTabbar');
   barra.style.gridTemplateColumns = 'repeat(' + v.tabs.length + ',1fr)';
   Object.keys(APP_VISTAS).forEach(function(k){ document.body.classList.toggle('vista-' + k, k === (APP.vista || 'supervisor')); });
@@ -13180,7 +13186,7 @@ const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, inventario:fun
 function appPantallaEstado(p){
   const e = { gasto:[APP_G, APP_CAL], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope], pendcompras:[APP_PC], pendlog:[APP_PL],
     indicadores:[APP.indPer || 'semana'], avance:[APP.avQ || ''] }[p];
-  return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0);
+  return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (appSinPrecios() ? 's' : '');
 }
 function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_PANT_FN[p]); }
 // Mientras nadie toca nada, se adelanta el cálculo de las otras pestañas de a poquito (un trozo por
@@ -13189,7 +13195,7 @@ function appPrecalentar(){
   if(!RQ_MOVIL.matches || !appHayDatos() || appPrecalentar._firma === appFirmaDatos() + APP.vista) return;
   appPrecalentar._firma = appFirmaDatos() + APP.vista;
   const v = APP.vista, q = [];
-  if(v === 'gerencia' && gerAbierto){
+  if(v === 'gerencia' && appGerOk()){
     ['semana', 'semanaAnt', 'mes'].forEach(function(k){ q.push(function(){ appIndDatos(appIndPeriodo(k).f); }); });
     appIndTendF(true).forEach(function(x){ q.push(function(){ appIndDatos(x.f); }); });
     q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appAvanceGrupos(); }, function(){ appPantallaHtml('avance'); }, function(){ appPantallaHtml('gasto'); });
@@ -13376,7 +13382,7 @@ function appIndDetalle(clave){
     ${filas.length > tope ? '<div class="m-sec-nota">Se muestran los primeros ' + tope + ' (primero los fuera de meta).</div>' : ''}`);
 }
 function appIndicadoresHtml(){
-  if(!gerAbierto) return APP_GER_LOCK;
+  if(!appGerOk()) return APP_GER_LOCK;
   const k = APP.indPer || 'semana', per = appIndPeriodo(k), datos = appIndDatos(per.f);
   const porSemana = k === 'semana' || k === 'semanaAnt', tend = appIndTendencia(porSemana);
   const chips = [['semana','Semana actual'], ['semanaAnt','Semana pasada'], ['mes','Este mes'], ['anio','Este año'], ['todo','Todo']]
@@ -13523,6 +13529,7 @@ function appCalDetalle(tipo){
   const fecha = d + ' de ' + POLAR_MESES[m] + ' ' + a;
   if(!x) return appToast('No hay movimientos ese día.');
   if(tipo === 'gasto'){
+    if(appSinPrecios()) return;
     const g = ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){ return r.anio === a && r.mes === m + 1 && r.dia === d; });
     const prov = appAgrupar(g, 'proveedor'), tot = g.reduce(function(s, r){ return s + (r.montoPEN || 0); }, 0);
     return appListaAbrir('💰 Gasto del día', fecha, `<div class="oc-hero"><div class="oc-num"><b>${appUSD(tot)}</b> · ${g.length} líneas</div><small>Toca un proveedor para ver sus OC.</small></div>
@@ -13549,7 +13556,7 @@ function appCalendarioHtml(){
   let celdas = '';
   for(let i = 0; i < primero; i++) celdas += '<span></span>';
   for(let d = 1; d <= nDias; d++){
-    const x = dias[d], nivel = x && x.gasto ? Math.min(4, 1 + Math.floor(x.gasto / maxG * 3.99)) : 0;
+    const x = dias[d], nivel = x && x.gasto && !appSinPrecios() ? Math.min(4, 1 + Math.floor(x.gasto / maxG * 3.99)) : 0;
     const hoy = a === c.getUTCFullYear() && m === c.getUTCMonth() && d === c.getUTCDate();
     celdas += `<button type="button" data-cal="${d}" class="g${nivel}${d === APP_CAL.dia ? ' sel' : ''}${hoy ? ' hoy' : ''}">${d}${x && x.ocs.size ? `<i class="${x.pend.size ? 'rojo' : ''}"></i>` : ''}</button>`;
   }
@@ -13558,12 +13565,12 @@ function appCalendarioHtml(){
   const tot = Object.values(dias).reduce(function(s, y){ return s + y.gasto; }, 0);
   return `<div class="ini-card m-cal"><div class="ini-card-tit">📅 Calendario</div>
       <div class="m-cal-nav"><button type="button" data-calmes="-1">‹</button><b>${POLAR_MESES[m].charAt(0).toUpperCase() + POLAR_MESES[m].slice(1)} ${a}</b><button type="button" data-calmes="1">›</button></div>
-      <div class="m-cal-sub">Gasto del mes ${appUSD(tot)}</div>
+      ${appSinPrecios() ? '' : `<div class="m-cal-sub">Gasto del mes ${appUSD(tot)}</div>`}
       <div class="m-cal-sem">${['L','M','M','J','V','S','D'].map(function(s){ return '<span>' + s + '</span>'; }).join('')}</div>
       <div class="m-cal-dias">${celdas}</div>
-      <div class="m-cal-ley"><span><i class="g2"></i>gasto del día</span><span><i class="pt"></i>OC por llegar</span><span><i class="pt rojo"></i>OC pendiente</span></div>
+      <div class="m-cal-ley">${appSinPrecios() ? '' : '<span><i class="g2"></i>gasto del día</span>'}<span><i class="pt"></i>OC por llegar</span><span><i class="pt rojo"></i>OC pendiente</span></div>
       <div class="m-cal-det"><b>${fecha.getUTCDate()} de ${POLAR_MESES[m]}</b>
-        <div class="m-tiles"><button type="button" data-caldet="gasto"><span>💰 Gasto ›</span><b>${x.gasto ? appUSD(x.gasto) : '—'}</b></button><button type="button" data-caldet="ocs"><span>🧾 OC que llegan ›</span><b>${x.ocs.size}${x.pend.size ? ` <small class="rojo">${x.pend.size} pend.</small>` : ''}</b></button>
+        <div class="m-tiles">${appSinPrecios() ? '' : `<button type="button" data-caldet="gasto"><span>💰 Gasto ›</span><b>${x.gasto ? appUSD(x.gasto) : '—'}</b></button>`}<button type="button" data-caldet="ocs"><span>🧾 OC que llegan ›</span><b>${x.ocs.size}${x.pend.size ? ` <small class="rojo">${x.pend.size} pend.</small>` : ''}</b></button>
           <button type="button" data-caldet="reqs"><span>📝 Req. nuevos ›</span><b>${x.reqs.size}</b></button><button type="button" data-caldet="sal"><span>🚚 Salidas a obra ›</span><b>${x.sal.size}</b></button></div>
         ${x.pend.size ? `<div class="asis-acc">${[...x.pend].slice(0, 4).map(function(o){ return `<button type="button" data-oc="${escapeHtml(o)}">OC ${escapeHtml(o.replace(/^000\d-0*/, ''))}</button>`; }).join('')}</div>` : ''}
       </div></div>`;
@@ -13752,7 +13759,7 @@ function appOCHtml(d){
         ${paso('📅', 'Entrega pactada', d.fComp, !!d.fComp && (!d.pend || fin), atraso > 0 ? 'vencida hace ' + atraso + ' d.h.' : (d.fComp && d.pend ? (busdayCount(hoy, d.fComp) > 0 ? 'faltan ' + busdayCount(hoy, d.fComp) + ' d.h.' : 'hoy') : ''))}
         ${paso('🏬', d.pend && !fin ? 'Recibida en parte' : 'Recibida', d.fRecep, !d.pend || fin, d.fRecep ? 'última recepción' : '')}</div>`}
       ${imp && d.pend && !fin ? '<div class="oc-nota">🌎 Importación: primero el proveedor la entrega, luego zarpa (ETD) y recién ahí hay ETA de llegada. Lo que todavía no tiene fecha queda <b>por definir</b>.</div>' : ''}
-      <div class="oc-datos">${dato('Comprador', escapeHtml(comp))}${dato('Origen', d.f0.origen === 'importado' || /^0002-/.test(cod) ? '🌎 Importación' : '🇵🇪 Nacional')}${dato('Monto', escapeHtml(d.montos))}${dato('Pago', escapeHtml(d.cond))}${dato('Requerimientos', d.reqs.length ? d.reqs.length + '' : 'Pedido directo')}</div>
+      <div class="oc-datos">${dato('Comprador', escapeHtml(comp))}${dato('Origen', d.f0.origen === 'importado' || /^0002-/.test(cod) ? '🌎 Importación' : '🇵🇪 Nacional')}${appSinPrecios() ? '' : dato('Monto', escapeHtml(d.montos)) + dato('Pago', escapeHtml(d.cond))}${dato('Requerimientos', d.reqs.length ? d.reqs.length + '' : 'Pedido directo')}</div>
       ${fin && OC_FIN[cod] && (OC_FIN[cod].motivo || OC_FIN[cod].por) ? `<div class="oc-nota">✔ ${escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · '))}</div>` : ''}
       <div class="oc-tit">Ítems de la OC</div>
       <div class="oc-items">${d.items.map(it).join('')}</div>
@@ -14234,7 +14241,7 @@ function appInicioLogistica(){
 const APP_GER_LOCK = `<div class="ini-card ini-lock"><div class="ic">🔒</div><b>Módulo Gerencial</b>
       <small>Los indicadores y el gasto necesitan la clave.</small><button type="button" class="btn" data-ir="proceso">Ingresar clave</button></div>`;
 function appInicioGerencia(){
-  if(!gerAbierto) return APP_GER_LOCK;
+  if(!appGerOk()) return APP_GER_LOCK;
   // Indicadores de la semana actual (29.09.2026, Piero: "que salga en inicio los resultados de la última
   // semana actual"), en palabras simples: % a tiempo, demora promedio y cuántos casos.
   let kpis = '';
@@ -14281,7 +14288,7 @@ function appInicioGerencia(){
   }
   return `<div class="ini-card"><div class="ini-card-tit">⏱️ Indicadores · semana actual</div>${kpis || '<div class="ini-vacio">Sin datos de indicadores.</div>'}</div>
     <div id="iniCal">${appCalendarioHtml()}</div>
-    <div class="ini-card"><div class="ini-card-tit">💰 Concentración de gasto · semana actual</div>${gastoPer}${gasto}</div>`;
+    ${appSinPrecios() ? '' : `<div class="ini-card"><div class="ini-card-tit">💰 Concentración de gasto · semana actual</div>${gastoPer}${gasto}</div>`}`;
 }
 
 // ---------- Acciones del inicio ----------
