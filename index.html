@@ -12810,7 +12810,7 @@ function appConstruir(){
     <div class="app-sheet-fondo" id="appSheet"><div class="app-sheet" id="appSheetIn"></div></div>
     <div class="app-oc" id="appOC"></div>
     <div class="app-bienv" id="appBienv"></div>
-    <button type="button" class="asis-fab" id="asisFab"><img class="i" src="${POLAR_AVATAR}" alt="">Pregúntale a Leo</button>
+    <button type="button" class="asis-fab" id="asisFab" title="Pregúntale a Leo" aria-label="Pregúntale a Leo"><img class="i" src="${POLAR_AVATAR}" alt="">Pregúntale a Leo</button>
     <div class="asis" id="asis" role="dialog" aria-label="Asistente Leo">
       <div class="asis-cab"><img class="av" src="${POLAR_AVATAR}" alt="Leo"><div class="tx"><b>Leo</b><span>Asistente de consultas · Friopacking</span></div>
         <button type="button" id="asisMenu" aria-label="Menú">☰</button>
@@ -12931,22 +12931,29 @@ function appAtrasPreparar(){
 // pantalla ancha: contenido centrado, barra de abajo flotante, Leo como panel a la derecha (o al centro,
 // para el supervisor) y el menú ☰ centrado. Nada del celular cambia.
 const APP_PC_CSS = `
-  body.app-pc{padding-bottom:70px;}
   body.app-pc .app-top{padding-left:32px;padding-right:32px;}
   body.app-pc .content{max-width:none;margin:0;width:100%;box-sizing:border-box;padding:22px 32px 40px;}
   body.app-pc .imp-linea{display:grid;grid-template-columns:repeat(auto-fill, minmax(440px, 1fr));gap:10px;padding-left:0;}
   body.app-pc .imp-linea::before, body.app-pc .imp-card::before{display:none;}
   body.app-pc .imp-card{margin-bottom:0;} body.app-pc .imp-corte{grid-column:1 / -1;}
-  body.app-pc .app-tabbar{left:0;right:0;bottom:0;width:auto;transform:none;border-radius:0;align-items:center;
-    background:var(--brand);border-top:0;box-shadow:0 -6px 20px rgba(10,30,100,.22);padding:5px 32px;}
-  body.app-pc .app-tabbar button{cursor:pointer;flex-direction:row;justify-content:center;gap:8px;font-size:13px;padding:7px 0;border-radius:10px;
-    color:rgba(255,255,255,.72);margin:0 6px;}
-  body.app-pc .app-tabbar button .i{font-size:17px;filter:none;opacity:.85;}
+  /* PC: la barra de abajo pasa a un menú lateral a la izquierda y Leo queda como burbuja flotante circular a
+     la derecha (05.10.2026, Piero). En el celular sigue la barra de abajo. */
+  body.app-pc .app-tabbar{top:0;bottom:0;left:0;right:auto;width:220px;transform:none;border-radius:0;display:flex;flex-direction:column;
+    align-items:stretch;justify-content:flex-start;gap:4px;background:var(--brand);border-top:0;box-shadow:6px 0 20px rgba(10,30,100,.18);
+    padding:84px 12px 20px;overflow-y:auto;}
+  body.app-pc .app-tabbar button{cursor:pointer;flex-direction:row;justify-content:flex-start;gap:12px;font-size:14px;padding:12px 14px;border-radius:12px;
+    color:rgba(255,255,255,.75);margin:0;text-align:left;}
+  body.app-pc .app-tabbar button .i{font-size:18px;filter:none;opacity:.9;width:22px;text-align:center;}
   body.app-pc .app-tabbar button:hover{color:#fff;background:rgba(255,255,255,.08);}
-  body.app-pc .app-tabbar button.on{color:#fff;background:rgba(62,198,172,.22);box-shadow:inset 0 -3px 0 var(--brand-2);}
-  body.app-pc .app-tabbar button.polar{color:#fff;}
-  body.app-pc .app-tabbar button.polar .i{width:40px;height:40px;margin-top:-16px;border-color:var(--brand);}
-  body.app-pc{padding-bottom:70px;}
+  body.app-pc .app-tabbar button.on{color:#fff;background:rgba(62,198,172,.22);box-shadow:inset 3px 0 0 var(--brand-2);}
+  body.app-pc .app-tabbar button.polar{display:none;}
+  body.app-pc{padding-left:220px;}
+  body.app-pc.vista-supervisor{padding-left:0;} body.app-pc.vista-supervisor .app-tabbar{display:none;}
+  body.app-pc .asis-fab{display:flex;right:28px;bottom:28px;width:68px;height:68px;padding:0;border-radius:50%;font-size:0;gap:0;justify-content:center;
+    background:var(--brand);border:3px solid #fff;box-shadow:0 10px 28px rgba(10,30,100,.4);transition:transform .2s ease, box-shadow .2s ease;}
+  body.app-pc .asis-fab .i{width:100%;height:100%;margin:0;}
+  body.app-pc.vista-supervisor .asis-fab{left:auto;transform:none;}
+  body.app-pc .asis-fab:hover{transform:translateY(-3px) scale(1.06);box-shadow:0 14px 34px rgba(10,30,100,.5);}
   body.app-pc .asis{inset:16px 16px 16px auto;width:460px;height:auto;border-radius:22px;border:1px solid var(--border);box-shadow:0 24px 60px rgba(10,20,40,.3);}
   body.app-pc.vista-supervisor .asis{inset:0;width:auto;border-radius:0;border:0;box-shadow:none;}
   body.app-pc.vista-supervisor .asis-cab, body.app-pc.vista-supervisor .asis-chat, body.app-pc.vista-supervisor .asis-sug, body.app-pc.vista-supervisor .asis-pie{
@@ -12956,12 +12963,10 @@ const APP_PC_CSS = `
   body.app-pc .app-sheet{max-width:520px;border-radius:24px;padding-bottom:18px;max-height:calc(100vh - 60px);overflow-y:auto;}
   body.app-pc .app-sheet-fondo.abierto .app-sheet{animation:appSubeSuave .35s cubic-bezier(.22,.8,.2,1);}
   body.app-pc .app-sheet-fondo.cerrando .app-sheet{animation:appFondoSale .25s ease-in forwards;}
-  body.app-pc .app-toast{bottom:110px;}
+  body.app-pc .app-toast{bottom:40px;}
   body.app-pc .m-fila:hover, body.app-pc .m-prod-cab:hover, body.app-pc .ind-fila:hover{background:var(--surface-2);}
   body.app-pc .m-cal-dias button{aspect-ratio:auto;height:44px;font-size:14px;} body.app-pc .m-cal-dias button:hover{filter:brightness(.95);}
-  body.app-pc .asis-fab{display:none;}
   body.app-pc .app-oc{inset:0 0 0 auto;width:min(760px, 100%);box-shadow:-20px 0 60px rgba(10,20,40,.25);}
-  body.app-pc.vista-supervisor .asis-fab{display:flex;}
 `;
 function appPcActivar(){
   if(!APP_EN_PC || document.getElementById('appPcCss')) return;
