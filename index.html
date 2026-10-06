@@ -13451,7 +13451,7 @@ function appFPryOpts(){ rqPreparar(); return appMemo('fpry', function(){
   return { cli:[...cli.entries()].filter(function(e){ return e[1].c > 1; }).sort(function(a,b){ return a[1].n < b[1].n ? -1 : 1; }),
     pry:[...ids.entries()].sort(function(a,b){ return (a[1] + a[0]) < (b[1] + b[0]) ? -1 : 1; }) };
 }); }
-function appFPersonas(){ const el = document.getElementById('filterProcesoResponsable'); return el ? [...el.options].map(function(o){ return o.value; }).filter(function(v){ return v && v !== 'all'; }) : []; }
+function appFPersonas(){ const el = document.getElementById('filterProcesoResponsable'); return el ? [...el.options].map(function(o){ return o.value; }).filter(function(v){ return v && v !== 'all' && PD_PERSONAS[pdPersona(v)]; }) : []; }   // solo compradores con nombre (06.10.2026: sin LNUNEZ ni ACHAVEZ)
 function appFNomPersona(v){ return PD_PERSONAS[pdPersona(v)] || v; }
 function appFNomPry(v){ if(!v) return ''; if(v.charAt(0) === 'c'){ const x = appFPryOpts().cli.find(function(e){ return e[0] === v.slice(2); }); return x ? x[1].n + ' (todos sus proyectos)' : ''; }
   const x = appFPryOpts().pry.find(function(e){ return e[0] === v.slice(2); }); return x ? x[1] + ' · ' + x[0] : v.slice(2); }
