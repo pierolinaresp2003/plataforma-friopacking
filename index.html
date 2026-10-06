@@ -1184,9 +1184,19 @@
     .m-tiles button{font:inherit;color:inherit;text-align:left;border:0;cursor:pointer;}
     .m-lista{padding:0 !important;overflow:hidden;} .m-lista .m-fila:first-child{border-top:0;}
     .imp-card, .m-prod, .rqm-card{content-visibility:auto;contain-intrinsic-size:auto 150px;}
-    .sku-fam{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 0 4px;padding:7px 12px;border-radius:10px;
-      background:var(--surface-2);font-size:12px;font-weight:800;color:var(--brand-ink);text-transform:uppercase;letter-spacing:.03em;}
-    .sku-fam:first-child{margin-top:0;} .sku-fam b{font-size:11.5px;color:var(--muted);text-transform:none;letter-spacing:0;}
+    .sku-lista{display:grid;gap:12px;}
+    .sku-grupo{background:var(--card);border-radius:14px;box-shadow:var(--shadow);border:1px solid var(--border);border-left:6px solid var(--fam);overflow:hidden;}
+    .sku-grupo > summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;padding:11px 14px;
+      background:color-mix(in srgb, var(--fam) 10%, var(--card));border-bottom:1px solid color-mix(in srgb, var(--fam) 25%, var(--border));}
+    .sku-grupo > summary::-webkit-details-marker{display:none;}
+    .sku-grupo > summary i{width:10px;height:10px;border-radius:50%;background:var(--fam);flex-shrink:0;}
+    .sku-grupo > summary span{font-weight:800;font-size:13.5px;color:var(--fam);text-transform:uppercase;letter-spacing:.03em;flex:1;min-width:0;}
+    .sku-grupo > summary small{font-size:11.5px;color:var(--muted);font-weight:600;}
+    .sku-grupo > summary b{min-width:28px;text-align:center;font-size:13px;color:#fff;background:var(--fam);border-radius:20px;padding:2px 9px;}
+    .sku-grupo > summary::after{content:'▾';color:var(--muted);font-size:12px;transition:transform .2s;}
+    .sku-grupo:not([open]) > summary::after{transform:rotate(-90deg);} .sku-grupo:not([open]) > summary{border-bottom:0;}
+    .sku-filas{padding:2px 12px 6px;}
+    .sku-filas .m-fila{box-shadow:inset 3px 0 0 color-mix(in srgb, var(--fam) 45%, transparent);padding-left:12px;}
     .sku-quien, .sku-obs{display:block;margin-top:3px;font-size:11.5px;color:var(--ink-soft);}
     .sku-obs{font-style:italic;color:var(--muted);white-space:normal;}
     .m-fila .t .sku-quien b{display:inline;font-size:inherit;font-weight:700;color:var(--ink);}
@@ -13847,7 +13857,7 @@ function appOCCerrar(){
 }
 
 // ---------- Pendientes de Compras (Logística) ----------
-const APP_PC = { persona:'', sec:'venc', tope:20, q:'' };
+const APP_PC = { persona:'', sec:'venc', tope:20, q:'', fam:'' };
 function appPendComprasHtml(soloLista){
   const hoy = new Date(), c = appIndCorte(), finSem = isoWeekStart(c); finSem.setUTCDate(finSem.getUTCDate() + 6);
   const todas = pdFilas();
@@ -13900,10 +13910,18 @@ function appPendComprasHtml(soloLista){
       r.cantPedido != null ? appN(r.cantPedido) + ' ' + escapeHtml(r.unidad || '') : '—', 'desde ' + appDDMM(r.fPedido) + ' · ' + polarDh(r.fPedido) + ' · ' + escapeHtml(nom(r.persona)));
   };
   // Pedidos sin OC agrupados por familia de producto: lo que se cotiza junto, junto (06.10.2026, Piero).
-  const skuPorFamilia = function(l){
+  // Cada familia es un bloque con su color (franja, encabezado y borde de cada fila) y arriba una fila de
+  // chips para quedarse con una sola familia.
+  const skuGrupos = function(l){
     const g = new Map(); l.forEach(function(r){ const k = (r.familia || 'Sin familia').toString().trim() || 'Sin familia'; if(!g.has(k)) g.set(k, []); g.get(k).push(r); });
-    return [...g.entries()].sort(function(a,b){ return b[1].length - a[1].length || a[0].localeCompare(b[0]); }).map(function(e){
-      return `<div class="sku-fam"><span>📦 ${escapeHtml(e[0])}</span><b>${e[1].length} ítem${e[1].length === 1 ? '' : 's'}</b></div>` + e[1].map(filaSku).join(''); }).join('');
+    return [...g.entries()].sort(function(a,b){ return b[1].length - a[1].length || a[0].localeCompare(b[0]); });
+  };
+  const skuPorFamilia = function(l){
+    return skuGrupos(l).map(function(e){
+      const peds = new Set(e[1].map(function(r){ return r.codPedido; })).size, prys = new Set(e[1].map(function(r){ return r.idProyecto; }).filter(Boolean)).size;
+      return `<details class="sku-grupo" open style="--fam:${appColorFamilia(e[0])}"><summary><i></i><span>${escapeHtml(e[0])}</span>
+          <small>${peds} pedido${peds === 1 ? '' : 's'} · ${prys} proyecto${prys === 1 ? '' : 's'}</small><b>${e[1].length}</b></summary>
+        <div class="sku-filas">${e[1].map(filaSku).join('')}</div></details>`; }).join('');
   };
   // Buscador general (05.10.2026, Piero): OC, pedido, req., código, producto, proveedor o proyecto, en
   // todos los estados a la vez. Una OC sale completa si cualquiera de sus ítems coincide.
@@ -13914,9 +13932,11 @@ function appPendComprasHtml(soloLista){
   const bloque = function(k){
     const x = S[k]; let l = k === 'ped' ? items : x[3];
     if(q) l = k === 'ped' ? l.filter(pasa) : l.filter(function(o){ return ocHit.has(o.oc); });
+    const famChips = k === 'ped' && l.length ? appChips('skufam', APP_PC.fam || '', [['', 'Todas las familias']].concat(skuGrupos(l).map(function(e){ return [e[0], e[0].charAt(0) + e[0].slice(1).toLowerCase() + ' · ' + e[1].length]; }))) : '';
+    if(k === 'ped' && APP_PC.fam) l = l.filter(function(r){ return ((r.familia || 'Sin familia').toString().trim() || 'Sin familia') === APP_PC.fam; });
     if(q && !l.length) return '';
     return `<div class="m-pl-tit"><span>${x[0]} ${x[1]}</span><b>${k === 'ped' ? (q ? l.length + (l.length === 1 ? ' ítem' : ' ítems') : pl.length + (pl.length === 1 ? ' pedido · ' : ' pedidos · ') + items.length + (items.length === 1 ? ' ítem' : ' ítems')) : l.length}</b></div><div class="m-sec-nota">${x[4]}</div>`
-      + (!l.length ? '<div class="ini-vacio">✅ Nada en este estado.</div>' : k === 'ped' ? '<div class="ini-card">' + skuPorFamilia(l.slice(0, tope)) + '</div>'
+      + famChips + (!l.length ? '<div class="ini-vacio">✅ Nada en este estado.</div>' : k === 'ped' ? '<div class="sku-lista">' + skuPorFamilia(l.slice(0, tope)) + '</div>'
         : '<div class="imp-linea">' + l.slice(0, tope).map(function(o, i){ return cardOC(o, i, k); }).join('') + '</div>')
       + (l.length > tope ? `<button type="button" class="ini-link" data-pcmas="1">Ver más (${appN(l.length - tope)} restantes) ›</button>` : '');
   };
@@ -14142,6 +14162,9 @@ function appTarjetaHtml(t){
       <div class="imp-pie"><span>${escapeHtml(t.pie || '')}</span><span>${escapeHtml(t.quien || '')}</span></div>
     </div>`;
 }
+// Color fijo por familia de producto (el mismo nombre siempre da el mismo color).
+const APP_FAM_COLORES = ['#2563eb', '#0d9488', '#d97706', '#7c3aed', '#db2777', '#059669', '#dc2626', '#0891b2', '#65a30d', '#c2410c'];
+function appColorFamilia(n){ let h = 0; String(n || '').split('').forEach(function(c){ h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return APP_FAM_COLORES[h % APP_FAM_COLORES.length]; }
 function appDDMM(d){ return d ? String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') : '—'; }
 function appPendLogLista(){
   const L = appImpDatos(), q = polarNorm(APP_PL.q || '');
@@ -14398,9 +14421,10 @@ function appClickInicio(e){
       const bt = document.querySelector('#invLista [data-invsel="' + CSS.escape(cod) + '"]'), card = bt && bt.closest('.m-prod'); if(x && card) card.outerHTML = appInvTarjeta(x); };
     pinta(antes); if(APP_INV.sel && APP_INV.sel !== antes) pinta(APP_INV.sel); return; }
   if(b.dataset.invbuscar){ APP_INV.q = b.dataset.invbuscar; APP_INV.sel = b.dataset.invbuscar; return appInicio('inventario'); }
-  if(b.dataset.pcper !== undefined){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; return appRenderInicio(); }
+  if(b.dataset.pcper !== undefined){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
   if(b.dataset.pcsec){ APP_PC.sec = b.dataset.pcsec; APP_PC.q = ''; APP_PC.tope = 20; return appRenderInicio(); }
   if(b.dataset.pcmas){ APP_PC.tope += 30; return appRenderInicio(); }
+  if(b.dataset.skufam !== undefined){ APP_PC.fam = b.dataset.skufam; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true); return; }
 
   if(b.dataset.plsec){ APP_PL.sec = b.dataset.plsec; APP_PL.q = ''; APP_PL.tope = 15; return appRenderInicio(); }
   if(b.dataset.plmas){ APP_PL.tope += 30; const l = document.getElementById('plLista'); if(l) l.innerHTML = appPendLogLista(); return; }
