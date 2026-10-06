@@ -1538,6 +1538,9 @@
   .kdx-homol small{display:block;font-size:11px;color:var(--muted);}
   .asis-cal{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--muted);}
   .asis-cal button{font:inherit;font-size:14px;line-height:1;background:var(--surface-2, #f1f4f7);border:0;border-radius:999px;padding:5px 9px;cursor:pointer;}
+  .asis-espera{display:flex;flex-direction:column;gap:5px;width:100%;} .asis-espera div{display:flex;gap:6px;}
+  .asis-espera input{flex:1;min-width:0;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--card);color:var(--ink);}
+  .asis-espera button{font-size:12.5px;font-weight:700;background:var(--brand);color:#fff;border-radius:10px;padding:7px 12px;}
   .asis-pensando{color:var(--ink-soft);font-style:italic;}
   .asis-pensando span{animation:asisPunto 1.2s infinite;opacity:.2;} .asis-pensando span:nth-child(2){animation-delay:.2s;} .asis-pensando span:nth-child(3){animation-delay:.4s;}
   @keyframes asisPunto{50%{opacity:1;}}
@@ -14966,8 +14969,16 @@ function polarAccion(e){
     const burbuja = b.closest('.asis-msg, [data-preg]') || b.parentNode.parentNode, cal = b.parentNode;
     const bien = b.dataset.leocal === 'bien';
     cal.remove();
-    polarAnotar(burbuja.dataset.preg || '', bien ? '👍 le sirvió' : '👎 respuesta incorrecta', burbuja.dataset.ent, polarResumenBurbuja(burbuja));
-    cal.innerHTML = bien ? '<span>¡Gracias! 🙌</span>' : '<span>Gracias, lo reviso para que Leo aprenda.</span>'; burbuja.appendChild(cal);
+    const resumenB = polarResumenBurbuja(burbuja);
+    polarAnotar(burbuja.dataset.preg || '', bien ? '👍 le sirvió' : '👎 respuesta incorrecta', burbuja.dataset.ent, resumenB);
+    // Con 👎 se pregunta qué esperaba ver: eso es lo que Leo necesita para aprender bien (06.10.2026).
+    cal.innerHTML = bien ? '<span>¡Gracias! 🙌</span>' : '<form class="asis-espera"><span>Gracias. ¿Qué esperabas ver? (opcional)</span><div><input type="text" maxlength="250" placeholder="Ej.: los últimos 5 precios, no solo el último"><button type="submit">Enviar</button></div></form>';
+    burbuja.appendChild(cal);
+    const f = cal.querySelector('form');
+    if(f){ f.addEventListener('submit', function(ev){ ev.preventDefault(); const t = f.querySelector('input').value.trim();
+      if(t) polarAnotar(burbuja.dataset.preg || '', '👎 qué esperaba', burbuja.dataset.ent, resumenB, t);
+      cal.innerHTML = '<span>' + (t ? '¡Anotado! Con eso Leo aprende a responderla. 🙌' : 'Gracias, lo reviso para que Leo aprenda.') + '</span>'; });
+      setTimeout(function(){ try{ f.querySelector('input').focus(); }catch(err){} }, 50); }
     return;
   }
   if(b.dataset.q) return polarEnviar(b.dataset.q);
@@ -15221,12 +15232,12 @@ function polarFiltrarPorFecha(filas, f){
 const POLAR_APRENDE_URL = 'https://script.google.com/macros/s/AKfycbxKPU7t3V_gH_aVtZdsQn_Ee9EQ9OQfi4LGiBB-ekV34woDDo2GV3zdjd5iYuhyp2by/exec';   // pegar acá la URL /exec del Apps Script polar-aprende (ver polar-aprende.gs)
 // Desde el 30.09.2026 se guardan TODAS las consultas (Piero: "¿qué pasa si responde pero lo da mal?"),
 // con un resumen de lo que contestó, y el usuario puede marcar 👍 / 👎 cada respuesta.
-function polarAnotar(texto, motivo, entendido, respuesta){
+function polarAnotar(texto, motivo, entendido, respuesta, esperaba){
   if(!POLAR_APRENDE_URL) return;
   try{
     fetch(POLAR_APRENDE_URL, { method:'POST', mode:'no-cors',
       body: JSON.stringify({ pregunta:String(texto).slice(0, 300), entendido:String(entendido || '').slice(0, 300), motivo:motivo, vista:polarVista(),
-        respuesta:String(respuesta || '').slice(0, 400), datos:(DATA && DATA.corte) ? fmtDate(DATA.corte) : '',
+        respuesta:String(respuesta || '').slice(0, 400), esperaba:String(esperaba || '').slice(0, 250), datos:(DATA && DATA.corte) ? fmtDate(DATA.corte) : '',
         // Quién preguntó (01.10.2026, pedido de Piero): correo con que entró y su nombre si se conoce.
         usuario:[(APP.usuario && APP.usuario.correo) || '', polarMiNombre() || ''].filter(Boolean).join(' · ') }) }).catch(function(){});
   }catch(err){}
@@ -15727,12 +15738,12 @@ function polarImportaciones(q, p){
 // Cliente/proyecto nombrado en una pregunta de importaciones ("importaciones de Sun Fruits").
 function polarClienteImport(qr){
   const ruido = /^(importacion|importaciones|importados?|reporte|reportes|sobre|para|del|los|las|que|tiene|tienen|dashboard|resumen|informe|analisis|todas|todos|este|esta|ano|anio|cliente|proyecto|proyectos|estado|estatus|como|van|vamos|dame|quiero|ver|oc|ocs|llegan|llegaron|pendientes|transito|booking|embarcar)$/;
-  const pal = qr.replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter(function(w){ return w.length >= 3 && !ruido.test(w) && !/^\d+$/.test(w) && POLAR_MESES.indexOf(w) === -1; });
+  const pal = qr.replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter(function(w){ return w.length >= 3 && !ruido.test(w) && !/^(req|reqs|requerimientos?|ocs?|pedidos?|compras?|items?)$/.test(w) && !/^\d+$/.test(w) && POLAR_MESES.indexOf(w) === -1; });
   if(!pal.length) return [];
   const nombres = new Set();
   polarLineasOC().forEach(function(r){ if(r.proyecto && (r.origen === 'importado' || /^0002-/.test(r.codOrden || '')) && !/^pedido directo|sin proyecto/i.test(r.proyecto)) nombres.add(appImpNombre(r.proyecto)); });
   const hits = [];
-  nombres.forEach(function(n){ const d = polarNorm(n); const k = pal.filter(function(w){ return polarContiene(d, w); }).length; if(k && k >= Math.min(2, pal.length)) hits.push([n, k]); });
+  nombres.forEach(function(n){ const d = polarNorm(n); const k = pal.filter(function(w){ return polarNombreCalza(d, w); }).length; if(k && k >= Math.min(2, pal.length)) hits.push([n, k]); });
   return hits.sort(function(a,b){ return b[1] - a[1]; }).filter(function(h, i, a){ return h[1] === a[0][1]; }).map(function(h){ return h[0]; });
 }
 function polarDashImportacion(p, cli){
@@ -16225,7 +16236,7 @@ function polarConContexto(texto){
   const resto = palabras.filter(function(w){ return !POLAR_RELLENO.has(w) && !POLAR_TEMA_RE.test(w) && POLAR_MESES.indexOf(w) === -1 && !/^\d+$/.test(w) && personaPal.indexOf(w) === -1 && POLAR_COMUNES.indexOf(w) === -1; });
   // "¿y en importaciones?" solo cambia un filtro del tema anterior; "importaciones de Melissa" es otra pregunta.
   const tieneTema = (conector ? POLAR_TEMA_RE.test(q.replace(/\bimporta\w*|\bnacional\w*/g, ' ')) : POLAR_TEMA_RE.test(q)) || !!polarFocoDe(q);
-  const pideRef = conector || !!polarFocoDe(q) || (palabras.length <= 4 && /\b(excel|kardex|proveedor|guia|reserv\w*|estado|detalle|trazabilidad|correo|precio|consumo|rotacion)\b/.test(q));
+  const pideRef = conector || !!polarFocoDe(q) || (palabras.length <= 4 && /\b(excel|kardex|proveedor|guia|reserv\w*|estado|detalle|trazabilidad|correo|precio|consumo|rotacion)\b/.test(q)) || /\b(este|ese|esta|esa) (item|producto|codigo|material)\b/.test(q);
   const partes = [];
   let out = texto;
   const cambiaDato = conector || (!resto.length && palabras.length <= 4 && !tieneRef);   // solo cambia el período, la persona o el objeto
@@ -16311,7 +16322,19 @@ function polarResponder1(texto){
   if(!appHayDatos()) return '<p>Todavía se están cargando los datos de la plataforma. Prueba en unos segundos. ⏳</p>';
   if(!q || /^(hola|buenas|buenos|hey|ola|que tal)\b/.test(q) && q.length < 25) return '<p>¡Hola' + (polarMiNombre() ? ', ' + escapeHtml(polarMiNombre().split(' ')[0].charAt(0) + polarMiNombre().split(' ')[0].slice(1).toLowerCase()) : '') + '! 👋</p>' + polarAyuda();
   if(/^(gracias|muchas gracias|ok|okey|listo|perfecto|genial|chevere|bacan)\b/.test(q) && q.length < 30) return '<p>¡De nada! 🙌 Aquí estoy para lo que necesites.</p>';
+  // "¿qué reportes puedes generar?", "¿generas PDF?" (06.10.2026, aprendido de la hoja de Leo).
+  if(/reporte|informe|\bpdf\b|excel|dashboard/.test(qr) && /(puedes|sabes|generas|haces|hay|tienes|que|cuales)\b/.test(qr) && !/\d{3,}/.test(qr)) return polarAyudaReportes();
   if(/(que|como) (puedes|sabes|me ayudas)|^ayuda|como funciona|que (te )?puedo preguntar/.test(q)) return polarAyuda();
+  // "Quiero consultar una orden de compra" sin número: se pide el dato en vez de no entender.
+  const mSinNum = qr.match(/\b(consultar|revisar|ver|buscar|saber de|averiguar)\b.*\b(orden(es)? de compra|oc|requerimiento|req|pedido|proyecto|importacion)\b/);
+  if(mSinNum && !/\d{3,}|pry/.test(qr) && qr.split(' ').length <= 8){
+    const t = mSinNum[2];
+    return /orden|oc/.test(t) ? '<p>Claro 👍 Escríbeme el <b>número de la OC</b> (por ejemplo <span class="mono">12038</span>; si es importación, <span class="mono">1856</span> o <span class="mono">0002-1856</span>).</p><p>Si no lo sabes, dime el <b>producto</b> o el <b>proveedor</b> y te la busco.</p>'
+      : /importacion/.test(t) ? '<p>Claro 👍 Dime el <b>N° de OC</b>, el <b>proveedor</b> o el <b>producto</b> de la importación, o pregúntame "importaciones en tránsito".</p>'
+      : /proyecto/.test(t) ? '<p>Claro 👍 Dime el <b>código del proyecto</b> (por ejemplo <span class="mono">PRY2026-0000036</span>) o el <b>nombre del cliente</b>.</p>'
+      : /pedido/.test(t) ? '<p>Claro 👍 Escríbeme el <b>N° de pedido</b> (por ejemplo <span class="mono">16428</span> o <span class="mono">0001-0016428</span>).</p>'
+      : '<p>Claro 👍 Escríbeme el <b>N° de requerimiento</b> (por ejemplo <span class="mono">23303</span>).</p>';
+  }
 
   const T = String(texto).toUpperCase();
   // En la vista Supervisor (celular) Polar solo habla de requerimientos y proyectos (29.09.2026, Piero).
@@ -16334,8 +16357,13 @@ function polarResponder1(texto){
   }
   if(/excel|exporta|descarg|xlsx/.test(q)) return polarExportar(q, T);
   if(!soloReqs && /\bbooking\b|\betd\b|\beta\b|embarc|zarp/.test(q) && !/cuanto tarda|demora|promedio|\boc\s*\d/.test(q)) return polarImportaciones(q, p);
-  const prod = T.match(/\b\d{12}\b/);
-  if(prod){ if(soloReqs) return fueraDeAlcance; return /precio|costo|proveedor|a quien/.test(q) ? (polarComprasDeProducto([prod[0]], /precio|costo/.test(q) ? 'precio' : 'prov') || polarProducto(prod[0])) : polarProducto(prod[0]); }
+  let prod = T.match(/\b\d{12}\b/), codNota = '';
+  if(!prod){ const m9 = T.match(/\b\d{9,11}\b/); const cp = m9 ? polarCodigoParecido(m9[0]) : null; if(cp){ prod = [cp]; codNota = cp === m9[0].padStart(12, '0') ? '' : `<p class="asis-nota">Usé el código <b class="mono">${escapeHtml(cp)}</b> (el más parecido a ${escapeHtml(m9[0])}).</p>`; } }
+  if(prod && /(que|cuales|cuantos) (proyectos?|requerimientos?|req|clientes?|obras?)|quien(es)? (lo )?(pide|piden|pidio|pidieron|solicita|solicitan|solicito|usa|usan)|(solicitan|solicitaron|piden|pidieron) (este|el|ese)/.test(qr)) return codNota + polarQuienPide(prod[0]);
+  if(prod){ if(soloReqs) return fueraDeAlcance;
+    if(/precio|costo/.test(q)){ const rp = polarComprasDeProducto([prod[0]], 'precio'); if(rp) return codNota + rp;
+      return codNota + '<p>💲 Este código <b>todavía no tiene compras registradas</b>, así que no tengo un precio. Esto es lo que hay en stock:</p>' + polarProducto(prod[0]); }
+    return codNota + (/proveedor|a quien/.test(q) ? (polarComprasDeProducto([prod[0]], 'prov') || polarProducto(prod[0])) : polarProducto(prod[0])); }
 
   // Proyecto por código o por número ("proyecto 36"), con sus sub-preguntas.
   const sobrePry = function(id){
@@ -16358,6 +16386,8 @@ function polarResponder1(texto){
   if(bare && /^20[2-3]\d$/.test(bare[1]) && !/requerimiento/.test(q)) bare = null;   // un año, no un N° de req
   if(bare && bare[1].length < 3 && !esPry) bare = null;
   if(quiereProducto && !doc && bare && bare[1].length < 5) bare = null;              // "panel 100": es parte del producto
+  // "MALLA 150 MY PARA FIA 50 148H3130": descripción de producto con números, no un N° de requerimiento.
+  if(bare && !doc && bare[1].length < 5 && !esOC && !esPed && !esPry && !/requerimiento|\breq\b|pedido|\boc\b/.test(q) && (function(n){ return n >= 3 || (n >= 2 && /\b\d+[a-z]+\d+[a-z0-9]*\b/.test(qr)); })(polarPalabrasProducto(qr).filter(function(w){ return /[a-z]{3,}/.test(w); }).length)) bare = null;
   if(esPry && bare){
     const ids = polarProyectoPorNumero(bare[1]);
     if(ids.length) return sobrePry(ids[0]);
@@ -16386,6 +16416,11 @@ function polarResponder1(texto){
     if(POLAR.resultado === 'ok' && !/^(atrasados|vencidos)$/.test(mReqDe[1])) return r2;
     if(POLAR.resultado === 'ok') return polarResponder1('requerimientos de ' + mReqDe[2] + ' atrasados');
     POLAR.resultado = 'ok';
+  }
+  const mPend = qr.match(/^(?:los |las )?(?:pendientes|lo pendiente|lo que falta|faltantes)\s+(?:de |del |de la )?(?:proyecto |cliente |obra )?(.+)$/);
+  if(mPend && !polarPersonaEn(q, true) && !/^(compras?|logistica|almacen|importac|oc\b|la semana|este mes|hoy)/.test(mPend[1])){
+    const pn = polarProyectoPorNombre(polarNombresEnPregunta(mPend[1]).length ? polarNombresEnPregunta(mPend[1]) : polarPalabrasProducto(mPend[1]));
+    if(pn) return pn;
   }
   // Supervisor preguntando por lo suyo ("¿qué tengo con OC?", "lo que pedí"): eso va primero a sus requerimientos.
   const supMio = polarSinPrecios() && /\btengo\b|\bmis?\b|\bme (llega|toca|falta)|\bmios\b|\bmias\b|lo que pedi|\bpedi\b/.test(q);
@@ -16524,13 +16559,65 @@ function polarResponder1(texto){
   if(!quiereProducto){ const pn = polarProyectoPorNombre(palabras); if(pn) return pn; }
   // Producto o proveedor que no está en el kardex (o se pregunta por la OC): se busca en todas las OC.
   const exactoKdx = palabras.length && ALMACEN_DATA && ALMACEN_DATA.rows && ALMACEN_DATA.rows.some(function(r){ const d = polarNorm(r.descripcion); return palabras.every(function(w){ return polarContiene(d, w); }); });
-  if(!quiereProducto && (!exactoKdx || /\boc\b|orden/.test(q))){ const bo = polarBuscarOCs({ pal:palabras, p:p }) || polarBuscarOCs({ pal:polarPalabrasProducto(qr), p:p }); if(bo) return bo;
+  if(!quiereProducto && (!exactoKdx || /\boc\b|orden/.test(q))){ const soloPal = polarPalabrasProducto(qr).filter(function(w){ return /^[a-z]{4,}$/.test(w) && !/^(nacional|nacionales|importado|importados|importacion|importaciones|directo|orden|ordenes)$/.test(w); });
+    const bo = polarBuscarOCs({ pal:palabras, p:p }) || polarBuscarOCs({ pal:polarPalabrasProducto(qr), p:p }) || (soloPal.length >= 2 ? polarBuscarOCs({ pal:soloPal, p:p }) : null); if(bo) return bo;
     if(!exactoKdx){ const pv = polarProveedoresEn(qr); if(pv.length >= 1 && pv.length <= 4){ const bp = polarBuscarOCs({ provs:pv, p:p }); if(bp) return bp; } } }
   const pr = polarBuscarProducto(palabras);
   if(pr) return pr;
   if(quiereProducto){ POLAR.resultado = 'no encontró'; return `<p>No encontré productos con "${escapeHtml(palabras.join(' '))}". Prueba con el código de 12 dígitos o con otra palabra de la descripción.</p>`; }
+  const fb = polarUltimoIntento(q, qr, p); if(fb) return fb;
   POLAR.resultado = 'no entendió';
   return '<p>No entendí bien la consulta 🤔 Ya la anoté para aprender a responderla.</p>' + polarAyuda();
+}
+// ---------- Aprendido de la hoja de Leo (06.10.2026): lo que antes terminaba en "no entendí" ----------
+// 1) Un proveedor por una sola palabra ("Alapont"). 2) Un producto por su descripción completa, aunque
+// traiga medidas ("FIBRA DE ACERO ENCOLADA SD80/60G 0.75MM X 60M"). 3) Una palabra que solo aparece en la
+// observación o el nombre del proyecto de los requerimientos ("rintisa").
+function polarUltimoIntento(q, qr, p){
+  const pals = qr.replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter(function(w){ return /^[a-z]{4,}$/.test(w) && !/^(nacional|nacionales|importado|importados|importacion|importaciones|pedido|pedidos|directo|orden|ordenes|compra|compras|consulta|consultar)$/.test(w) && !POLAR_RUIDO.has(w) && POLAR_COMUNES.indexOf(w) === -1 && POLAR_RUIDO_PROV.indexOf(w) === -1 && POLAR_MESES.indexOf(w) === -1; });
+  if(!pals.length) return null;
+  const nombres = new Set(); polarLineasOC().forEach(function(r){ if(r.proveedor) nombres.add(r.proveedor); });
+  const provs = [...nombres].filter(function(n){ const c = polarCompacto(polarNorm(n)); return pals.some(function(w){ return w.length >= 5 && c.indexOf(w) !== -1; }); });
+  if(provs.length >= 1 && provs.length <= 4){ const bp = polarBuscarOCs({ provs:provs, p:p }); if(bp) return bp; }
+  const clave = pals.slice(0, 4);
+  if(clave.length >= 2){ const bo = polarBuscarOCs({ pal:clave, p:p }); if(bo) return bo; const pr = polarBuscarProducto(clave); if(pr) return pr; }
+  rqPreparar();
+  const largas = pals.filter(function(w){ return w.length >= 5; });
+  if(largas.length){
+    const filas = RQ.filas.filter(function(r){ const d = polarNorm((r.obs || '') + ' ' + (r.proyecto || '')); return largas.every(function(w){ return d.indexOf(w) !== -1; }); });
+    if(filas.length){ POLAR.nuevoRef = largas.join(' '); POLAR.nuevoRefTxt = '"' + largas.join(' ') + '"';
+      const pend = filas.filter(function(r){ return !rqItemListo(r); });
+      return polarListaReqs(pend.length ? pend : filas, '🔎 "' + largas.join(' ') + '"', 'Requerimientos que lo mencionan en la observación o el proyecto' + (pend.length ? ' · lo que falta' : ''), 8); }
+  }
+  return null;
+}
+// Código de 12 dígitos escrito con dígitos de menos o uno de más (Excel le quita los ceros de adelante).
+function polarCodigoParecido(n){
+  const existe = function(c){ return !!rqStockDe(c) || polarLineasOC().some(function(r){ return r.idProducto === c; }); };
+  const pad = n.padStart(12, '0'); if(n.length <= 12 && existe(pad)) return pad;
+  const cand = new Set();
+  for(let i = 0; i < n.length; i++){ const x = (n.slice(0, i) + n.slice(i + 1)).padStart(12, '0'); if(x.length === 12 && existe(x)) cand.add(x); }
+  return cand.size === 1 ? [...cand][0] : null;
+}
+// ¿Qué proyectos / requerimientos piden este producto? Primero lo que todavía falta.
+function polarQuienPide(cod){
+  rqPreparar();
+  const p = rqStockDe(cod), filas = RQ.filas.filter(function(r){ return r.idProducto === cod || (p && p.codigos && p.codigos.indexOf(r.idProducto) !== -1); });
+  POLAR.nuevoRef = cod; POLAR.nuevoRefTxt = polarCorta((p && p.descripcion) || (filas[0] && filas[0].producto) || cod, 40);
+  if(!filas.length) return `<p>Ningún requerimiento pidió el código <b class="mono">${escapeHtml(cod)}</b>.</p>`;
+  const pend = filas.filter(function(r){ return !rqItemListo(r); }), um = filas[0].unidad || '';
+  const pry = new Map(); pend.forEach(function(r){ const k = r.proyecto || '—'; const y = pry.get(k) || { n:0, q:0, reqs:new Set() }; y.n++; y.q += (r.cantidad || 0) - (r.cantSalida || 0); y.reqs.add(r.codRequerimiento); pry.set(k, y); });
+  return `<div class="cab">🏗️ ¿Quién pide ${escapeHtml(polarCorta(POLAR.nuevoRefTxt, 46))}?</div><div class="sub"><span class="mono">${escapeHtml(cod)}</span> · ${filas.length} línea${filas.length === 1 ? '' : 's'} en ${new Set(filas.map(function(r){ return r.codRequerimiento; })).size} requerimientos</div>
+    ${pend.length ? `<p><b>Lo que todavía falta</b> (${pend.length}):</p>` + [...pry.entries()].sort(function(a,b){ return b[1].q - a[1].q; }).map(function(e){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(e[0], 50))}</div><div class="q">faltan <b>${polarNum(Math.round(e[1].q * 100) / 100)} ${escapeHtml(um)}</b> · ${[...e[1].reqs].map(function(c){ return polarBtn('q', c, escapeHtml(c.replace(/^0001-0*/, ''))); }).join(' ')}</div></div>`; }).join('')
+      : '<p>✅ Todo lo que se pidió de este producto ya salió a obra.</p>'}
+    ${filas.length > pend.length ? `<p class="q">Ya atendidos: ${filas.length - pend.length} línea${filas.length - pend.length === 1 ? '' : 's'} (${[...new Set(filas.filter(rqItemListo).map(function(r){ return polarCorta(r.proyecto || '—', 24); }))].slice(0, 4).map(escapeHtml).join(', ')}).</p>` : ''}`;
+}
+function polarAyudaReportes(){
+  return `<div class="cab">📑 Reportes que puedo armarte</div>
+    <p>📄 <b>PDF</b> de un requerimiento completo (con semáforo, stock en Lima y lo que viene en camino): "pdf del req 23405".<br>
+    📊 <b>Dashboard de importaciones</b> (y en PDF): "dashboard de importaciones 2026", "importaciones de sun fruits en pdf".<br>
+    📥 <b>Excel</b>: "excel del req 23303", "excel del proyecto 36", "excel de pendientes de Melissa", "excel de reposición", "excel de indicadores".</p>
+    <div class="asis-acc">${polarBtn('q', 'dashboard de importaciones ' + appIndCorte().getUTCFullYear(), '📊 Dashboard de importaciones')}${polarBtn('q', 'excel de reposición', '📥 Excel de reposición')}</div>`;
 }
 
 // Estado de un ítem en UNA línea corta (30.09.2026, Piero: "hay mucha información y se pierde con tanto
@@ -16722,7 +16809,8 @@ function polarOC(cod){
     <div class="asis-acc">${RQ_MOVIL.matches ? polarBtn('oc', cod, '📄 Ver cómo va la OC') : ''}${polarBtn('q', 'proveedor ' + (f0.proveedor || ''), 'Proveedor')}${reqs.slice(0, 2).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r.replace(/^0001-0*/, ''))); }).join('')}</div>`;
 }
 function polarPedido(cod){
-  const filas = getReqRows().filter(function(r){ return r.codPedido === cod; });
+  // También los pedidos directos (sin requerimiento), con o sin OC (06.10.2026: "pedido 16428" no se encontraba).
+  const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || [], (typeof PEDIDO_SIN_REQ_PEND !== 'undefined' && PEDIDO_SIN_REQ_PEND) || []).filter(function(r){ return r.codPedido === cod; });
   if(!filas.length) return null;
   POLAR.nuevoRef = 'pedido ' + cod; POLAR.nuevoRefTxt = 'pedido ' + cod;
   const ocs = [...new Set(filas.map(function(r){ return r.codOrden; }).filter(Boolean))];

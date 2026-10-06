@@ -13,6 +13,12 @@
  * cómo la entendió Leo después de corregir tipeo y sinónimos, el motivo (respondió / no entendió /
  * no encontró / 👍 le sirvió / 👎 respuesta incorrecta), la fecha de los datos y un resumen de la respuesta.
  * Desde el 01.10.2026 también se guarda quién preguntó (correo y nombre), a pedido de Piero.
+ * Desde el 06.10.2026 (v4): cuando alguien marca 👎, Leo le pregunta "¿Qué esperabas ver?" y la respuesta
+ * se guarda en la columna J. Es lo que Leo necesita para aprender a contestar bien esa consulta.
+ *
+ * ACTUALIZAR (si ya estaba instalado): pega este archivo encima del anterior → Guardar →
+ *   Implementar → Administrar implementaciones → ✏️ editar → Versión: Nueva versión → Implementar.
+ *   Así la URL /exec sigue siendo la misma y no hay que tocar el index.html.
  */
 
 const HOJA = 'Preguntas';
@@ -26,11 +32,15 @@ function doPost(e) {
     let hoja = libro.getSheetByName(HOJA);
     if (!hoja) {
       hoja = libro.insertSheet(HOJA);
-      hoja.appendRow(['Fecha', 'Vista', 'Pregunta', 'Cómo la entendió Leo', 'Motivo', 'Datos al', '¿Ya se le enseñó?', 'Respuesta de Leo', 'Usuario']);
+      hoja.appendRow(['Fecha', 'Vista', 'Pregunta', 'Cómo la entendió Leo', 'Motivo', 'Datos al', '¿Ya se le enseñó?', 'Respuesta de Leo', 'Usuario', '¿Qué esperaba?']);
       hoja.setFrozenRows(1);
       hoja.setColumnWidths(1, 1, 150); hoja.setColumnWidth(3, 380); hoja.setColumnWidth(4, 320);
     }
-    // Hojas creadas con versiones anteriores: se agregan las columnas H e I.
+    // Hojas creadas con versiones anteriores: se agregan las columnas H, I y J.
+    if (!hoja.getRange('J1').getValue()) {
+      hoja.getRange('J1').setValue('¿Qué esperaba?'); hoja.setColumnWidth(10, 380);
+      hoja.getRange('J1').setFontWeight('bold').setBackground('#0a1e64').setFontColor('#ffffff');
+    }
     if (!hoja.getRange('H1').getValue() || !hoja.getRange('I1').getValue()) {
       hoja.getRange('H1').setValue('Respuesta de Leo'); hoja.setColumnWidth(8, 420);
       hoja.getRange('I1').setValue('Usuario'); hoja.setColumnWidth(9, 260);
@@ -47,7 +57,7 @@ function doPost(e) {
       Utilities.formatDate(new Date(), 'America/Lima', 'yyyy-MM-dd HH:mm'),
       String(d.vista || ''), pregunta, String(d.entendido || '').slice(0, 300),
       String(d.motivo || ''), String(d.datos || ''), '', String(d.respuesta || '').slice(0, 400),
-      String(d.usuario || '').slice(0, 120),
+      String(d.usuario || '').slice(0, 120), String(d.esperaba || '').slice(0, 250),
     ]);
     return salida({ ok: true });
   } catch (err) {
