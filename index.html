@@ -3035,7 +3035,7 @@ function buildSnapshot(){
       // miles de filas históricas.
       rows: GASTO_DATA.rows.map(r => ({
         pv: r.proveedor, fa: r.familia, sf: r.subfamilia, pr: r.producto, og: r.origen, mn: r.moneda, cb: r.creditoBucket,
-        a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100, no: Math.round(r.montoNativo*100)/100,
+        a: r.anio, m: r.mes, d: r.dia, mo: Math.round(r.montoPEN*100)/100, no: Math.round(r.montoNativo*100)/100, oc: r.oc || undefined,
       })),
     } : null,
     // Inventario · Almacén General (09.09.2026): faltaba publicarse, así que el link público mostraba
@@ -3345,7 +3345,7 @@ function loadFromSnapshot(snap){
       producto: r.pr || "(sin detalle de producto en este snapshot)",
       origen: r.og || "nacional",
       moneda: r.mn || null, creditoBucket: r.cb || "Sin dato",
-      anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo, montoNativo: (r.no!=null ? r.no : r.mo),
+      anio: r.a, mes: r.m, dia: r.d, montoPEN: r.mo, montoNativo: (r.no!=null ? r.no : r.mo), oc: r.oc || '',
     })),
   } : null;
   // Inventario · Almacén General (09.09.2026). Un snapshot publicado antes de esta ronda no trae
@@ -5129,6 +5129,9 @@ function processConsulta(wb, filename){
       creditoBucket: creditoBucketFor(formaPagoTexto),
       fecha, montoPEN, montoNativo,
       anio: fecha.getUTCFullYear(), mes: fecha.getUTCMonth()+1, dia: fecha.getUTCDate(),
+      // N° de OC para saber el comprador (06.10.2026, Piero: filtro de comprador en Gasto). Solo "OCO …":
+      // las "OSR …" son órdenes de servicio con su propia numeración.
+      oc: (function(m){ return m ? m[1] + '-' + m[2].padStart(7, '0') : ''; })(/^OCO\s+(\d{4})-(\d+)/i.exec(documento)),
     });
   }
 
@@ -13372,7 +13375,7 @@ function appOtifHtml(){
   const pry = new Map(); l.forEach(function(x){ const id = x.r.idProyecto || '—'; const g = pry.get(id) || { id:id, nombre:x.r.proyecto || id, l:[] }; g.l.push(x); pry.set(id, g); });
   const prys = [...pry.values()].sort(function(a,b){ return b.l.length - a.l.length; });
   const barra = function(attr, t, v, sub){ return `<button type="button" class="m-bar" ${attr}><span class="t">${escapeHtml(t || '—')}</span><i><em style="width:${Math.max(2, v || 0).toFixed(1)}%"></em></i><b>${v == null ? '—' : v.toFixed(0) + '%'}</b><small>${sub}</small></button>`; };
-  return appFBarra('otif', { persona:1, pry:1 })
+  return appFBarra('otif', { pry:1 })
     + `<div class="ini-card m-total"><span>OTIF · ${lbl}</span><b class="${appIndClase(pct)}">${p1(pct)}</b><small>${appN(n - Object.values(cuenta).reduce(function(a, b){ return a + b; }, 0))} de ${appN(n)} líneas salieron a obra completas y a tiempo · ${appIndEstado(pct)}</small>
         <div class="m-tiles"><div><span>🕒 A tiempo</span><b>${p1(n ? l.filter(function(x){ return x.ot; }).length / n * 100 : null)}</b></div><div><span>📦 Completas</span><b>${p1(n ? l.filter(function(x){ return x.inf; }).length / n * 100 : null)}</b></div><div><span>⏳ Aún en plazo</span><b>${appN(D.enPlazo)}</b></div></div></div>
       ${n ? `<div class="ini-card"><div class="ini-card-tit">❌ ¿Por qué no se cumple? <small>toca para ver las líneas</small></div>
@@ -13384,7 +13387,7 @@ function appOtifHtml(){
       <div class="ini-card"><div class="ini-card-tit">🏗️ OTIF por proyecto <small>${prys.length} proyectos · toca uno</small></div>
         ${prys.map(function(g){ const f = g.l.filter(function(x){ return x.tipo; }).length;
           return barra('data-otifpry="' + escapeHtml(g.id) + '"', polarCorta(g.nombre, 48), appOtifPct(g.l), (g.id !== '—' ? escapeHtml(g.id) + ' · ' : '') + appN(g.l.length) + ' líneas · ' + appN(f) + ' no cumplieron'); }).join('')}</div>` : '<div class="ini-card"><div class="ini-vacio">No hay líneas para medir en este período.</div></div>'}
-      <div class="av-nota">OTIF = líneas de requerimiento que salieron a obra <b>completas</b> (toda la cantidad pedida) y <b>a tiempo</b> (hasta ${OTIF_META} días hábiles desde el requerimiento) ÷ líneas medidas. Sin archivados. Las que no han salido y todavía están dentro del plazo no se cuentan.${APP_F.otif.persona ? ' Con comprador elegido solo entran las líneas que pasaron por una OC suya.' : ''}</div>`;
+      <div class="av-nota">OTIF = líneas de requerimiento que salieron a obra <b>completas</b> (toda la cantidad pedida) y <b>a tiempo</b> (hasta ${OTIF_META} días hábiles desde el requerimiento) ÷ líneas medidas. Sin archivados. Las que no han salido y todavía están dentro del plazo no se cuentan.</div>`;
 }
 // Detalle: las líneas que no cumplieron (de un proyecto o de un motivo), en el panel, con PDF.
 function appOtifDetalle(pry, tipo){
@@ -13423,8 +13426,7 @@ function appIndCorto(d){ return d.getUTCDate() + ' ' + MESES_CORTOS[d.getUTCMont
 // Períodos: semana actual (lunes a domingo del día de corte), semana pasada, mes, año y todo.
 // ---------- Filtros de Gerencia (06.10.2026, Piero: "que los filtros de arriba sean más personalizados, no
 // que sea presionar un cuadro"): período con fechas a elección, comprador y proyecto / cliente, en listas.
-const APP_FPER = [['semana','Semana actual'], ['semanaAnt','Semana pasada'], ['mes','Este mes'], ['mesAnt','Mes pasado'], ['tri','Últimos 3 meses'], ['anio','Este año'], ['todo','Todo'], ['custom','Personalizado (fechas)']];
-const APP_F0 = { indicadores:{ per:'semana', desde:'', hasta:'', persona:'', pry:'' }, gasto:{ per:'mes', desde:'', hasta:'', orig:'todo' }, otif:{ per:'anio', desde:'', hasta:'', persona:'', pry:'' } };
+const APP_F0 = { indicadores:{ per:'semana', desde:'', hasta:'', persona:'', pry:'' }, gasto:{ per:'mes', desde:'', hasta:'', orig:'todo', persona:'' }, otif:{ per:'anio', desde:'', hasta:'', pry:'' } };
 const APP_F = JSON.parse(JSON.stringify(APP_F0));
 function appFRango(st){
   const c = appIndCorte(), Y = c.getUTCFullYear(), M = c.getUTCMonth(), D = function(y, m, d){ return new Date(Date.UTC(y, m, d)); };
@@ -13458,7 +13460,16 @@ function appFBarra(pant, opc){
   const st = APP_F[pant];
   const op = function(v, t, s){ return `<option value="${escapeHtml(v)}"${v === s ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
   const sel = function(campo, lbl, ops){ return `<label><span>${lbl}</span><select class="ini-select" data-fcampo="${campo}">${ops}</select></label>`; };
-  let h = sel('per', '📅 Período', APP_FPER.map(function(x){ return op(x[0], x[1], st.per); }).join(''));
+  // Período agrupado de lo más corto a lo más largo y con las fechas que abarca (06.10.2026, Piero: "no se
+  // entienden los filtros de período, están desordenados").
+  const dd = function(d){ return d.getUTCDate() + ' ' + MESES_CORTOS[d.getUTCMonth()].toLowerCase(); };
+  const rg = function(k){ const r = appFRango({ per:k }); return r.desde.getUTCMonth() === r.hasta.getUTCMonth() ? r.desde.getUTCDate() + ' al ' + dd(r.hasta) : dd(r.desde) + ' al ' + dd(r.hasta); };
+  const mesN = function(k){ return POLAR_MESES[appFRango({ per:k }).desde.getUTCMonth()]; };
+  const grp = function(t, l){ return '<optgroup label="' + t + '">' + l.map(function(x){ return op(x[0], x[1], st.per); }).join('') + '</optgroup>'; };
+  let h = sel('per', '📅 Período', grp('Por semana (lunes a domingo)', [['semana', 'Esta semana · ' + rg('semana')], ['semanaAnt', 'Semana pasada · ' + rg('semanaAnt')]])
+    + grp('Por mes', [['mes', 'Este mes · ' + mesN('mes')], ['mesAnt', 'Mes pasado · ' + mesN('mesAnt')], ['tri', 'Últimos 3 meses · ' + mesN('tri') + ' a ' + mesN('mes')]])
+    + grp('Por año', [['anio', 'Este año · ' + appIndCorte().getUTCFullYear()], ['todo', 'Todo lo cargado']])
+    + grp('A tu medida', [['custom', '📆 Elegir fechas (desde / hasta)']]));
   if(st.per === 'custom') h += `<label><span>Desde</span><input type="date" class="ini-select" data-fcampo="desde" value="${escapeHtml(st.desde)}"></label><label><span>Hasta</span><input type="date" class="ini-select" data-fcampo="hasta" value="${escapeHtml(st.hasta)}"></label>`;
   if(opc.orig) h += sel('orig', '🌎 Origen', op('todo', 'Nacional e importado', st.orig) + op('nacional', 'Nacional', st.orig) + op('importado', 'Importado', st.orig));
   if(opc.persona) h += sel('persona', '🧑‍💼 Comprador', op('', 'Todos', st.persona) + appFPersonas().map(function(v){ return op(v, appFNomPersona(v), st.persona); }).join(''));
@@ -13604,9 +13615,15 @@ function appGastoPeriodo(k){
   return k === 'semana' ? polarPeriodoDe('esta semana') : k === 'mes' ? polarPeriodoDe('este mes') : k === 'mesAnt' ? polarPeriodoDe('mes pasado')
     : k === 'anio' ? polarPeriodoDe('este ano') : null;
 }
-function appGastoFilas(per, orig, fam){
+// Comprador de cada OC, desde el Reporte Maestro y PedidoSinReq (usuario de Compras).
+function appCompradorOC(){ return appMemo('ocComprador', function(){ const m = new Map();
+  getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(r.codOrden && r.usuarioCompras && !m.has(r.codOrden)) m.set(r.codOrden, r.usuarioCompras); });
+  return m; }); }
+function appGastoFilas(per, orig, fam, persona){
+  const cm = persona ? appCompradorOC() : null;
   return ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){
     if(orig !== 'todo' && r.origen !== orig) return false;
+    if(cm && cm.get(r.oc) !== persona) return false;
     if(fam && r.familia !== fam) return false;
     return !per || polarEnPeriodo(dateFromYMD(r.anio, r.mes, r.dia), per);
   });
@@ -13618,7 +13635,7 @@ function appAgrupar(filas, campo){
 function appGastoHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
   if(!(GASTO_DATA && GASTO_DATA.rows && GASTO_DATA.rows.length)) return '<div class="ini-card"><div class="ini-vacio">Carga Consulta.xlsx para ver el gasto.</div></div>';
-  const per = appFRango(APP_F.gasto), filas = appGastoFilas(per, APP_F.gasto.orig, APP_G.fam);
+  const per = appFRango(APP_F.gasto), filas = appGastoFilas(per, APP_F.gasto.orig, APP_G.fam, APP_F.gasto.persona);
   const total = filas.reduce(function(a, r){ return a + (r.montoPEN || 0); }, 0);
   const nac = montoPorMonedaOrigen(filas.filter(function(r){ return r.origen === 'nacional'; }));
   const imp = montoPorMonedaOrigen(filas.filter(function(r){ return r.origen === 'importado'; }));
@@ -13627,14 +13644,15 @@ function appGastoHtml(){
   for(let i = 5; i >= 0; i--){
     const d = new Date(Date.UTC(c.getUTCFullYear(), c.getUTCMonth() - i, 1));
     const p = { desde:d, hasta:new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)) };
-    meses.push([MESES_CORTOS[d.getUTCMonth()], appGastoFilas(p, APP_F.gasto.orig, APP_G.fam).reduce(function(a, r){ return a + (r.montoPEN || 0); }, 0)]);
+    meses.push([MESES_CORTOS[d.getUTCMonth()], appGastoFilas(p, APP_F.gasto.orig, APP_G.fam, APP_F.gasto.persona).reduce(function(a, r){ return a + (r.montoPEN || 0); }, 0)]);
   }
   const maxM = Math.max.apply(null, meses.map(function(m){ return m[1]; }).concat([1]));
   const tiles = [['🇵🇪 Nacional S/', nac.soles, fmtPEN(nac.soles)], ['🇵🇪 Nacional $', nac.dolares, fmtUSD(nac.dolares)], ['🌎 Importado $', imp.dolares, fmtUSD(imp.dolares)]]
     .filter(function(t){ return Math.round(t[1]) !== 0; });
   const fams = appAgrupar(filas, APP_G.fam ? 'subfamilia' : 'familia'), provs = appAgrupar(filas, 'proveedor');
-  const perTxt = per ? per.label : 'todo lo cargado';
-  return appFBarra('gasto', { orig:1 })
+  const perTxt = (per ? per.label : 'todo lo cargado') + (APP_F.gasto.persona ? ' · ' + appFNomPersona(APP_F.gasto.persona) : '');
+  return appFBarra('gasto', { orig:1, persona:1 })
+    + (APP_F.gasto.persona && !((GASTO_DATA && GASTO_DATA.rows) || []).some(function(r){ return r.oc; }) ? '<div class="ini-card"><div class="ini-vacio">Para filtrar el gasto por comprador hay que volver a cargar <b>Consulta.xlsx</b> y publicar (Guardar y compartir).</div></div>' : '')
     + (APP_G.fam ? `<button type="button" class="m-volver" data-gfam="">‹ Todas las familias</button>` : '')
     + `<div class="ini-card m-total"><span>${APP_G.fam ? escapeHtml(APP_G.fam) + ' · ' : ''}${escapeHtml(perTxt)}</span><b>${appUSD(total)}</b><small>equivalente en dólares · ${appN(filas.length)} líneas · ${appN(new Set(filas.map(function(r){ return r.proveedor; })).size)} proveedores</small>
         ${tiles.length ? `<div class="m-tiles">${tiles.map(function(t){ return `<div><span>${t[0]}</span><b>${t[2]}</b></div>`; }).join('')}</div>` : ''}</div>
@@ -13648,7 +13666,7 @@ function appGastoHtml(){
 // OC y productos de un proveedor en el período y filtros de Gasto.
 function appGastoProv(prov){
   const per = appFRango(APP_F.gasto), n = polarNorm(prov);
-  const g = appGastoFilas(per, APP_F.gasto.orig, APP_G.fam).filter(function(r){ return r.proveedor === prov; });
+  const g = appGastoFilas(per, APP_F.gasto.orig, APP_G.fam, APP_F.gasto.persona).filter(function(r){ return r.proveedor === prov; });
   const total = g.reduce(function(a, r){ return a + (r.montoPEN || 0); }, 0);
   const prods = appAgrupar(g, 'producto');
   const ocs = new Map();
