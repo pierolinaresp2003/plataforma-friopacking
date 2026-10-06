@@ -14284,6 +14284,21 @@ function appReqPdf(cod){
       <div class="asis-estados">${appChipsEstado(est)}</div></div>
     <div class="ini-card"><div class="ini-card-tit">📋 Datos del requerimiento</div>
       ${dato(r0.proyecto, 'Proyecto' + (r0.idProyecto ? ' · ' + escapeHtml(r0.idProyecto) : ''))}${dato(r0.responsable, 'Solicitante')}${dato(rqFecha(r0.fReq), 'Fecha del requerimiento')}${dato(r0.obs, 'Observación')}</div>
+    ${(function(){
+      // Stock en camino sin REQ que puede atender lo pendiente (06.10.2026, Piero: "en el pdf considera si hay
+      // algo en tránsito que pueda usarse con esos productos"). Misma regla del cruce: OC sin REQ relacionado.
+      const cr = rqCruceLibre(pend);
+      if(!pend.length) return '';
+      if(!cr.length) return '<div class="ini-card"><div class="ini-card-tit">📦 Stock en camino que puede usarse</div><div class="ini-vacio">No hay compras ni importaciones en camino sin REQ para los productos pendientes.</div></div>';
+      return `<div class="ini-card"><div class="ini-card-tit">📦 Stock en camino que puede usarse <small>${cr.length} de ${pend.length} ítems pendientes</small></div>
+        ${cr.map(function(c){ const ct = rqCubreTxt(c.total, c.falta), um = c.r.unidad || '';
+          return c.libres.map(function(y){
+            return appFilaHtml('', 'rq-pdf ' + (ct[0] === 'ok' ? 'verde' : 'ambar'), c.r.producto,
+              escapeHtml(c.r.idProducto) + (y.cod !== c.r.idProducto ? ' (homologado ' + escapeHtml(y.cod) + ')' : '') + ' · faltan ' + polarNum(c.falta) + ' ' + escapeHtml(um)
+                + ' · OC ' + escapeHtml(y.oc) + ' · ' + escapeHtml(y.prov) + ' · ETA ' + escapeHtml(y.lleg.etaTxt) + ' · ' + escapeHtml(y.lleg.est[1]),
+              polarNum(y.q) + ' ' + escapeHtml(y.um) + ' en camino', ct[1]); }).join(''); }).join('')}
+        <div class="av-nota">Compras o importaciones que todavía no llegan y no tienen un requerimiento relacionado: están libres para atender este pedido.</div></div>`;
+    })()}
     ${sec('⏳ Pendientes', 'ambar', pend)}${sec('✅ Atendidos', 'verde', listos)}`);
   return true;
 }
