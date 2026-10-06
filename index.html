@@ -1250,7 +1250,11 @@
     .m-fila{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:10px 14px;text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);}
     .m-fila .t{flex:1;min-width:0;} .m-fila .t b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .m-fila .t small{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
-.m-fila.rq-pdf{cursor:default;} .m-fila .t small .rq-camino{display:block;margin-top:3px;font-weight:700;color:var(--green);} .m-fila .t small .rq-camino.espera{color:var(--amber-ink);} .m-fila.rq-pdf .t b{white-space:normal;} .m-fila.rq-pdf .v{max-width:42%;}
+.m-fila.rq-pdf{cursor:default;} .rqp-it{padding:12px 14px;border-top:1px solid var(--border);} .rqp-it:nth-child(odd of .rqp-it){background:var(--surface-2);}
+.rqp-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;} .rqp-top .asis-est{flex-shrink:0;white-space:nowrap;font-size:11.5px;padding:4px 9px;}
+.rqp-nom{font-weight:800;font-size:13.5px;color:var(--ink);line-height:1.3;} .rqp-n{display:inline-block;min-width:22px;color:var(--muted);font-weight:800;}
+.rqp-meta{font-size:11.5px;color:var(--muted);margin:2px 0 0 22px;} .rqp-txt{font-size:12.5px;color:var(--ink-soft);margin:6px 0 0 22px;line-height:1.4;}
+.rqp-cam{margin:7px 0 0 22px;font-size:12px;line-height:1.4;background:var(--green-bg);color:var(--green);border-radius:8px;padding:6px 10px;} .rqp-cam.espera{background:var(--amber-bg);color:var(--amber-ink);} .m-fila .t small .rq-camino{display:block;margin-top:3px;font-weight:700;color:var(--green);} .m-fila .t small .rq-camino.espera{color:var(--amber-ink);} .m-fila.rq-pdf .t b{white-space:normal;} .m-fila.rq-pdf .v{max-width:42%;}
     .m-fila .v{flex-shrink:0;text-align:right;} .m-fila .v b{display:block;font-size:14px;} .m-fila .v small{font-size:10px;color:var(--muted);}
     .m-fila.rojo .v b{color:var(--red);} .m-fila.ambar .v b{color:var(--amber-ink);} .m-fila.azul .v b{color:var(--brand-ink);} .m-fila.verde .v b{color:var(--green);}
     .m-aviso{display:block;width:100%;background:var(--red-bg);color:var(--red);border:0;border-radius:12px;padding:10px 12px;font-size:12.5px;font-weight:800;margin-bottom:10px;text-align:left;cursor:pointer;font-family:inherit;}
@@ -14274,17 +14278,39 @@ function appReqPdf(cod){
   const r0 = items[0], pend = items.filter(function(r){ return !rqItemListo(r); }), listos = items.filter(rqItemListo);
   const pct = Math.round(listos.length / items.length * 100), est = {};
   items.forEach(function(r){ est[r.estadoCalc || '—'] = (est[r.estadoCalc || '—'] || 0) + 1; });
-  const color = { ok:'verde', camino:'azul', recibido:'azul', espera:'ambar', tarde:'rojo' };
-  // Stock en camino sin REQ que puede atender cada pendiente, dentro de su propia línea (06.10.2026, Piero:
-  // "está como separado, impleméntalo en la línea del requerimiento").
+  // Cada producto en un bloque propio, con una frase simple de cómo va en vez de todos los datos seguidos
+  // (06.10.2026, Piero: "con tanta información se pierde; una explicación sencilla de cómo va"). El stock en
+  // camino sin REQ que puede atenderlo va dentro del mismo bloque.
   const cr = rqCruceLibre(pend), crDe = new Map(cr.map(function(c){ return [c.r, c]; }));
-  const camino = function(c){ if(!c) return ''; const ct = rqCubreTxt(c.total, c.falta);
-    return c.libres.map(function(y){ return `<span class="rq-camino ${ct[0]}">📦 ${polarNum(y.q)} ${escapeHtml(y.um)} en camino sin REQ · OC ${escapeHtml(y.oc)} · ${escapeHtml(polarCorta(y.prov, 30))} · ETA ${escapeHtml(y.lleg.etaTxt)} · ${escapeHtml(y.lleg.est[1])}${y.cod !== c.r.idProducto ? ' · homologado ' + escapeHtml(y.cod) : ''}</span>`; }).join('')
-      + `<span class="rq-camino ${ct[0]}">${ct[1]}: ${polarNum(c.total)} por llegar para ${polarNum(c.falta)} ${escapeHtml(c.r.unidad || '')} que faltan</span>`; };
-  const fila = function(r){ const s = polarSitCorta(r);
-    const det = [r.idProducto, polarNum(r.cantidad) + ' ' + (r.unidad || ''), r.familia, r.codPedido ? 'Pedido ' + r.codPedido : '', r.codOrden ? 'OC ' + r.codOrden : '',
-      r.proveedor || '', r.docSalida ? 'Salida ' + r.docSalida + rqDesde(r) : '', r.docObra ? 'Obra ' + r.docObra : ''].filter(Boolean);
-    return appFilaHtml('', 'rq-pdf ' + (color[s[0]] || ''), r.producto, escapeHtml(det.join(' · ')) + camino(crDe.get(r)), s[1] + ' ' + escapeHtml(s[2]), escapeHtml(s[3] || '')); };
+  const dh = function(f){ const n = f ? Math.max(0, busdayCount(f, new Date())) : 0; return n === 0 ? 'hoy' : 'hace ' + n + (n === 1 ? ' día hábil' : ' días hábiles'); };
+  const ocC = function(o){ return 'OC ' + String(o || '').replace(/^000\d-0*/, ''); };
+  const prov = function(p){ return polarCorta(appImpNombre(p || ''), 34); };
+  const frase = function(r){
+    const e = r.estadoCalc || '', um = r.unidad || '', n = function(v){ return polarNum(v) + ' ' + um; };
+    if(r.partido && !(r.cantRecep > 0 || r.fRecep))
+      return 'Salieron ' + n(r.cantSalida) + ' del stock; el resto (' + n(r.cantPedido) + ') ' + (r.codOrden ? 'está comprado a ' + prov(r.proveedor) + ' (' + ocC(r.codOrden) + ').' : 'está en Compras, todavía sin orden de compra.');
+    if(e === 'En Revisión') return 'Almacén está revisando si lo atiende con stock o lo pide a Compras (desde ' + dh(r.fReq) + ').';
+    if(e === 'Pedido pendiente') return 'Está en Compras, todavía sin orden de compra (' + dh(r.fPedido || r.fReq) + ').';
+    if(e === 'Enviado a pedido — cuenta con OC'){
+      const tarde = r.fCompromiso && busdayCount(r.fCompromiso, new Date()) > 0;
+      return 'Comprado a ' + prov(r.proveedor) + ' (' + ocC(r.codOrden) + '). ' + (!r.fCompromiso ? 'Fecha de llegada por definir.' : tarde ? '⚠️ Debía llegar el ' + rqFecha(r.fCompromiso) + ' y aún no llega.' : 'Llega aprox. el ' + rqFecha(r.fCompromiso) + '.');
+    }
+    if(e === 'Recibido en Almacén') return 'Ya está en el almacén' + (r.fRecep ? ' desde el ' + rqFecha(r.fRecep) : '') + '; falta enviarlo a obra.';
+    if(e === 'Enviado a Obra'){
+      const f = r.cantidad != null && r.cantSalida != null ? Math.round((r.cantidad - r.cantSalida) * 100) / 100 : 0;
+      return f > 0 ? 'Salió una parte a obra (' + n(r.cantSalida) + ' de ' + n(r.cantidad) + '); faltan ' + n(f) + '.' : 'Salió a obra el ' + rqFecha(r.fSalida) + (r.sedeSalida ? ' desde ' + r.sedeSalida : '') + '.';
+    }
+    if(e === 'Recibido en Obra') return 'Recibido en obra el ' + rqFecha(r.fObra || r.fSalida) + '.';
+    if(e === 'Archivado') return 'Archivado (ya no se atiende).';
+    return e || '—';
+  };
+  const camino = function(c){ if(!c) return ''; const y = c.libres[0], ok = c.total >= c.falta - 0.001;
+    const eta = String(y.lleg.etaTxt || '').replace(/\s*\(.*\)\s*$/, '');
+    return `<div class="rqp-cam ${ok ? '' : 'espera'}">📦 Se puede atender con <b>${polarNum(c.total)} ${escapeHtml(y.um)}</b> que vienen en camino sin REQ: ${escapeHtml(ocC(y.oc))} de ${escapeHtml(prov(y.prov))}${c.libres.length > 1 ? ' y ' + (c.libres.length - 1) + ' OC más' : ''} · ${escapeHtml(y.lleg.est[1])} · ETA ${escapeHtml(eta)}. ${ok ? '<b>Alcanza para lo que falta.</b>' : '<b>Cubre solo una parte.</b>'}</div>`; };
+  const fila = function(r, i){ const s = polarSitCorta(r);
+    return `<div class="rqp-it"><div class="rqp-top"><div class="rqp-nom"><span class="rqp-n">${i + 1}</span>${escapeHtml(r.producto || '—')}</div><span class="asis-est ${s[0]}">${s[1]} ${escapeHtml(r.partido && !(r.cantRecep > 0 || r.fRecep) ? 'Atendido en parte' : ((APP_ESTADOS.find(function(e){ return e[0] === r.estadoCalc; }) || [])[1] || r.estadoCalc || '—'))}</span></div>
+      <div class="rqp-meta">Código ${escapeHtml(r.idProducto || '—')} · pidió ${polarNum(r.cantidad)} ${escapeHtml(r.unidad || '')}</div>
+      <div class="rqp-txt">${escapeHtml(frase(r))}</div>${camino(crDe.get(r))}</div>`; };
   const dato = function(t, st){ return t ? appFilaHtml('', 'rq-pdf', t, st) : ''; };
   const sec = function(tit, cls, l){ return l.length ? `<details class="m-sec ${cls}" open><summary><span>${tit}</span><b>${l.length}</b></summary>${l.map(fila).join('')}</details>` : ''; };
   appListaAbrir('📄 Requerimiento ' + escapeHtml(cod.replace(/^0001-0*/, '')), escapeHtml(cod) + ' · datos al ' + rqFecha(appIndCorte()), `
