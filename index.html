@@ -590,6 +590,7 @@
   .rqm-sit.detalle{background:var(--card);border:1px solid var(--border);border-left-width:4px;}
   .rqm-sit small.volver{color:var(--muted);font-style:italic;margin-top:5px;}
   .rqm-falta{margin-top:8px;font-size:13px;background:rgba(255,255,255,.14);border-radius:8px;padding:6px 10px;display:inline-block;}
+  button.rqm-falta{border:0;color:#fff;font-family:inherit;font-weight:700;cursor:pointer;}
   .rqm-listos{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:4px 14px;}
   .rqm-listos summary{cursor:pointer;font-size:13px;font-weight:800;color:var(--green);padding:10px 0;list-style:none;}
   .rqm-listos summary::-webkit-details-marker{display:none;}
@@ -1245,6 +1246,7 @@
     .m-fila{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:10px 14px;text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);}
     .m-fila .t{flex:1;min-width:0;} .m-fila .t b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .m-fila .t small{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
+.m-fila.rq-pdf{cursor:default;} .m-fila.rq-pdf .t b{white-space:normal;} .m-fila.rq-pdf .v{max-width:42%;}
     .m-fila .v{flex-shrink:0;text-align:right;} .m-fila .v b{display:block;font-size:14px;} .m-fila .v small{font-size:10px;color:var(--muted);}
     .m-fila.rojo .v b{color:var(--red);} .m-fila.ambar .v b{color:var(--amber-ink);} .m-fila.azul .v b{color:var(--brand-ink);} .m-fila.verde .v b{color:var(--green);}
     .m-aviso{display:block;width:100%;background:var(--red-bg);color:var(--red);border:0;border-radius:12px;padding:10px 12px;font-size:12.5px;font-weight:800;margin-bottom:10px;text-align:left;cursor:pointer;font-family:inherit;}
@@ -11447,6 +11449,7 @@ function rqVistaTarjetas(cont, filas){
       <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>
       <div class="rqm-resp">Pidió <b>${rqTxt(r0.responsable)}</b> · ${todo.length} ítem${todo.length === 1 ? '' : 's'}</div>${faltaTxt}
       ${cruce.length ? `<div class="rqm-falta">📦 <b>${cruce.length}</b> ítem${cruce.length === 1 ? '' : 's'} con stock en camino sin REQ (ver en la tarjeta)</div>` : ''}
+      <button type="button" class="rqm-falta rq-pdf-btn" data-reqpdf="${escapeHtml(r0.codRequerimiento)}">📄 Exportar a PDF</button>
     </div>` : (soloFalta && pryUnico ? `<div class="rqm-cab">
       <div class="rqm-cab-top"><span class="rqm-num">${escapeHtml(r0.idProyecto || '')}</span><span class="rqm-fecha">${reqs.length} req.</span></div>
       <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>${faltaTxt}
@@ -11557,7 +11560,7 @@ function rqVistaItem(cont, filas){
   // Dos filas de encabezado: arriba el tramo del proceso, abajo la columna. Así se lee de izquierda a
   // derecha en el mismo orden en que las cosas pasan de verdad (25.09.2026, pedido de Piero).
   const unReq = ver.length && ver.every(function(r){ return r.codRequerimiento === ver[0].codRequerimiento; });
-  cont.innerHTML = (unReq ? rqLibreTablaHtml(rqCruceLibre(orden)) : '') + `<div class="card table-card rq-scroll"><table class="rq-tabla">
+  cont.innerHTML = (unReq ? `<button type="button" class="ini-link rq-pdf-btn" data-reqpdf="${escapeHtml(ver[0].codRequerimiento)}">📄 Exportar a PDF el requerimiento ${escapeHtml(ver[0].codRequerimiento)}</button>` + rqLibreTablaHtml(rqCruceLibre(orden)) : '') + `<div class="card table-card rq-scroll"><table class="rq-tabla">
       <thead>
         <tr class="rq-grupos">
           <th colspan="10" class="t1">1 · Requerimiento</th>
@@ -11979,6 +11982,8 @@ function rqAbrirStock(btn){
 document.addEventListener('click', function(e){
   const b = e.target.closest ? e.target.closest('[data-rqstock]') : null;
   if(b){ rqAbrirStock(b); return; }
+  const rp = e.target.closest ? e.target.closest('[data-reqpdf]') : null;
+  if(rp){ if(appReqPdf(rp.dataset.reqpdf)) appPanelPdf(); return; }
   const t = e.target.closest ? e.target.closest('[data-transito]') : null;
   if(t){ trAbrirTransito(t); return; }
   if(!(e.target.closest && e.target.closest('#rqPop'))) rqCerrarPop();
@@ -14119,6 +14124,34 @@ async function appPanelPdf(){
   }catch(err){ appToast('No se pudo generar el PDF. Inténtalo de nuevo.'); }
 }
 
+// ---------- PDF de un requerimiento (06.10.2026, Piero: "cuando se consulte por un req, la opción de
+// exportarlo como pdf ... debe ser del total del requerimiento"). Panel con TODOS los ítems (pendientes y
+// atendidos), sin precios, y se exporta con appPanelPdf.
+function appReqPdf(cod){
+  rqPreparar();
+  const items = RQ.filas.filter(function(r){ return r.codRequerimiento === cod; });
+  if(!items.length){ appToast('No encontré el requerimiento ' + cod + '.'); return false; }
+  const r0 = items[0], pend = items.filter(function(r){ return !rqItemListo(r); }), listos = items.filter(rqItemListo);
+  const pct = Math.round(listos.length / items.length * 100), est = {};
+  items.forEach(function(r){ est[r.estadoCalc || '—'] = (est[r.estadoCalc || '—'] || 0) + 1; });
+  const color = { ok:'verde', camino:'azul', recibido:'azul', espera:'ambar', tarde:'rojo' };
+  const fila = function(r){ const s = polarSitCorta(r);
+    const det = [r.idProducto, polarNum(r.cantidad) + ' ' + (r.unidad || ''), r.familia, r.codPedido ? 'Pedido ' + r.codPedido : '', r.codOrden ? 'OC ' + r.codOrden : '',
+      r.proveedor || '', r.docSalida ? 'Salida ' + r.docSalida + rqDesde(r) : '', r.docObra ? 'Obra ' + r.docObra : ''].filter(Boolean);
+    return appFilaHtml('', 'rq-pdf ' + (color[s[0]] || ''), r.producto, escapeHtml(det.join(' · ')), s[1] + ' ' + escapeHtml(s[2]), escapeHtml(s[3] || '')); };
+  const dato = function(t, st){ return t ? appFilaHtml('', 'rq-pdf', t, st) : ''; };
+  const sec = function(tit, cls, l){ return l.length ? `<details class="m-sec ${cls}" open><summary><span>${tit}</span><b>${l.length}</b></summary>${l.map(fila).join('')}</details>` : ''; };
+  appListaAbrir('📄 Requerimiento ' + escapeHtml(cod.replace(/^0001-0*/, '')), escapeHtml(cod) + ' · datos al ' + rqFecha(appIndCorte()), `
+    <button type="button" class="ini-link" data-ocpdf="1">📄 Exportar a PDF</button>
+    <div class="ini-card m-total"><span>Avance del requerimiento</span><b>${pct}%</b><small>${listos.length} de ${items.length} ítems atendidos</small>
+      <div class="m-tiles"><div><span>Ítems</span><b>${items.length}</b></div><div><span>Atendidos</span><b>${listos.length}</b></div><div><span>Pendientes</span><b>${pend.length}</b></div></div>
+      <div class="asis-estados">${appChipsEstado(est)}</div></div>
+    <div class="ini-card"><div class="ini-card-tit">📋 Datos del requerimiento</div>
+      ${dato(r0.proyecto, 'Proyecto' + (r0.idProyecto ? ' · ' + escapeHtml(r0.idProyecto) : ''))}${dato(r0.responsable, 'Solicitante')}${dato(rqFecha(r0.fReq), 'Fecha del requerimiento')}${dato(r0.obs, 'Observación')}</div>
+    ${sec('⏳ Pendientes', 'ambar', pend)}${sec('✅ Atendidos', 'verde', listos)}`);
+  return true;
+}
+
 // ---------- Estatus de importaciones (reemplaza Pendientes de Logística, 30.09.2026) ----------
 // Pedido de Piero: la pestaña Logística muestra el estatus de las importaciones abiertas, como las
 // infografías del Control Tower. Solo con datos de Nisira: ETD = zarpe; ParaFechaOrden = ETA cuando ya
@@ -15717,6 +15750,10 @@ function polarProveedor(nombre, que){
 }
 // ¿A quién le compramos X? · último precio de X (líneas de OC con monto y cantidad).
 function polarComprasDeProducto(palabras, que){
+  // "últimos 5 precios", "historial de precios": varias compras por producto, no solo la última (06.10.2026).
+  const qh = POLAR.entendido || '', mh = qh.match(/\bultim[oa]s?\s+(\d{1,2})\b/);
+  const hist = que === 'precio' && (mh || /\bultim[oa]s\b|historial|historico|evolucion/.test(qh)) ? Math.min(20, mh ? +mh[1] : 5) : 0;
+  palabras = palabras.filter(function(w){ return !/^(ultim[oa]s?|historial|historico|evolucion|precios?|\d{1,2})$/.test(w); });
   if(!palabras.length) return null;
   const esCod = palabras.length === 1 && /^\d{12}$/.test(palabras[0]);
   // Primero por la descripción del producto; si no calza, también por su familia.
@@ -15727,6 +15764,14 @@ function polarComprasDeProducto(palabras, que){
     const con = l.filter(function(r){ return r.montoNativo > 0 && r.cantidadOrden > 0; }).sort(function(a,b){ return (b.fOrden || 0) - (a.fOrden || 0); });
     if(!con.length) return `<p>Encontré compras de "${escapeHtml(palabras.join(' '))}", pero sin monto y cantidad para calcular el precio.</p>`;
     const vistos = new Set(), ult = con.filter(function(r){ if(vistos.has(r.idProducto)) return false; vistos.add(r.idProducto); return true; });
+    const pu = function(r){ return r.montoNativo / r.cantidadOrden; }, mon = function(r){ return monedaLabel(r.moneda) === 'S/' ? 'S/' : '$'; };
+    if(hist) return `<div class="cab">💲 Últimos ${hist} precios de compra</div><div class="sub">"${escapeHtml(palabras.join(' '))}" · del más reciente al más antiguo · precio unitario = monto ÷ cantidad</div>
+      ${ult.slice(0, 3).map(function(u){ const l = con.filter(function(r){ return r.idProducto === u.idProducto; }).slice(0, hist);
+        return `<p><b>${escapeHtml(polarCorta(u.producto, 60))}</b> <span class="mono">${escapeHtml(u.idProducto)}</span> · ${l.length} compra${l.length === 1 ? '' : 's'}</p>` + l.map(function(r, i){
+          const ant = l[i + 1], v = ant && mon(ant) === mon(r) && pu(ant) > 0 ? (pu(r) / pu(ant) - 1) * 100 : null;
+          return `<div class="asis-item"><div class="d"><b>${mon(r)} ${pu(r).toLocaleString('es-PE', { maximumFractionDigits:2 })}</b> por ${escapeHtml(r.unidad || 'unidad')}${v != null && Math.abs(v) >= 0.5 ? ` <span class="asis-est ${v > 0 ? 'tarde' : 'ok'}">${v > 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(0)}%</span>` : ''}</div>
+            <div class="q">${rqFecha(r.fOrden)} · ${escapeHtml(polarCorta(r.proveedor, 30))} · OC <span class="mono">${escapeHtml(r.codOrden)}</span> · ${polarNum(r.cantidadOrden)} ${escapeHtml(r.unidad || '')}</div></div>`; }).join(''); }).join('')}
+      ${ult.length > 3 ? `<p class="q">…y ${ult.length - 3} productos más con esas palabras: escribe el código para ver uno.</p>` : ''}`;
     return `<div class="cab">💲 Último precio de compra</div><div class="sub">"${escapeHtml(palabras.join(' '))}" · precio unitario = monto de la línea ÷ cantidad</div>
       ${ult.slice(0, 6).map(function(r){ const pu = r.montoNativo / r.cantidadOrden, mon = monedaLabel(r.moneda);
         return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(r.producto, 60))}</div><div class="q"><b>${mon === 'S/' ? 'S/' : '$'} ${pu.toLocaleString('es-PE', { maximumFractionDigits:2 })}</b> por ${escapeHtml(r.unidad || 'unidad')} · ${escapeHtml(polarCorta(r.proveedor, 30))} · OC <span class="mono">${escapeHtml(r.codOrden)}</span> (${rqFecha(r.fOrden)})</div></div>`; }).join('')}`;
@@ -16063,6 +16108,12 @@ function polarResponder1(texto){
 
   // "Dashboard de importaciones en PDF": el dashboard con su botón 📄 Exportar PDF (05.10.2026).
   if(!soloReqs && /\bpdf\b/.test(qr) && /importac|dashboard|tablero/.test(qr)) return polarDashImportacion(polarPeriodoDe(q), polarClienteImport(qr)[0] || '');
+  // "PDF del req 23303": el requerimiento completo en PDF (06.10.2026).
+  if(/\bpdf\b/.test(qr) && !/importac|dashboard|tablero/.test(qr)){
+    const m = T.match(/\b(\d{4})\s*-\s*(\d{3,7})\b/) || T.match(/\b(\d{3,7})\b/);
+    if(m){ const cod = m[2] ? m[1] + '-' + m[2].padStart(7, '0') : '0001-' + m[1].padStart(7, '0');
+      if(appReqPdf(cod)){ appPanelPdf(); return `<p>📄 Listo, armé el PDF del requerimiento <b class="mono">${escapeHtml(cod)}</b> con todos sus ítems.</p>`; } }
+  }
   if(/excel|exporta|descarg|xlsx/.test(q)) return polarExportar(q, T);
   if(!soloReqs && /\bbooking\b|\betd\b|\beta\b|embarc|zarp/.test(q) && !/cuanto tarda|demora|promedio|\boc\s*\d/.test(q)) return polarImportaciones(q, p);
   const prod = T.match(/\b\d{12}\b/);
@@ -16310,7 +16361,7 @@ function polarReq(cod){
       return `<p><b>📦 Stock en camino sin REQ</b> que puede atender ${cr.length} ítem${cr.length === 1 ? '' : 's'}:</p>` + cr.slice(0, 4).map(function(c){ const y = c.libres[0], ct = rqCubreTxt(c.total, c.falta);
         return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(c.r.producto, 46))} <span class="mono">${escapeHtml(c.r.idProducto)}</span></div>
           <div class="q">Pidió ${polarNum(c.r.cantidad)} · faltan ${polarNum(c.falta)} · por llegar <b>${polarNum(c.total)} ${escapeHtml(y.um)}</b> · OC ${escapeHtml(y.oc.replace(/^000\d-0*/, ''))}${c.libres.length > 1 ? ' +' + (c.libres.length - 1) : ''} · ${escapeHtml(polarCorta(y.prov, 26))} · ETA ${escapeHtml(y.lleg.etaTxt)} <span class="asis-est ${y.lleg.est[0]}">${escapeHtml(y.lleg.est[1])}</span> <span class="asis-est ${ct[0]}">${ct[1]}</span></div></div>`; }).join('') + (cr.length > 4 ? `<div class="q">…y ${cr.length - 4} más en "Ver trazabilidad".</div>` : ''); })()}
-    <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad')}${polarBtn('q', 'excel del req ' + cod, '📥 Excel')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Proyecto') : ''}</div>`;
+    <div class="asis-acc">${polarBtn('req', cod, 'Ver trazabilidad')}${polarBtn('q', 'excel del req ' + cod, '📥 Excel')}${polarBtn('reqpdf', cod, '📄 PDF')}${r0.idProyecto ? polarBtn('q', r0.idProyecto, 'Proyecto') : ''}</div>`;
 }
 
 // ---------- Proyecto ----------
