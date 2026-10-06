@@ -1250,7 +1250,7 @@
     .m-fila{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:10px 14px;text-align:left;cursor:pointer;font-family:inherit;color:var(--ink);}
     .m-fila .t{flex:1;min-width:0;} .m-fila .t b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .m-fila .t small{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
-.m-fila.rq-pdf{cursor:default;} .m-fila.rq-pdf .t b{white-space:normal;} .m-fila.rq-pdf .v{max-width:42%;}
+.m-fila.rq-pdf{cursor:default;} .m-fila .t small .rq-camino{display:block;margin-top:3px;font-weight:700;color:var(--green);} .m-fila .t small .rq-camino.espera{color:var(--amber-ink);} .m-fila.rq-pdf .t b{white-space:normal;} .m-fila.rq-pdf .v{max-width:42%;}
     .m-fila .v{flex-shrink:0;text-align:right;} .m-fila .v b{display:block;font-size:14px;} .m-fila .v small{font-size:10px;color:var(--muted);}
     .m-fila.rojo .v b{color:var(--red);} .m-fila.ambar .v b{color:var(--amber-ink);} .m-fila.azul .v b{color:var(--brand-ink);} .m-fila.verde .v b{color:var(--green);}
     .m-aviso{display:block;width:100%;background:var(--red-bg);color:var(--red);border:0;border-radius:12px;padding:10px 12px;font-size:12.5px;font-weight:800;margin-bottom:10px;text-align:left;cursor:pointer;font-family:inherit;}
@@ -14273,34 +14273,26 @@ function appReqPdf(cod){
   const pct = Math.round(listos.length / items.length * 100), est = {};
   items.forEach(function(r){ est[r.estadoCalc || '—'] = (est[r.estadoCalc || '—'] || 0) + 1; });
   const color = { ok:'verde', camino:'azul', recibido:'azul', espera:'ambar', tarde:'rojo' };
+  // Stock en camino sin REQ que puede atender cada pendiente, dentro de su propia línea (06.10.2026, Piero:
+  // "está como separado, impleméntalo en la línea del requerimiento").
+  const cr = rqCruceLibre(pend), crDe = new Map(cr.map(function(c){ return [c.r, c]; }));
+  const camino = function(c){ if(!c) return ''; const ct = rqCubreTxt(c.total, c.falta);
+    return c.libres.map(function(y){ return `<span class="rq-camino ${ct[0]}">📦 ${polarNum(y.q)} ${escapeHtml(y.um)} en camino sin REQ · OC ${escapeHtml(y.oc)} · ${escapeHtml(polarCorta(y.prov, 30))} · ETA ${escapeHtml(y.lleg.etaTxt)} · ${escapeHtml(y.lleg.est[1])}${y.cod !== c.r.idProducto ? ' · homologado ' + escapeHtml(y.cod) : ''}</span>`; }).join('')
+      + `<span class="rq-camino ${ct[0]}">${ct[1]}: ${polarNum(c.total)} por llegar para ${polarNum(c.falta)} ${escapeHtml(c.r.unidad || '')} que faltan</span>`; };
   const fila = function(r){ const s = polarSitCorta(r);
     const det = [r.idProducto, polarNum(r.cantidad) + ' ' + (r.unidad || ''), r.familia, r.codPedido ? 'Pedido ' + r.codPedido : '', r.codOrden ? 'OC ' + r.codOrden : '',
       r.proveedor || '', r.docSalida ? 'Salida ' + r.docSalida + rqDesde(r) : '', r.docObra ? 'Obra ' + r.docObra : ''].filter(Boolean);
-    return appFilaHtml('', 'rq-pdf ' + (color[s[0]] || ''), r.producto, escapeHtml(det.join(' · ')), s[1] + ' ' + escapeHtml(s[2]), escapeHtml(s[3] || '')); };
+    return appFilaHtml('', 'rq-pdf ' + (color[s[0]] || ''), r.producto, escapeHtml(det.join(' · ')) + camino(crDe.get(r)), s[1] + ' ' + escapeHtml(s[2]), escapeHtml(s[3] || '')); };
   const dato = function(t, st){ return t ? appFilaHtml('', 'rq-pdf', t, st) : ''; };
   const sec = function(tit, cls, l){ return l.length ? `<details class="m-sec ${cls}" open><summary><span>${tit}</span><b>${l.length}</b></summary>${l.map(fila).join('')}</details>` : ''; };
   appListaAbrir('📄 Requerimiento ' + escapeHtml(cod.replace(/^0001-0*/, '')), escapeHtml(cod) + ' · datos al ' + rqFecha(appIndCorte()), `
     <button type="button" class="ini-link" data-ocpdf="1">📄 Exportar a PDF</button>
     <div class="ini-card m-total"><span>Avance del requerimiento</span><b>${pct}%</b><small>${listos.length} de ${items.length} ítems atendidos</small>
       <div class="m-tiles"><div><span>Ítems</span><b>${items.length}</b></div><div><span>Atendidos</span><b>${listos.length}</b></div><div><span>Pendientes</span><b>${pend.length}</b></div></div>
-      <div class="asis-estados">${appChipsEstado(est)}</div></div>
+      <div class="asis-estados">${appChipsEstado(est)}</div>
+      ${pend.length ? `<small>${cr.length ? '📦 ' + cr.length + ' de ' + pend.length + ' pendientes tienen stock en camino sin REQ (se indica en cada línea)' : '📦 Ningún pendiente tiene stock en camino sin REQ'}</small>` : ''}</div>
     <div class="ini-card"><div class="ini-card-tit">📋 Datos del requerimiento</div>
       ${dato(r0.proyecto, 'Proyecto' + (r0.idProyecto ? ' · ' + escapeHtml(r0.idProyecto) : ''))}${dato(r0.responsable, 'Solicitante')}${dato(rqFecha(r0.fReq), 'Fecha del requerimiento')}${dato(r0.obs, 'Observación')}</div>
-    ${(function(){
-      // Stock en camino sin REQ que puede atender lo pendiente (06.10.2026, Piero: "en el pdf considera si hay
-      // algo en tránsito que pueda usarse con esos productos"). Misma regla del cruce: OC sin REQ relacionado.
-      const cr = rqCruceLibre(pend);
-      if(!pend.length) return '';
-      if(!cr.length) return '<div class="ini-card"><div class="ini-card-tit">📦 Stock en camino que puede usarse</div><div class="ini-vacio">No hay compras ni importaciones en camino sin REQ para los productos pendientes.</div></div>';
-      return `<div class="ini-card"><div class="ini-card-tit">📦 Stock en camino que puede usarse <small>${cr.length} de ${pend.length} ítems pendientes</small></div>
-        ${cr.map(function(c){ const ct = rqCubreTxt(c.total, c.falta), um = c.r.unidad || '';
-          return c.libres.map(function(y){
-            return appFilaHtml('', 'rq-pdf ' + (ct[0] === 'ok' ? 'verde' : 'ambar'), c.r.producto,
-              escapeHtml(c.r.idProducto) + (y.cod !== c.r.idProducto ? ' (homologado ' + escapeHtml(y.cod) + ')' : '') + ' · faltan ' + polarNum(c.falta) + ' ' + escapeHtml(um)
-                + ' · OC ' + escapeHtml(y.oc) + ' · ' + escapeHtml(y.prov) + ' · ETA ' + escapeHtml(y.lleg.etaTxt) + ' · ' + escapeHtml(y.lleg.est[1]),
-              polarNum(y.q) + ' ' + escapeHtml(y.um) + ' en camino', ct[1]); }).join(''); }).join('')}
-        <div class="av-nota">Compras o importaciones que todavía no llegan y no tienen un requerimiento relacionado: están libres para atender este pedido.</div></div>`;
-    })()}
     ${sec('⏳ Pendientes', 'ambar', pend)}${sec('✅ Atendidos', 'verde', listos)}`);
   return true;
 }
