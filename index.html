@@ -12783,7 +12783,7 @@ const APP_VISTAS = {
   gerencia:   { nombre:'Gerencia',   ico:'📊', desc:'Indicadores de logística y concentración de gasto.',
     // "Vista" se cambió por el avance de atención de los requerimientos por proyecto (29.09.2026, Piero).
     // La vista se sigue cambiando desde el botón de arriba.
-    tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Indicadores'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
+    tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Tiempos'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
   supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
     // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
     // Solo Inicio y Mis req. (29.09.2026, Piero: "para el supervisor solo coloca inicio y mis req"). La vista
@@ -12797,7 +12797,7 @@ const APP_VISTAS = {
     tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones']] },
 };
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
-const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores', gasto:'Concentración de gasto', inventario:'Inventario',
+const APP_PANTALLAS = { otif:'OTIF', indicadores:'Tiempos', gasto:'Concentración de gasto', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
@@ -14603,7 +14603,7 @@ function appInicioGerencia(){
       return `<button type="button" class="ind-fila" data-inddet="${d.ind.key}|semana">
         <span class="t"><b>${escapeHtml(APP_IND_TXT[d.ind.key].corto)}</b><small>${d.st.n ? d.st.n + ' caso' + (d.st.n === 1 ? '' : 's') + ' · demora prom. ' + d.st.promedio.toFixed(1) + ' días háb.' : 'Sin casos esta semana'}</small></span>
         <span class="p ${cls}">${pct == null ? '—' : Math.round(pct) + '%'}<small>${pct == null ? '' : 'a tiempo'}</small></span></button>`;
-    }).join('') + '<button type="button" class="ini-link" data-pantalla="indicadores">Ver indicadores ›</button>';
+    }).join('') + '<button type="button" class="ini-link" data-pantalla="indicadores">Ver tiempos ›</button>';
   }catch(err){ kpis = ''; }
   let gasto = '<div class="ini-vacio">Carga Consulta.xlsx para ver el gasto.</div>';
   let gastoPer = '';
@@ -16170,7 +16170,7 @@ function polarIndicadoresV2(q){
   const lista = uno ? datos.filter(function(d){ return d.ind.key === uno; }) : datos;
   return `<div class="cab">⏱️ ${uno ? escapeHtml(APP_IND_TXT[uno].corto) : 'Indicadores de logística'}</div><div class="sub">${escapeHtml(per)}</div>
     ${uno ? `<p class="asis-nota">${escapeHtml(APP_IND_TXT[uno].que)}</p>` : ''}${lista.map(linea).join('')}
-    <div class="asis-acc">${polarBtn('pantalla', 'indicadores', 'Ver indicadores')}${polarBtn('q', 'exporta en excel los indicadores' + (persona ? ' de ' + persona : '') + (f.mes ? ' ' + POLAR_MESES[f.mes - 1] : '') + (f.anio ? ' ' + f.anio : ''), '📥 Excel')}</div>`;
+    <div class="asis-acc">${polarBtn('pantalla', 'indicadores', 'Ver tiempos')}${polarBtn('q', 'exporta en excel los indicadores' + (persona ? ' de ' + persona : '') + (f.mes ? ' ' + POLAR_MESES[f.mes - 1] : '') + (f.anio ? ' ' + f.anio : ''), '📥 Excel')}</div>`;
 }
 
 // ---------- Resumen general ("¿cómo vamos?", "resumen de la semana") ----------
