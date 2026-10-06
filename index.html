@@ -1184,6 +1184,12 @@
     .m-tiles button{font:inherit;color:inherit;text-align:left;border:0;cursor:pointer;}
     .m-lista{padding:0 !important;overflow:hidden;} .m-lista .m-fila:first-child{border-top:0;}
     .imp-card, .m-prod, .rqm-card{content-visibility:auto;contain-intrinsic-size:auto 150px;}
+    .sku-fam{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:14px 0 4px;padding:7px 12px;border-radius:10px;
+      background:var(--surface-2);font-size:12px;font-weight:800;color:var(--brand-ink);text-transform:uppercase;letter-spacing:.03em;}
+    .sku-fam:first-child{margin-top:0;} .sku-fam b{font-size:11.5px;color:var(--muted);text-transform:none;letter-spacing:0;}
+    .sku-quien, .sku-obs{display:block;margin-top:3px;font-size:11.5px;color:var(--ink-soft);}
+    .sku-obs{font-style:italic;color:var(--muted);white-space:normal;}
+    .m-fila .t .sku-quien b{display:inline;font-size:inherit;font-weight:700;color:var(--ink);}
     .imp-card{position:relative;background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px 9px 14px;margin-bottom:9px;border-left:5px solid #1fb5a3;}
     .imp-card::before{content:"";position:absolute;left:-19px;top:12px;width:9px;height:9px;border-radius:50%;background:var(--card);border:2px solid #1fb5a3;}
     .imp-card.em{border-left-color:#3565d9;} .imp-card.em::before{border-color:#3565d9;}
@@ -2965,7 +2971,7 @@ function buildSnapshot(){
       // Módulo Logística → Requerimientos (24.09.2026). Mismo criterio que el resto: filas compactas
       // con claves cortas, para que el link publicado muestre lo mismo sin volver a subir el Excel.
       req: (DATA.reqRows||[]).map(r => ({
-        f: isoDay(r.fReq), n: r.codRequerimiento, rs: r.responsable, ipy: r.idProyecto, py: r.proyecto,
+        f: isoDay(r.fReq), n: r.codRequerimiento, rs: r.responsable, ob: r.obs || undefined, ipy: r.idProyecto, py: r.proyecto,
         e: r.estado, fa: r.familia, ip: r.idProducto, pr: r.producto, u: r.unidad, q: r.cantidad,
         og: r.origen, pv: r.proveedor,
         cp: r.codPedido, fp: isoDay(r.fPedido), rp: r.responsablePedido, qp: r.cantPedido,
@@ -3061,6 +3067,7 @@ function buildSnapshot(){
       nHomologados: ALMACEN_DATA.nHomologados,
       nGruposHomologados: ALMACEN_DATA.nGruposHomologados,
       conflictosUm: ALMACEN_DATA.conflictosUm,
+      otros: ALMACEN_DATA.otros || undefined,   // stock de los productos sin punto de reorden (05.10.2026)
       // Periodos del kardex (Ene 2025 en adelante), una sola vez para todo el módulo — no se repiten por
       // producto. null si el Excel publicado no tenía las hojas "Ingresos"/"Movimientos".
       kardexPeriods: ALMACEN_DATA.kardexPeriods || null,
@@ -3262,7 +3269,7 @@ function loadFromSnapshot(snap){
     // Requerimientos (24.09.2026): ausente en snapshots viejos — el módulo avisa que hay que
     // volver a publicar, en vez de mostrar una lista vacía como si no hubiera requerimientos.
     reqRows: (snap.proceso && snap.proceso.req) ? snap.proceso.req.map(r => ({
-      fReq: fromIsoDay(r.f), codRequerimiento: r.n || '', responsable: r.rs || '',
+      fReq: fromIsoDay(r.f), codRequerimiento: r.n || '', responsable: r.rs || '', obs: r.ob || '',
       idProyecto: r.ipy || 'SIN PROYECTO', proyecto: r.py || 'SIN PROYECTO (compra de almacén)',
       estado: r.e || '(sin estado)', familia: r.fa || 'Sin familia', idProducto: r.ip || '',
       producto: r.pr || '(sin descripción)', unidad: r.u || '', cantidad: (r.q!=null ? r.q : null),
@@ -3573,6 +3580,8 @@ function processWorkbook(wb, filename){
     responsablePedido: findCol(headerRow, ["ResponsablePedido"]),
     // Quien pidió el requerimiento (23.09.2026): va en copia en los correos a proveedores.
     nombreResponsable: findCol(headerRow, ["NombreResponsable"]),
+    // Observación del requerimiento (06.10.2026, Piero: que salga en Pedidos sin OC para cotizar).
+    obsReq: findCol(headerRow, ["Observación REQ","Observacion REQ","Observación Requerimiento"]),
     usuarioCompras: findCol(headerRow, ["UsuarioCompras"]),
     responsableSalida: findCol(headerRow, ["ResponsableGeneralSalida"]),
     codRequerimiento: findCol(headerRow, ["CodRequerimiento"]),
@@ -3825,6 +3834,7 @@ function processWorkbook(wb, filename){
       reqRows.push({
         fReq, codRequerimiento: col.codRequerimiento!==-1 ? txt(col.codRequerimiento) : "",
         responsable: txt(col.nombreResponsable),
+        obs: txt(col.obsReq),
         idProyecto: txt(col.idProyecto) || "SIN PROYECTO",
         proyecto: txt(col.nombreProyecto) || "SIN PROYECTO (compra de almacén)",
         estado: estadoReqAt || "(sin estado)",
@@ -4778,13 +4788,21 @@ function processAlmacen(wb, filename){
   const dataRows = rows.slice(headerRowIdx+1);
   const almacenRows = [];
   let excluidas = 0, sinRop = 0;
+  // Productos SIN punto de reorden (05.10.2026, Piero: "debe mostrar la data de todos los productos"): no
+  // entran a la reposición ni al kardex, pero su stock por sede se guarda aparte (compacto) para consultarlo
+  // desde trazabilidad y Leo. [código, descripción, UM, Ica, Lima, Trujillo, tránsito, reserva, picking]
+  const otros = [];
+  const n2 = v => Math.round((v || 0) * 100) / 100;
   for(const r of dataRows){
     if(!r) continue;
     const codigo = txt(r[col.codigo]);
     if(!codigo){ excluidas++; continue; }
     const rop = num(r[col.rop]);
-    // Universo confirmado con Piero: solo productos con punto de reorden definido.
-    if(rop === null || rop <= 0){ sinRop++; continue; }
+    // Universo de reposición confirmado con Piero: solo productos con punto de reorden definido.
+    if(rop === null || rop <= 0){ sinRop++;
+      otros.push([codigo, col.descripcion!==-1 ? txt(r[col.descripcion]) : '', col.unidad!==-1 ? txt(r[col.unidad]) : '',
+        n2(val(r, sedeIdx['ICA'])), n2(val(r, sedeIdx['LIMA'])), n2(val(r, sedeIdx['TRUJILLO'])), n2(val(r, col.transito)), n2(val(r, col.reserva)), n2(val(r, col.picking))]);
+      continue; }
     const lima = val(r, sedeIdx['LIMA']);
     const transito = val(r, col.transito);
     const reserva = val(r, col.reserva);
@@ -4946,6 +4964,8 @@ function processAlmacen(wb, filename){
     nGruposHomologados: productos.filter(p=>p.nCodigos>1).length,
     conflictosUm,
     kardexPeriods,
+    otros: (function(){ const ya = new Set(); productos.forEach(function(p){ ya.add(p.codigo); (p.codigos || []).forEach(function(c){ ya.add(c); }); });
+      return otros.filter(function(o){ return !ya.has(o[0]); }); })(),
   };
   const nRepo = productos.filter(r=>r.estado==='reposicion').length;
   const extraHom = ALMACEN_DATA.nGruposHomologados
@@ -11837,7 +11857,18 @@ function rqStockDe(codigo){
     const p = rows[i];
     if(p.codigo === c || (p.codigos && p.codigos.indexOf(c) !== -1)) return p;
   }
-  return null;
+  return almOtrosLista().find(function(p){ return p.codigo === c; }) || null;
+}
+// Productos sin punto de reorden, como objetos (se arman una vez por archivo cargado).
+function almOtrosLista(){
+  const o = ALMACEN_DATA && ALMACEN_DATA.otros;
+  if(!o || !o.length) return [];
+  if(almOtrosLista._src !== o){
+    almOtrosLista._src = o;
+    almOtrosLista._l = o.map(function(a){ return { codigo:a[0], descripcion:a[1] || '', unidad:a[2] || '', ica:a[3] || 0, lima:a[4] || 0, trujillo:a[5] || 0,
+      transito:a[6] || 0, reserva:a[7] || 0, picking:a[8] || 0, consumoMensual:0, sinRop:true }; });
+  }
+  return almOtrosLista._l;
 }
 
 // Reservas de un código: material que YA LLEGÓ al almacén para un requerimiento y todavía no tiene
@@ -11880,7 +11911,7 @@ function rqAbrirStock(btn){
     pop.innerHTML = `<button class="cerrar" type="button" aria-label="Cerrar">&times;</button>
       <h5>${escapeHtml(cod)}</h5>
       <div class="desc aviso">${(ALMACEN_DATA && ALMACEN_DATA.rows)
-        ? 'Este código no está en la hoja "Análisis Inventario" del Reporte Almacén: solo aparecen ahí los productos con punto de reorden definido.'
+        ? 'Este código no está en la hoja "Análisis Inventario" del Reporte Almacén.'
         : 'Carga <b>Reporte Almacen.xlsx</b> para ver el stock por sede.'}</div>`;
   } else {
     // El stock es el DEL CÓDIGO QUE SE PIDIÓ, sin homologar: acá no se suman ni se listan los
@@ -11911,6 +11942,7 @@ function rqAbrirStock(btn){
       <h5>${escapeHtml(cod)}</h5>
       <div class="desc">${escapeHtml(yo.descripcion || p.descripcion || '')}${p.unidad ? ' · <b>' + escapeHtml(p.unidad) + '</b>' : ''}</div>
       <div class="sedes">${sede('LIMA', yo.lima)}${sede('TRUJILLO', yo.trujillo)}${sede('ICA', yo.ica)}</div>
+      ${p.sinRop ? '<div class="desc aviso" style="font-size:11.5px;">Sin punto de reorden: no entra en la reposición ni tiene kardex.</div>' : ''}
       ${(!p.miembros && p.nCodigos > 1) ? `<div class="alt"><div class="aviso" style="font-size:11.5px;">Este link se publicó antes del desglose por código: lo de arriba suma ${p.nCodigos} códigos. Vuelve a publicar con ☁.</div></div>` : ''}
       <div class="res">
         <div class="res-tit"><span>Reservado</span><b>${reservado ? '−' + num(reservado) : '0'}</b></div>
@@ -12288,7 +12320,7 @@ function pdFilas(){ return appMemo('pdFilas', pdFilasCalc).slice(); }
 function pdFilasCalc(){
   const out = [];
   getReqRows().forEach(function(r){
-    const base = { req: r.codRequerimiento, proyecto: r.proyecto, idProyecto: r.idProyecto,
+    const base = { req: r.codRequerimiento, proyecto: r.proyecto, idProyecto: r.idProyecto, solicitante: r.responsable, obs: r.obs, familia: r.familia,
       idProducto: r.idProducto, producto: r.producto, unidad: r.unidad, codPedido: r.codPedido,
       fPedido: r.fPedido, cantPedido: r.cantPedido, codOrden: r.codOrden, estadoOrden: r.estadoOrden,
       proveedor: r.proveedor, cantOrden: r.cantOrden, cantRecep: r.cantRecep, fOrden: r.fOrden,
@@ -13854,16 +13886,29 @@ function appPendComprasHtml(soloLista){
   const tile = function(k){ const x = S[k]; return `<button type="button" class="pc-${x[2]}${APP_PC.sec === k && !APP_PC.q ? ' sel' : ''}" data-pcsec="${k}"><b>${x[3].length}</b><span>${x[1]}</span></button>`; };
   // Pedidos sin OC como listado: una fila por SKU, el pedido más antiguo primero (05.10.2026, Piero).
   const items = filas.filter(function(r){ return r.tipo !== 'oc'; }).sort(function(a,b){ return ((a.fPedido || 0) - (b.fPedido || 0)) || String(a.codPedido).localeCompare(String(b.codPedido)); });
+  // Cada SKU con lo que hace falta para cotizar (06.10.2026, Piero): PRY, quién lo pidió y la observación
+  // del requerimiento. Agrupados por familia de producto (bloque de abajo).
   const filaSku = function(r){
     const pry = /^pedido directo/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : appImpNombre(r.proyecto || '');
+    const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '';
+    const quien = r.solicitante ? r.solicitante.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }) : '';
     return appFilaHtml('data-q="pedido ' + escapeHtml(r.codPedido) + '"', 'gris', r.producto || r.idProducto,
-      '<span class="mono">' + escapeHtml(r.idProducto || '') + '</span> · Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.req ? ' · Req ' + escapeHtml(r.req.replace(/^000\d-0*/, '')) : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 34)) : ''),
+      '<span class="mono">' + escapeHtml(r.idProducto || '') + '</span> · Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.req ? ' · Req ' + escapeHtml(r.req.replace(/^000\d-0*/, '')) : '')
+        + (pryId ? ' · <span class="mono">' + escapeHtml(pryId) + '</span>' : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 34)) : '')
+        + (quien ? '<span class="sku-quien">👷 Solicitó: <b>' + escapeHtml(quien) + '</b></span>' : '')
+        + (r.obs ? '<span class="sku-obs">📝 ' + escapeHtml(r.obs) + '</span>' : ''),
       r.cantPedido != null ? appN(r.cantPedido) + ' ' + escapeHtml(r.unidad || '') : '—', 'desde ' + appDDMM(r.fPedido) + ' · ' + polarDh(r.fPedido) + ' · ' + escapeHtml(nom(r.persona)));
+  };
+  // Pedidos sin OC agrupados por familia de producto: lo que se cotiza junto, junto (06.10.2026, Piero).
+  const skuPorFamilia = function(l){
+    const g = new Map(); l.forEach(function(r){ const k = (r.familia || 'Sin familia').toString().trim() || 'Sin familia'; if(!g.has(k)) g.set(k, []); g.get(k).push(r); });
+    return [...g.entries()].sort(function(a,b){ return b[1].length - a[1].length || a[0].localeCompare(b[0]); }).map(function(e){
+      return `<div class="sku-fam"><span>📦 ${escapeHtml(e[0])}</span><b>${e[1].length} ítem${e[1].length === 1 ? '' : 's'}</b></div>` + e[1].map(filaSku).join(''); }).join('');
   };
   // Buscador general (05.10.2026, Piero): OC, pedido, req., código, producto, proveedor o proyecto, en
   // todos los estados a la vez. Una OC sale completa si cualquiera de sus ítems coincide.
   const q = polarNorm(APP_PC.q || ''), tope = Infinity;   // todo a la vista (05.10.2026)
-  const pasa = function(r){ const t = polarNorm([r.codOrden, r.codPedido, r.req, r.idProducto, r.producto, r.proveedor, r.proyecto].join(' '));
+  const pasa = function(r){ const t = polarNorm([r.codOrden, r.codPedido, r.req, r.idProducto, r.producto, r.proveedor, r.proyecto, r.idProyecto, r.solicitante, r.obs, r.familia].join(' '));
     return q.split(' ').filter(Boolean).every(function(w){ return t.indexOf(w) !== -1 || polarCompacto(t).indexOf(polarCompacto(w)) !== -1; }); };
   const ocHit = new Set(); if(q) filas.forEach(function(r){ if(r.tipo === 'oc' && pasa(r)) ocHit.add(r.codOrden); });
   const bloque = function(k){
@@ -13871,7 +13916,7 @@ function appPendComprasHtml(soloLista){
     if(q) l = k === 'ped' ? l.filter(pasa) : l.filter(function(o){ return ocHit.has(o.oc); });
     if(q && !l.length) return '';
     return `<div class="m-pl-tit"><span>${x[0]} ${x[1]}</span><b>${k === 'ped' ? (q ? l.length + (l.length === 1 ? ' ítem' : ' ítems') : pl.length + (pl.length === 1 ? ' pedido · ' : ' pedidos · ') + items.length + (items.length === 1 ? ' ítem' : ' ítems')) : l.length}</b></div><div class="m-sec-nota">${x[4]}</div>`
-      + (!l.length ? '<div class="ini-vacio">✅ Nada en este estado.</div>' : k === 'ped' ? '<div class="ini-card">' + l.slice(0, tope).map(filaSku).join('') + '</div>'
+      + (!l.length ? '<div class="ini-vacio">✅ Nada en este estado.</div>' : k === 'ped' ? '<div class="ini-card">' + skuPorFamilia(l.slice(0, tope)) + '</div>'
         : '<div class="imp-linea">' + l.slice(0, tope).map(function(o, i){ return cardOC(o, i, k); }).join('') + '</div>')
       + (l.length > tope ? `<button type="button" class="ini-link" data-pcmas="1">Ver más (${appN(l.length - tope)} restantes) ›</button>` : '');
   };
@@ -16298,18 +16343,19 @@ function polarProducto(cod){
     ${reservado > 0 ? `<p>En Lima hay <b>${polarNum(reservado)} ${um}</b> reservados para ${res.length} requerimiento(s): disponible real <b>${polarNum(libre)} ${um}</b>.</p>` : ''}
     ${p.consumoMensual > 0 ? (function(){ const cob = stockParaReposicion(p) / p.consumoMensual; return `<p>Rotación: <b>${polarNum(p.consumoMensual)} ${um}</b> al mes · ${cob <= 0 ? '<b style="color:var(--red)">sin stock disponible</b>' : 'alcanza <b>~' + (cob < 1 ? Math.max(1, Math.round(cob * 30)) + ' días' : polarNum(Math.round(cob * 10) / 10) + ' meses') + '</b>'}.</p>`; })() : ''}
     ${trHtml ? '<p><b>En camino:</b></p>' + trHtml : (p.transito > 0 ? `<p>El almacén marca ${polarNum(p.transito)} ${um} en tránsito.</p>` : '')}
-    <div class="asis-acc">${polarBtn('inv', p.codigo, 'Ver kardex, ingresos y salidas')}</div>`;
+    ${p.sinRop ? '<p>Este producto no tiene punto de reorden: no entra en la reposición ni tiene kardex.</p>' : `<div class="asis-acc">${polarBtn('inv', p.codigo, 'Ver kardex, ingresos y salidas')}</div>`}`;
 }
 function polarBuscarProducto(palabras){
   if(!palabras.length || !(ALMACEN_DATA && ALMACEN_DATA.rows)) return null;
-  const hits = ALMACEN_DATA.rows.filter(function(r){
+  const base = ALMACEN_DATA.rows.concat(almOtrosLista());   // también los productos sin punto de reorden
+  const hits = base.filter(function(r){
     const d = polarNorm(r.descripcion);
     return palabras.every(function(w){ return polarContiene(d, w); });
   });
   let parecido = false;
   if(!hits.length && palabras.length >= 2){
     // No exacto: los que calzan con más palabras (al menos todas menos una).
-    const puntos = ALMACEN_DATA.rows.map(function(r){ const d = polarNorm(r.descripcion); return { r:r, n:palabras.filter(function(w){ return d.indexOf(w) !== -1; }).length }; })
+    const puntos = base.map(function(r){ const d = polarNorm(r.descripcion); return { r:r, n:palabras.filter(function(w){ return d.indexOf(w) !== -1; }).length }; })
       .filter(function(x){ return x.n >= palabras.length - 1 && x.n > 0; }).sort(function(a,b){ return b.n - a.n; });
     puntos.slice(0, 40).forEach(function(x){ hits.push(x.r); });
     parecido = hits.length > 0;
