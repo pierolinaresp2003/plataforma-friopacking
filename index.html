@@ -12338,13 +12338,19 @@ function pdFilasCalc(){
     if(pdOcPendiente(r)) out.push(Object.assign({ tipo:'oc', persona: pdPersona(r.usuarioCompras) }, base));
     else if(pdPedidoAbierto(r)) out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, base));
   });
+  // Familia de los pedidos directos (no la traen): la del mismo código en el Reporte Maestro o PedidoSinReq.
+  const famDe = new Map();
+  getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(x){ if(x.idProducto && x.familia && x.familia !== 'Sin familia' && !famDe.has(x.idProducto)) famDe.set(x.idProducto, x.familia); });
   PEDIDO_SIN_REQ_PEND.forEach(function(r){
-    const base = Object.assign({ req:'', proyecto:'Pedido directo (sin requerimiento)', idProyecto:'' }, r);
+    const base = Object.assign({ req:'', proyecto:'Pedido directo (sin requerimiento)', idProyecto:'', directo:true, familia: famDe.get(r.idProducto) || 'Sin familia' }, r);
     if(pdOcPendiente(r)) out.push(Object.assign(base, { tipo:'oc', persona: pdPersona(r.usuarioCompras) }));
-    else if(pdPedidoAbierto(r)) out.push(Object.assign(base, { tipo:'ped', persona: pdPersona(r.responsablePedido) }));
+    // En un pedido directo el ResponsablePedido es quien lo pidió (almacén, oficina…), no un comprador:
+    // igual cuenta como pendiente, sin comprador asignado hasta que alguien emita la OC (06.10.2026, Piero).
+    else if(pdPedidoAbierto(r)){ const per = pdPersona(r.responsablePedido);
+      out.push(Object.assign(base, { tipo:'ped', persona: pdEsComprador(per) ? per : '', solicitante: r.responsablePedido })); }
   });
   out.forEach(function(r){ if(r.tipo === 'oc') r.fCompromiso = ocFechaVale(r.codOrden, r.fCompromiso); });
-  return out.filter(function(r){ return pdEsComprador(r.persona); });
+  return out.filter(function(r){ return pdEsComprador(r.persona) || (r.directo && r.tipo === 'ped' && !r.persona); });
 }
 
 function pdDiasHtml(r){
@@ -13893,7 +13899,8 @@ function appPendComprasHtml(soloLista){
       cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', polarCorta(appImpNombre(o.prov), 34)], b:['Proyecto', prysTxt(o)],
       pie:pie + ' · ' + o.n + ' ítem' + (o.n === 1 ? '' : 's') + (imp && !tr ? ' · 🌎 importación' : ''), quien:nom(o.persona) });
   };
-  const tile = function(k){ const x = S[k]; return `<button type="button" class="pc-${x[2]}${APP_PC.sec === k && !APP_PC.q ? ' sel' : ''}" data-pcsec="${k}"><b>${x[3].length}</b><span>${x[1]}</span></button>`; };
+  // En "Pedidos sin OC" el número es la cantidad de SKU del listado, no de pedidos (06.10.2026, Piero).
+  const tile = function(k){ const x = S[k]; return `<button type="button" class="pc-${x[2]}${APP_PC.sec === k && !APP_PC.q ? ' sel' : ''}" data-pcsec="${k}"><b>${k === 'ped' ? items.length : x[3].length}</b><span>${k === 'ped' ? 'SKU sin OC' : x[1]}</span></button>`; };
   // Pedidos sin OC como listado: una fila por SKU, el pedido más antiguo primero (05.10.2026, Piero).
   const items = filas.filter(function(r){ return r.tipo !== 'oc'; }).sort(function(a,b){ return ((a.fPedido || 0) - (b.fPedido || 0)) || String(a.codPedido).localeCompare(String(b.codPedido)); });
   // Cada SKU con lo que hace falta para cotizar (06.10.2026, Piero): PRY, quién lo pidió y la observación
@@ -13906,8 +13913,9 @@ function appPendComprasHtml(soloLista){
       '<span class="mono">' + escapeHtml(r.idProducto || '') + '</span> · Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.req ? ' · Req ' + escapeHtml(r.req.replace(/^000\d-0*/, '')) : '')
         + (pryId ? ' · <span class="mono">' + escapeHtml(pryId) + '</span>' : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 34)) : '')
         + (quien ? '<span class="sku-quien">👷 Solicitó: <b>' + escapeHtml(quien) + '</b></span>' : '')
+        + (r.directo ? '<span class="sku-quien">🛒 <b>Pedido directo</b> · sin requerimiento</span>' : '')
         + (r.obs ? '<span class="sku-obs">📝 ' + escapeHtml(r.obs) + '</span>' : ''),
-      r.cantPedido != null ? appN(r.cantPedido) + ' ' + escapeHtml(r.unidad || '') : '—', 'desde ' + appDDMM(r.fPedido) + ' · ' + polarDh(r.fPedido) + ' · ' + escapeHtml(nom(r.persona)));
+      r.cantPedido != null ? appN(r.cantPedido) + ' ' + escapeHtml(r.unidad || '') : '—', 'desde ' + appDDMM(r.fPedido) + ' · ' + polarDh(r.fPedido) + ' · ' + escapeHtml(r.persona ? nom(r.persona) : 'sin comprador asignado'));
   };
   // Pedidos sin OC agrupados por familia de producto: lo que se cotiza junto, junto (06.10.2026, Piero).
   // Cada familia es un bloque con su color (franja, encabezado y borde de cada fila) y arriba una fila de
@@ -15645,7 +15653,7 @@ function polarPedidosSinOC(persona){
   if(!lista.length) return `<p>No hay pedidos sin OC${persona ? ' de ' + escapeHtml(PD_PERSONAS[persona] || persona) : ''}. ✅</p>`;
   const pp = new Map(); lista.forEach(function(x){ pp.set(x.persona, (pp.get(x.persona) || 0) + 1); });
   return `<div class="cab">🛒 Pedidos sin OC</div><div class="sub">${persona ? escapeHtml(PD_PERSONAS[persona] || persona) : 'Todo Compras'} · del más antiguo al más nuevo</div>
-    <p><b>${lista.length}</b> pedidos (${filas.length} ítems).${persona ? '' : ' ' + [...pp.entries()].sort(function(a,b){ return b[1] - a[1]; }).map(function(e){ return escapeHtml(PD_PERSONAS[e[0]] || e[0]) + ' ' + e[1]; }).join(' · ')}</p>
+    <p><b>${lista.length}</b> pedidos (${filas.length} ítems).${persona ? '' : ' ' + [...pp.entries()].sort(function(a,b){ return b[1] - a[1]; }).map(function(e){ return escapeHtml(PD_PERSONAS[e[0]] || e[0] || 'Sin comprador (pedido directo)') + ' ' + e[1]; }).join(' · ')}</p>
     ${lista.slice(0, 7).map(function(x){ return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(x.p)}</span> · desde ${rqFecha(x.f)} (${rqHace(x.f)})</div><div class="q">${escapeHtml(polarCorta(x.proyecto, 40))} · ${x.n} ítem${x.n === 1 ? '' : 's'} ${polarBtn('q', 'pedido ' + x.p, 'ver')}</div></div>`; }).join('')}`;
 }
 
