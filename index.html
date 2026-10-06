@@ -14218,6 +14218,8 @@ async function appPanelPdf(){
     const winH = Math.max(el.scrollHeight + 400, 1200);
     const prep = function(medir){ return function(doc){
       const c = doc.getElementById('appOC');
+      // Si el panel estaba bajado, la cabecera fija (sticky) quedaba encima del contenido en el PDF (06.10.2026).
+      c.scrollTop = 0; c.querySelectorAll('.oc-cab').forEach(function(h){ h.style.position = 'static'; });
       c.style.cssText += ';position:absolute;left:0;top:0;right:auto;bottom:auto;width:' + ancho + 'px;height:auto;max-height:none;overflow:visible;transform:none;box-shadow:none;animation:none;';
       c.querySelectorAll('[data-ocpdf], .oc-cab .atras').forEach(function(b){ b.remove(); });
       if(!medir) return;
