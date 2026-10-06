@@ -1255,7 +1255,10 @@
 .rqp-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;} .rqp-top .asis-est{flex-shrink:0;white-space:nowrap;font-size:11.5px;padding:4px 9px;}
 .rqp-nom{font-weight:800;font-size:13.5px;color:var(--ink);line-height:1.3;} .rqp-n{display:inline-block;min-width:22px;color:var(--muted);font-weight:800;}
 .rqp-meta{font-size:11.5px;color:var(--muted);margin:2px 0 0 22px;} .rqp-txt{font-size:12.5px;color:var(--ink-soft);margin:6px 0 0 22px;line-height:1.4;}
-.rqp-cam{margin:7px 0 0 22px;font-size:12px;line-height:1.4;background:var(--green-bg);color:var(--green);border-radius:8px;padding:6px 10px;} .rqp-cam.espera{background:var(--amber-bg);color:var(--amber-ink);} .m-fila .t small .rq-camino{display:block;margin-top:3px;font-weight:700;color:var(--green);} .m-fila .t small .rq-camino.espera{color:var(--amber-ink);} .m-fila.rq-pdf .t b{white-space:normal;} .m-fila.rq-pdf .v{max-width:42%;}
+.rqp-cam{margin:7px 0 0 22px;font-size:12px;line-height:1.4;border-radius:8px;padding:6px 10px;} .rqp-cam.lima{background:var(--green-bg);color:var(--green);} .rqp-cam.camino{background:var(--amber-bg);color:var(--amber-ink);} .rqp-cam.nada{background:var(--surface-2);color:var(--muted);}
+.rqp-it.verde{border-left:6px solid var(--green);} .rqp-it.amarillo{border-left:6px solid var(--amber);} .rqp-it.rojo{border-left:6px solid var(--red);background:color-mix(in srgb, var(--red-bg) 45%, var(--card));}
+.rqp-ley{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px;} .rqp-ley span{font-size:11.5px;font-weight:700;border-radius:20px;padding:4px 10px;}
+.rqp-ley .verde{background:var(--green-bg);color:var(--green);} .rqp-ley .amarillo{background:var(--amber-bg);color:var(--amber-ink);} .rqp-ley .rojo{background:var(--red-bg);color:var(--red);} .m-fila .t small .rq-camino{display:block;margin-top:3px;font-weight:700;color:var(--green);} .m-fila .t small .rq-camino.espera{color:var(--amber-ink);} .m-fila.rq-pdf .t b{white-space:normal;} .m-fila.rq-pdf .v{max-width:42%;}
     .m-fila .v{flex-shrink:0;text-align:right;} .m-fila .v b{display:block;font-size:14px;} .m-fila .v small{font-size:10px;color:var(--muted);}
     .m-fila.rojo .v b{color:var(--red);} .m-fila.ambar .v b{color:var(--amber-ink);} .m-fila.azul .v b{color:var(--brand-ink);} .m-fila.verde .v b{color:var(--green);}
     .m-aviso{display:block;width:100%;background:var(--red-bg);color:var(--red);border:0;border-radius:12px;padding:10px 12px;font-size:12.5px;font-weight:800;margin-bottom:10px;text-align:left;cursor:pointer;font-family:inherit;}
@@ -14285,6 +14288,23 @@ async function appPanelPdf(){
 // ---------- PDF de un requerimiento (06.10.2026, Piero: "cuando se consulte por un req, la opción de
 // exportarlo como pdf ... debe ser del total del requerimiento"). Panel con TODOS los ítems (pendientes y
 // atendidos), sin precios, y se exporta con appPanelPdf.
+// Stock libre en Lima para una línea pendiente: lo que hay en Lima menos lo reservado para OTROS requerimientos
+// (lo reservado para este mismo sí le sirve). Lo recibido en almacén para este req ya es suyo: no aplica.
+function rqLimaLibre(r){
+  if(rqItemListo(r) || r.estadoCalc === 'Recibido en Almacén') return null;
+  const p = rqStockDe(r.idProducto); if(!p) return null;
+  const otros = rqReservasDe(r.idProducto).filter(function(y){ return y.req !== r.codRequerimiento; }).reduce(function(a, y){ return a + y.q; }, 0);
+  const falta = Math.round(((r.cantidad || 0) - (r.cantSalida || 0)) * 100) / 100;
+  return { lima:p.lima || 0, reservado:Math.round(otros * 100) / 100, libre:Math.max(0, Math.round(((p.lima || 0) - otros) * 100) / 100), falta:falta, um:p.unidad || r.unidad || '' };
+}
+// Semáforo de una línea pendiente (06.10.2026, Piero): verde = el stock libre en Lima alcanza; amarillo = viene
+// en camino sin REQ (o Lima cubre solo una parte); rojo = en revisión y sin stock en Lima ni en camino.
+function rqSemaforo(r, c, lm){
+  if(rqItemListo(r)) return '';
+  if(lm && lm.falta > 0 && lm.libre >= lm.falta - 0.001) return 'verde';
+  if(c || (lm && lm.libre > 0)) return 'amarillo';
+  return r.estadoCalc === 'En Revisión' ? 'rojo' : '';
+}
 // Frase simple de cómo va una línea de requerimiento (PDF y Excel del requerimiento, 06.10.2026).
 function rqDh(f){ const n = f ? Math.max(0, busdayCount(f, new Date())) : 0; return n === 0 ? 'hoy' : 'hace ' + n + (n === 1 ? ' día hábil' : ' días hábiles'); }
 function rqOcCorta(o){ return 'OC ' + String(o || '').replace(/^000\d-0*/, ''); }
@@ -14321,13 +14341,20 @@ function appReqPdf(cod){
   // camino sin REQ que puede atenderlo va dentro del mismo bloque.
   const cr = rqCruceLibre(pend), crDe = new Map(cr.map(function(c){ return [c.r, c]; }));
   const dh = rqDh, ocC = rqOcCorta, prov = rqProvCorto, frase = rqComoVa;
+  const lmDe = new Map(pend.map(function(r){ return [r, rqLimaLibre(r)]; }));
+  const semDe = new Map(pend.map(function(r){ return [r, rqSemaforo(r, crDe.get(r), lmDe.get(r))]; }));
+  const nSem = function(k){ return pend.filter(function(r){ return semDe.get(r) === k; }).length; };
+  const lima = function(lm){ if(!lm || !(lm.falta > 0)) return '';
+    if(lm.libre > 0) return `<div class="rqp-cam lima">🏬 En Lima hay <b>${polarNum(lm.libre)} ${escapeHtml(lm.um)}</b> disponibles${lm.reservado > 0 ? ' (sin contar ' + polarNum(lm.reservado) + ' reservadas para otros requerimientos)' : ''}. <b>${lm.libre >= lm.falta - 0.001 ? 'Alcanza para lo que falta.' : 'Cubre solo una parte.'}</b></div>`;
+    if(lm.lima > 0) return `<div class="rqp-cam nada">🏬 En Lima hay ${polarNum(lm.lima)} ${escapeHtml(lm.um)}, pero están reservadas para otros requerimientos.</div>`;
+    return ''; };
   const camino = function(c){ if(!c) return ''; const y = c.libres[0], ok = c.total >= c.falta - 0.001;
     const eta = String(y.lleg.etaTxt || '').replace(/\s*\(.*\)\s*$/, '');
-    return `<div class="rqp-cam ${ok ? '' : 'espera'}">📦 Se puede atender con <b>${polarNum(c.total)} ${escapeHtml(y.um)}</b> que vienen en camino sin REQ: ${escapeHtml(ocC(y.oc))} de ${escapeHtml(prov(y.prov))}${c.libres.length > 1 ? ' y ' + (c.libres.length - 1) + ' OC más' : ''} · ${escapeHtml(y.lleg.est[1])} · ETA ${escapeHtml(eta)}. ${ok ? '<b>Alcanza para lo que falta.</b>' : '<b>Cubre solo una parte.</b>'}</div>`; };
+    return `<div class="rqp-cam camino">📦 Se puede atender con <b>${polarNum(c.total)} ${escapeHtml(y.um)}</b> que vienen en camino sin REQ: ${escapeHtml(ocC(y.oc))} de ${escapeHtml(prov(y.prov))}${c.libres.length > 1 ? ' y ' + (c.libres.length - 1) + ' OC más' : ''} · ${escapeHtml(y.lleg.est[1])} · ETA ${escapeHtml(eta)}. ${ok ? '<b>Alcanza para lo que falta.</b>' : '<b>Cubre solo una parte.</b>'}</div>`; };
   const fila = function(r, i){ const s = polarSitCorta(r);
-    return `<div class="rqp-it"><div class="rqp-top"><div class="rqp-nom"><span class="rqp-n">${i + 1}</span>${escapeHtml(r.producto || '—')}</div><span class="asis-est ${s[0]}">${s[1]} ${escapeHtml(r.partido && !(r.cantRecep > 0 || r.fRecep) ? 'Atendido en parte' : ((APP_ESTADOS.find(function(e){ return e[0] === r.estadoCalc; }) || [])[1] || r.estadoCalc || '—'))}</span></div>
+    return `<div class="rqp-it ${semDe.get(r) || ''}"><div class="rqp-top"><div class="rqp-nom"><span class="rqp-n">${i + 1}</span>${escapeHtml(r.producto || '—')}</div><span class="asis-est ${s[0]}">${s[1]} ${escapeHtml(r.partido && !(r.cantRecep > 0 || r.fRecep) ? 'Atendido en parte' : ((APP_ESTADOS.find(function(e){ return e[0] === r.estadoCalc; }) || [])[1] || r.estadoCalc || '—'))}</span></div>
       <div class="rqp-meta">Código ${escapeHtml(r.idProducto || '—')} · pidió ${polarNum(r.cantidad)} ${escapeHtml(r.unidad || '')}</div>
-      <div class="rqp-txt">${escapeHtml(frase(r))}</div>${camino(crDe.get(r))}</div>`; };
+      <div class="rqp-txt">${escapeHtml(frase(r))}</div>${lima(lmDe.get(r))}${camino(crDe.get(r))}</div>`; };
   const dato = function(t, st){ return t ? appFilaHtml('', 'rq-pdf', t, st) : ''; };
   const sec = function(tit, cls, l){ return l.length ? `<details class="m-sec ${cls}" open><summary><span>${tit}</span><b>${l.length}</b></summary>${l.map(fila).join('')}</details>` : ''; };
   appListaAbrir('📄 Requerimiento ' + escapeHtml(cod.replace(/^0001-0*/, '')), escapeHtml(cod) + ' · datos al ' + rqFecha(appIndCorte()), `
@@ -14335,7 +14362,7 @@ function appReqPdf(cod){
     <div class="ini-card m-total"><span>Avance del requerimiento</span><b>${pct}%</b><small>${listos.length} de ${items.length} ítems atendidos</small>
       <div class="m-tiles"><div><span>Ítems</span><b>${items.length}</b></div><div><span>Atendidos</span><b>${listos.length}</b></div><div><span>Pendientes</span><b>${pend.length}</b></div></div>
       <div class="asis-estados">${appChipsEstado(est)}</div>
-      ${pend.length ? `<small>${cr.length ? '📦 ' + cr.length + ' de ' + pend.length + ' pendientes tienen stock en camino sin REQ (se indica en cada línea)' : '📦 Ningún pendiente tiene stock en camino sin REQ'}</small>` : ''}</div>
+      ${pend.length ? `<div class="rqp-ley"><span class="verde">🟢 ${nSem('verde')} con stock en Lima</span><span class="amarillo">🟡 ${nSem('amarillo')} con stock en camino o parcial en Lima</span><span class="rojo">🔴 ${nSem('rojo')} en revisión sin stock</span></div>` : ''}</div>
     <div class="ini-card"><div class="ini-card-tit">📋 Datos del requerimiento</div>
       ${dato(r0.proyecto, 'Proyecto' + (r0.idProyecto ? ' · ' + escapeHtml(r0.idProyecto) : ''))}${dato(r0.responsable, 'Solicitante')}${dato(rqFecha(r0.fReq), 'Fecha del requerimiento')}${dato(r0.obs, 'Observación')}</div>
     ${sec('⏳ Pendientes', 'ambar', pend)}${sec('✅ Atendidos', 'verde', listos)}`);
@@ -16817,13 +16844,15 @@ function rqHojaComoVa(filas, wb){
   const estLbl = function(r){ return r.partido && !(r.cantRecep > 0 || r.fRecep) ? 'Atendido en parte' : ((APP_ESTADOS.find(function(e){ return e[0] === r.estadoCalc; }) || [])[1] || r.estadoCalc || ''); };
   const orden = []; const porReq = new Map();
   filas.forEach(function(r){ if(!porReq.has(r.codRequerimiento)){ porReq.set(r.codRequerimiento, []); orden.push(r.codRequerimiento); } porReq.get(r.codRequerimiento).push(r); });
-  const cv = [['N° Requerimiento', '#', 'Código', 'Producto', 'Pidió', 'UM', 'Estado', '¿Cómo va?', 'En camino sin REQ', 'OC en camino', 'Proveedor (en camino)', 'Situación', 'ETA', '¿Cubre lo que falta?']];
+  const semTx = { verde:'🟢 Stock en Lima', amarillo:'🟡 En camino / parcial', rojo:'🔴 En revisión sin stock' };
+  const cv = [['N° Requerimiento', '#', 'Código', 'Producto', 'Pidió', 'UM', 'Estado', 'Semáforo', '¿Cómo va?', 'Disponible en Lima', '¿Alcanza con Lima?', 'En camino sin REQ', 'OC en camino', 'Proveedor (en camino)', 'Situación', 'ETA', '¿Cubre lo que falta?']];
   orden.forEach(function(cod){ const l = porReq.get(cod), ls = l.filter(function(r){ return !rqItemListo(r); }).concat(l.filter(rqItemListo));
-    ls.forEach(function(r, i){ const c = cr.get(r), y = c ? c.libres[0] : null;
-      cv.push([cod, i + 1, r.idProducto || '', r.producto || '', r.cantidad != null ? r.cantidad : '', r.unidad || '', estLbl(r), rqComoVa(r),
+    ls.forEach(function(r, i){ const c = cr.get(r), y = c ? c.libres[0] : null, lm = rqLimaLibre(r), sm = rqSemaforo(r, c, lm);
+      cv.push([cod, i + 1, r.idProducto || '', r.producto || '', r.cantidad != null ? r.cantidad : '', r.unidad || '', estLbl(r), semTx[sm] || '', rqComoVa(r),
+        lm && lm.falta > 0 ? lm.libre : '', lm && lm.falta > 0 ? (lm.libre >= lm.falta - 0.001 ? 'Sí, alcanza' : lm.libre > 0 ? 'Solo una parte' : 'No hay libre') : '',
         c ? c.total : '', c ? c.libres.map(function(x){ return x.oc; }).join(' · ') : '', y ? appImpNombre(y.prov) : '', y ? y.lleg.est[1].replace(/^\S+\s/, '') : '',
         y ? String(y.lleg.etaTxt || '').replace(/\s*\(.*\)\s*$/, '') : '', c ? (c.total >= c.falta - 0.001 ? 'Sí, alcanza' : 'Solo una parte') : '']); }); });
-  polarHoja(wb, 'Cómo va', cv, [16, 5, 14, 46, 8, 7, 22, 70, 12, 26, 28, 16, 14, 16]);
+  polarHoja(wb, 'Cómo va', cv, [16, 5, 14, 46, 8, 7, 22, 24, 70, 12, 16, 12, 26, 28, 16, 14, 16]);
   return wb;
 }
 function polarExcelReqs(filas, titulo, sub){
