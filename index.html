@@ -13272,8 +13272,8 @@ function appPrecalentar(){
   appPrecalentar._firma = appFirmaDatos() + APP.vista;
   const v = APP.vista, q = [];
   if(v === 'gerencia' && gerAbierto){
-    ['semana', 'semanaAnt', 'mes'].forEach(function(k){ q.push(function(){ appIndDatos(appIndPeriodo(k).f); }); });
-    appIndTendF(true).forEach(function(x){ q.push(function(){ appIndDatos(x.f); }); });
+    q.push(function(){ appIndDatos(appFIndF(APP_F0.indicadores)); });
+    appIndTendF(false).forEach(function(x){ q.push(function(){ appIndDatos(x.f); }); });
     q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appPantallaHtml('otif'); }, function(){ appPantallaHtml('gasto'); });
   } else if(v === 'logistica'){
     q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog', appInicioLogistica); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
@@ -13430,7 +13430,7 @@ function appIndCorto(d){ return d.getUTCDate() + ' ' + MESES_CORTOS[d.getUTCMont
 // Períodos: semana actual (lunes a domingo del día de corte), semana pasada, mes, año y todo.
 // ---------- Filtros de Gerencia (06.10.2026, Piero: "que los filtros de arriba sean más personalizados, no
 // que sea presionar un cuadro"): período con fechas a elección, comprador y proyecto / cliente, en listas.
-const APP_F0 = { indicadores:{ per:'semana', desde:'', hasta:'', persona:'', pry:'' }, gasto:{ per:'mes', desde:'', hasta:'', orig:'todo', persona:'' }, otif:{ per:'anio', desde:'', hasta:'', pry:'' } };
+const APP_F0 = { indicadores:{ per:'anio', desde:'', hasta:'', persona:'', pry:'' }, gasto:{ per:'mes', desde:'', hasta:'', orig:'todo', persona:'' }, otif:{ per:'anio', desde:'', hasta:'', pry:'' } };
 const APP_F = JSON.parse(JSON.stringify(APP_F0));
 function appFRango(st){
   const c = appIndCorte(), Y = c.getUTCFullYear(), M = c.getUTCMonth(), D = function(y, m, d){ return new Date(Date.UTC(y, m, d)); };
@@ -13519,9 +13519,11 @@ function appIndDatosCalc(f){
   return Array.isArray(r) ? r : [];
 }
 // Tendencia: % a tiempo de las últimas 6 semanas (si se mira por semana) o de los últimos 6 meses.
+// Por mes: desde enero del año en curso, igual que OTIF (06.10.2026, Piero: "así como el OTIF, desde
+// inicios de año para los indicadores").
 function appIndTendF(porSemana){
   const c = appIndCorte(), out = [];
-  for(let i = 5; i >= 0; i--){
+  for(let i = porSemana ? 5 : c.getUTCMonth(); i >= 0; i--){
     if(porSemana){
       const ini = isoWeekStart(c); ini.setUTCDate(ini.getUTCDate() - 7 * i);
       const fin = new Date(ini); fin.setUTCDate(fin.getUTCDate() + 6);
@@ -13583,8 +13585,8 @@ function appIndicadoresHtml(){
         ${pct != null ? `<div class="ind-barra"><i class="ok" style="width:${pct.toFixed(1)}%"></i><i class="warn" style="width:${(100 - pct).toFixed(1)}%"></i></div>
         <div class="ind-ley"><span><i class="ok"></i>A tiempo ${st.cumpleN}</span><span><i class="warn"></i>Fuera de meta ${st.noCumpleN}</span></div>` : ''}`
         : '<div class="ini-vacio">No hay casos terminados en este período.</div>'}
-      <div class="ind-sub">% a tiempo · ${porSemana ? 'últimas 6 semanas' : 'últimos 6 meses'}</div>
-      <div class="ind-tend">${barras}</div>
+      <div class="ind-sub">% a tiempo · ${porSemana ? 'últimas 6 semanas' : 'por mes desde enero ' + appIndCorte().getUTCFullYear()}</div>
+      <div class="ind-tend" style="grid-template-columns:repeat(${tend.length},1fr)">${barras}</div>
       ${st.n ? '<div class="ind-ver">Ver los ' + st.n + ' casos ›</div>' : ''}
     </div>`;
   }).join('');
