@@ -1119,6 +1119,7 @@
     .m-total{text-align:center;padding:18px 14px;} .m-total > span{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);}
     .m-total > b{display:block;font-size:32px;font-weight:800;color:var(--brand-ink);letter-spacing:-.5px;margin:4px 0 2px;}
     .m-total > small{display:block;font-size:11.5px;color:var(--muted);}
+    .m-total > b.late{color:var(--amber-ink);} .m-total > b.warn{color:var(--red);}
     .m-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:12px;text-align:left;}
     .m-tiles div{background:var(--surface-2);border-radius:12px;padding:9px 10px;min-width:0;} .m-tiles span{display:block;font-size:10.5px;font-weight:700;color:var(--ink-soft);}
     .m-tiles b{display:block;font-size:15px;font-weight:800;color:var(--ink);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -12763,7 +12764,7 @@ const APP_VISTAS = {
   gerencia:   { nombre:'Gerencia',   ico:'📊', desc:'Indicadores de logística y concentración de gasto.',
     // "Vista" se cambió por el avance de atención de los requerimientos por proyecto (29.09.2026, Piero).
     // La vista se sigue cambiando desde el botón de arriba.
-    tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Indicadores'], ['polar'], ['gasto','💰','Gasto'], ['avance','📈','Avance']] },
+    tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Indicadores'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
   supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
     // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
     // Solo Inicio y Mis req. (29.09.2026, Piero: "para el supervisor solo coloca inicio y mis req"). La vista
@@ -12777,9 +12778,9 @@ const APP_VISTAS = {
     tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Logística']] },
 };
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
-const APP_PANTALLAS = { avance:'Avance', indicadores:'Indicadores', gasto:'Concentración de gasto', inventario:'Inventario',
+const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores', gasto:'Concentración de gasto', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones' };
-const APP = { vista:null, enInicio:false, pantalla:'inicio', avQ:'' };
+const APP = { vista:null, enInicio:false, pantalla:'inicio', otifPer:'anio' };
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
 // Usuario del celular (29.09.2026, Piero: "al abrir la aplicación, previo a todo, una interfaz de Grupo
 // Friopacking para crear usuario y así definir qué tipo de usuario tendrá acceso a ciertas vistas";
@@ -12914,9 +12915,6 @@ function appConstruir(){
       }, 250);
       return;
     }
-    if(e.target.id !== 'avBusca') return;
-    APP.avQ = e.target.value;
-    const l = document.getElementById('avLista'); if(l) l.innerHTML = appAvanceLista();
   });
   document.getElementById('section-inicio').addEventListener('change', function(e){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
@@ -13244,10 +13242,10 @@ function appSaludo(){
 // HTML de cada pantalla guardado por su estado (período, filtros, búsqueda): volver a una pestaña es
 // instantáneo. Se vacía solo cuando cambian los datos (appMemo).
 const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
-  pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, avance:function(){ return appAvanceHtml(); } };
+  pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
   const e = { gasto:[APP_G, APP_CAL], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope], pendcompras:[APP_PC], pendlog:[APP_PL],
-    indicadores:[APP.indPer || 'semana'], avance:[APP.avQ || ''] }[p];
+    indicadores:[APP.indPer || 'semana'], otif:[APP.otifPer] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0);
 }
 function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_PANT_FN[p]); }
@@ -13260,7 +13258,7 @@ function appPrecalentar(){
   if(v === 'gerencia' && gerAbierto){
     ['semana', 'semanaAnt', 'mes'].forEach(function(k){ q.push(function(){ appIndDatos(appIndPeriodo(k).f); }); });
     appIndTendF(true).forEach(function(x){ q.push(function(){ appIndDatos(x.f); }); });
-    q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appAvanceGrupos(); }, function(){ appPantallaHtml('avance'); }, function(){ appPantallaHtml('gasto'); });
+    q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appPantallaHtml('otif'); }, function(){ appPantallaHtml('gasto'); });
   } else if(v === 'logistica'){
     q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog', appInicioLogistica); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
       function(){ appImpDatos(); }, function(){ appPantallaHtml('pendlog'); });
@@ -13290,7 +13288,7 @@ function appRenderInicio(){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     if(APP.pantalla === 'inventario') setTimeout(appInvCompletar, 0);
     return;
-  } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'avance'){
+  } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'otif'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
@@ -13329,27 +13327,70 @@ function appAvanceGruposCalc(){
   // Primero el que más le falta despachar (29.09.2026, Piero); dentro, sus req. del más reciente al más antiguo.
   return [...m.values()].sort(function(a,b){ return (b.faltan - a.faltan) || (b.reqs.length - a.reqs.length); });
 }
-function appAvanceLista(){
-  const q = polarNorm(APP.avQ || '');
-  let lista = appAvanceGrupos();
-  if(q) lista = lista.filter(function(g){ return polarNorm(g.nombre + ' ' + g.id + ' ' + g.reqs.map(function(y){ return y.cod; }).join(' ')).indexOf(q) !== -1; });
-  if(!lista.length) return '<div class="ini-vacio">' + (q ? 'Ningún proyecto con eso.' : '✅ No hay nada pendiente de despachar.') + '</div>';
-  // Siempre todos los proyectos (29.09.2026, Piero: "siempre completo todos los proyectos").
-  return lista.map(function(g){
-    return `<details class="avp"><summary><span class="t"><b>${escapeHtml(polarCorta(g.nombre, 60))}</b><small class="mono">${escapeHtml(g.id)}</small></span>
-        <span class="n"><b>${g.faltan}</b><small>ítems · ${g.reqs.length} req.</small></span></summary>
-      ${g.reqs.map(function(y){
-        return `<button type="button" class="avp-req" data-req="${escapeHtml(y.cod)}"><b class="mono">${escapeHtml(y.cod)}</b><span>${rqFecha(y.fReq)}</span><em>falta${y.faltan === 1 ? '' : 'n'} ${y.faltan} de ${y.n} ítem${y.n === 1 ? '' : 's'}</em></button>`;
-      }).join('')}</details>`;
-  }).join('');
+
+// ---------- OTIF (Gerencia) — reemplaza el módulo Avance (06.10.2026, Piero: "quita el módulo de avance y
+// coloca el % de OTIF con su detalle"). Por línea de requerimiento (sin archivados):
+//   On Time = salió a obra hasta 15 días hábiles después del requerimiento (meta del Despacho de requerimiento).
+//   In Full = salió toda la cantidad pedida.
+// Se mide la línea que ya salió o cuyo plazo ya venció; las que siguen dentro de los 15 días quedan "en plazo".
+const OTIF_META = 15;
+const OTIF_TIPOS = { ambas:['🔴', 'Tarde e incompleta', 'rojo'], tarde:['🕒', 'Salió tarde (completa)', 'ambar'], incompleta:['📦', 'A tiempo pero incompleta', 'ambar'] };
+function appOtifDatos(k){ rqPreparar(); return appMemo('otif|' + k, function(){
+  const c = appIndCorte(), desde = k === 'anio' ? new Date(Date.UTC(c.getUTCFullYear(), 0, 1)) : k === 'tri' ? new Date(Date.UTC(c.getUTCFullYear(), c.getUTCMonth() - 2, 1)) : null;
+  const l = []; let enPlazo = 0;
+  RQ.filas.forEach(function(r){
+    if(!r.fReq || r.estadoCalc === 'Archivado' || (desde && r.fReq < desde)) return;
+    const fs = r.fSalida || r.fObra, qs = r.cantSalida != null ? r.cantSalida : r.cantObra;
+    const dias = fs ? busdayCount(r.fReq, fs) : null;
+    if(!fs && busdayCount(r.fReq, c) <= OTIF_META){ enPlazo++; return; }
+    const ot = dias != null && dias <= OTIF_META, inf = qs != null && r.cantidad != null && qs >= r.cantidad - 1e-9;
+    l.push({ r:r, dias:dias, qs:qs, ot:ot, inf:inf, tipo: ot && inf ? '' : (!ot && !inf ? 'ambas' : !ot ? 'tarde' : 'incompleta') });
+  });
+  return { l:l, enPlazo:enPlazo, k:k };
+}); }
+function appOtifPct(l){ return l.length ? l.filter(function(x){ return !x.tipo; }).length / l.length * 100 : null; }
+function appOtifHtml(){
+  if(!gerAbierto) return APP_GER_LOCK;
+  const D = appOtifDatos(APP.otifPer), l = D.l, n = l.length, pct = appOtifPct(l);
+  const lbl = { anio:'Este año', tri:'Últimos 3 meses', todo:'Todo lo cargado' }[APP.otifPer];
+  const p1 = function(v){ return v == null ? '—' : v.toFixed(1) + '%'; };
+  const cuenta = {}; l.forEach(function(x){ if(x.tipo) cuenta[x.tipo] = (cuenta[x.tipo] || 0) + 1; });
+  // Por mes del requerimiento
+  const meses = new Map(); l.forEach(function(x){ const k = x.r.fReq.toISOString().slice(0, 7); const m = meses.get(k) || []; m.push(x); meses.set(k, m); });
+  const mk = [...meses.keys()].sort().slice(-12);
+  // Por proyecto: primero el que más líneas pidió
+  const pry = new Map(); l.forEach(function(x){ const id = x.r.idProyecto || '—'; const g = pry.get(id) || { id:id, nombre:x.r.proyecto || id, l:[] }; g.l.push(x); pry.set(id, g); });
+  const prys = [...pry.values()].sort(function(a,b){ return b.l.length - a.l.length; });
+  const barra = function(attr, t, v, sub){ return `<button type="button" class="m-bar" ${attr}><span class="t">${escapeHtml(t || '—')}</span><i><em style="width:${Math.max(2, v || 0).toFixed(1)}%"></em></i><b>${v == null ? '—' : v.toFixed(0) + '%'}</b><small>${sub}</small></button>`; };
+  return appChips('otifper', APP.otifPer, [['anio','Este año'], ['tri','Últimos 3 meses'], ['todo','Todo']])
+    + `<div class="ini-card m-total"><span>OTIF · ${lbl}</span><b class="${appIndClase(pct)}">${p1(pct)}</b><small>${appN(n - Object.values(cuenta).reduce(function(a, b){ return a + b; }, 0))} de ${appN(n)} líneas salieron a obra completas y a tiempo · ${appIndEstado(pct)}</small>
+        <div class="m-tiles"><div><span>🕒 A tiempo</span><b>${p1(n ? l.filter(function(x){ return x.ot; }).length / n * 100 : null)}</b></div><div><span>📦 Completas</span><b>${p1(n ? l.filter(function(x){ return x.inf; }).length / n * 100 : null)}</b></div><div><span>⏳ Aún en plazo</span><b>${appN(D.enPlazo)}</b></div></div></div>
+      ${n ? `<div class="ini-card"><div class="ini-card-tit">❌ ¿Por qué no se cumple? <small>toca para ver las líneas</small></div>
+        ${Object.keys(OTIF_TIPOS).filter(function(t){ return cuenta[t]; }).map(function(t){ const e = OTIF_TIPOS[t];
+          return appFilaHtml('data-otiftipo="' + t + '"', e[2], e[0] + ' ' + e[1], (cuenta[t] / n * 100).toFixed(1) + '% de las líneas', appN(cuenta[t]), 'líneas'); }).join('')}</div>
+      <div class="ini-card"><div class="ini-card-tit">📈 OTIF por mes <small>según la fecha del requerimiento</small></div>
+        <div class="m-cols" style="grid-template-columns:repeat(${mk.length},1fr)">${mk.map(function(k){ const v = appOtifPct(meses.get(k));
+          return `<div><i><em style="height:${Math.max(3, v || 0).toFixed(0)}%"></em></i><b>${v == null ? '—' : v.toFixed(0) + '%'}</b><small>${MESES_CORTOS[+k.slice(5) - 1]}</small></div>`; }).join('')}</div></div>
+      <div class="ini-card"><div class="ini-card-tit">🏗️ OTIF por proyecto <small>${prys.length} proyectos · toca uno</small></div>
+        ${prys.map(function(g){ const f = g.l.filter(function(x){ return x.tipo; }).length;
+          return barra('data-otifpry="' + escapeHtml(g.id) + '"', polarCorta(g.nombre, 48), appOtifPct(g.l), (g.id !== '—' ? escapeHtml(g.id) + ' · ' : '') + appN(g.l.length) + ' líneas · ' + appN(f) + ' no cumplieron'); }).join('')}</div>` : '<div class="ini-card"><div class="ini-vacio">No hay líneas para medir en este período.</div></div>'}
+      <div class="av-nota">OTIF = líneas de requerimiento que salieron a obra <b>completas</b> (toda la cantidad pedida) y <b>a tiempo</b> (hasta ${OTIF_META} días hábiles desde el requerimiento) ÷ líneas medidas. Sin archivados. Las que no han salido y todavía están dentro del plazo no se cuentan.</div>`;
 }
-function appAvanceHtml(){
-  const g = appAvanceGrupos(), nReq = g.reduce(function(a, x){ return a + x.reqs.length; }, 0);
-  return `<div class="ini-card"><div class="ini-card-tit">🚚 Falta despachar <small>${g.length} proyectos · ${nReq} req.</small></div>
-      <input type="search" id="avBusca" class="ini-select av-busca" placeholder="Buscar proyecto, PRY o N° de req…" value="${escapeHtml(APP.avQ || '')}">
-      <div id="avLista">${appAvanceLista()}</div>
-      <div class="av-nota">Primero los proyectos con más ítems por despachar. Toca un proyecto para ver sus requerimientos (del más reciente al más antiguo) y un requerimiento para ver su trazabilidad.</div>
-    </div>`;
+// Detalle: las líneas que no cumplieron (de un proyecto o de un motivo), en el panel, con PDF.
+function appOtifDetalle(pry, tipo){
+  const D = appOtifDatos(APP.otifPer);
+  let l = D.l.filter(function(x){ return pry ? (x.r.idProyecto || '—') === pry : x.tipo === tipo; });
+  const pct = appOtifPct(l), malas = l.filter(function(x){ return x.tipo; });
+  const fila = function(x){ const r = x.r, um = r.unidad || '';
+    return appFilaHtml('data-ocreq="' + escapeHtml(r.codRequerimiento) + '"', OTIF_TIPOS[x.tipo][2], r.producto,
+      'REQ ' + escapeHtml(r.codRequerimiento.replace(/^0001-0*/, '')) + ' · ' + rqFecha(r.fReq) + ' · ' + escapeHtml(r.idProducto || '') + (pry ? '' : ' · ' + escapeHtml(polarCorta(r.proyecto || '', 30))),
+      x.dias == null ? 'sin salida' : x.dias + ' d.h.', 'pidió ' + polarNum(r.cantidad) + ' · salió ' + polarNum(x.qs || 0) + ' ' + escapeHtml(um)); };
+  const nom = pry ? ((l[0] && l[0].r.proyecto) || pry) : OTIF_TIPOS[tipo][1];
+  appListaAbrir('🎯 OTIF · ' + escapeHtml(polarCorta(nom, 40)), (pry ? escapeHtml(pry) + ' · OTIF ' + (pct == null ? '—' : pct.toFixed(1) + '%') + ' · ' : '') + appN(malas.length) + ' líneas no cumplieron · ' + { anio:'este año', tri:'últimos 3 meses', todo:'todo' }[APP.otifPer], `
+    <button type="button" class="ini-link" data-ocpdf="1">📄 Exportar a PDF</button>
+    ${Object.keys(OTIF_TIPOS).map(function(t){ const s = malas.filter(function(x){ return x.tipo === t; }).sort(function(a,b){ return a.r.fReq - b.r.fReq; }); const e = OTIF_TIPOS[t];
+      return s.length ? `<details class="m-sec ${e[2]}" open><summary><span>${e[0]} ${e[1]}</span><b>${s.length}</b></summary>${s.map(fila).join('')}</details>` : ''; }).join('')}
+    ${malas.length ? '' : '<div class="ini-card"><div class="ini-vacio">✅ Todas las líneas salieron completas y a tiempo.</div></div>'}`);
 }
 
 // ---------- Indicadores (Gerencia, celular) ----------
@@ -13580,7 +13621,9 @@ function appCalDatosCalc(anio, mes){
   ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.anio === anio && r.mes === mes + 1) dia(r.dia).gasto += r.montoPEN || 0; });
   // Pendiente = la misma regla de Compras → Pendientes, mirando la línea misma (antes se cruzaba con
   // pdFilas y se perdían OC abiertas que no tienen requerimiento en el Reporte Maestro).
-  polarLineasOC().forEach(function(r){ if(en(r.fCompromiso)){ const x = dia(k(r.fCompromiso)); x.ocs.add(r.codOrden); if(pdOcPendiente(r)) x.pend.add(r.codOrden); } });
+  // Importaciones: solo cuentan el día de la ETA (con zarpe); la fecha de entrega del proveedor no es la
+  // llegada real (06.10.2026, Piero).
+  polarLineasOC().forEach(function(r){ const f = ocFechaVale(r.codOrden, r.fCompromiso); if(en(f)){ const x = dia(k(f)); x.ocs.add(r.codOrden); if(pdOcPendiente(r)) x.pend.add(r.codOrden); } });
   rqPreparar();
   RQ.filas.forEach(function(r){ if(en(r.fReq)) dia(k(r.fReq)).reqs.add(r.codRequerimiento); if(en(r.fSalida)) dia(k(r.fSalida)).sal.add(r.codRequerimiento); });
   return dias;
@@ -14084,43 +14127,57 @@ async function appPanelPdf(){
   if(!el || !el.classList.contains('abierto')) return;
   if(typeof html2canvas !== 'function'){ appToast('No se pudo preparar el PDF: revisa tu conexión.'); return; }
   // Sin emojis: la letra del PDF no los tiene y en el nombre del archivo estorban.
-  const tit = ((el.querySelector('.oc-cab .tx b') || {}).textContent || 'Dashboard').replace(/[^\u0020-\u00ff·–]+/g, '').replace(/\s+/g, ' ').trim() || 'Dashboard';
+  const tit = ((el.querySelector('.oc-cab .tx b') || {}).textContent || 'Dashboard').replace(/[^ -ÿ·–]+/g, '').replace(/\s+/g, ' ').trim() || 'Dashboard';
   appToast('Preparando el PDF…');
   try{
     const JsPDF = await appCargarJsPdf();
     const ancho = 760, escala = 2, cortes = [];
+    let alto = 0;
     const fondo = getComputedStyle(el).backgroundColor || '#ffffff';
-    const canvas = await html2canvas(el, { backgroundColor: fondo, scale: escala, windowWidth: ancho, windowHeight: Math.max(el.scrollHeight + 400, 1200),
-      onclone: function(doc){
-        const c = doc.getElementById('appOC');
-        c.style.cssText += ';position:absolute;left:0;top:0;right:auto;bottom:auto;width:' + ancho + 'px;height:auto;max-height:none;overflow:visible;transform:none;box-shadow:none;animation:none;';
-        c.querySelectorAll('[data-ocpdf], .oc-cab .atras').forEach(function(b){ b.remove(); });
-        // Dónde se puede cortar la página: al empezar cada tarjeta, sección o fila.
-        const y0 = c.getBoundingClientRect().top;
-        c.querySelectorAll('.oc-cuerpo > *, details > *, .m-fila, .m-bar, .ini-card > *').forEach(function(x){ cortes.push(Math.round((x.getBoundingClientRect().top - y0) * escala)); });
-      } });
-    cortes.push(canvas.height); cortes.sort(function(a,b){ return a - b; });
+    const winH = Math.max(el.scrollHeight + 400, 1200);
+    const prep = function(medir){ return function(doc){
+      const c = doc.getElementById('appOC');
+      c.style.cssText += ';position:absolute;left:0;top:0;right:auto;bottom:auto;width:' + ancho + 'px;height:auto;max-height:none;overflow:visible;transform:none;box-shadow:none;animation:none;';
+      c.querySelectorAll('[data-ocpdf], .oc-cab .atras').forEach(function(b){ b.remove(); });
+      if(!medir) return;
+      // Dónde se puede cortar la página: al empezar cada tarjeta, sección o fila (en px de pantalla).
+      const y0 = c.getBoundingClientRect().top; alto = Math.ceil(c.getBoundingClientRect().height);
+      c.querySelectorAll('.oc-cuerpo > *, details > *, .m-fila, .m-bar, .ini-card > *').forEach(function(x){ cortes.push(Math.round(x.getBoundingClientRect().top - y0)); });
+    }; };
+    // 1) Medir. 2) Fotografiar por tramos: una sola foto de un panel muy largo (cientos de filas) pasa el
+    // tamaño máximo de imagen del navegador y sale en blanco (06.10.2026, detalle de OTIF).
+    await html2canvas(el, { backgroundColor: fondo, scale: 1, height: 1, windowWidth: ancho, windowHeight: winH, onclone: prep(true) });
+    cortes.push(alto); cortes.sort(function(a,b){ return a - b; });
     const pdf = new JsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
-    const mx = 10, w = 190, hPag = 277 - 8, pxMm = canvas.width / w, maxPx = Math.floor(hPag * pxMm);
+    const mx = 10, w = 190, hPag = 277 - 8, maxCss = Math.floor(hPag * ancho / w);
     const paginas = [];
     let y = 0;
-    while(y < canvas.height - 2){
-      let fin = Math.min(canvas.height, y + maxPx);
-      if(fin < canvas.height){ const ok = cortes.filter(function(c){ return c > y + maxPx * 0.4 && c <= fin; }); if(ok.length) fin = ok[ok.length - 1]; }
+    while(y < alto - 1){
+      let fin = Math.min(alto, y + maxCss);
+      if(fin < alto){ const ok = cortes.filter(function(c){ return c > y + maxCss * 0.4 && c <= fin; }); if(ok.length) fin = ok[ok.length - 1]; }
       paginas.push([y, fin]); y = fin;
     }
+    const tramos = [];
+    paginas.forEach(function(p, i){ const t = tramos[tramos.length - 1]; if(t && p[1] - t.y0 <= 9000) t.p.push(i); else tramos.push({ y0:p[0], p:[i] }); });
     const hoy = rqFecha(new Date());
-    paginas.forEach(function(p, i){
-      if(i) pdf.addPage();
-      const c = document.createElement('canvas'); c.width = canvas.width; c.height = p[1] - p[0];
-      const cx = c.getContext('2d'); cx.fillStyle = fondo; cx.fillRect(0, 0, c.width, c.height);
-      cx.drawImage(canvas, 0, p[0], canvas.width, c.height, 0, 0, canvas.width, c.height);
-      pdf.addImage(c.toDataURL('image/jpeg', 0.85), 'JPEG', mx, mx, w, c.height / pxMm);
-      pdf.setFontSize(8); pdf.setTextColor(120);
-      pdf.text('Grupo Friopacking · ' + tit + ' · generado el ' + hoy, mx, 292);
-      pdf.text('Página ' + (i + 1) + ' de ' + paginas.length, 200, 292, { align:'right' });
-    });
-    pdf.save(tit.replace(/[^A-Za-z0-9áéíóúüñÁÉÍÓÚÜÑ ,_-]+/g, ' ').replace(/\s+/g, ' ').trim() + '.pdf');
+    for(const t of tramos){
+      const y1 = paginas[t.p[t.p.length - 1]][1];
+      if(tramos.length > 1) appToast('Preparando el PDF… página ' + (t.p[0] + 1) + ' de ' + paginas.length);
+      const canvas = await html2canvas(el, { backgroundColor: fondo, scale: escala, y: t.y0, height: y1 - t.y0, windowWidth: ancho, windowHeight: winH, onclone: prep(false) });
+      const pxMm = canvas.width / w;
+      t.p.forEach(function(i){
+        const p = paginas[i];
+        if(i) pdf.addPage();
+        const c = document.createElement('canvas'); c.width = canvas.width; c.height = Math.round((p[1] - p[0]) * escala);
+        const cx = c.getContext('2d'); cx.fillStyle = fondo; cx.fillRect(0, 0, c.width, c.height);
+        cx.drawImage(canvas, 0, Math.round((p[0] - t.y0) * escala), canvas.width, c.height, 0, 0, canvas.width, c.height);
+        pdf.addImage(c.toDataURL('image/jpeg', 0.85), 'JPEG', mx, mx, w, c.height / pxMm);
+        pdf.setFontSize(8); pdf.setTextColor(120);
+        pdf.text('Grupo Friopacking · ' + tit + ' · generado el ' + hoy, mx, 292);
+        pdf.text('Página ' + (i + 1) + ' de ' + paginas.length, 200, 292, { align:'right' });
+      });
+    }
+    pdf.save(tit.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ,_-]+/g, ' ').replace(/\s+/g, ' ').trim() + '.pdf');
   }catch(err){ appToast('No se pudo generar el PDF. Inténtalo de nuevo.'); }
 }
 
@@ -14465,6 +14522,9 @@ function appClickInicio(e){
   if(b.dataset.pry) return appAbrirProyecto(b.dataset.pry);
   if(b.dataset.per){ APP.indPer = b.dataset.per; return appRenderInicio(); }
   if(b.dataset.gper !== undefined){ APP_G.per = b.dataset.gper; return appRenderInicio(); }
+  if(b.dataset.otifper !== undefined){ APP.otifPer = b.dataset.otifper; return appRenderInicio(); }
+  if(b.dataset.otifpry !== undefined) return appOtifDetalle(b.dataset.otifpry, '');
+  if(b.dataset.otiftipo) return appOtifDetalle('', b.dataset.otiftipo);
   if(b.dataset.gorig !== undefined){ APP_G.orig = b.dataset.gorig; return appRenderInicio(); }
   if(b.dataset.gfam !== undefined){ APP_G.fam = b.dataset.gfam; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.calmes){ APP_CAL.mes += Number(b.dataset.calmes); if(APP_CAL.mes < 0){ APP_CAL.mes = 11; APP_CAL.anio--; } if(APP_CAL.mes > 11){ APP_CAL.mes = 0; APP_CAL.anio++; } APP_CAL.dia = 1; return appRefrescarCal(); }
@@ -15966,8 +16026,7 @@ function polarProyectosPendientes(){
   return `<div class="cab">🏗️ Proyectos con pendientes</div>
     <p><b>${g.length}</b> proyectos tienen algo por despachar (${g.reduce(function(a, x){ return a + x.reqs.length; }, 0)} requerimientos).</p>
     <div class="asis-item"><div class="d">Con más requerimientos pendientes</div><div class="q"><b>${escapeHtml(polarCorta(mas.nombre, 44))}</b> · ${mas.reqs.length} req. ${polarBtn('q', mas.id, 'ver')}</div></div>
-    <div class="asis-item"><div class="d">Con lo pendiente más antiguo</div><div class="q"><b>${escapeHtml(polarCorta(viejo.g.nombre, 44))}</b> · desde el ${rqFecha(viejo.f)} (${rqHace(viejo.f)}) ${polarBtn('q', viejo.g.id, 'ver')}</div></div>
-    <div class="asis-acc">${polarBtn('pantalla', 'avance', 'Ver Avance')}</div>`;
+    <div class="asis-item"><div class="d">Con lo pendiente más antiguo</div><div class="q"><b>${escapeHtml(polarCorta(viejo.g.nombre, 44))}</b> · desde el ${rqFecha(viejo.f)} (${rqHace(viejo.f)}) ${polarBtn('q', viejo.g.id, 'ver')}</div></div>`;
 }
 function polarAtendidos(p){
   rqPreparar();
