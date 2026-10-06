@@ -13635,8 +13635,8 @@ function appCalendarioHtml(){
 // ---------- Inventario (Logística) ----------
 const APP_INV = { f:'reponer', q:'', sel:'', tope:30 };
 function appInvIndice(){
-  const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
-  const firma = rows.length + '|' + ((DATA && DATA.corte) ? +DATA.corte : 0) + '|' + (document.getElementById('mesesAbastecer') || {}).value;
+  const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [], otros = almOtrosLista();
+  const firma = rows.length + '|' + otros.length + '|' + ((DATA && DATA.corte) ? +DATA.corte : 0) + '|' + (document.getElementById('mesesAbastecer') || {}).value;
   if(APP_INV.cache && APP_INV.cache.firma === firma) return APP_INV.cache;
   const meses = Math.max(0, Number((document.getElementById('mesesAbastecer') || {}).value) || 3);
   const pedir = new Map(); try{ pedirRowsFor(meses, 'pedir').rows.forEach(function(r){ pedir.set(r.codigo, r.aPedir); }); }catch(err){}
@@ -13654,10 +13654,16 @@ function appInvIndice(){
     else if(tot <= 0) e = 'nada';
     return { r:r, tot:tot, disp:disp, cons:cons, cob:cob, e:e, pedir:pedir.get(r.codigo) || 0, camino:(r.transito || 0) > 0 };
   });
+  // Todos los códigos del Reporte Almacén, también los que no tienen punto de reorden (06.10.2026, Piero:
+  // "necesito ver el stock de todos los códigos que existen"). No entran a la reposición.
+  otros.forEach(function(r){
+    const tot = (r.lima || 0) + (r.trujillo || 0) + (r.ica || 0);
+    items.push({ r:r, tot:tot, disp:r.lima || 0, cons:0, cob:null, e: tot > 0 ? 'sinrop' : 'nada', pedir:0, camino:(r.transito || 0) > 0 });
+  });
   APP_INV.cache = { firma:firma, items:items };
   return APP_INV.cache;
 }
-const APP_INV_EST = { sin:['rojo','Sin stock'], reponer:['ambar','Reponer'], ok:['verde','OK'], sinmov:['gris','Sin movimiento'], nada:['gris','Sin uso'] };
+const APP_INV_EST = { sin:['rojo','Sin stock'], reponer:['ambar','Reponer'], ok:['verde','OK'], sinmov:['gris','Sin movimiento'], nada:['gris','Sin uso'], sinrop:['gris','Sin punto de reorden'] };
 function appInvFiltrada(){
   const idx = appInvIndice().items, q = polarNorm(APP_INV.q || '');
   let l;
@@ -13697,7 +13703,7 @@ function appInvCompletar(){
 function appInvTarjeta(x){
   const r = x.r, um = escapeHtml(r.unidad || ''), est = APP_INV_EST[x.e] || ['gris', ''];
   const pct = x.cob == null ? (x.tot > 0 ? 100 : 0) : Math.min(100, x.cob / 3 * 100);
-  const alcanza = x.cob == null ? (x.tot > 0 ? 'sin consumo registrado' : 'sin stock ni consumo') : x.cob <= 0 ? (x.tot > 0 ? 'Lima sin stock (lo de sedes no cuenta)' : 'no alcanza: sin stock') : x.cob < 1 ? (Math.round(x.cob * 30) <= 1 ? 'alcanza ~1 día' : 'alcanza ~' + Math.round(x.cob * 30) + ' días') : 'alcanza ~' + appN(x.cob, 1) + ' meses';
+  const alcanza = r.sinRop ? (x.tot > 0 ? 'no entra en la reposición' : 'sin stock') : x.cob == null ? (x.tot > 0 ? 'sin consumo registrado' : 'sin stock ni consumo') : x.cob <= 0 ? (x.tot > 0 ? 'Lima sin stock (lo de sedes no cuenta)' : 'no alcanza: sin stock') : x.cob < 1 ? (Math.round(x.cob * 30) <= 1 ? 'alcanza ~1 día' : 'alcanza ~' + Math.round(x.cob * 30) + ' días') : 'alcanza ~' + appN(x.cob, 1) + ' meses';
   const abierto = APP_INV.sel === r.codigo;
   return `<div class="ini-card m-prod ${est[0]}${abierto ? ' abierto' : ''}">
     <button type="button" class="m-prod-cab" data-invsel="${escapeHtml(r.codigo)}">
@@ -13711,6 +13717,14 @@ function appInvTarjeta(x){
 }
 function appInvDetalle(x){
   const r = x.r, um = escapeHtml(r.unidad || '');
+  if(r.sinRop){
+    let tr0 = []; try{ tr0 = trTransitoDe(r.codigo) || []; }catch(err){}
+    const res0 = rqReservasDe(r.codigo), reservado0 = res0.reduce(function(a, y){ return a + y.q; }, 0);
+    return `<div class="m-prod-det"><div class="m-tiles"><div><span>Reservado</span><b>${appN(reservado0, 2)}</b></div><div><span>En tránsito</span><b>${appN(r.transito, 2)}</b></div></div>
+      <div class="m-sec-nota">Sin punto de reorden: no entra en la reposición ni tiene kardex.</div>
+      ${tr0.length ? `<div class="m-det-t">🚚 En camino</div>${tr0.slice(0, 3).map(function(o){ return `<div class="m-det-f"><span class="mono">${escapeHtml(String(o.oc).replace(/^000\d-0*/, ''))}</span> ${escapeHtml(polarCorta(o.proveedor, 22))}<b>${appN(o.cant, 2)}</b></div>`; }).join('')}` : ''}
+      <div class="asis-acc"><button type="button" data-q="precio de ${escapeHtml(r.codigo)}">💲 Último precio</button></div></div>`;
+  }
   const res = rqReservasDe(r.codigo), reservado = res.reduce(function(a, y){ return a + y.q; }, 0);
   let tr = []; try{ tr = trTransitoDe(r.codigo, r.codigos) || []; }catch(err){}
   // Últimas 12 semanas: lo que entró (verde, arriba) y lo que salió (rojo, abajo).
@@ -13734,7 +13748,7 @@ function appInventarioHtml(){
   if(!idx.length) return '<div class="ini-card"><div class="ini-vacio">Carga el Reporte Almacén para ver el inventario.</div></div>';
   const cnt = function(f){ return idx.filter(function(x){ return f === 'camino' ? x.camino : f === 'reponer' ? (x.e === 'reponer' || x.e === 'sin') : x.e === f; }).length; };
   return `<div class="m-buscar"><input type="search" id="invBusca" placeholder="🔍 Código o descripción" value="${escapeHtml(APP_INV.q)}"></div>
-    ${appChips('invf', APP_INV.q ? '' : APP_INV.f, [['reponer','⚠️ Reponer ' + cnt('reponer')], ['sin','🔴 Sin stock ' + cnt('sin')], ['camino','🚚 En camino ' + cnt('camino')], ['sinmov','💤 Sin movimiento ' + cnt('sinmov')], ['todos','Todos']])}
+    ${appChips('invf', APP_INV.q ? '' : APP_INV.f, [['reponer','⚠️ Reponer ' + cnt('reponer')], ['sin','🔴 Sin stock ' + cnt('sin')], ['camino','🚚 En camino ' + cnt('camino')], ['sinmov','💤 Sin movimiento ' + cnt('sinmov')]].concat(cnt('sinrop') ? [['sinrop','📋 Sin punto de reorden ' + cnt('sinrop')]] : []).concat([['todos','Todos']]))}
     <div id="invLista">${appInvLista()}</div>`;
 }
 
