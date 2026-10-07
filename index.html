@@ -1286,6 +1286,7 @@
     .imp-tabs button.imp-tr{border-top-color:#1fb5a3;} .imp-tabs button.imp-tr b{color:#11897b;}
     .imp-tabs button.imp-em{border-top-color:#3565d9;} .imp-tabs button.imp-em b{color:#3565d9;}
     .imp-tabs button.imp-bk{border-top-color:#f59a2e;} .imp-tabs button.imp-bk b{color:#d97a0c;}
+    .imp-tabs button.imp-ot{border-top-color:#8a94a6;} .imp-tabs button.imp-ot b{color:#5b6780;}
     .imp-linea{position:relative;padding-left:14px;margin-bottom:10px;}
     .imp-linea::before{content:"";position:absolute;left:4px;top:6px;bottom:6px;width:2px;background:var(--border);}
     .imp-card{cursor:pointer;} .imp-card:hover{box-shadow:0 4px 16px rgba(10,30,100,.14);}
@@ -1363,7 +1364,7 @@
     .ctw-esq.der{left:auto;right:10px;border-left:0;border-right:2px solid;}
     .ctw-r1{display:flex;align-items:center;gap:10px;padding-bottom:8px;border-bottom:1px solid #dfe4ec;} .ctw-oc{flex:1;min-width:0;}
     .ctw-oc small{display:block;font-size:11px;font-weight:800;} .ctw-oc b{display:block;font-size:17px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .ctw-fe{width:100px;border-radius:8px;padding:4px 10px;color:#fff;box-shadow:0 2px 4px rgba(10,26,92,.15);} .ctw-fe small{display:block;font-size:8.5px;font-weight:800;opacity:.9;} .ctw-fe b{display:block;font-size:14.5px;font-weight:900;} .ctw-fe b.pd{font-size:11px;padding:3px 0 2px;white-space:nowrap;}
+    .ctw-fe{width:112px;border-radius:8px;padding:4px 10px;color:#fff;box-shadow:0 2px 4px rgba(10,26,92,.15);} .ctw-fe small{display:block;font-size:8.5px;font-weight:800;opacity:.9;} .ctw-fe b{display:block;font-size:14.5px;font-weight:900;}
     .ctw-r2{display:flex;margin-top:7px;} .ctw-r2 > div{min-width:0;} .ctw-r2 > div:first-child{width:44%;} .ctw-r2 > div:last-child{flex:1;}
     .ctw-r2 small,.ctw-r3 small{display:block;font-size:10.5px;font-weight:800;color:#5b6780;} .ctw-r2 b{display:block;font-size:15.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .ctw-prod{margin:3px -6px 0;padding:2px 6px;border-radius:4px;font-size:15.5px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -15539,7 +15540,9 @@ function appImpDatosCalc(){
   let n = 0; ['tr', 'em', 'bk'].forEach(function(k){ L[k].forEach(function(g){ g.n = ++n; }); });
   return L;
 }
-const APP_IMP_SEC = { tr:['🚢', 'En tránsito', 'Ya zarpó (ETD) o ya arribó a Perú · ordenado por la ETA más próxima'], em:['🛳️', 'Por zarpar', 'ETD programado, booking pendiente, o el proveedor ya la entregó y falta el ETD'],
+const APP_IMP_SEC = { tr:['🚢', 'En tránsito', 'Ya zarpó y todavía no llega · ordenado por la ETA más próxima'], em:['🛳️', 'Por embarcar', 'ETD programado, booking pendiente, o el proveedor ya la entregó y falta el ETD'],
+  bo:['📋', 'Pendiente booking', 'Sin ETD ni ETA · falta el booking con la agencia'],
+  ot:['📦', 'Otras OC abiertas', 'Ya arribaron (falta el ingreso a Lurín), siguen en fabricación o no están en el seguimiento de Camila'],
   bk:['🏭', 'En fabricación', 'El proveedor todavía no la entrega en su fábrica para el zarpe · ordenado por esa fecha estimada'] };
 function appImpNombre(t){
   return String(t || '').replace(/\b(S\.?\s?A\.?\s?C\.?|S\.?\s?A\.?\s?S\.?|S\.?\s?A\.?|S\.?\s?R\.?\s?L\.?|E\.?\s?I\.?\s?R\.?\s?L\.?|SOCIEDAD ANONIMA( CERRADA)?|CO\.?,?\s?LTD\.?|LIMITED|LTDA\.?|S\.P\.A\.?|INC\.?|GMBH|CORPORATION)(?=\s|$|[.,])/gi, '')
@@ -15559,12 +15562,47 @@ function appTarjetaHtml(t){
 const APP_FAM_COLORES = ['#2563eb', '#0d9488', '#d97706', '#7c3aed', '#db2777', '#059669', '#dc2626', '#0891b2', '#65a30d', '#c2410c'];
 function appColorFamilia(n){ let h = 0; String(n || '').split('').forEach(function(c){ h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return APP_FAM_COLORES[h % APP_FAM_COLORES.length]; }
 function appDDMM(d){ return d ? String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') : '—'; }
+// Pestañas de Importaciones con los mismos 3 estados del PDF "Estatus de embarques" (07.10.2026, Piero:
+// "puedes considerar también esos 3 estados para filtrar arriba"): una tarjeta por embarque del Excel de
+// Camila. Lo demás que sigue abierto en Nisira va en "Otras OC abiertas", para no perder nada de vista.
+// Sin el Excel de Camila cargado, se queda como antes (solo Nisira).
+function appImpSecciones(){
+  return appMemo('impSec', function(){
+    if(!(EMB_DATA.rows || []).length) return null;
+    const L = appImpDatos(), S = ctwSecciones(), vistos = new Set(); let n = 0;
+    ['tr', 'em', 'bo'].forEach(function(k){ S[k].forEach(function(x){ x.n = ++n; x.e.oc.forEach(function(c){ vistos.add(c); }); }); });
+    S.ot = ['tr', 'em', 'bk'].reduce(function(a, k){ return a.concat(L[k].filter(function(g){ return !g.ocs.some(function(c){ return vistos.has(c); }); })); }, []);
+    S.nOt = new Map(); S.ot.forEach(function(g){ S.nOt.set(g, ++n); });
+    S.existe = new Set(getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).map(function(r){ return r.codOrden; }).filter(Boolean));
+    return S;
+  });
+}
+function appImpEmbCard(x, k, S){
+  const e = x.e, g = x.g, p = ctwPartes(e), ddmm = appDDMM, hoy = appIndCorte();
+  const dias = function(d){ return d ? Math.round((polarDia(d) - hoy) / 864e5) : null; };
+  const prov = p.prov || (g ? ctwProv(g.prov) : ''), pry = p.pry.length ? p.pry : (g ? [...g.prys].map(appImpNombre) : []);
+  let fecha, flag = '', pie;
+  if(k === 'bo'){ fecha = 'ETD / ETA pendientes'; pie = '📋 Falta el booking con la agencia'; }
+  else {
+    fecha = 'ETD ' + ddmm(x.etd) + ' → ETA ' + (x.eta ? ddmm(x.eta) : 'por confirmar');
+    if(k === 'em'){ const d = dias(x.etd); if(d != null && d <= 3) flag = '<em class="prox">ETD próximo</em>'; pie = '🛳️ Zarpa en ' + d + ' d.'; }
+    else { const d = dias(x.eta); if(d != null && d <= 3) flag = '<em class="prox">ETA próxima</em>'; pie = '🚢 Zarpó hace ' + (-dias(x.etd)) + ' d.' + (d === 0 ? ' · llega hoy' : d != null ? ' · llega en ' + d + ' d.' : ''); }
+  }
+  const nom = function(q){ return (PD_PERSONAS[q] || q || '').split(' ')[0]; };
+  return appTarjetaHtml({ cls:k === 'bo' ? 'bk' : k, n:x.n, est:APP_IMP_SEC[k][1], flag:flag, fecha:fecha, codLbl:'OC',
+    cods:e.oc.map(function(c){ return [c.replace(/^0002-0*/, ''), S.existe.has(c) ? 'data-oc="' + escapeHtml(c) + '"' : '']; }),
+    a:['Proveedor', polarCorta(prov || '—', 34)], b:['Proyecto', polarCorta(pry.slice(0, 3).join(' · '), 40)],
+    extra:[e.mt, ctwOrigen(e.ds), ctwCarga(e)[1], e.ag ? '🚚 ' + e.ag : '', e.rf ? 'Ref ' + e.rf : ''].filter(Boolean).join(' · '),
+    pie:pie, quien:g ? [...g.personas].map(nom).filter(Boolean).join(' · ') : '' });
+}
 function appPendLogLista(){
-  const L = appImpDatos(), q = polarNorm(APP_PL.q || '');
+  const L = appImpDatos(), q = polarNorm(APP_PL.q || ''), S = appImpSecciones();
   const ddmm = appDDMM;
   const filtra = function(l){ return q ? l.filter(function(g){ const t = polarNorm([g.ocs.join(' '), g.prov, [...g.prys].join(' '), [...g.prods.keys()].join(' '), g.emb ? [g.emb.rf, g.emb.ag, g.emb.ds, g.emb.mt].join(' ') : ''].join(' '));
     return t.indexOf(q) !== -1 || polarCompacto(t).indexOf(polarCompacto(q)) !== -1; }) : l; };
   const nom = function(p){ return (PD_PERSONAS[p] || p || '').split(' ')[0]; };
+  const filtraE = function(l){ return q ? l.filter(function(x){ const e = x.e, t = polarNorm([e.oc.join(' '), e.ds, e.mt, e.ag, e.rf, x.g ? x.g.prov + ' ' + [...x.g.prys].join(' ') : ''].join(' '));
+    return t.indexOf(q) !== -1 || polarCompacto(t).indexOf(polarCompacto(q)) !== -1; }) : l; };
   const card = function(g){
     const prys = [...g.prys].map(appImpNombre);
     let fechas, flag = '', pie = '';
@@ -15587,15 +15625,17 @@ function appPendLogLista(){
     }
     if(g.parcial) pie += ' · ya llegó una parte';
     const ex = g.emb ? ['🚚 ' + (g.emb.ag || 'Sin agencia'), g.emb.rf ? 'Ref ' + g.emb.rf : '', g.emb.bl, g.emb.ob].filter(Boolean).join(' · ') : '';
-    return appTarjetaHtml({ extra:ex, cls:g.k, n:g.n, est:APP_IMP_SEC[g.k][1], flag:flag, fecha:fechas, codLbl:'OC',
+    return appTarjetaHtml({ extra:ex, cls:g.k, n:(S && S.nOt.get(g)) || g.n, est:S ? (g.emb && g.emb.es === 'ARRIBO' ? 'Arribó a Perú' : APP_IMP_SEC[g.k][1] + ' (Nisira)') : APP_IMP_SEC[g.k][1], flag:flag, fecha:fechas, codLbl:'OC',
       cods:g.ocs.map(function(oc){ return [oc.replace(/^0002-0*/, ''), 'data-oc="' + escapeHtml(oc) + '"']; }),
       a:['Proveedor', polarCorta(appImpNombre(g.prov), 34)], b:['Cliente', prys.length ? polarCorta(prys.slice(0, 2).join(' · '), 40) + (prys.length > 2 ? ' +' + (prys.length - 2) : '') : ''],
       pie:pie, quien:[...g.personas].map(nom).filter(Boolean).join(' · ') });
   };
-  const claves = q ? ['tr', 'em', 'bk'] : [APP_PL.sec];
+  const claves = q ? (S ? ['tr', 'em', 'bo', 'ot'] : ['tr', 'em', 'bk']) : [APP_PL.sec];
   const html = claves.map(function(k){
-    const l = filtra(L[k] || []), c = APP_IMP_SEC[k], tope = Infinity;   // todo a la vista (05.10.2026)
+    const l = S ? (k === 'ot' ? filtra(S.ot) : filtraE(S[k] || [])) : filtra(L[k] || []), c = APP_IMP_SEC[k], tope = Infinity;   // todo a la vista (05.10.2026)
     if(q && !l.length) return '';
+    if(S && k !== 'ot') return `<div class="m-pl-tit imp-${k === 'bo' ? 'bk' : k}"><span>${c[0]} ${c[1]}</span><b>${l.length}</b></div><div class="m-sec-nota">${c[2]}</div>`
+      + (l.length ? '<div class="imp-linea">' + l.map(function(x){ return appImpEmbCard(x, k, S); }).join('') + '</div>' : '<div class="ini-vacio">✅ Nada en este estado.</div>');
     return `<div class="m-pl-tit imp-${k}"><span>${c[0]} ${c[1]}</span><b>${l.length}</b></div><div class="m-sec-nota">${c[2]}</div>`
       + (l.length ? '<div class="imp-linea">' + l.slice(0, tope).map(function(g, i, a){
           const corte = k === 'tr' && g.dEta != null && g.dEta < 0 && !(i && a[i - 1].dEta != null && a[i - 1].dEta < 0);
@@ -15605,11 +15645,12 @@ function appPendLogLista(){
   return html || `<div class="ini-vacio">No hay importaciones con "${escapeHtml(APP_PL.q)}".</div>`;
 }
 function appPendLogHtml(){
-  const L = appImpDatos();
+  const S = appImpSecciones(), L = S || appImpDatos();
   if(!L[APP_PL.sec]) APP_PL.sec = 'tr';
-  const tile = function(k, cls){ const l = L[k], noc = l.reduce(function(s, g){ return s + g.ocs.length; }, 0);
+  const tile = function(k, cls){ const l = L[k], noc = l.reduce(function(s, g){ return s + (g.e ? g.e.oc.length : g.ocs.length); }, 0);
     return `<button type="button" class="${cls}${APP_PL.sec === k && !APP_PL.q ? ' sel' : ''}" data-plsec="${k}"><b>${l.length}</b><span>${APP_IMP_SEC[k][1]}</span><small>${noc} OC</small></button>`; };
-  return `<div class="m-resumen tres m-pl-tabs imp-tabs">${tile('tr', 'imp-tr')}${tile('em', 'imp-em')}${tile('bk', 'imp-bk')}</div>
+  return `${S ? `<div class="m-resumen m-pl-tabs imp-tabs">${tile('tr', 'imp-tr')}${tile('em', 'imp-em')}${tile('bo', 'imp-bk')}${tile('ot', 'imp-ot')}</div>`
+      : `<div class="m-resumen tres m-pl-tabs imp-tabs">${tile('tr', 'imp-tr')}${tile('em', 'imp-em')}${tile('bk', 'imp-bk')}</div>`}
     <button type="button" class="m-aviso" data-dashimp="${appIndCorte().getUTCFullYear()}">📊 Dashboard de importaciones ${appIndCorte().getUTCFullYear()} ›</button>
     <button type="button" class="m-aviso" data-impdf="1">📄 Exportar PDF · Estatus de embarques (Control Tower) ›</button>
     <div class="m-buscar"><input type="search" id="plBusca" placeholder="🔍 OC, proveedor, proyecto o producto" value="${escapeHtml(APP_PL.q)}"></div>
@@ -15627,7 +15668,7 @@ function appPendLogHtml(){
 const CTW_SEC = {
   tr:{ t:'EN TRÁNSITO', ley:'En tránsito', ord:'ORDEN POR ETA', c:'#1aa88c', tint:'#d8f4ec', txt:'#0e7a64', ban:'#0a1a5c' },
   em:{ t:'POR EMBARCAR', ley:'Por embarcar', ord:'ORDEN POR ETD', c:'#2459d6', tint:'#dde7fb', txt:'#1f4fc4', ban:'#ffffff' },
-  bo:{ t:'PENDIENTE BOOKING', ley:'Pendiente booking', ord:'SIN ETD / ETA CONFIRMADAS', c:'#ee8a1a', tint:'#fde9d2', txt:'#b4610a', ban:'#ffffff' } };
+  bo:{ t:'PENDIENTE BOOKING', ley:'Pendiente booking', ord:'ETD Y ETA PENDIENTES DE INFORMACIÓN', c:'#ee8a1a', tint:'#fde9d2', txt:'#b4610a', ban:'#0a1a5c' } };
 function ctwOrigen(t){
   const x = sinAcentos(String(t || '')).toUpperCase();
   const ch = [['QUINDAO', 'QINGDAO'], ['QINGDAO', 'QINGDAO'], ['SHANGHAI', 'SHANGHÁI'], ['FUZHO', 'FUZHOU'], ['FUJIAN', 'FUJIAN'], ['GUANGDONG', 'GUANGDONG']].find(function(c){ return x.indexOf(c[0]) !== -1; });
@@ -15666,7 +15707,7 @@ function ctwPartes(e){
   if(parts.length === 2 && !conPais) return { prov:limpia(parts[1]).join(' '), pry:limpia(parts[0]) };
   return { prov:'', pry:[] };
 }
-function ctwDDMMYY(d){ return d ? String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + String(d.getUTCFullYear()).slice(2) : 'POR DEFINIR'; }
+function ctwDDMMYY(d){ return d ? String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + String(d.getUTCFullYear()).slice(2) : 'PENDIENTE'; }
 function ctwSecciones(){
   const corte = appIndCorte(), L = appImpDatos(), pend = new Map();
   ['tr', 'em', 'bk'].forEach(function(k){ L[k].forEach(function(g){ g.ocs.forEach(function(oc){ pend.set(oc, g); }); }); });
@@ -15703,7 +15744,7 @@ function ctwTarjeta(x, k, n){
   if(!pry.length && g) pry = [...new Set([...g.prys].map(function(y){ return /^stock/i.test(y) ? 'STOCK PARA PROYECTOS' : appImpNombre(y).toUpperCase().split(/\s+/).slice(0, 2).join(' '); }))];
   const prod = e.mt || (g ? [...g.prods.keys()][0] : '') || '—', org = ctwOrigen(e.ds), carga = ctwCarga(e);
   const ocs = e.oc.map(function(c){ return c.replace(/^0002-0*/, '').padStart(4, '0'); }).join(' · ');
-  const fe = function(t, d){ return `<div class="ctw-fe" style="background:${s.c}"><small>${t}</small><b${d ? '' : ' class="pd"'}>${ctwDDMMYY(d)}</b></div>`; };
+  const fe = function(t, d){ return `<div class="ctw-fe" style="background:${s.c}"><small>${t}</small><b>${ctwDDMMYY(d)}</b></div>`; };
   return `<div class="ctw-card"><i class="ctw-bar" style="background:${s.c}"></i><i class="ctw-esq" style="border-color:${s.c}"></i><i class="ctw-esq der" style="border-color:${s.c}"></i>
     <div class="ctw-r1"><div class="ctw-oc"><small style="color:${s.txt}">${String(n).padStart(2, '0')} / OC</small><b>${escapeHtml(ocs)}</b></div>${fe('ETD · SALIDA', x.etd)}${fe('ETA · LLEGADA', x.eta)}</div>
     <div class="ctw-r2"><div><small>PROVEEDOR</small><b>${escapeHtml(polarCorta(prov, 24))}</b></div><div><small>PROYECTO</small><b>${escapeHtml(polarCorta(pry.slice(0, 3).join(' · ') || '—', 36))}</b></div></div>
@@ -15721,10 +15762,10 @@ function ctwHojas(){
     const l = S[k], s = CTW_SEC[k], porHoja = 9, tot = Math.ceil(l.length / porHoja);
     for(let h = 0; h < tot; h++){
       const cards = l.slice(h * porHoja, (h + 1) * porHoja).map(function(x){ return ctwTarjeta(x, k, ++n); }).join('');
-      hojas.push(`<div class="ctw-hoja"><div class="ctw-cab"><div class="ctw-tit"><small>IMPORTACIONES / CONTROL TOWER</small><b>ESTATUS DE EMBARQUES</b><span>CORTE ${fCorte} · GRUPO FRIOPACKING</span></div>
+      hojas.push(`<div class="ctw-hoja"><div class="ctw-cab"><div class="ctw-tit"><small style="color:${s.txt}">IMPORTACIONES / CONTROL TOWER</small><b>ESTATUS DE EMBARQUES</b><span>CORTE ${fCorte} · GRUPO FRIOPACKING</span></div>
           ${logo ? `<div class="ctw-logo"><img src="${logo}"></div>` : ''}
           <div class="ctw-modos">${modo(CTW_ICO.barco, 'MARÍTIMO', 'Contenedores / LCL')}${modo(CTW_ICO.avion, 'AÉREO', 'Carga aérea')}${modo(CTW_ICO.camion, 'TERRESTRE', 'Carga internacional')}</div></div>
-        <div class="ctw-regla"></div>
+        <div class="ctw-regla" style="background:${s.c}"></div>
         <div class="ctw-ban"><div class="ctw-box" style="background:${s.c};color:${s.ban}"><b>${String(l.length).padStart(2, '0')}</b><div><span>${s.t}</span><small>${tot > 1 ? 'HOJA ' + (h + 1) + ' DE ' + tot + '  /  ' : ''}${s.ord}</small></div></div>
           <div class="ctw-ley"><small>LEYENDA DE ESTADOS</small>${ley}</div></div>
         <div class="ctw-lista">${cards}</div>
