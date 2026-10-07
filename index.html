@@ -1171,6 +1171,12 @@
     .m-pp-ver{display:block;margin:4px 16px 12px auto;background:none;border:0;color:var(--brand-ink);font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit;padding:4px 0;} .m-pp-hizo .m-pp-ver{margin:8px 0 0 auto;}
     .m-pp-full table{width:100%;border-collapse:collapse;font-size:13px;} .m-pp-full td.pr{min-width:220px;} .m-pp-full th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:800;padding:6px 8px;border-bottom:2px solid var(--border);white-space:nowrap;}
     .m-pp-full td{padding:8px;border-top:1px solid var(--border);vertical-align:top;color:var(--ink);} .m-pp-full td.nw{white-space:nowrap;} .m-pp-full-cab{display:flex;align-items:center;gap:10px;font-size:15px;} .m-pp-full-cab span{margin-left:auto;font-weight:900;font-size:17px;color:var(--brand-ink);}
+    .sku-prio{font-style:normal;font-weight:800;} .sku-prio.rojo{color:var(--red);} .sku-prio.ambar{color:var(--amber-ink);} .sku-prio.verde{color:var(--green);}
+    .sku-ped{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;} .sku-ped div{background:var(--surface-2);border-radius:12px;padding:8px 10px;min-width:0;}
+    .sku-ped span{display:block;font-size:11px;font-weight:800;color:var(--muted);} .sku-ped b{display:block;font-size:14px;font-weight:800;color:var(--ink);margin-top:2px;overflow-wrap:anywhere;} .sku-ped b.rojo{color:var(--red);}
+    .sku-stock div.ok b{color:var(--green);} .sku-nota{display:block;margin-top:8px;color:var(--muted);font-size:12px;} .sku-ult{margin-top:10px;font-size:13px;color:var(--ink-soft);}
+    .sku-prov{padding:10px 0;border-top:1px solid var(--border);} .sku-prov b{display:block;font-size:14px;} .sku-prov small{display:block;font-size:12px;color:var(--ink-soft);margin:2px 0 4px;} .sku-prov .m-link{font-size:12.5px;text-decoration:none;} .sku-sinmail{font-size:12px;color:var(--muted);}
+    .ini-card-tit + .sku-prov{border-top:0;}
     .m-tar{margin-top:16px;} .m-tar .m-pp-tit small{font-size:11.5px;color:var(--muted);font-weight:700;margin-left:6px;}
     .m-tar-aviso{font-size:12.5px;color:var(--amber-ink);background:rgba(244,166,64,.12);border-radius:10px;padding:8px 10px;margin:6px 0;} .m-tar-vacio{font-size:12.5px;color:var(--muted);padding:6px 0;}
     .m-tar-per{font-size:12px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin:12px 0 2px;}
@@ -13118,7 +13124,7 @@ const APP_PC_CSS = `
   body.app-pc .m-pp-hero{padding:26px 32px;} body.app-pc .m-pp-av{width:84px;height:84px;font-size:30px;} body.app-pc .m-pp-nom b{font-size:30px;} body.app-pc .m-pp-monto b{font-size:42px;}
   body.app-pc .m-pp-kpis{grid-template-columns:repeat(4,1fr);gap:14px;} body.app-pc .m-pp-kpi{padding:18px 20px;} body.app-pc .m-pp-kpi b{font-size:40px;}
   body.app-pc .m-pp-alertas{grid-template-columns:1.4fr 1fr 1fr;gap:14px;} body.app-pc .m-pp-al{padding:18px 20px;} body.app-pc .m-pp-al > b{font-size:40px;}
-  body.app-pc .m-pp-hizo{padding:18px 22px;} body.app-pc .m-tar-f{grid-template-columns:minmax(0,1.3fr) auto minmax(0,1fr);align-items:center;}
+  body.app-pc .sku-ped{grid-template-columns:repeat(3,minmax(0,1fr));} body.app-pc .m-pp-hizo{padding:18px 22px;} body.app-pc .m-tar-f{grid-template-columns:minmax(0,1.3fr) auto minmax(0,1fr);align-items:center;}
 `;
 function appPcActivar(){
   if(!APP_EN_PC || document.getElementById('appPcCss')) return;
@@ -14399,7 +14405,8 @@ function appPendComprasHtml(soloLista){
     const pry = /^pedido directo/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : appImpNombre(r.proyecto || '');
     const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '';
     const quien = r.solicitante ? r.solicitante.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }) : '';
-    return appFilaHtml('data-q="pedido ' + escapeHtml(r.codPedido) + '"', 'gris', r.producto || r.idProducto,
+    const dh = r.fPedido ? Math.max(0, busdayCount(r.fPedido, hoy) || 0) : 0;
+    return appFilaHtml('data-sku="' + escapeHtml(r.idProducto || '') + '" data-skuped="' + escapeHtml(r.codPedido || '') + '" data-skureq="' + escapeHtml(r.req || '') + '"', dh >= 5 ? 'rojo' : dh >= 3 ? 'ambar' : 'verde', r.producto || r.idProducto,
       '<span class="mono">' + escapeHtml(r.idProducto || '') + '</span> · Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.req ? ' · Req ' + escapeHtml(r.req.replace(/^000\d-0*/, '')) : '')
         + (pryId ? ' · <span class="mono">' + escapeHtml(pryId) + '</span>' : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 34)) : '')
         + (quien ? '<span class="sku-quien">👷 Solicitó: <b>' + escapeHtml(quien) + '</b></span>' : '')
@@ -14412,13 +14419,16 @@ function appPendComprasHtml(soloLista){
   // chips para quedarse con una sola familia.
   const skuGrupos = function(l){
     const g = new Map(); l.forEach(function(r){ const k = (r.familia || 'Sin familia').toString().trim() || 'Sin familia'; if(!g.has(k)) g.set(k, []); g.get(k).push(r); });
-    return [...g.entries()].sort(function(a,b){ return b[1].length - a[1].length || a[0].localeCompare(b[0]); });
+    // Por prioridad (07.10.2026, Piero): primero la familia con el pedido más antiguo; dentro, el más antiguo primero.
+    const f0 = function(l2){ return l2.reduce(function(m, r){ return r.fPedido && (!m || r.fPedido < m) ? r.fPedido : m; }, null) || new Date(8.64e15); };
+    return [...g.entries()].sort(function(a,b){ return f0(a[1]) - f0(b[1]) || b[1].length - a[1].length || a[0].localeCompare(b[0]); });
   };
   const skuPorFamilia = function(l){
     return skuGrupos(l).map(function(e){
       const peds = new Set(e[1].map(function(r){ return r.codPedido; })).size, prys = new Set(e[1].map(function(r){ return r.idProyecto; }).filter(Boolean)).size;
+      const viejo = e[1][0] && e[1][0].fPedido ? Math.max(0, busdayCount(e[1][0].fPedido, hoy) || 0) : 0;
       return `<details class="sku-grupo" open style="--fam:${appColorFamilia(e[0])}"><summary><i></i><span>${escapeHtml(e[0])}</span>
-          <small>${peds} pedido${peds === 1 ? '' : 's'} · ${prys} proyecto${prys === 1 ? '' : 's'}</small><b>${e[1].length}</b></summary>
+          <small>${peds} pedido${peds === 1 ? '' : 's'} · ${prys} proyecto${prys === 1 ? '' : 's'} · <em class="sku-prio ${viejo >= 5 ? 'rojo' : viejo >= 3 ? 'ambar' : 'verde'}">el más antiguo: ${viejo} d.h.</em></small><b>${e[1].length}</b></summary>
         <div class="sku-filas">${e[1].map(filaSku).join('')}</div></details>`; }).join('');
   };
   // Buscador general (05.10.2026, Piero): OC, pedido, req., código, producto, proveedor o proyecto, en
@@ -14444,6 +14454,89 @@ function appPendComprasHtml(soloLista){
     + `<div class="m-resumen m-pl-tabs imp-tabs">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}</div>`
     + `<div class="m-buscar"><input type="search" id="pcBusca" placeholder="🔍 OC, pedido, req., código, producto, proveedor o proyecto" value="${escapeHtml(APP_PC.q || '')}"></div>`
     + `<div id="pcLista">${lista}</div>`;
+}
+
+// ---------- Ficha del SKU (07.10.2026, Piero) ----------
+// Al tocar un SKU sin OC: el pedido (req., PRY y proyecto), el stock en las 3 sedes (0 si no figura), el
+// historial de precios (de las OC de Nisira), a quién se le compró por última vez y con quién cotizar.
+function appSkuStock(cod){
+  const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [];
+  const r = rows.find(function(x){ return x.codigo === cod || (x.codigos || []).indexOf(cod) !== -1; });
+  if(!r) return { lima:0, ica:0, trujillo:0, transito:0, grupo:null };
+  const m = (r.miembros || []).find(function(x){ return x.codigo === cod; }) || r;
+  return { lima:m.lima || 0, ica:m.ica || 0, trujillo:m.trujillo || 0, transito:m.transito || 0, grupo:(r.miembros && r.miembros.length > 1) ? r : null };
+}
+function appSkuHistorial(cod){
+  return appMemo('skuHist:' + cod, function(){
+    const porOC = new Map();
+    polarLineasOC().forEach(function(r){
+      if(r.idProducto !== cod || !r.codOrden || !r.fOrden || /anul/i.test(r.estadoOrden || '')) return;
+      const q = r.cantidadOrden != null ? r.cantidadOrden : r.cantOrden;
+      const o = porOC.get(r.codOrden) || { oc:r.codOrden, f:r.fOrden, prov:r.proveedor || '', ruc:r.rucProveedor || '', q:0, total:0, mon:monedaLabel(r.moneda), um:r.unidad || '', pry:r.proyecto || '', conMonto:false };
+      if(q != null) o.q += q; if(r.montoNativo != null && !isNaN(r.montoNativo)){ o.total += r.montoNativo; o.conMonto = true; }
+      porOC.set(r.codOrden, o);
+    });
+    return [...porOC.values()].map(function(o){ o.pu = o.conMonto && o.q > 0 ? o.total / o.q : null; return o; }).sort(function(a, b){ return b.f - a.f; });
+  });
+}
+// Proveedores de la misma familia (último año), para pedir más cotizaciones.
+function appSkuProvFamilia(fam){
+  return appMemo('skuFam:' + fam, function(){
+    const lim = new Date(appIndCorte()); lim.setUTCFullYear(lim.getUTCFullYear() - 1);
+    const m = new Map();
+    polarLineasOC().forEach(function(r){ if(r.familia !== fam || !r.proveedor || !r.fOrden || r.fOrden < lim) return;
+      const x = m.get(r.proveedor) || { prov:r.proveedor, ruc:r.rucProveedor || '', ocs:new Set(), f:r.fOrden }; x.ocs.add(r.codOrden); if(r.fOrden > x.f) x.f = r.fOrden; m.set(r.proveedor, x); });
+    return [...m.values()].sort(function(a, b){ return b.ocs.size - a.ocs.size; });
+  });
+}
+function appSkuPrecio(v, mon){ return v == null ? '—' : (mon === 'S/' ? 'S/ ' : mon === 'US$' ? '$ ' : (mon || '') + ' ') + Number(v).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+function appSkuAbrir(cod, ped, req){
+  const fila = pdFilas().find(function(r){ return r.idProducto === cod && r.codPedido === ped && (!req || r.req === req); })
+    || pdFilas().find(function(r){ return r.idProducto === cod; }) || {};
+  const e = escapeHtml, hoy = new Date(), dh = fila.fPedido ? Math.max(0, busdayCount(fila.fPedido, hoy) || 0) : 0;
+  const st = appSkuStock(cod), hist = appSkuHistorial(cod), ult = hist[0];
+  const pry = /^pedido directo/i.test(fila.proyecto || '') ? 'Stock / sin proyecto' : appImpNombre(fila.proyecto || '');
+  const pryId = fila.idProyecto && !/^SIN PROYECTO/i.test(fila.idProyecto) ? fila.idProyecto : '';
+  const quien = fila.solicitante ? fila.solicitante.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }) : '';
+  const tile = function(t, v, cls){ return `<div class="${cls || ''}"><span>${t}</span><b>${v}</b></div>`; };
+  const n = function(v){ return appN(Math.round(v * 100) / 100); }, um = e(fila.unidad || (ult && ult.um) || '');
+  // Precios por moneda (no se mezclan soles con dólares)
+  const mon = ult ? ult.mon : '', mismos = hist.filter(function(h){ return h.pu != null && h.mon === mon; });
+  const prom = mismos.length ? mismos.reduce(function(a, h){ return a + h.pu; }, 0) / mismos.length : null;
+  const min = mismos.length ? mismos.reduce(function(a, h){ return h.pu < a.pu ? h : a; }) : null;
+  // Con quién cotizar: a quién ya se le compró este SKU (con su último precio) + proveedores de la familia.
+  const provSku = new Map(); hist.forEach(function(h){ const x = provSku.get(h.prov) || { prov:h.prov, ruc:h.ruc, n:0, ult:h, mejor:null }; x.n++;
+    if(h.pu != null && h.mon === mon && (!x.mejor || h.pu < x.mejor.pu)) x.mejor = h; provSku.set(h.prov, x); });
+  const fam = appSkuProvFamilia(fila.familia || '').filter(function(x){ return !provSku.has(x.prov); }).slice(0, 6);
+  const mail = function(ruc, prov){ const M = PROVEEDOR_MAIL || {}, k = sinAcentos(String(prov || '')).toUpperCase().trim();
+    const m = M[ruc] || Object.values(M).find(function(v){ return v && sinAcentos(String(v.nombre || '')).toUpperCase().trim() === k; }) || null; return m && m.to ? `<a class="m-link" href="mailto:${e(m.to)}">✉️ ${e(m.to)}</a>` : '<span class="sku-sinmail">sin correo registrado</span>'; };
+  const cuerpo = `<div class="oc-hero"><div class="oc-num"><b>${e(fila.producto || cod)}</b></div>
+      <small><span class="mono">${e(cod)}</span> · ${e(fila.familia || 'Sin familia')}</small>
+      <div class="sku-ped">
+        <div><span>Pedido</span><b><button type="button" class="m-link mono" data-q="pedido ${e(fila.codPedido || '')}">${e(String(fila.codPedido || '—').replace(/^000\d-0*/, ''))}</button></b></div>
+        <div><span>Requerimiento</span><b>${fila.req ? `<button type="button" class="m-link mono" data-ocreq="${e(fila.req)}">${e(fila.req.replace(/^000\d-0*/, ''))}</button>` : '—'}</b></div>
+        <div><span>PRY</span><b class="mono">${e(pryId || '—')}</b></div>
+        <div><span>Proyecto</span><b>${e(pry || '—')}</b></div>
+        <div><span>Cantidad pedida</span><b>${fila.cantPedido != null ? n(fila.cantPedido) + ' ' + um : '—'}</b></div>
+        <div><span>Esperando OC</span><b class="${dh >= 5 ? 'rojo' : ''}">${fila.fPedido ? 'desde ' + appDDMM(fila.fPedido) + ' · ' + dh + ' d.h.' : '—'}</b></div>
+      </div>
+      ${quien ? `<div class="sku-quien">👷 Solicitó: <b>${e(quien)}</b></div>` : ''}${fila.obs ? `<div class="sku-obs">📝 ${e(fila.obs)}</div>` : ''}</div>
+    <div class="ini-card"><div class="ini-card-tit">🏬 Stock en sedes</div>
+      <div class="m-tiles sku-stock">${tile('Lima', n(st.lima) + ' ' + um, st.lima ? 'ok' : '')}${tile('Ica', n(st.ica) + ' ' + um, st.ica ? 'ok' : '')}${tile('Trujillo', n(st.trujillo) + ' ' + um, st.trujillo ? 'ok' : '')}${tile('En tránsito', n(st.transito) + ' ' + um)}</div>
+      ${st.grupo ? `<small class="sku-nota">Código homologado: el grupo suma ${n((st.grupo.lima || 0) + (st.grupo.ica || 0) + (st.grupo.trujillo || 0))} ${um} entre ${st.grupo.miembros.length} códigos.</small>` : ''}</div>
+    <div class="ini-card"><div class="ini-card-tit">💲 Precio</div>
+      ${ult ? `<div class="m-tiles sku-precio">${tile('Último precio unitario', appSkuPrecio(ult.pu, ult.mon))}${tile('Promedio (' + mismos.length + ' compra' + (mismos.length === 1 ? '' : 's') + ')', appSkuPrecio(prom, mon))}${tile('Mejor precio', min ? appSkuPrecio(min.pu, mon) : '—')}${tile('Última compra', appDDMM(ult.f) + ' ' + ult.f.getUTCFullYear())}</div>
+        <div class="sku-ult">🏷️ Último proveedor: <b>${e(ult.prov)}</b> · OC <button type="button" class="m-link mono" data-oc="${e(ult.oc)}">${e(ult.oc.replace(/^000\d-0*/, ''))}</button>${min && min.prov !== ult.prov ? ` · el mejor precio fue con <b>${e(min.prov)}</b>` : ''}</div>`
+        : '<div class="ini-vacio">No hay compras anteriores de este código en los datos de Nisira (desde enero 2026). Es la primera vez o se compró con otro código.</div>'}</div>
+    <div class="ini-card"><div class="ini-card-tit">🤝 ¿Con quién cotizar?</div>
+      ${[...provSku.values()].map(function(x){ return `<div class="sku-prov"><div><b>${e(x.prov)}</b><small>✅ Le compramos este producto ${x.n} ${x.n === 1 ? 'vez' : 'veces'} · última ${appDDMM(x.ult.f)} a ${appSkuPrecio(x.ult.pu, x.ult.mon)}${x.mejor && x.mejor !== x.ult ? ' · mejor ' + appSkuPrecio(x.mejor.pu, x.mejor.mon) : ''}</small>${mail(x.ruc, x.prov)}</div></div>`; }).join('')}
+      ${fam.map(function(x){ return `<div class="sku-prov fam"><div><b>${e(x.prov)}</b><small>🏷️ Proveedor de ${e((fila.familia || '').toLowerCase())} · ${x.ocs.size} OC en el último año · última ${appDDMM(x.f)}</small>${mail(x.ruc, x.prov)}</div></div>`; }).join('')}
+      ${!provSku.size && !fam.length ? '<div class="ini-vacio">Sin proveedores previos para este producto ni su familia.</div>' : ''}</div>
+    ${hist.length ? `<div class="ini-card m-pp-full"><div class="ini-card-tit">📈 Historial de compras</div><table><thead><tr><th>Fecha</th><th>OC</th><th>Proveedor</th><th>Cantidad</th><th>P. unitario</th><th>Total</th></tr></thead><tbody>
+      ${hist.slice(0, 30).map(function(h){ return `<tr><td data-l="Fecha" class="nw">${appDDMM(h.f)}/${String(h.f.getUTCFullYear()).slice(2)}</td><td data-l="OC"><button type="button" class="m-link mono" data-oc="${e(h.oc)}">${e(h.oc.replace(/^000\d-0*/, ''))}</button></td><td data-l="Proveedor" class="pr">${e(h.prov)}</td><td data-l="Cantidad" class="nw">${n(h.q)} ${e(h.um)}</td><td data-l="P. unitario" class="nw"><b>${appSkuPrecio(h.pu, h.mon)}</b></td><td data-l="Total" class="nw">${h.conMonto ? appSkuPrecio(h.total, h.mon) : '—'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+    <div class="asis-acc"><button type="button" data-q="pedido ${e(fila.codPedido || '')}">🐻‍❄️ Preguntar a Leo por el pedido</button></div>`;
+  appListaAbrir('📦 Ficha del SKU', e(cod) + (fila.codPedido ? ' · Pedido ' + e(String(fila.codPedido).replace(/^000\d-0*/, '')) : ''), cuerpo);
+  document.getElementById('appOC').classList.add('ancho');   // en la PC, a pantalla completa como el Daily
 }
 
 // ---------- Pendientes de Logística (almacén) ----------
@@ -15001,6 +15094,7 @@ function appClickInicio(e){
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
   if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
+  if(b.dataset.sku !== undefined) return appSkuAbrir(b.dataset.sku, b.dataset.skuped, b.dataset.skureq);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
   if(b.dataset.dailyfecha) return appDailyAbrir(b.dataset.dailyfecha);
