@@ -18,6 +18,7 @@
  *
  * Desde el 07.10.2026 (v5): también guarda las TAREAS MANUALES del Daily call in en la pestaña "Daily tareas"
  * (quién, qué tarea, estado Pendiente / En proceso / Cumplida / No cumplida y comentario de cómo quedó).
+ * Cada comprador solo anota y actualiza sus propias tareas (se valida con su correo: plinares@… = PLINARES).
  * La plataforma las lee con doGet?accion=tareas. Misma hoja, misma URL: solo hay que actualizar (abajo).
  *
  * ACTUALIZAR (si ya estaba instalado): pega este archivo encima del anterior → Guardar →
@@ -114,9 +115,13 @@ function tareaGuardar(d) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
     const h = hojaTareas(), quien = txt(d.usuario, 120);
+    // Cada comprador solo anota y actualiza SUS tareas: el usuario del correo (plinares@…) debe ser el código.
+    const yo = String(d.correo || '').trim().toLowerCase().split('@')[0].toUpperCase();
+    if (!yo) return salida({ ok: false, error: 'sin usuario' });
     if (d.accion === 'crear') {
       const tarea = txt(d.tarea, 400), cod = txt(d.cod, 20), dia = txt(d.dia, 10);
       if (!tarea || !cod || !/^\d{4}-\d{2}-\d{2}$/.test(dia)) return salida({ ok: false, error: 'faltan datos' });
+      if (cod !== yo) return salida({ ok: false, error: 'solo puedes anotar tareas a tu nombre' });
       const id = Utilities.getUuid().slice(0, 8);
       h.appendRow([id, dia, cod, txt(d.nombre, 80), tarea, 'Pendiente', '', quien, ahora(), '', '']);
       return salida({ ok: true, tarea: { id: id, dia: dia, cod: cod, tarea: tarea, estado: 'Pendiente', com: '', por: quien, creada: ahora(), act: '', actpor: '' } });
@@ -125,6 +130,7 @@ function tareaGuardar(d) {
     const celda = h.getRange('A:A').createTextFinder(id).matchEntireCell(true).findNext();
     if (!celda) return salida({ ok: false, error: 'no existe' });
     const fila = celda.getRow();
+    if (String(h.getRange(fila, 3).getValue()) !== yo) return salida({ ok: false, error: 'solo el dueño puede cambiar esta tarea' });
     if (d.accion === 'borrar') { h.deleteRow(fila); return salida({ ok: true }); }
     const estado = ESTADOS.indexOf(d.estado) !== -1 ? d.estado : h.getRange(fila, 6).getValue();
     h.getRange(fila, 6, 1, 2).setValues([[estado, txt(d.com, 400)]]);

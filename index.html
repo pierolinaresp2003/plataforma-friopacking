@@ -1178,8 +1178,8 @@
     .m-tar-tx b{display:block;font-size:14px;font-weight:800;color:var(--ink);overflow-wrap:anywhere;} .m-tar-tx small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;}
     .m-tar-est{display:flex;flex-wrap:wrap;gap:6px;} .m-tar-est button{border:1px solid var(--border);background:var(--card);color:var(--ink-soft);border-radius:16px;padding:5px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}
     .m-tar-est button.on{background:var(--brand-ink);border-color:var(--brand-ink);color:#fff;}
-    .m-tar-com,.m-tar-nuevo{display:flex;gap:6px;} .m-tar-com input,.m-tar-nuevo input,.m-tar-nuevo select{flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;background:var(--card);color:var(--ink);}
-    .m-tar-nuevo select{flex:0 0 auto;max-width:170px;} .m-tar-nuevo{margin-top:12px;padding-top:12px;border-top:2px dashed var(--border);}
+    .m-tar-com,.m-tar-nuevo{display:flex;gap:6px;} .m-tar-com input,.m-tar-nuevo input{flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;background:var(--card);color:var(--ink);}
+    .m-tar-solo{margin-top:12px;padding-top:12px;border-top:2px dashed var(--border);font-size:12.5px;color:var(--muted);font-weight:700;} .m-tar-nuevo{margin-top:12px;padding-top:12px;border-top:2px dashed var(--border);}
     .m-tar-com button,.m-tar-nuevo button{border:0;border-radius:10px;padding:8px 12px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;background:var(--brand-ink);color:#fff;white-space:nowrap;} .m-tar-com .m-tar-x{background:var(--surface-2);color:var(--ink);}
     .m-tar button:disabled{opacity:.5;cursor:default;}
     .m-pp-full-sub{display:block;color:var(--ink-soft);font-size:12px;margin:4px 0 8px;}
@@ -13672,6 +13672,10 @@ const APP_TAREAS = { lista:[], cargado:false, cargando:false, error:'', t:0, n:0
 const TAREA_ESTADOS = [['Pendiente', '🟡'], ['En proceso', '🔵'], ['Cumplida', '✅'], ['No cumplida', '❌']];
 try{ const c = JSON.parse(localStorage.getItem('fp-daily-tareas') || 'null'); if(c && c.lista) APP_TAREAS.lista = c.lista; }catch(err){}
 function tareaAbierta(t){ return t.estado === 'Pendiente' || t.estado === 'En proceso'; }
+// Solo cada comprador anota y actualiza SUS tareas (07.10.2026, Piero): se reconoce por el correo con que entró
+// (plinares@… = PLINARES). Los demás solo las ven.
+function tareaMiCod(){ const u = APP.usuario ? appUsuarioDe(APP.usuario.correo).toUpperCase() : '';
+  if(APP_DAILY_EQUIPO.indexOf(u) !== -1) return u; const p = pdPersona(polarMiNombre()); return APP_DAILY_EQUIPO.indexOf(p) !== -1 ? p : ''; }
 function tareaYo(){ return [(APP.usuario && APP.usuario.correo) || '', polarMiNombre() || ''].filter(Boolean).join(' · '); }
 function appTareasCargar(forzar){
   if(!POLAR_APRENDE_URL || APP_TAREAS.cargando || (!forzar && Date.now() - APP_TAREAS.t < 60000)) return;
@@ -13686,14 +13690,14 @@ function appTareasCargar(forzar){
 }
 function appTareasEnviar(d){
   return fetch(POLAR_APRENDE_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
-    body:JSON.stringify(Object.assign({ tipo:'tarea', usuario:tareaYo() }, d)) }).then(function(r){ return r.json(); });
+    body:JSON.stringify(Object.assign({ tipo:'tarea', usuario:tareaYo(), correo:(APP.usuario && APP.usuario.correo) || '' }, d)) }).then(function(r){ return r.json(); });
 }
 function appTareasPintar(){
   document.querySelectorAll('#appOC [data-tareas]').forEach(function(c){
-    const nueva = c.querySelector('[data-tarnueva]'), txt = nueva ? nueva.value : '', sel = c.querySelector('[data-tarper]'), per = sel ? sel.value : '';
+    const nueva = c.querySelector('[data-tarnueva]'), txt = nueva ? nueva.value : '';
     c.outerHTML = appDailyTareasHtml(c.dataset.dia, c.dataset.cod);
     const n = document.querySelector(`#appOC [data-tareas][data-dia="${c.dataset.dia}"][data-cod="${c.dataset.cod}"]`);
-    if(n){ const i = n.querySelector('[data-tarnueva]'); if(i) i.value = txt; const s2 = n.querySelector('[data-tarper]'); if(s2 && per) s2.value = per; }
+    if(n){ const i = n.querySelector('[data-tarnueva]'); if(i) i.value = txt; }
   });
 }
 // Tareas que van ese día: las anotadas ese día + las de días anteriores que ese día seguían abiertas
@@ -13703,8 +13707,11 @@ function appTareasDelDia(dia, cod){
     .sort(function(a, b){ return (tareaAbierta(b) ? 1 : 0) - (tareaAbierta(a) ? 1 : 0) || (a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0); });
 }
 function appDailyTareasHtml(dia, cod){
-  const e = escapeHtml, l = appTareasDelDia(dia, cod), corto = function(k){ return k.slice(8, 10) + '/' + k.slice(5, 7); };
+  const e = escapeHtml, l = appTareasDelDia(dia, cod), corto = function(k){ return k.slice(8, 10) + '/' + k.slice(5, 7); }, yo = tareaMiCod();
   const fila = function(t){ const tmp = !!t.guardando;
+    if(t.cod !== yo) return `<div class="m-tar-f${tareaAbierta(t) ? '' : ' cerrada'}"><div class="m-tar-tx"><b>${e(t.tarea)}</b>
+        <small>${t.dia < dia ? '⏪ desde ' + corto(t.dia) : 'anotada ese día'}${t.com ? ' · 💬 ' + e(t.com) : ''}</small></div>
+      <div class="m-tar-est"><button type="button" class="on" disabled>${(TAREA_ESTADOS.find(function(x){ return x[0] === t.estado; }) || ['', ''])[1]} ${e(t.estado)}</button></div><div></div></div>`;
     return `<div class="m-tar-f${tareaAbierta(t) ? '' : ' cerrada'}"><div class="m-tar-tx"><b>${e(t.tarea)}</b>
         <small>${t.dia < dia ? '⏪ desde ' + corto(t.dia) : 'anotada ese día'}${t.por ? ' · por ' + e(t.por.split(' · ').pop()) : ''}${tmp ? ' · guardando…' : ''}</small></div>
       <div class="m-tar-est">${TAREA_ESTADOS.map(function(x){ return `<button type="button" data-tarest="${e(t.id)}" data-v="${x[0]}" class="${t.estado === x[0] ? 'on' : ''}"${tmp ? ' disabled' : ''}>${x[1]} ${x[0]}</button>`; }).join('')}</div>
@@ -13715,8 +13722,8 @@ function appDailyTareasHtml(dia, cod){
     <div class="m-pp-tit">🗒️ Tareas del daily <small>${l.length ? abiertas + ' abierta' + (abiertas === 1 ? '' : 's') + ' · ' + (l.length - abiertas) + ' cerrada' + (l.length - abiertas === 1 ? '' : 's') + ' · ' : ''}se guardan en Drive</small></div>
     ${APP_TAREAS.error ? `<div class="m-tar-aviso">⚠️ ${e(APP_TAREAS.error)}</div>` : (!APP_TAREAS.cargado && APP_TAREAS.cargando ? '<div class="m-tar-aviso">Cargando tareas…</div>' : '')}
     ${grupos.map(function(g){ return (cod ? '' : `<div class="m-tar-per">${e(PD_PERSONAS[g[0]] || g[0])}</div>`) + g[1].map(fila).join(''); }).join('') || '<div class="m-tar-vacio">Sin tareas anotadas para este día.</div>'}
-    <div class="m-tar-nuevo">${cod ? '' : `<select data-tarper>${APP_DAILY_EQUIPO.map(function(c){ return `<option value="${c}">${e(PD_PERSONAS[c])}</option>`; }).join('')}</select>`}
-      <input type="text" data-tarnueva placeholder="Nueva tarea… (ej. seguir cotización de válvulas con Danfoss)" maxlength="400"><button type="button" data-taragregar>➕ Agregar</button></div>
+    ${yo && (!cod || cod === yo) ? `<div class="m-tar-nuevo"><input type="text" data-tarnueva placeholder="Nueva tarea a tu nombre (${e(PD_PERSONAS[yo])})… ej. seguir cotización con Danfoss" maxlength="400"><button type="button" data-taragregar>➕ Agregar</button></div>`
+      : `<div class="m-tar-solo">🔒 ${yo ? 'Solo ' + e(PD_PERSONAS[cod] || cod) + ' puede anotar y actualizar sus tareas.' : 'Cada comprador anota y actualiza sus propias tareas desde su usuario.'}</div>`}
   </div>`;
 }
 function appTareaAccion(b, el){
@@ -13725,7 +13732,7 @@ function appTareaAccion(b, el){
   const falla = function(){ appToast('No se pudo guardar en Drive. Revisa tu conexión.'); appTareasCargar(true); };
   if(b.dataset.taragregar !== undefined){
     const i = c.querySelector('[data-tarnueva]'), txt = (i.value || '').trim(); if(!txt) return i.focus();
-    const cod = c.dataset.cod || c.querySelector('[data-tarper]').value;
+    const cod = tareaMiCod(); if(!cod || (c.dataset.cod && c.dataset.cod !== cod)) return appToast('Solo puedes anotar tareas a tu nombre.');
     const t = { id:'tmp' + (++APP_TAREAS.n), dia:dia, cod:cod, tarea:txt, estado:'Pendiente', com:'', por:tareaYo(), guardando:true };
     APP_TAREAS.lista.push(t); i.value = ''; appTareasPintar();
     return appTareasEnviar({ accion:'crear', dia:dia, cod:cod, nombre:PD_PERSONAS[cod] || cod, tarea:txt }).then(function(r){
@@ -13733,6 +13740,7 @@ function appTareaAccion(b, el){
       APP_TAREAS.lista = APP_TAREAS.lista.filter(function(x){ return x !== t; }); appTareasPintar(); falla(); });
   }
   const id = b.dataset.tarest || b.dataset.tarcom || b.dataset.tarborrar, t = buscar(id); if(!t) return;
+  if(t.cod !== tareaMiCod()) return appToast('Solo ' + (PD_PERSONAS[t.cod] || t.cod) + ' puede actualizar esta tarea.');
   if(b.dataset.tarborrar){ if(!window.confirm('¿Eliminar esta tarea de la hoja?')) return;
     APP_TAREAS.lista = APP_TAREAS.lista.filter(function(x){ return x !== t; }); appTareasPintar();
     return appTareasEnviar({ accion:'borrar', id:id }).then(function(r){ if(!r || !r.ok) throw new Error(); }).catch(falla); }
