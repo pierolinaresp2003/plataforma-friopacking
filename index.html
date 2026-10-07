@@ -13466,31 +13466,35 @@ function appDailyCalHtml(dia){
 function appDailyDatos(dia){
   return appMemo('daily:' + dia, function(){
     const P = new Map(), per = function(v){ const c = pdPersona(v); if(!PD_PERSONAS[c] || APP_DAILY_EQUIPO.indexOf(c) === -1) return null;
-      if(!P.has(c)) P.set(c, { cod:c, ped:new Map(), oc:new Map(), cer:new Set(), sku:new Set(), venc:new Set(), man:new Map(), dEmi:[], viejo:null }); return P.get(c); };
+      if(!P.has(c)) P.set(c, { cod:c, ped:new Map(), oc:new Map(), cer:new Set(), sku:new Set(), venc:new Set(), man:new Map(), sinOC:[] }); return P.get(c); };
     const ini = new Date(dia + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() - 120); const desde = isoDay(ini);
     const sig = new Date(dia + 'T00:00:00Z'); do { sig.setUTCDate(sig.getUTCDate() + 1); } while(sig.getUTCDay() === 0); const manana = isoDay(sig);
     const dias = function(a, b){ return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000); };
     const filas = appDailyFilas(), porPed = new Map(), porOC = new Map();
+    // SKU de pedidos que al cierre del día seguían sin OC, con la regla de Pendientes de Compras: pendiente hoy,
+    // o su OC se emitió después de ese día (07.10.2026, Piero: "detallar a ese día qué pedidos están pendientes").
     filas.forEach(function(r){
       const fp = isoDay(r.fPedido), fo = isoDay(r.fOrden), fc = isoDay(r.fRecep), fx = isoDay(r.fCompromiso);
-      if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '', pr:r.producto || '' }); porPed.set(r.codPedido, g); }
+      if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '' }); porPed.set(r.codPedido, g); }
       // Solo los pedidos DIRECTOS los genera el comprador; los que vienen de un requerimiento salen solos
       // (07.10.2026, Piero: "nosotros no generamos pedidos, estos vienen solos a partir de un req").
+      if(r.codPedido && fp && fp <= dia && r.codOrden && fo && fo > dia){ const x = per(r.responsablePedido); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:dias(fp, dia) }); }
       if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
       if(!r.codOrden || !r.usuarioCompras) return;
       const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden);
-      const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fx:fx, fxD:r.fCompromiso, imp:imp, rec:[], sku:new Map(), anul:/anul/i.test(r.estadoOrden || '') };
-      o.rec.push(fc); const k = r.codOrden + '|' + (r.idProducto || r.producto || '');
-      if(!o.sku.has(k) && fp && fo && fo >= fp) o.sku.set(k, dias(fp, fo)); else if(!o.sku.has(k)) o.sku.set(k, null);
+      const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fx:fx, fxD:r.fCompromiso, imp:imp, rec:[], sku:new Set(), anul:/anul/i.test(r.estadoOrden || '') };
+      o.rec.push(fc); o.sku.add(r.codOrden + '|' + (r.idProducto || r.producto || ''));
       porOC.set(r.codOrden, o);
     });
     // OC vencidas con la MISMA regla de Pendientes de Compras (estado de Nisira + OC Finalizadas.xlsx + ETA de
     // importaciones), 07.10.2026: antes salían 12 aquí y 3 en Pendientes.
     const pendHoy = new Set(pdFilas().filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; })), diaD = new Date(dia + 'T00:00:00Z');
+    pdFilas().forEach(function(r){ const fp = isoDay(r.fPedido); if(r.tipo !== 'ped' || (fp && fp > dia)) return;   // cada línea cuenta, como en Pendientes
+      const x = per(r.persona); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:fp ? dias(fp, dia) : 0 }); });
     porOC.forEach(function(o, co){
       const x = per(o.uc); if(!x || o.anul) return;
-      // SKU hechos = líneas de las OC emitidas ese día; tiempo de emisión = días del pedido a la OC de cada línea.
-      if(o.fo === dia){ x.oc.set(co, o); o.sku.forEach(function(d, k){ x.sku.add(k); if(d != null) x.dEmi.push(d); }); }
+      // SKU hechos = líneas de las OC emitidas ese día.
+      if(o.fo === dia){ x.oc.set(co, o); o.sku.forEach(function(k){ x.sku.add(k); }); }
       const falta = o.rec.some(function(f){ return !f || f > dia; });
       // Vencida al cierre del día: sigue pendiente hoy (o todavía le faltaba llegar algo ese día) y ya pasó su fecha.
       if(o.fo && o.fo <= dia && !ocFinalizada(co) && !ocEnTransito(co) && (pendHoy.has(co) || o.rec.some(function(f){ return f && f > dia; }))){
@@ -13501,8 +13505,7 @@ function appDailyDatos(dia){
     porPed.forEach(function(g, cp){
       if(!g.fp || g.fp > dia || g.fp < desde) return;
       const abiertas = g.l.filter(function(l){ return l.co ? (l.fo && l.fo > dia) : !/archiv|atendido/i.test(l.ep); });
-      if(abiertas.length){ const x = per(g.resp), d = dias(g.fp, dia);   // el pedido más antiguo que sigue sin OC
-        if(x && (!x.viejo || d > x.viejo.d)) x.viejo = { cp:cp, d:d, prod:abiertas[0].pr, n:abiertas.length, tot:g.l.length }; return; }   // se muestra el ítem que falta, no el primero del pedido
+      if(abiertas.length) return;
       // Cerrado ese día: la última línea pasó a OC ese día; se le anota al comprador de esa OC.
       const ult = g.l.filter(function(l){ return l.fo; }).sort(function(a,b){ return a.fo < b.fo ? 1 : -1; })[0];
       if(ult && ult.fo === dia){ const x = per(ult.uc); if(x) x.cer.add(cp); }
@@ -13514,8 +13517,7 @@ function appDailyDatos(dia){
       const mon = monedaLabel(r.moneda); m.set(r.codOrden, (m.get(r.codOrden) || 0) + r.montoNativo * (mon === 'S/' ? 1 : (TIPO_CAMBIO[mon] || TIPO_CAMBIO.USD))); });
       m.forEach(function(v, co){ montoOC.set(co, v); }); }
     const lista = [...P.values()].map(function(x){ x.monto = [...x.oc.keys()].reduce(function(a, co){ return a + (montoOC.get(co) || 0); }, 0);
-      x.hizo = x.ped.size + x.oc.size + x.cer.size; x.pts = appDailyPts(x);
-      x.tEmi = x.dEmi.length ? x.dEmi.reduce(function(a, d){ return a + d; }, 0) / x.dEmi.length : null; return x; })
+      x.hizo = x.ped.size + x.oc.size + x.cer.size; x.pts = appDailyPts(x); return x; })
       .filter(function(x){ return x.hizo; })   // solo se muestran y cuentan los que hicieron algo ese día
       .sort(function(a,b){ return b.pts - a.pts || b.monto - a.monto; });
     return { lista:lista, montoOC:montoOC, manana:manana };
@@ -13561,9 +13563,9 @@ function appDailyPersonaHtml(dia, cod){
   const nums = [[x.oc.size, 'OC emitidas'], [x.sku.size, 'SKU hechos'], [x.cer.size, 'pedidos cerrados'], [x.ped.size, 'pedidos directos']].filter(function(n){ return n[0]; }).map(function(n){ return num(appN(n[0]), n[1]); }).join('');
   const dato = function(ic, t, v, cls){ return `<div class="m-pp-dato ${cls || ''}"><span>${ic}</span><p>${t}</p><b>${v}</b></div>`; };
   const fecha = function(k){ const d = new Date(k + 'T00:00:00Z'); return APP_DIAS_SEM[d.getUTCDay()] + ' ' + d.getUTCDate(); };
-  const datos = (x.tEmi != null ? dato('⏱️', 'Tiempo de emisión (del pedido a la OC)', x.tEmi.toFixed(1) + ' días') : '')
+  const sin = x.sinOC.slice().sort(function(a, b){ return b.d - a.d; }), nPed = new Set(sin.map(function(e){ return e.cp; })).size;
+  const datos = dato('📝', 'SKU sin OC al cierre del día' + (sin.length ? ` <small>· ${nPed} pedido${nPed === 1 ? '' : 's'} · el más antiguo lleva <b class="${sin[0].d > 30 ? 'rojo' : ''}">${sin[0].d} días</b></small>` : ''), appN(sin.length))
     + dato('📅', 'OC que deben llegar el ' + fecha(D.manana), appN(man.length))
-    + (x.viejo ? dato('🕰️', `Pedido más antiguo sin OC: <button type="button" class="mono m-link" data-q="pedido ${escapeHtml(x.viejo.cp)}">${escapeHtml(x.viejo.cp.replace(/^0001-0*/, ''))}</button> · falta ${escapeHtml(polarCorta(x.viejo.prod, 34))}${x.viejo.tot > 1 ? ` <small>(${x.viejo.n} de ${x.viejo.tot} ítems)</small>` : ''}`, x.viejo.d + ' días', x.viejo.d > 30 ? 'rojo' : '') : '')
     + (x.venc.size ? dato('⚠️', 'OC vencidas al cierre del día', appN(x.venc.size), 'rojo') : '');
   const plegable = function(t, html){ return html ? `<details class="m-dp-lista"><summary>${t}</summary>${html}</details>` : ''; };
   return `<div class="oc-hero m-dd"><div class="m-dp-cab">${appDailyAvatar(x, 'gr')}<div class="m-dp-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${['🥇', '🥈', '🥉'][i] || ('#' + (i + 1))} del día · ${x.pts} pts</small></div>${x.monto ? `<div class="m-dp-monto"><b>${appUSD(x.monto)}</b><small>emitido</small></div>` : ''}</div>
@@ -13571,6 +13573,7 @@ function appDailyPersonaHtml(dia, cod){
     <div class="ini-card"><div class="ini-card-tit">📌 Para el daily</div>${datos}</div>
     <div class="ini-card">${plegable('🧾 Ver ' + oc.length + ' OC emitidas', oc.map(fOC).join(''))}
       ${plegable('📝 Ver ' + ped.length + ' pedido' + (ped.length === 1 ? '' : 's') + ' directo' + (ped.length === 1 ? '' : 's'), ped.map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^0001-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1], 44))}</div>`; }).join(''))}
+      ${plegable('📝 Ver ' + sin.length + ' SKU sin OC', sin.slice(0, 60).map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e.cp)}">${escapeHtml(e.cp.replace(/^0001-0*/, ''))}</button> ${escapeHtml(polarCorta(e.pr, 44))}<b class="${e.d > 30 ? 'rojo' : ''}">${e.d} días</b></div>`; }).join('') + (sin.length > 60 ? `<div class="m-det-f">… y ${sin.length - 60} más</div>` : ''))}
       ${plegable('📅 Ver ' + man.length + ' OC que llegan el ' + fecha(D.manana), man.map(fOC).join(''))}</div>`;
 }
 function appDailyCopiar(b){
