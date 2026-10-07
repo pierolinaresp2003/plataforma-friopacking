@@ -13422,7 +13422,9 @@ function appDailyDatos(dia){
     filas.forEach(function(r){
       const fp = isoDay(r.fPedido), fo = isoDay(r.fOrden), fb = isoDay(r.fAprob), fc = isoDay(r.fRecep), fx = isoDay(r.fCompromiso);
       if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '' }); porPed.set(r.codPedido, g); }
-      if(fp === dia && r.codPedido){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.esPedidoDirecto ? 'pedido directo' : (r.codRequerimiento ? 'req ' + r.codRequerimiento.replace(/^0001-0*/, '') : '')); }
+      // Solo los pedidos DIRECTOS los genera el comprador; los que vienen de un requerimiento salen solos
+      // (07.10.2026, Piero: "nosotros no generamos pedidos, estos vienen solos a partir de un req").
+      if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
       if(!r.codOrden || !r.usuarioCompras) return;
       const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden);
       const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fb:fb, fx:fx, imp:imp, rec:[], anul:/anul/i.test(r.estadoOrden || '') };
@@ -13462,16 +13464,16 @@ function appDailyHtml(){
   const tile = function(t, v, cls){ return `<div><span>${t}</span><b class="${cls || ''}">${v}</b></div>`; };
   const cab = `<div class="ini-card"><div class="m-cal-nav"><button type="button" data-dailydia="-1" aria-label="Día anterior">‹</button><b>${appDailyFechaTxt(dia)}</b><button type="button" data-dailydia="1" aria-label="Día siguiente" ${dia >= appDailyUltimo() ? 'disabled' : ''}>›</button></div>
     <div class="m-cal-sub">Lo que hizo cada comprador ese día, según los datos de Nisira${dia === appDailyUltimo() ? ' · último día con datos' : ''}</div>
-    <div class="m-tiles">${tile('📝 Pedidos generados', appN(tot('ped')))}${tile('🧾 OC emitidas', appN(tot('oc')))}${tile('💰 Monto emitido', appUSD(montoTot))}${tile('✅ Pedidos cerrados', appN(tot('cer')))}${tile('📥 OC recibidas', appN(tot('rec')))}${tile('⏳ Pedidos sin OC al cierre', appN(tot('pend')), tot('pend') ? 'rojo' : '')}</div>
+    <div class="m-tiles">${tile('📝 Pedidos directos', appN(tot('ped')))}${tile('🧾 OC emitidas', appN(tot('oc')))}${tile('💰 Monto emitido', appUSD(montoTot))}${tile('✅ Pedidos cerrados', appN(tot('cer')))}${tile('📥 OC recibidas', appN(tot('rec')))}${tile('⏳ Pedidos sin OC al cierre', appN(tot('pend')), tot('pend') ? 'rojo' : '')}</div>
     <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
   if(!l.length) return cab + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
   const tarjeta = function(x){
     const oc = [...x.oc.entries()];
     return `<div class="ini-card m-daily"><div class="m-daily-nom">👤 ${escapeHtml(PD_PERSONAS[x.cod])} <small>${escapeHtml(x.cod)}</small></div>
-      <div class="m-tiles">${tile('Pedidos generados', appN(x.ped.size))}${tile('OC emitidas', appN(x.oc.size))}${tile('Monto', x.monto ? appUSD(x.monto) : '—')}${tile('Pedidos cerrados', appN(x.cer.size))}${tile('OC aprobadas', appN(x.apr.size))}${tile('OC recibidas', appN(x.rec.size))}</div>
+      <div class="m-tiles">${tile('Pedidos directos', appN(x.ped.size))}${tile('OC emitidas', appN(x.oc.size))}${tile('Monto', x.monto ? appUSD(x.monto) : '—')}${tile('Pedidos cerrados', appN(x.cer.size))}${tile('OC aprobadas', appN(x.apr.size))}${tile('OC recibidas', appN(x.rec.size))}</div>
       ${oc.length ? `<div class="m-det-t">🧾 OC emitidas</div>${oc.slice(0, 8).map(function(e){ const m = D.montoOC.get(e[0]);
         return `<div class="m-det-f"><button type="button" class="mono m-link" data-oc="${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^000\d-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1].prov, 30))}${e[1].imp ? ' · 🌎' : ''}<b>${m ? appUSD(m) : ''}</b></div>`; }).join('')}${oc.length > 8 ? `<div class="m-det-f">… y ${oc.length - 8} OC más</div>` : ''}` : ''}
-      ${x.ped.size ? `<div class="m-det-t">📝 Pedidos generados</div>${[...x.ped.entries()].slice(0, 6).map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^0001-0*/, ''))}</button> ${escapeHtml(e[1])}</div>`; }).join('')}${x.ped.size > 6 ? `<div class="m-det-f">… y ${x.ped.size - 6} más</div>` : ''}` : ''}
+      ${x.ped.size ? `<div class="m-det-t">📝 Pedidos directos (sin requerimiento)</div>${[...x.ped.entries()].slice(0, 6).map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^0001-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1], 40))}</div>`; }).join('')}${x.ped.size > 6 ? `<div class="m-det-f">… y ${x.ped.size - 6} más</div>` : ''}` : ''}
       ${x.pend.size || x.venc.size ? `<div class="m-daily-pend">⏳ Al cierre del día: ${x.pend.size ? `<b>${appN(x.pend.size)}</b> pedido${x.pend.size === 1 ? '' : 's'} sin OC` : ''}${x.pend.size && x.venc.size ? ' · ' : ''}${x.venc.size ? `<b class="rojo">${appN(x.venc.size)}</b> OC nacional${x.venc.size === 1 ? '' : 'es'} vencida${x.venc.size === 1 ? '' : 's'}` : ''}</div>` : ''}
     </div>`; };
   return cab + l.map(tarjeta).join('');
@@ -13479,7 +13481,7 @@ function appDailyHtml(){
 function appDailyCopiar(b){
   const dia = APP_DAILY.dia || appDailyUltimo(), l = appDailyDatos(dia).lista;
   const txt = ['*Daily de Compras · ' + appDailyFechaTxt(dia) + '*'].concat(l.map(function(x){
-    return '• ' + PD_PERSONAS[x.cod] + ': ' + x.ped.size + ' pedidos generados, ' + x.oc.size + ' OC emitidas' + (x.monto ? ' (' + appUSD(x.monto) + ')' : '') + ', ' + x.cer.size + ' pedidos cerrados, ' + x.rec.size + ' OC recibidas'
+    return '• ' + PD_PERSONAS[x.cod] + ': ' + x.oc.size + ' OC emitidas' + (x.monto ? ' (' + appUSD(x.monto) + ')' : '') + ', ' + x.cer.size + ' pedidos cerrados, ' + x.ped.size + ' pedidos directos, ' + x.rec.size + ' OC recibidas'
       + (x.pend.size || x.venc.size ? '. Pendiente: ' + x.pend.size + ' pedidos sin OC, ' + x.venc.size + ' OC vencidas' : '') + '.'; })).join('\n');
   const ok = function(){ b.textContent = '✅ Copiado'; setTimeout(function(){ b.textContent = '📋 Copiar resumen para el chat'; }, 1800); };
   if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function(){ window.prompt('Copia el resumen:', txt); });
