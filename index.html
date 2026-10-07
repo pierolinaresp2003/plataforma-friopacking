@@ -1194,6 +1194,10 @@
     .pr-barra i{display:block;height:7px;border-radius:4px;background:var(--border);overflow:hidden;margin-top:6px;} .pr-barra em{display:block;height:100%;border-radius:4px;background:#1baf7a;}
     .pr-barra.ambar em{background:#eda100;} .pr-barra.rojo em{background:#d03b3b;} .pr-fila .t{min-width:0;flex:1;} .pr-fila .rojo{color:#d03b3b;font-weight:800;}
     .pr-chips{flex:1 1 220px;align-self:flex-end;} .pr-tile-btn{text-align:left;font:inherit;color:inherit;cursor:pointer;background:var(--surface-2);border:1px solid color-mix(in srgb, #d03b3b 30%, var(--border));border-radius:12px;padding:9px 10px;min-width:0;} .pr-ver-exc{display:block;width:100%;margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid color-mix(in srgb, #d03b3b 40%, var(--border));background:var(--card);color:#d03b3b;font:inherit;font-weight:800;font-size:14px;text-align:left;cursor:pointer;}
+    .oc-presu{display:flex;gap:12px;align-items:center;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:10px 2px;text-align:left;font:inherit;color:inherit;cursor:pointer;}
+    .oc-presu-l .oc-presu:first-child{border-top:0;} .oc-presu .t{flex:1;min-width:0;} .oc-presu .t b{display:block;font-size:13.5px;} .oc-presu .t small{display:block;font-size:12px;color:var(--muted);margin-top:2px;} .oc-presu .t small b{display:inline;font-size:12px;color:var(--ink);}
+    .oc-presu .v{text-align:right;flex-shrink:0;} .oc-presu .v b{display:block;font-size:17px;font-weight:900;} .oc-presu .v small{font-size:11px;color:var(--muted);}
+    .oc-presu.rojo .v b, .oc-presu .rojo{color:#d03b3b;} .oc-presu.ambar .v b{color:#b07a00;} .oc-presu.verde .v b{color:#13865d;}
     .pr-tile-btn small{display:block;font-size:11.5px;color:#d03b3b;font-weight:700;margin-top:2px;} .pr-tile-btn:disabled{cursor:default;} .pr-nota{display:block;margin:4px 2px 12px;}
     .pr-part{border-top:1px solid var(--border);} .pr-part:first-child{border-top:0;} .pr-part summary{display:flex;gap:12px;align-items:center;padding:10px 2px;cursor:pointer;list-style:none;}
     .pr-part summary::-webkit-details-marker{display:none;} .pr-part summary .t{flex:1;min-width:0;} .pr-part summary .t b{display:block;font-size:13.5px;} .pr-part summary small{display:block;font-size:11.5px;color:var(--muted);}
@@ -14625,6 +14629,26 @@ function appOCDatos(cod){
     montos:monto.length ? polarMontos(monto) : '', cond:(filas.find(function(r){ return r.condiciones; }) || {}).condiciones || '',
     reqs:[...new Set(filas.map(function(r){ return r.codRequerimiento; }).filter(Boolean))], imp:ocImportInfo(cod) };
 }
+// Presupuesto de las partidas que toca una OC (07.10.2026, Piero: "cuando salen ahí las OC se debe poder ver
+// el presupuesto al hacer click"): cuánto pone esta OC en cada partida y cómo va la partida con todas sus OC.
+function appOCPresuHtml(cod){
+  const l = [], fuera = [];
+  appPresuDatos().forEach(function(x){
+    x.part.forEach(function(p){ let u = 0; p.ocs.forEach(function(o){ if(o.oc === cod) u += o.usd; }); if(u > 0) l.push({ x:x, p:p, u:u }); });
+    let f = 0; x.ocsFuera.forEach(function(o){ if(o.oc === cod) f += o.usd; }); if(f > 0) fuera.push({ x:x, u:f });
+  });
+  if(!l.length && !fuera.length) return '';
+  l.sort(function(a, b){ return b.u - a.u; });
+  const fila = function(y){ const pc = y.p.pc, pct = pc > 0 ? y.p.usd / pc * 100 : null;
+    return `<button type="button" class="oc-presu ${appPresuCls(pct)}" data-prpry="${escapeHtml(y.x.id)}"><span class="t"><b>${escapeHtml(y.p.t || y.p.es)}</b>
+        <small><span class="mono">${escapeHtml(y.x.id)}</span> · ${escapeHtml(polarCorta(y.x.cli || y.x.n, 30))} · <span class="mono">${escapeHtml(y.p.es)}</span></small>
+        ${pc > 0 ? appPresuBarra(y.p.usd, pc) : ''}
+        <small>Esta OC: <b>${fmtUSD(y.u)}</b> · partida: ${fmtUSD(y.p.usd)} de ${pc > 0 ? fmtUSD(pc) : 'sin presupuesto'}${pc > 0 && y.p.usd > pc ? ' · <b class="rojo">pasada por ' + fmtUSD(y.p.usd - pc) + '</b>' : ''}</small></span>
+      <span class="v"><b>${pct == null ? '—' : pct.toFixed(0) + '%'}</b><small>usado</small></span></button>`; };
+  return `<div class="oc-tit">💼 Presupuesto de las partidas</div><div class="ini-card oc-presu-l">${l.map(fila).join('')}
+    ${fuera.map(function(y){ return `<button type="button" class="oc-presu" data-prpry="${escapeHtml(y.x.id)}"><span class="t"><b>Fuera de partida</b><small><span class="mono">${escapeHtml(y.x.id)}</span> · ${escapeHtml(polarCorta(y.x.cli || y.x.n, 30))}</small><small>Esta OC: <b>${fmtUSD(y.u)}</b> sin presupuesto asignado</small></span><span class="v"><b>—</b></span></button>`; }).join('')}
+    <small class="sku-nota">Presupuesto costo en dólares. Toca una partida para ver todo el presupuesto del proyecto.</small></div>`;
+}
 function appOCHtml(d){
   const hoy = new Date(), cod = d.cod, corto = cod.replace(/^000\d-0*/, ''), fin = ocFinalizada(cod);
   const n = d.items.length, rec = n - d.pend, pct = n ? Math.round(rec / n * 100) : 0;
@@ -14661,6 +14685,7 @@ function appOCHtml(d){
       ${imp && d.pend && !fin ? '<div class="oc-nota">🌎 Importación: primero el proveedor la entrega, luego zarpa (ETD) y recién ahí hay ETA de llegada. Lo que todavía no tiene fecha queda <b>por definir</b>.</div>' : ''}
       <div class="oc-datos">${dato('Comprador', escapeHtml(comp))}${dato('Origen', d.f0.origen === 'importado' || /^0002-/.test(cod) ? '🌎 Importación' : '🇵🇪 Nacional')}${polarSinPrecios() ? '' : dato('Monto', escapeHtml(d.montos)) + dato('Pago', escapeHtml(d.cond))}${dato('Requerimientos', d.reqs.length ? d.reqs.length + '' : 'Pedido directo')}</div>
       ${fin && OC_FIN[cod] && (OC_FIN[cod].motivo || OC_FIN[cod].por) ? `<div class="oc-nota">✔ ${escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · '))}</div>` : ''}
+      ${polarSinPrecios() ? '' : appOCPresuHtml(cod)}
       <div class="oc-tit">Ítems de la OC</div>
       <div class="oc-items">${d.items.map(it).join('')}</div>
       <div class="oc-acc"><button type="button" data-ocleo="${escapeHtml(cod)}">🐻‍❄️ Preguntar a Leo</button><button type="button" data-ocprov="${escapeHtml(d.f0.proveedor || '')}">🏭 Proveedor y correo</button></div>
