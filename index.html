@@ -1179,6 +1179,14 @@
     .sku-ley{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 2px;font-size:12px;color:var(--ink-soft);font-weight:700;} .sku-ley i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;}
     body.vista-frioteam .asis-fab, body.vista-frioteam #asis, body.vista-frioteam .ini-pregunta{display:none!important;}
     .pry-nom{display:block;font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px;} .rqm-cab .pry-nom{color:inherit;opacity:.85;}
+    .pr-barra i{display:block;height:7px;border-radius:4px;background:var(--border);overflow:hidden;margin-top:6px;} .pr-barra em{display:block;height:100%;border-radius:4px;background:#1baf7a;}
+    .pr-barra.ambar em{background:#eda100;} .pr-barra.rojo em{background:#d03b3b;} .pr-fila .t{min-width:0;flex:1;} .pr-fila .rojo{color:#d03b3b;font-weight:800;}
+    .pr-chips{flex:1 1 220px;align-self:flex-end;} .pr-nota{display:block;margin:4px 2px 12px;}
+    .pr-part{border-top:1px solid var(--border);} .pr-part:first-child{border-top:0;} .pr-part summary{display:flex;gap:12px;align-items:center;padding:10px 2px;cursor:pointer;list-style:none;}
+    .pr-part summary::-webkit-details-marker{display:none;} .pr-part summary .t{flex:1;min-width:0;} .pr-part summary .t b{display:block;font-size:13.5px;} .pr-part summary small{display:block;font-size:11.5px;color:var(--muted);}
+    .pr-part summary .v{text-align:right;flex-shrink:0;} .pr-part summary .v b{display:block;font-size:14px;} .pr-part.rojo summary .v b{color:#d03b3b;} .pr-part.ambar summary .v b{color:#b07a00;}
+    .pr-part > .m-lista{padding:0 0 8px 10px;} .pr-alerta{background:color-mix(in srgb, #d03b3b 10%, var(--card));border:1px solid color-mix(in srgb, #d03b3b 35%, var(--border));border-radius:12px;padding:10px 12px;font-weight:700;margin-bottom:10px;}
+    .pr-sinoc summary{cursor:pointer;font-weight:700;} .pr-part-s{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--border);font-size:13px;} .pr-part-s span{min-width:0;}
     .sku-graf{position:relative;margin-top:6px;} .sku-graf svg{display:block;width:100%;height:auto;overflow:visible;}
     .sku-grid{stroke:var(--border);stroke-width:1;vector-effect:non-scaling-stroke;} .sku-eje{font-size:11px;fill:var(--muted);font-family:inherit;}
     .sku-linea{fill:none;stroke:var(--ink-soft);stroke-opacity:.45;stroke-width:2;vector-effect:non-scaling-stroke;} .sku-pt{stroke:var(--card);stroke-width:2;vector-effect:non-scaling-stroke;}
@@ -3126,6 +3134,7 @@ function buildSnapshot(){
         qo: r.cantOrden, qr: r.cantRecep, g: r.guia, fx2: r.factura,
         fs: isoDay(r.fSalida), qs: r.cantSalida, gs: r.docSalida, so: r.sedeSalida || '',
         fob: isoDay(r.fObra), qob: r.cantObra, gob: r.docObra,
+        mn: r.moneda || undefined, pu: r.precioUnit == null ? undefined : r.precioUnit,
         es: r.estructura || undefined, tp: r.tareaPry || undefined, ptv: r.presVenta == null ? undefined : r.presVenta, ptc: r.presCosto == null ? undefined : r.presCosto,
       })),
       // Pedidos directos de PedidoSinReq.xlsx (04.09.2026 ronda 37) — OC que Reporte Maestro.xlsx nunca
@@ -3431,6 +3440,7 @@ function loadFromSnapshot(snap){
       guia: r.g || '', factura: r.fx2 || '',
       fSalida: fromIsoDay(r.fs), cantSalida: (r.qs!=null ? r.qs : null), docSalida: r.gs || '', sedeSalida: r.so || rqSedeDe('', r.gs),
       fObra: fromIsoDay(r.fob), cantObra: (r.qob!=null ? r.qob : null), docObra: r.gob || '',
+      moneda: r.mn || '', precioUnit: (r.pu!=null ? r.pu : null),
       estructura: r.es || '', tareaPry: r.tp || '', presVenta: (r.ptv!=null ? r.ptv : null), presCosto: (r.ptc!=null ? r.ptc : null),
     })) : [],
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
@@ -4010,6 +4020,8 @@ function processWorkbook(wb, filename){
         estadoOrden: txt(col.estadoOrden),
         fOrden, fAprob, fCompromiso, fRecep,
         cantOrden: numOrNull(col.cantidadOrden!==-1 ? r[col.cantidadOrden] : null),
+        // Precio y moneda de la OC (07.10.2026): para Presupuesto vs. OC de Gerencia.
+        moneda: txt(col.moneda), precioUnit: numOrNull(col.precioUnitario!==-1 ? r[col.precioUnitario] : null),
         // Recepción en ALMACÉN: lo que llegó de la compra, con la guía y la factura del proveedor.
         cantRecep: numOrNull(col.cantRecepcion!==-1 ? r[col.cantRecepcion] : null),
         guia: txt(col.guiaAlmacen), factura: txt(col.facturaProv),
@@ -12921,7 +12933,7 @@ const APP_VISTAS = {
   gerencia:   { nombre:'Gerencia',   ico:'📊', desc:'Indicadores de logística y concentración de gasto.',
     // "Vista" se cambió por el avance de atención de los requerimientos por proyecto (29.09.2026, Piero).
     // La vista se sigue cambiando desde el botón de arriba.
-    tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Tiempos'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
+    tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Tiempos'], ['polar'], ['gasto','💰','Gasto'], ['presu','💼','Presupuesto'], ['otif','🎯','OTIF']] },
   // Frioteam (07.10.2026, Piero): solo el Inventario de Logística (stock por sede y kardex), sin Leo.
   frioteam:   { nombre:'Frioteam',   ico:'❄️', desc:'Inventario de Logística: stock por sede y kardex.',
     tabs:[['inventario','📦','Inventario']] },
@@ -12938,7 +12950,7 @@ const APP_VISTAS = {
     tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones']] },
 };
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
-const APP_PANTALLAS = { otif:'OTIF', indicadores:'Tiempos', gasto:'Concentración de gasto', inventario:'Inventario',
+const APP_PANTALLAS = { otif:'OTIF', indicadores:'Tiempos', gasto:'Concentración de gasto', presu:'Presupuesto vs. OC', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
@@ -13067,6 +13079,7 @@ function appConstruir(){
   let appBuscaEspera = null;
   document.getElementById('section-inicio').addEventListener('input', function(e){
     const id = e.target.id, v = e.target.value;
+    if(id === 'prBusca'){ clearTimeout(appBuscaEspera); appBuscaEspera = setTimeout(function(){ APP_PR.q = v; const l = document.getElementById('prLista'); if(l) l.innerHTML = appPresuLista(); }, 250); return; }
     if(id === 'invBusca' || id === 'plBusca' || id === 'pcBusca'){
       clearTimeout(appBuscaEspera);
       appBuscaEspera = setTimeout(function(){
@@ -13081,6 +13094,7 @@ function appConstruir(){
   });
   document.getElementById('section-inicio').addEventListener('change', function(e){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
+    if(e.target.id === 'prCli' || e.target.id === 'prPry'){ APP_PR[e.target.id === 'prCli' ? 'cli' : 'pry'] = e.target.value; if(e.target.id === 'prCli') APP_PR.pry = ''; return appRenderInicio(); }
     const fb = e.target.closest && e.target.closest('[data-fbar]');
     if(fb && e.target.dataset.fcampo){ const st = APP_F[fb.dataset.fbar], c = e.target.dataset.fcampo; st[c] = e.target.value;
       if(c === 'per' && st.per === 'custom' && !st.desde && !st.hasta){ const r = appFRango({ per:'mes' }); st.desde = appIndIso(r.desde); st.hasta = appIndIso(appIndCorte()); }
@@ -13418,10 +13432,10 @@ function appSaludo(){
 
 // HTML de cada pantalla guardado por su estado (período, filtros, búsqueda): volver a una pestaña es
 // instantáneo. Se vacía solo cuando cambian los datos (appMemo).
-const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
+const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
   pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
-  const e = { gasto:[APP_G, APP_F.gasto], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
+  const e = { gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
     indicadores:[APP_F.indicadores], otif:[APP_F.otif] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0);
 }
@@ -13461,7 +13475,7 @@ function appRenderInicio(){
       : '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los datos de la plataforma…</div></div>';
     clearTimeout(appEsperaDatos);
     appEsperaDatos = setTimeout(function(){ if(APP.enInicio) appRenderInicio(); }, 1500);
-  } else if(APP.pantalla === 'gasto' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog'){
+  } else if(APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     if(APP.pantalla === 'inventario') setTimeout(appInvCompletar, 0);
     return;
@@ -14139,6 +14153,119 @@ function appGastoHtml(){
       ${filas.length ? `<div class="ini-card"><div class="ini-card-tit">🧩 ${APP_G.fam ? 'Dentro de la familia' : '¿En qué se gasta?'} <small>${APP_G.fam ? '' : 'toca una familia'}</small></div>
         ${appBarras(fams.slice(0, 7), total, APP_G.fam ? null : function(f){ return 'data-gfam="' + escapeHtml(f[0]) + '"'; })}</div>
       <div class="ini-card"><div class="ini-card-tit">🏭 ¿A quién le compramos? <small>toca un proveedor</small></div>${appBarras(provs.slice(0, 10), total, function(f){ return 'data-gprov="' + escapeHtml(f[0]) + '"'; })}</div>` : ''}`;
+}
+
+// ---------- Presupuesto vs. OC (Gerencia, 07.10.2026, Piero) ----------
+// "Un módulo de presupuesto costo, a ver si en las OC que se hicieron se está dentro de ese monto".
+// Presupuesto = PresupuestoCosto de R.LPY (Reporte Maestro BO:BR) por partida: proyecto + Estructura + Tarea
+// (el mismo valor se repite en cada ítem de la partida; se toma una vez). Comprometido = Cantidad de orden ×
+// Precio unitario sin IGV de cada línea con OC de esa partida (una vez por OC + producto + req.). El
+// presupuesto se lee en dólares (en ~78% de las partidas lo comprometido en $ queda por debajo; en soles se
+// pasaría en el 70%): los soles se convierten con TIPO_CAMBIO. Las OC del proyecto sin partida (pedidos
+// directos o ítems sin estructura) se muestran aparte. Solo proyectos activos (Estado ≠ Cerrado) salvo que
+// se pida ver también los cerrados.
+const APP_PR = { q:'', cli:'', pry:'', todos:false };
+function appPresuUSD(m, mon){ const t = String(mon || '').toUpperCase(); if(!m) return 0;
+  if(/^S/.test(t)) return m / TIPO_CAMBIO.USD; if(t.indexOf('€') !== -1 || /^EU/.test(t)) return m * TIPO_CAMBIO['€'] / TIPO_CAMBIO.USD; return m; }
+function appPresuDatos(){ return appMemo('presu', function(){
+  const P = new Map(), vistas = new Set();
+  const pr = function(id){ let x = P.get(id); if(!x){ const i = pryInfo(id) || {};
+      x = { id:id, n:i.n || id, cli:i.cl || '', e:i.e || '', dep:i.dep || '', cq:i.cq || '', part:new Map(), fuera:0, ocsFuera:new Map(), activo:!/^cerrad/i.test(i.e || '') }; P.set(id, x); } return x; };
+  getReqRows().forEach(function(r){
+    const id = r.idProyecto; if(!id || !pryNombre(id)) return;
+    const x = pr(id); if(!x.cli && r.proyecto && !/^sin proyecto/i.test(r.proyecto)) x.cli = r.proyecto;
+    const kp = r.estructura ? r.estructura + '|' + (r.tareaPry || '') : '';
+    let pa = null;
+    if(kp){ pa = x.part.get(kp); if(!pa){ pa = { es:r.estructura, t:r.tareaPry || '', pc:0, pv:0, usd:0, ocs:new Map() }; x.part.set(kp, pa); }
+      if(r.presCosto > pa.pc) pa.pc = r.presCosto; if(r.presVenta > pa.pv) pa.pv = r.presVenta; }
+    if(!r.codOrden || r.cantOrden == null || r.precioUnit == null) return;
+    const k = r.codOrden + '|' + r.idProducto + '|' + r.codRequerimiento; if(vistas.has(k)) return; vistas.add(k);
+    const usd = appPresuUSD(r.cantOrden * r.precioUnit, r.moneda);
+    const dest = pa ? pa.ocs : x.ocsFuera; if(pa) pa.usd += usd; else x.fuera += usd;
+    const o = dest.get(r.codOrden) || { oc:r.codOrden, f:r.fOrden, prov:r.proveedor || '', usd:0, n:0 }; o.usd += usd; o.n++; dest.set(r.codOrden, o);
+  });
+  // Pedidos directos (PedidoSinReq AF) con proyecto: OC del proyecto fuera de partida.
+  (PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){
+    if(!r.idProyecto || !pryNombre(r.idProyecto) || r.montoNativo == null) return;
+    const x = pr(r.idProyecto), k = r.codOrden + '|' + r.idProducto + '|directo'; if(vistas.has(k)) return; vistas.add(k);
+    const usd = appPresuUSD(r.montoNativo, r.moneda); x.fuera += usd;
+    const o = x.ocsFuera.get(r.codOrden) || { oc:r.codOrden, f:r.fOrden, prov:r.proveedor || '', usd:0, n:0, directo:true }; o.usd += usd; o.n++; x.ocsFuera.set(r.codOrden, o);
+  });
+  return [...P.values()].map(function(x){
+    const parts = [...x.part.values()];
+    x.pc = parts.reduce(function(a, p){ return a + p.pc; }, 0); x.pv = parts.reduce(function(a, p){ return a + p.pv; }, 0);
+    // % del proyecto solo con las partidas que tienen presupuesto; lo comprado en partidas sin presupuesto
+    // (PresupuestoCosto 0) va aparte, junto con lo que está fuera de partida.
+    x.usd = parts.reduce(function(a, p){ return a + (p.pc > 0 ? p.usd : 0); }, 0);
+    x.usdSinPresu = parts.reduce(function(a, p){ return a + (p.pc > 0 ? 0 : p.usd); }, 0);
+    x.exc = parts.filter(function(p){ return p.pc > 0 && p.usd > p.pc; }).length;
+    x.sinPresu = parts.filter(function(p){ return !(p.pc > 0) && p.usd > 0; }).length;
+    x.pct = x.pc > 0 ? x.usd / x.pc * 100 : null;
+    return x; }).filter(function(x){ return x.pc > 0 || x.usd > 0 || x.fuera > 0; });
+}); }
+function appPresuCls(pct){ return pct == null ? '' : pct > 100 ? 'rojo' : pct >= 80 ? 'ambar' : 'verde'; }
+function appPresuFiltrados(){
+  const q = polarNorm(APP_PR.q || '');
+  return appPresuDatos().filter(function(x){
+    if(!APP_PR.todos && !x.activo) return false;
+    if(APP_PR.cli && x.cli !== APP_PR.cli) return false;
+    if(APP_PR.pry && x.id !== APP_PR.pry) return false;
+    return !q || q.split(/\s+/).every(function(w){ return polarNorm(x.id + ' ' + x.n + ' ' + x.cli + ' ' + x.cq).indexOf(w) !== -1; });
+  }).sort(function(a, b){ return (b.pct == null ? -1 : b.pct) - (a.pct == null ? -1 : a.pct) || b.pc - a.pc; });
+}
+function appPresuBarra(usd, pc){ const p = pc > 0 ? usd / pc * 100 : 0;
+  return `<div class="pr-barra ${appPresuCls(pc > 0 ? p : null)}"><i><em style="width:${Math.min(100, Math.max(pc > 0 ? 2 : 0, p)).toFixed(1)}%"></em></i></div>`; }
+function appPresuLista(){
+  const l = appPresuFiltrados();
+  if(!l.length) return '<div class="ini-card"><div class="ini-vacio">Ningún proyecto calza con ese filtro.</div></div>';
+  return '<div class="ini-card m-lista">' + l.map(function(x){
+    const est = x.pct == null ? 'Sin presupuesto' : x.pct.toFixed(0) + '% usado';
+    return `<button type="button" class="m-fila pr-fila ${appPresuCls(x.pct)}" data-prpry="${escapeHtml(x.id)}"><span class="t"><b>${escapeHtml(x.n)}</b><small><span class="mono">${escapeHtml(x.id)}</span> · ${escapeHtml(polarCorta(x.cli || '—', 40))}${x.activo ? '' : ' · cerrado'}${x.exc ? ` · <span class="rojo">${x.exc} partida${x.exc === 1 ? '' : 's'} excedida${x.exc === 1 ? '' : 's'}</span>` : ''}</small>${appPresuBarra(x.usd, x.pc)}</span>
+      <span class="v"><b>${est}</b><small>${fmtUSD(x.usd)} de ${x.pc > 0 ? fmtUSD(x.pc) : '—'}</small></span></button>`; }).join('') + '</div>';
+}
+function appPresuHtml(){
+  if(!gerAbierto) return APP_GER_LOCK;
+  const datos = appPresuDatos();
+  if(!datos.length) return '<div class="ini-card"><div class="ini-vacio">Carga <b>Reporte Maestro.xlsx</b> con las columnas de R.PRY / R.LPY (BG:BR) para ver el presupuesto por proyecto.</div></div>';
+  const base = datos.filter(function(x){ return APP_PR.todos || x.activo; });
+  const clis = [...new Set(base.map(function(x){ return x.cli; }).filter(Boolean))].sort(function(a, b){ return a.localeCompare(b, 'es'); });
+  const prys = base.filter(function(x){ return !APP_PR.cli || x.cli === APP_PR.cli; }).sort(function(a, b){ return a.n.localeCompare(b.n, 'es'); });
+  const l = appPresuFiltrados();
+  const pc = l.reduce(function(a, x){ return a + x.pc; }, 0), usd = l.reduce(function(a, x){ return a + x.usd; }, 0), fuera = l.reduce(function(a, x){ return a + x.fuera; }, 0);
+  const sinP = l.reduce(function(a, x){ return a + x.usdSinPresu; }, 0), exc = l.reduce(function(a, x){ return a + x.exc; }, 0), nExc = l.filter(function(x){ return x.pct != null && x.pct > 100; }).length;
+  const op = function(v, t, s){ return `<option value="${escapeHtml(v)}"${v === s ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
+  return `<div class="m-filtros">
+      <label><span>🏢 Cliente</span><select class="ini-select" id="prCli">${op('', 'Todos los clientes' + (APP_PR.todos ? '' : ' activos'), APP_PR.cli)}${clis.map(function(c){ return op(c, c, APP_PR.cli); }).join('')}</select></label>
+      <label><span>🏗️ Proyecto</span><select class="ini-select" id="prPry">${op('', 'Todos', APP_PR.pry)}${prys.map(function(x){ return op(x.id, x.n + ' · ' + x.id, APP_PR.pry); }).join('')}</select></label>
+      <div class="ind-chips pr-chips"><button type="button" data-prtodos="0" class="${APP_PR.todos ? '' : 'on'}">Solo activos</button><button type="button" data-prtodos="1" class="${APP_PR.todos ? 'on' : ''}">Incluir cerrados</button></div></div>
+    <div class="m-buscar"><input type="search" id="prBusca" placeholder="🔍 Id de proyecto, cliente, nombre del proyecto o cotización" value="${escapeHtml(APP_PR.q || '')}"></div>
+    <div class="ini-card m-total"><span>Presupuesto costo vs. comprometido en OC · ${l.length} proyecto${l.length === 1 ? '' : 's'}${APP_PR.todos ? '' : ' activos'}</span><b>${pc > 0 ? (usd / pc * 100).toFixed(0) + '% usado' : '—'}</b>
+      <small>${fmtUSD(usd)} en OC de ${fmtUSD(pc)} presupuestados · quedan ${fmtUSD(Math.max(0, pc - usd))}</small>${appPresuBarra(usd, pc)}
+      <div class="m-tiles"><div><span>Proyectos pasados</span><b class="${nExc ? 'rojo' : ''}">${nExc}</b></div><div><span>Partidas excedidas</span><b class="${exc ? 'rojo' : ''}">${exc}</b></div><div><span>OC sin presupuesto</span><b>${fmtUSD(fuera + sinP)}</b></div></div></div>
+    <div id="prLista">${appPresuLista()}</div>
+    <small class="sku-nota pr-nota">Presupuesto costo de cada partida (R.LPY) en dólares; las OC en soles se pasan a dólares a S/ ${TIPO_CAMBIO.USD}. Comprometido = cantidad × precio unitario sin IGV de las OC de la partida. 🟢 menos de 80% · 🟡 80–100% · 🔴 pasado.</small>`;
+}
+function appPresuProyecto(id){
+  const x = appPresuDatos().find(function(y){ return y.id === id; }); if(!x) return;
+  const parts = [...x.part.values()].sort(function(a, b){ const pa = a.pc > 0 ? a.usd / a.pc : (a.usd > 0 ? 9 : -1), pb = b.pc > 0 ? b.usd / b.pc : (b.usd > 0 ? 9 : -1); return pb - pa || b.pc - a.pc; });
+  const conOC = parts.filter(function(p){ return p.usd > 0 && p.pc > 0; }), sinPres = parts.filter(function(p){ return p.usd > 0 && !(p.pc > 0); }), sinOC = parts.filter(function(p){ return !(p.usd > 0); });
+  const ocsHtml = function(m){ return [...m.values()].sort(function(a, b){ return (b.f || 0) - (a.f || 0); }).map(function(o){
+    return appFilaHtml('data-oc="' + escapeHtml(o.oc) + '"', '', 'OC ' + o.oc.replace(/^000\d-0*/, ''), escapeHtml(polarCorta(appImpNombre(o.prov), 40)) + (o.directo ? ' · pedido directo' : ''), fmtUSD(o.usd), (o.f ? rqFecha(o.f) : '') + ' · ' + o.n + ' ítem' + (o.n === 1 ? '' : 's')); }).join(''); };
+  const filaP = function(p){ const pct = p.pc > 0 ? p.usd / p.pc * 100 : null;
+    return `<details class="pr-part ${appPresuCls(pct)}"><summary><span class="t"><b>${escapeHtml(p.t || p.es)}</b><small><span class="mono">${escapeHtml(p.es)}</span> · ${p.ocs.size} OC</small>${appPresuBarra(p.usd, p.pc)}</span>
+      <span class="v"><b>${pct == null ? (p.usd > 0 ? 'Sin presupuesto' : '—') : pct.toFixed(0) + '%'}</b><small>${fmtUSD(p.usd)} de ${p.pc > 0 ? fmtUSD(p.pc) : '—'}</small></span></summary>
+      <div class="m-lista">${ocsHtml(p.ocs) || '<div class="ini-vacio">Todavía sin OC.</div>'}</div></details>`; };
+  const pct = x.pct;
+  appListaAbrir('💼 ' + escapeHtml(polarCorta(x.n, 40)), escapeHtml(x.id + ' · ' + (x.cli || '')), `<div class="oc-hero"><div class="oc-num"><b>${pct == null ? 'Sin presupuesto' : pct.toFixed(0) + '% del presupuesto'}</b></div>
+      <small>${fmtUSD(x.usd)} comprometido en OC de ${fmtUSD(x.pc)} (presupuesto costo)${x.usdSinPresu + x.fuera > 0 ? ' · ' + fmtUSD(x.usdSinPresu + x.fuera) + ' en OC sin presupuesto' : ''} · quedan ${fmtUSD(Math.max(0, x.pc - x.usd))}${x.pv > 0 ? ' · presupuesto venta ' + fmtUSD(x.pv) : ''}</small>
+      ${appPresuBarra(x.usd, x.pc)}
+      ${pryLinea(x.id) ? `<div class="sku-quien">🏗️ ${escapeHtml(pryLinea(x.id))}</div>` : ''}</div>
+    ${x.exc ? `<div class="pr-alerta">🔴 ${x.exc} partida${x.exc === 1 ? '' : 's'} ya pasaron su presupuesto.</div>` : ''}
+    <div class="oc-tit">Partidas con OC (${conOC.length}) <small>toca una para ver sus OC</small></div><div class="ini-card">${conOC.map(filaP).join('') || '<div class="ini-vacio">Todavía no hay OC en las partidas.</div>'}</div>
+    ${sinPres.length ? `<div class="oc-tit">Partidas con OC pero sin presupuesto costo (${sinPres.length}) · ${fmtUSD(x.usdSinPresu)}</div><div class="ini-card">${sinPres.map(filaP).join('')}</div>` : ''}
+    ${x.ocsFuera.size ? `<div class="oc-tit">OC del proyecto fuera de partida · ${fmtUSD(x.fuera)}</div><div class="ini-card m-lista">${ocsHtml(x.ocsFuera)}</div>` : ''}
+    ${sinOC.length ? `<details class="ini-card pr-sinoc"><summary>Partidas sin OC todavía (${sinOC.length}) · ${fmtUSD(sinOC.reduce(function(a, p){ return a + p.pc; }, 0))}</summary>${sinOC.map(function(p){
+      return `<div class="pr-part-s"><span>${escapeHtml(p.t || p.es)} <small class="mono">${escapeHtml(p.es)}</small></span><b>${p.pc > 0 ? fmtUSD(p.pc) : '—'}</b></div>`; }).join('')}</details>` : ''}`);
 }
 // OC y productos de un proveedor en el período y filtros de Gasto.
 function appGastoProv(prov){
@@ -15277,6 +15404,8 @@ function appClickInicio(e){
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
   if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
+  if(b.dataset.prpry) return appPresuProyecto(b.dataset.prpry);
+  if(b.dataset.prtodos !== undefined){ APP_PR.todos = b.dataset.prtodos === '1'; APP_PR.cli = ''; return appRenderInicio(); }
   if(b.dataset.sku !== undefined) return appSkuAbrir(b.dataset.sku, b.dataset.skuped, b.dataset.skureq);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
