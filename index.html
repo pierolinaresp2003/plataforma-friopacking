@@ -1175,8 +1175,17 @@
     .sku-ped{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px;} .sku-ped div{background:var(--surface-2);border-radius:12px;padding:8px 10px;min-width:0;}
     .sku-ped span{display:block;font-size:11px;font-weight:800;color:var(--muted);} .sku-ped b{display:block;font-size:14px;font-weight:800;color:var(--ink);margin-top:2px;overflow-wrap:anywhere;} .sku-ped b.rojo{color:var(--red);}
     .sku-stock div.ok b{color:var(--green);} .sku-nota{display:block;margin-top:8px;color:var(--muted);font-size:12px;} .sku-ult{margin-top:10px;font-size:13px;color:var(--ink-soft);}
-    .sku-prov{padding:10px 0;border-top:1px solid var(--border);} .sku-prov b{display:block;font-size:14px;} .sku-prov small{display:block;font-size:12px;color:var(--ink-soft);margin:2px 0 4px;} .sku-prov .m-link{font-size:12.5px;text-decoration:none;} .sku-sinmail{font-size:12px;color:var(--muted);}
-    .ini-card-tit + .sku-prov{border-top:0;}
+    .sku-ley{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 2px;font-size:12px;color:var(--ink-soft);font-weight:700;} .sku-ley i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;}
+    .sku-graf{position:relative;margin-top:6px;} .sku-graf svg{display:block;width:100%;height:auto;overflow:visible;}
+    .sku-grid{stroke:var(--border);stroke-width:1;vector-effect:non-scaling-stroke;} .sku-eje{font-size:11px;fill:var(--muted);font-family:inherit;}
+    .sku-linea{fill:none;stroke:var(--ink-soft);stroke-opacity:.45;stroke-width:2;vector-effect:non-scaling-stroke;} .sku-pt{stroke:var(--card);stroke-width:2;vector-effect:non-scaling-stroke;}
+    .sku-etq{font-size:12px;font-weight:800;fill:var(--ink);font-family:inherit;}
+    .sku-tip{position:absolute;z-index:3;pointer-events:none;background:var(--card);color:var(--ink);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.35;max-width:260px;}
+    .sku-tip small{color:var(--muted);} .sku-tabla{margin-top:10px;border-top:1px solid var(--border);}
+    .sku-dests{display:grid;gap:6px;margin:8px 0 12px;} .sku-dest{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--border);border-radius:10px;cursor:pointer;}
+    .sku-dest input{margin-top:3px;} .sku-dest b{display:block;font-size:13.5px;} .sku-dest small{display:block;font-size:12px;color:var(--ink-soft);overflow-wrap:anywhere;} .sku-dest.sin{opacity:.55;cursor:default;}
+    .sku-campo{display:block;margin-top:10px;} .sku-campo span{display:block;font-size:12px;font-weight:800;color:var(--muted);margin-bottom:4px;}
+    .sku-campo input,.sku-campo textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:13.5px;background:var(--card);color:var(--ink);resize:vertical;}
     .m-tar{margin-top:16px;} .m-tar .m-pp-tit small{font-size:11.5px;color:var(--muted);font-weight:700;margin-left:6px;}
     .m-tar-aviso{font-size:12.5px;color:var(--amber-ink);background:rgba(244,166,64,.12);border-radius:10px;padding:8px 10px;margin:6px 0;} .m-tar-vacio{font-size:12.5px;color:var(--muted);padding:6px 0;}
     .m-tar-per{font-size:12px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin:12px 0 2px;}
@@ -14353,7 +14362,14 @@ function appPanelMostrar(html){
     if(b.dataset.ocprov){ appOCCerrar(); return polarAbrir('correo de ' + b.dataset.ocprov); }
     if(b.dataset.ocpdf) return appPanelPdf();
     if(b.dataset.dailycopia !== undefined) return appDailyCopiar(b);
+    if(b.dataset.skumon){ const g = el.querySelector('#skuGraf'); if(g) g.innerHTML = appSkuGrafico(g.dataset.cod, b.dataset.skumon); return; }
+    if(b.dataset.skumail) return appSkuCorreo(el, true);
+    if(b.dataset.skucopia) return appSkuCorreo(el, false);
   });
+  // Evolución del precio: el detalle de cada compra al pasar el mouse o tocar un punto
+  el.addEventListener('mouseover', function(e){ const p = e.target.closest && e.target.closest('[data-skupt]'); if(p) appSkuTip(el, p.dataset.skupt); });
+  el.addEventListener('click', function(e){ const p = e.target.closest && e.target.closest('[data-skupt]'); if(p) appSkuTip(el, p.dataset.skupt); });
+  el.addEventListener('mouseout', function(e){ if(e.target.closest && e.target.closest('[data-skupt]') && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('[data-skupt]'))){ const t = el.querySelector('.sku-tip'); if(t) t.hidden = true; } });
   // Enter en las tareas del daily = Agregar / Guardar comentario
   el.addEventListener('keydown', function(e){ if(e.key !== 'Enter') return; const i = e.target, c = i.closest && i.closest('[data-tareas]'); if(!c) return;
     const b = i.dataset.tarnueva !== undefined ? c.querySelector('[data-taragregar]') : i.dataset.tarcomin ? c.querySelector(`[data-tarcom="${i.dataset.tarcomin}"]`) : null;
@@ -14512,6 +14528,69 @@ function appSkuProvFamilia(fam){
   });
 }
 function appSkuPrecio(v, mon){ return v == null ? '—' : (mon === 'S/' ? 'S/ ' : mon === 'US$' ? '$ ' : (mon || '') + ' ') + Number(v).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+// Evolución del precio (07.10.2026, Piero): un punto por compra, coloreado por proveedor (paleta categórica
+// validada, en orden fijo: el proveedor con más compras primero), línea fina de tendencia, etiqueta solo en el
+// último precio y en el mejor. Una sola moneda a la vez (no se mezclan soles con dólares).
+const SKU_COLORES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300'];
+let APP_SKU_PTS = [];
+function appSkuGrafico(cod, mon){
+  const e = escapeHtml, todos = appSkuHistorial(cod).filter(function(h){ return h.pu != null; }).slice().sort(function(a, b){ return a.f - b.f; });
+  const mons = [...new Set(todos.map(function(h){ return h.mon; }))];
+  if(!mon || mons.indexOf(mon) === -1) mon = todos.length ? todos[todos.length - 1].mon : '';
+  const pts = todos.filter(function(h){ return h.mon === mon; });
+  if(!pts.length) return '<div class="ini-vacio">Las compras anteriores no tienen precio registrado.</div>';
+  // Color por proveedor (sigue a la entidad, no al rango): orden fijo por cantidad de compras, 7.º en adelante = "Otros"
+  const cuenta = new Map(); todos.forEach(function(h){ cuenta.set(h.prov, (cuenta.get(h.prov) || 0) + 1); });
+  const orden = [...cuenta.keys()].sort(function(a, b){ return cuenta.get(b) - cuenta.get(a) || a.localeCompare(b); });
+  const color = function(p){ const i = orden.indexOf(p); return i < SKU_COLORES.length ? SKU_COLORES[i] : '#8a8f98'; };
+  // Ancho real del panel para que el SVG no se estire (textos y puntos sin deformar)
+  const W = Math.max(320, Math.min(1180, (document.documentElement.clientWidth || 800) - 64)), H = W < 600 ? 260 : 340, L = W < 600 ? 62 : 72, R = 24, T = 28, B = 42;
+  const t0 = +pts[0].f, t1 = +pts[pts.length - 1].f, span = t1 - t0 || 1;
+  let lo = Math.min.apply(null, pts.map(function(h){ return h.pu; })), hi = Math.max.apply(null, pts.map(function(h){ return h.pu; }));
+  if(hi === lo){ lo = lo * 0.8; hi = hi * 1.2 || 1; } else { const m = (hi - lo) * 0.18; lo = Math.max(0, lo - m); hi = hi + m; }
+  const x = function(f){ return pts.length === 1 ? (L + W - R) / 2 : L + (+f - t0) / span * (W - L - R); };
+  const y = function(v){ return T + (1 - (v - lo) / (hi - lo)) * (H - T - B); };
+  const pr = function(v){ return appSkuPrecio(v, mon); };
+  let g = '';
+  for(let k = 0; k <= 4; k++){ const v = lo + (hi - lo) * k / 4, yy = y(v);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" class="sku-grid"/><text x="${L - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end" class="sku-eje">${e(pr(v))}</text>`; }
+  const nx = Math.min(5, Math.max(1, pts.length));
+  for(let k = 0; k < nx; k++){ const f = new Date(t0 + span * (nx === 1 ? 0.5 : k / (nx - 1))), xx = pts.length === 1 ? x(pts[0].f) : x(f);
+    g += `<text x="${xx.toFixed(1)}" y="${H - 14}" text-anchor="middle" class="sku-eje">${appDDMM(f)}/${String(f.getUTCFullYear()).slice(2)}</text>`; if(pts.length === 1) break; }
+  const linea = pts.map(function(h, i){ return (i ? 'L' : 'M') + x(h.f).toFixed(1) + ' ' + y(h.pu).toFixed(1); }).join(' ');
+  const ult = pts[pts.length - 1], mejor = pts.reduce(function(a, h){ return h.pu < a.pu ? h : a; });
+  const etiqueta = function(h, txt){ const xx = x(h.f), yy = y(h.pu), izq = xx > W - 170;
+    return `<text x="${(izq ? xx - 12 : xx + 12).toFixed(1)}" y="${(yy - 10).toFixed(1)}" text-anchor="${izq ? 'end' : 'start'}" class="sku-etq">${e(txt)}</text>`; };
+  APP_SKU_PTS = pts;
+  const puntos = pts.map(function(h, i){ const xx = x(h.f).toFixed(1), yy = y(h.pu).toFixed(1);
+    return `<circle cx="${xx}" cy="${yy}" r="7" fill="${color(h.prov)}" class="sku-pt"/><circle cx="${xx}" cy="${yy}" r="16" fill="transparent" data-skupt="${i}" style="cursor:pointer"/>`; }).join('');
+  const usados = orden.filter(function(p){ return pts.some(function(h){ return h.prov === p; }); });
+  const leyenda = usados.slice(0, SKU_COLORES.length).map(function(p){ return `<span><i style="background:${color(p)}"></i>${e(polarCorta(p, 34))} · ${pts.filter(function(h){ return h.prov === p; }).length}</span>`; }).join('')
+    + (usados.length > SKU_COLORES.length ? '<span><i style="background:#8a8f98"></i>Otros</span>' : '');
+  const varPct = pts.length > 1 && pts[0].pu ? (ult.pu - pts[0].pu) / pts[0].pu * 100 : null;
+  return `${mons.length > 1 ? `<div class="ind-chips">${mons.map(function(m){ return `<button type="button" data-skumon="${e(m)}" class="${m === mon ? 'on' : ''}">${m === 'S/' ? 'Soles' : m === 'US$' ? 'Dólares' : e(m)} · ${todos.filter(function(h){ return h.mon === m; }).length}</button>`; }).join('')}</div>` : ''}
+    <div class="sku-ley">${leyenda}</div>
+    <div class="sku-graf"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Precio unitario por compra">${g}
+      <path d="${linea}" class="sku-linea"/>${puntos}${etiqueta(ult, 'Último ' + pr(ult.pu))}${mejor !== ult ? etiqueta(mejor, 'Mejor ' + pr(mejor.pu)) : ''}</svg><div class="sku-tip" hidden></div></div>
+    ${varPct != null ? `<small class="sku-nota">Desde la primera compra (${appDDMM(pts[0].f)}/${String(pts[0].f.getUTCFullYear()).slice(2)}) el precio ${varPct >= 0 ? 'subió' : 'bajó'} <b>${Math.abs(varPct).toFixed(1)}%</b> · ${pts.length} compras en ${mon === 'S/' ? 'soles' : 'dólares'}.</small>` : ''}`;
+}
+function appSkuTip(el, i){
+  const h = APP_SKU_PTS[+i], c = el.querySelector('#skuGraf .sku-graf'); if(!h || !c) return;
+  const t = c.querySelector('.sku-tip'), p = c.querySelector(`[data-skupt="${i}"]`), r = p.getBoundingClientRect(), rc = c.getBoundingClientRect();
+  t.innerHTML = `<b>${escapeHtml(appSkuPrecio(h.pu, h.mon))}</b> c/u<br>${escapeHtml(h.prov)}<br><small>${appDDMM(h.f)}/${h.f.getUTCFullYear()} · OC ${escapeHtml(h.oc.replace(/^000\d-0*/, ''))} · ${appN(Math.round(h.q * 100) / 100)} ${escapeHtml(h.um || '')}</small>`;
+  t.hidden = false;
+  const x = r.left - rc.left + r.width / 2, y = r.top - rc.top;
+  t.style.left = Math.max(0, Math.min(rc.width - t.offsetWidth, x - t.offsetWidth / 2)) + 'px';
+  t.style.top = Math.max(0, y - t.offsetHeight - 4) + 'px';
+}
+function appSkuCorreo(el, abrir){
+  const a = (el.querySelector('#skuAsunto') || {}).value || '', c = (el.querySelector('#skuCuerpo') || {}).value || '';
+  const bcc = [...el.querySelectorAll('[data-skudest]:checked')].map(function(i){ return i.value; }).filter(Boolean).join(',');
+  if(abrir){ window.location.href = 'mailto:?' + (bcc ? 'bcc=' + encodeURIComponent(bcc) + '&' : '') + 'subject=' + encodeURIComponent(a) + '&body=' + encodeURIComponent(c); return; }
+  const txt = (bcc ? 'Para (CCO): ' + bcc + '\n' : '') + 'Asunto: ' + a + '\n\n' + c;
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function(){ appToast('📋 Correo copiado'); }, function(){ window.prompt('Copia el correo:', txt); });
+  else window.prompt('Copia el correo:', txt);
+}
 function appSkuAbrir(cod, ped, req){
   const fila = pdFilas().find(function(r){ return r.idProducto === cod && r.codPedido === ped && (!req || r.req === req); })
     || pdFilas().find(function(r){ return r.idProducto === cod; }) || {};
@@ -14526,12 +14605,23 @@ function appSkuAbrir(cod, ped, req){
   const mon = ult ? ult.mon : '', mismos = hist.filter(function(h){ return h.pu != null && h.mon === mon; });
   const prom = mismos.length ? mismos.reduce(function(a, h){ return a + h.pu; }, 0) / mismos.length : null;
   const min = mismos.length ? mismos.reduce(function(a, h){ return h.pu < a.pu ? h : a; }) : null;
-  // Con quién cotizar: a quién ya se le compró este SKU (con su último precio) + proveedores de la familia.
-  const provSku = new Map(); hist.forEach(function(h){ const x = provSku.get(h.prov) || { prov:h.prov, ruc:h.ruc, n:0, ult:h, mejor:null }; x.n++;
-    if(h.pu != null && h.mon === mon && (!x.mejor || h.pu < x.mejor.pu)) x.mejor = h; provSku.set(h.prov, x); });
+  // Para el correo de cotización: a quién ya se le compró este SKU + proveedores de la familia (07.10.2026, Piero).
+  const provSku = new Map(); hist.forEach(function(h){ const x = provSku.get(h.prov) || { prov:h.prov, ruc:h.ruc, n:0, ult:h }; x.n++; provSku.set(h.prov, x); });
   const fam = appSkuProvFamilia(fila.familia || '').filter(function(x){ return !provSku.has(x.prov); }).slice(0, 6);
-  const mail = function(ruc, prov){ const M = PROVEEDOR_MAIL || {}, k = sinAcentos(String(prov || '')).toUpperCase().trim();
-    const m = M[ruc] || Object.values(M).find(function(v){ return v && sinAcentos(String(v.nombre || '')).toUpperCase().trim() === k; }) || null; return m && m.to ? `<a class="m-link" href="mailto:${e(m.to)}">✉️ ${e(m.to)}</a>` : '<span class="sku-sinmail">sin correo registrado</span>'; };
+  const correoDe = function(ruc, prov){ const M = PROVEEDOR_MAIL || {}, k = sinAcentos(String(prov || '')).toUpperCase().trim();
+    const m = M[ruc] || Object.values(M).find(function(v){ return v && sinAcentos(String(v.nombre || '')).toUpperCase().trim() === k; }) || null;
+    return m && m.to ? [m.to].concat(m.cc || []).join(',').split(/[,;\s]+/).filter(function(c){ return c && !/@friopacking\.pe$/i.test(c); }).join(', ') : ''; };
+  const dest = [...provSku.values()].map(function(x){ return { prov:x.prov, mail:correoDe(x.ruc, x.prov), por:'le compramos este producto ' + x.n + (x.n === 1 ? ' vez' : ' veces') + ' (última ' + appDDMM(x.ult.f) + '/' + String(x.ult.f.getUTCFullYear()).slice(2) + ')' }; })
+    .concat(fam.map(function(x){ return { prov:x.prov, mail:correoDe(x.ruc, x.prov), por:'proveedor de ' + (fila.familia || '').toLowerCase() + ' · ' + x.ocs.size + ' OC en el último año' }; }));
+  let marcados = 0;
+  const destHtml = dest.map(function(d){ const on = d.mail && marcados < 5; if(on) marcados++;
+    return `<label class="sku-dest${d.mail ? '' : ' sin'}"><input type="checkbox" data-skudest value="${e(d.mail)}"${on ? ' checked' : ''}${d.mail ? '' : ' disabled'}><span><b>${e(d.prov)}</b><small>${d.mail ? '✉️ ' + e(d.mail) : 'sin correo registrado'} · ${e(d.por)}</small></span></label>`; }).join('');
+  const yo = polarMiNombre() || '';
+  const asunto = 'Solicitud de cotización – ' + (fila.producto || cod) + ' (' + cod + ')';
+  const cuerpoMail = 'Estimados, buen día:\n\nPor medio del presente, les solicitamos su cotización para el siguiente producto:\n\n'
+    + '• Código: ' + cod + '\n• Descripción: ' + (fila.producto || '') + '\n• Cantidad: ' + (fila.cantPedido != null ? n(fila.cantPedido) + ' ' + (fila.unidad || '') : '') + '\n\n'
+    + 'Agradeceremos nos indiquen precio unitario (sin IGV), moneda, plazo de entrega, condiciones de pago, lugar de entrega y validez de la oferta.\n\n'
+    + 'Quedo atento a su respuesta.\n\nSaludos cordiales,\n' + (yo ? yo + '\n' : '') + 'Compras – Grupo Friopacking';
   const cuerpo = `<div class="oc-hero"><div class="oc-num"><b>${e(fila.producto || cod)}</b></div>
       <small><span class="mono">${e(cod)}</span> · ${e(fila.familia || 'Sin familia')}</small>
       <div class="sku-ped">
@@ -14550,12 +14640,15 @@ function appSkuAbrir(cod, ped, req){
       ${ult ? `<div class="m-tiles sku-precio">${tile('Último precio unitario', appSkuPrecio(ult.pu, ult.mon))}${tile('Promedio (' + mismos.length + ' compra' + (mismos.length === 1 ? '' : 's') + ')', appSkuPrecio(prom, mon))}${tile('Mejor precio', min ? appSkuPrecio(min.pu, mon) : '—')}${tile('Última compra', appDDMM(ult.f) + ' ' + ult.f.getUTCFullYear())}</div>
         <div class="sku-ult">🏷️ Último proveedor: <b>${e(ult.prov)}</b> · OC <button type="button" class="m-link mono" data-oc="${e(ult.oc)}">${e(ult.oc.replace(/^000\d-0*/, ''))}</button>${min && min.prov !== ult.prov ? ` · el mejor precio fue con <b>${e(min.prov)}</b>` : ''}</div>`
         : '<div class="ini-vacio">No hay compras anteriores de este código en Consulta.xlsx (desde 2020) ni en Nisira. Es la primera vez o se compró con otro código.</div>'}</div>
-    <div class="ini-card"><div class="ini-card-tit">🤝 ¿Con quién cotizar?</div>
-      ${[...provSku.values()].map(function(x){ return `<div class="sku-prov"><div><b>${e(x.prov)}</b><small>✅ Le compramos este producto ${x.n} ${x.n === 1 ? 'vez' : 'veces'} · última ${appDDMM(x.ult.f)}/${String(x.ult.f.getUTCFullYear()).slice(2)} a ${appSkuPrecio(x.ult.pu, x.ult.mon)}${x.mejor && x.mejor !== x.ult ? ' · mejor ' + appSkuPrecio(x.mejor.pu, x.mejor.mon) : ''}</small>${mail(x.ruc, x.prov)}</div></div>`; }).join('')}
-      ${fam.map(function(x){ return `<div class="sku-prov fam"><div><b>${e(x.prov)}</b><small>🏷️ Proveedor de ${e((fila.familia || '').toLowerCase())} · ${x.ocs.size} OC en el último año · última ${appDDMM(x.f)}</small>${mail(x.ruc, x.prov)}</div></div>`; }).join('')}
-      ${!provSku.size && !fam.length ? '<div class="ini-vacio">Sin proveedores previos para este producto ni su familia.</div>' : ''}</div>
-    ${hist.length ? `<div class="ini-card m-pp-full"><div class="ini-card-tit">📈 Historial de compras</div><table><thead><tr><th>Fecha</th><th>OC</th><th>Proveedor</th><th>Cantidad</th><th>P. unitario</th><th>Total</th></tr></thead><tbody>
-      ${hist.slice(0, 30).map(function(h){ return `<tr><td data-l="Fecha" class="nw">${appDDMM(h.f)}/${String(h.f.getUTCFullYear()).slice(2)}</td><td data-l="OC"><button type="button" class="m-link mono" data-oc="${e(h.oc)}">${e(h.oc.replace(/^000\d-0*/, ''))}</button></td><td data-l="Proveedor" class="pr">${e(h.prov)}</td><td data-l="Cantidad" class="nw">${n(h.q)} ${e(h.um)}</td><td data-l="P. unitario" class="nw"><b>${appSkuPrecio(h.pu, h.mon)}</b></td><td data-l="Total" class="nw">${h.conMonto ? appSkuPrecio(h.total, h.mon) : '—'}</td></tr>`; }).join('')}</tbody></table></div>` : ''}
+    ${hist.length ? `<div class="ini-card"><div class="ini-card-tit">📈 Evolución del precio</div><small class="sku-nota">Cada punto es una compra: pasa el mouse o tócalo para ver a quién, cuándo y a cuánto.</small>
+      <div id="skuGraf" data-cod="${e(cod)}">${appSkuGrafico(cod, mon)}</div>
+      <details class="m-dp-lista sku-tabla"><summary>Ver tabla del historial (${hist.length} compra${hist.length === 1 ? '' : 's'})</summary><div class="m-pp-full"><table><thead><tr><th>Fecha</th><th>OC</th><th>Proveedor</th><th>Cantidad</th><th>P. unitario</th><th>Total</th></tr></thead><tbody>
+      ${hist.slice(0, 40).map(function(h){ return `<tr><td data-l="Fecha" class="nw">${appDDMM(h.f)}/${String(h.f.getUTCFullYear()).slice(2)}</td><td data-l="OC"><button type="button" class="m-link mono" data-oc="${e(h.oc)}">${e(h.oc.replace(/^000\d-0*/, ''))}</button></td><td data-l="Proveedor" class="pr">${e(h.prov)}</td><td data-l="Cantidad" class="nw">${n(h.q)} ${e(h.um)}</td><td data-l="P. unitario" class="nw"><b>${appSkuPrecio(h.pu, h.mon)}</b></td><td data-l="Total" class="nw">${h.conMonto ? appSkuPrecio(h.total, h.mon) : '—'}</td></tr>`; }).join('')}</tbody></table></div></details></div>` : ''}
+    <div class="ini-card sku-mail"><div class="ini-card-tit">✉️ Pedir cotización</div>
+      ${dest.length ? `<small class="sku-nota">Marca a quién enviarla. Van en copia oculta: ningún proveedor ve a los demás.</small><div class="sku-dests">${destHtml}</div>` : '<small class="sku-nota">No hay proveedores previos para este producto ni su familia: escribe el correo del proveedor en tu correo antes de enviar.</small>'}
+      <label class="sku-campo"><span>Asunto</span><input type="text" id="skuAsunto" value="${e(asunto)}"></label>
+      <label class="sku-campo"><span>Mensaje</span><textarea id="skuCuerpo" rows="13">${e(cuerpoMail)}</textarea></label>
+      <div class="asis-acc"><button type="button" data-skumail="1">📧 Abrir en mi correo</button><button type="button" data-skucopia="1">📋 Copiar texto</button></div></div>
     <div class="asis-acc"><button type="button" data-q="pedido ${e(fila.codPedido || '')}">🐻‍❄️ Preguntar a Leo por el pedido</button></div>`;
   appListaAbrir('📦 Ficha del SKU', e(cod) + (fila.codPedido ? ' · Pedido ' + e(String(fila.codPedido).replace(/^000\d-0*/, '')) : ''), cuerpo);
   document.getElementById('appOC').classList.add('ancho');   // en la PC, a pantalla completa como el Daily
