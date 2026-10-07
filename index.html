@@ -1177,6 +1177,7 @@
     .sku-ped span{display:block;font-size:11px;font-weight:800;color:var(--muted);} .sku-ped b{display:block;font-size:14px;font-weight:800;color:var(--ink);margin-top:2px;overflow-wrap:anywhere;} .sku-ped b.rojo{color:var(--red);}
     .sku-stock div.ok b{color:var(--green);} .sku-nota{display:block;margin-top:8px;color:var(--muted);font-size:12px;} .sku-ult{margin-top:10px;font-size:13px;color:var(--ink-soft);}
     .sku-ley{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 2px;font-size:12px;color:var(--ink-soft);font-weight:700;} .sku-ley i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;}
+    body.vista-frioteam .asis-fab, body.vista-frioteam #asis, body.vista-frioteam .ini-pregunta{display:none!important;}
     .pry-nom{display:block;font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px;} .rqm-cab .pry-nom{color:inherit;opacity:.85;}
     .sku-graf{position:relative;margin-top:6px;} .sku-graf svg{display:block;width:100%;height:auto;overflow:visible;}
     .sku-grid{stroke:var(--border);stroke-width:1;vector-effect:non-scaling-stroke;} .sku-eje{font-size:11px;fill:var(--muted);font-family:inherit;}
@@ -4847,15 +4848,16 @@ function processSupervisores(wb, filename){
   if(hdr === -1){ SUPERVISOR_MAIL = null; return { ok:false, message:"no encontré las columnas Nombre y Correo." }; }
   const iN = findCol(rows[hdr], ["Nombre"]), iC = findCol(rows[hdr], ["Correo","Email","E_MAIL"]);
   const iA = findCol(rows[hdr], ["Acceso","Tipo","Rol"]);
-  const mapa = {}, roles = {}, rango = { supervisor:1, logistica:2, gerencia:3 };
+  const mapa = {}, roles = {}, rango = { frioteam:1, supervisor:1, logistica:2, gerencia:3 };
   for(let r=hdr+1; r<rows.length; r++){
     const row = rows[r]; if(!row) continue;
     const nom = s(row[iN]), correos = partirCorreos(row[iC]);
     if(!nom || !correos.length) continue;
     mapa[claveNombre(nom)] = correos[0];
     const a = sinAcentos(s(iA === -1 ? '' : row[iA]).toLowerCase());
-    const t = /^ger/.test(a) ? 'gerencia' : (/^log/.test(a) ? 'logistica' : 'supervisor');
-    const u = correos[0].toLowerCase().split('@')[0];
+    // Frioteam (07.10.2026, Piero): solo ve Logística → Inventario.
+    const t = /^ger/.test(a) ? 'gerencia' : (/^log/.test(a) ? 'logistica' : (/^frio/.test(a) ? 'frioteam' : 'supervisor'));
+    const u = appUsuarioDe(correos[0]);
     if(!roles[u] || rango[t] > rango[roles[u].t]) roles[u] = { t:t, n:nom.replace(/\s+/g, ' '), c:correos[0].toLowerCase() };
   }
   SUPERVISOR_ROL = Object.keys(roles).length ? roles : null;
@@ -12920,6 +12922,9 @@ const APP_VISTAS = {
     // "Vista" se cambió por el avance de atención de los requerimientos por proyecto (29.09.2026, Piero).
     // La vista se sigue cambiando desde el botón de arriba.
     tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Tiempos'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
+  // Frioteam (07.10.2026, Piero): solo el Inventario de Logística (stock por sede y kardex), sin Leo.
+  frioteam:   { nombre:'Frioteam',   ico:'❄️', desc:'Inventario de Logística: stock por sede y kardex.',
+    tabs:[['inventario','📦','Inventario']] },
   supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
     // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
     // Solo Inicio y Mis req. (29.09.2026, Piero: "para el supervisor solo coloca inicio y mis req"). La vista
@@ -12942,7 +12947,7 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 // Gerencia y Logística piden la clave del módulo Gerencial). Se guarda solo en ese celular: la plataforma
 // es una página estática, no hay un servidor con la lista de usuarios. Qué vistas ve cada tipo:
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
-const APP_ACCESO = { gerencia:['gerencia','logistica','supervisor'], logistica:['logistica','supervisor'], supervisor:['supervisor'] };
+const APP_ACCESO = { gerencia:['gerencia','logistica','supervisor'], logistica:['logistica','supervisor'], supervisor:['supervisor'], frioteam:['frioteam'] };
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
 // y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
 // solo entran los correos que están ahí. Los de Supervisor entran directo; Logística y Gerencial ponen la
@@ -12954,7 +12959,7 @@ const APP_LLAVE = 2843050290;
 // clave en ese celular; si no lo marcan, se pide cada vez que se abre la app (vale solo esa sesión).
 const APP_SESION = 'fp_app_ok';
 function appNecesitaClave(){
-  if(!APP.usuario || APP.usuario.tipo === 'supervisor' || APP.usuario.recordar) return false;
+  if(!APP.usuario || APP.usuario.tipo === 'supervisor' || APP.usuario.tipo === 'frioteam' || APP.usuario.recordar) return false;
   try{ return sessionStorage.getItem(APP_SESION) !== '1'; }catch(err){ return true; }
 }
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
@@ -12963,10 +12968,12 @@ const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co']
 // Cuando se publica con la base cargada, manda la publicada (SUPERVISOR_ROL).
 const APP_ACCESOS_BASE = {"asolorzano":{"t":"supervisor","n":"ABDON SOLORZANO TOSCANO","c":"asolorzano@friopacking.pe"},"aavila":{"t":"supervisor","n":"ANTERO AVILA SANCHEZ","c":"aavila@friopacking.pe"},"jrodriguez":{"t":"supervisor","n":"ANTHONY RODRIGUEZ MEZA","c":"jrodriguez@friopacking.pe"},"bviera":{"t":"supervisor","n":"BENJAMIN VIERA CHUCTAYA","c":"bviera@friopacking.pe"},"bmendoza":{"t":"supervisor","n":"BRUNO MENDOZA IPANAQUE","c":"bmendoza@friopacking.pe"},"ccalderon":{"t":"supervisor","n":"CALDERON CAHUA CARLOS GIOVANY","c":"ccalderon@friopacking.pe"},"vcalderon":{"t":"supervisor","n":"CALEB CALDERON VERA","c":"vcalderon@friopacking.pe"},"crojo":{"t":"supervisor","n":"CARLOS ROJO MARMOLEJO","c":"crojo@friopacking.pe"},"cpriale":{"t":"supervisor","n":"CARMEN PRIALE ROMERO","c":"cpriale@friopacking.pe"},"cbanda":{"t":"supervisor","n":"CESAR BANDA COBEÑAS","c":"cbanda@friopacking.pe"},"dasmat":{"t":"supervisor","n":"DIEGO ASMAT DELGADO","c":"dasmat@friopacking.pe"},"dmarquina":{"t":"supervisor","n":"DYLAN MARQUINA RODRIGUEZ","c":"dmarquina@friopacking.pe"},"esalvador":{"t":"supervisor","n":"ERICK SALVADOR LIZARRAGA","c":"esalvador@friopacking.pe"},"ejara":{"t":"supervisor","n":"ERIK JARA YPANAQUE","c":"ejara@friopacking.pe"},"eoscco":{"t":"supervisor","n":"ESTEFANIA OSCCO DURAND","c":"eoscco@friopacking.pe"},"fasmat":{"t":"supervisor","n":"FERNANDO ASMAT CORDOVA","c":"fasmat@friopacking.pe"},"faurazo":{"t":"supervisor","n":"FERNANDO AURAZO ALVARADO","c":"faurazo@friopacking.pe"},"ggirao":{"t":"supervisor","n":"GIANPIER GIRAO RAMOS","c":"ggirao@friopacking.pe"},"lgoycochea":{"t":"supervisor","n":"GOYCOCHEA MARTINEZ LUIS RICARDO","c":"lgoycochea@friopacking.pe"},"gmartinez":{"t":"supervisor","n":"GUSTAVO MARTINEZ QUISPE","c":"gmartinez@friopacking.pe"},"hmorales":{"t":"supervisor","n":"HUGO MORALES PARRA","c":"hmorales@grupofriopacking.pe"},"igutierrez":{"t":"supervisor","n":"IRWIN GUTIERREZ CAMPOS","c":"igutierrez@friopacking.pe"},"jcenteno":{"t":"logistica","n":"JAVIER CENTENO GUTIERRE","c":"jcenteno@friopacking.pe"},"jcabrera":{"t":"supervisor","n":"JESUS CABRERA CAMACHO","c":"jcabrera@friopacking.pe"},"jacosta":{"t":"supervisor","n":"JORDY ACOSTA VALENCIA","c":"jacosta@friopacking.pe"},"jhernandez":{"t":"supervisor","n":"JORGE HERNANDEZ YEPEZ","c":"jhernandez@friopacking.pe"},"jparedes":{"t":"supervisor","n":"JORVIN PAREDES MORALES","c":"jparedes@friopacking.pe"},"jfloresr":{"t":"supervisor","n":"JOSE FLORES RAMIREZ","c":"jfloresr@friopacking.pe"},"jperez":{"t":"supervisor","n":"JOSE PEREZ TRILLO","c":"jperez@friopacking.pe"},"kalbujar":{"t":"logistica","n":"KATHERINE ALBUJAR SOBRINO","c":"kalbujar@grupofriopacking.pe"},"kbuleje":{"t":"supervisor","n":"KELLY BULEJE QUISPE","c":"kbuleje@grupofriopacking.pe"},"esilva":{"t":"supervisor","n":"LUIS SILVA DAVILA","c":"esilva@friopacking.pe"},"mparra":{"t":"supervisor","n":"MARIO PARRA HUAROTO","c":"mparra@friopacking.co"},"ocastro":{"t":"supervisor","n":"OMAR CASTRO ARANDA","c":"ocastro@friopacking.pe"},"gparedes":{"t":"supervisor","n":"PABLO PAREDES BARROZO","c":"gparedes@friopacking.pe"},"pvilla":{"t":"supervisor","n":"PAOLO VILLA ABAD","c":"pvilla@friopacking.pe"},"psanchez":{"t":"supervisor","n":"PERCY SANCHEZ SANCHEZ","c":"psanchez@friopacking.pe"},"rmansilla":{"t":"supervisor","n":"RAQUEL MANSILLA MANSILLA","c":"rmansilla@grupofriopacking.pe"},"rjara":{"t":"supervisor","n":"RENATO JARA MEDINA","c":"rjara@friopacking.pe"},"rharo":{"t":"supervisor","n":"RHAIZA HARO VARGAS","c":"rharo@grupofriopacking.pe"},"aflores":{"t":"gerencia","n":"RICARDO FLORES PONCE","c":"aflores@friopacking.pe"},"dsaravia":{"t":"supervisor","n":"SARAVIA ABAD DENNIS ELEAZAR","c":"dsaravia@friopacking.pe"},"sflores":{"t":"supervisor","n":"SEBASTIAN FLORES OROSCO","c":"sflores@friopacking.pe"},"ssarmiento":{"t":"supervisor","n":"STEVE SARMIENTO CHAVEZ","c":"ssarmiento@friopacking.pe"},"pvasquez":{"t":"supervisor","n":"VASQUEZ ZAVALETA PATRICK GIANMARCO","c":"pvasquez@friopacking.pe"},"vflores":{"t":"supervisor","n":"VICTOR FLORES SALAZAR","c":"vflores@friopacking.pe"},"vramirez":{"t":"supervisor","n":"VICTOR RAMIREZ DILAS","c":"vramirez@friopacking.pe"},"wsaldana":{"t":"supervisor","n":"WALDIR SALDAÑA LOPEZ","c":"wsaldana@friopacking.pe"},"wchung":{"t":"supervisor","n":"WALTER CHUNG TORRES","c":"wchung@friopacking.pe"},"wvila":{"t":"supervisor","n":"WILLIAMS VILA LUJAN","c":"wvila@friopacking.pe"},"wurbina":{"t":"supervisor","n":"WILSON URBINA ESQUEN","c":"wurbina@friopacking.pe"},"zdavila":{"t":"supervisor","n":"ZULLY DAVILA QUISPE","c":"zdavila@grupofriopacking.pe"},"jraymundo":{"t":"supervisor","n":"JOSE ANDRES RAYMUNDO BALDERA","c":"jraymundo@friopacking.pe"},"plinares":{"t":"gerencia","n":"PIERO SEBASTIAN LINARES PALOMINO","c":"plinares@friopacking.pe"},"ccheca":{"t":"logistica","n":"CAROLINA ALEXANDRA CHECA SANDOVAL","c":"ccheca@friopacking.pe"},"msihuairo":{"t":"logistica","n":"MELISSA SIHUAIRO PEREYRA","c":"msihuairo@friopacking.pe"},"jaltamirano":{"t":"logistica","n":"JAIME ALTAMIRANO ORTIZ","c":"jaltamirano@friopacking.pe"},"mlujan":{"t":"gerencia","n":"MANUEL LUJAN CALDERON","c":"mlujan@grupofriopacking.pe"},"apl":{"t":"gerencia","n":"ANDRES PAREJA-LECAROS BELLIDO","c":"apl@grupofriopacking.pe"}};
 function appAccesos(){ return SUPERVISOR_ROL || APP_ACCESOS_BASE; }
-function appUsuarioDe(correo){ return String(correo || '').trim().toLowerCase().split('@')[0]; }
+// Correo corporativo → la parte antes de la @; otro dominio (Frioteam, 07.10.2026) → el correo completo.
+function appUsuarioDe(correo){ const c = String(correo || '').trim().toLowerCase(), d = c.split('@')[1] || '';
+  return (!d || APP_DOMINIOS.indexOf(d) !== -1) ? c.split('@')[0] : c; }
 function appCorreoValido(correo){
   const m = String(correo || '').trim().toLowerCase().match(/^[a-z0-9._%+-]+@([a-z0-9.-]+)$/);
-  return !!(m && APP_DOMINIOS.indexOf(m[1]) !== -1);
+  return !!(m && (APP_DOMINIOS.indexOf(m[1]) !== -1 || appAccesos()[m[0]]));
 }
 function appTipoPorCorreo(correo){
   if(!appCorreoValido(correo)) return null;
@@ -12982,7 +12989,8 @@ try{
   // La base de accesos llega con los datos publicados; hasta entonces se confía en lo guardado y
   // appRevisarAcceso lo vuelve a comprobar apenas llegan (si cambió su acceso en la base, cambia acá).
   const u = JSON.parse(localStorage.getItem('fp-usuario') || 'null');
-  if(u && APP_ACCESO[u.tipo] && appCorreoValido(u.correo)) APP.usuario = u;
+  // Frioteam puede tener otro dominio: se acepta lo guardado y appRevisarAcceso lo valida cuando llega la base.
+  if(u && APP_ACCESO[u.tipo] && (appCorreoValido(u.correo) || (u.tipo === 'frioteam' && /^[^@\s]+@[^@\s]+$/.test(u.correo || '')))) APP.usuario = u;
 }catch(err){}
 function appRevisarAcceso(){
   if(!SUPERVISOR_ROL || !APP.usuario) return;
@@ -13285,7 +13293,7 @@ function appBienvenida(correoFijo){
     const t = tipoDe(correo.value), a = document.getElementById('bvAcceso');
     a.hidden = !t;
     if(t) a.innerHTML = `${APP_VISTAS[t].ico} Acceso: <b>${APP_VISTAS[t].nombre}</b>` + (APP_ACCESO[t].length > 1 ? ` <small>(también ${APP_ACCESO[t].slice(1).map(function(k){ return APP_VISTAS[k].nombre; }).join(' y ')})</small>` : '');
-    document.getElementById('bvClave').hidden = !t || t === 'supervisor';
+    document.getElementById('bvClave').hidden = !t || t === 'supervisor' || t === 'frioteam';
     err('');
   };
   if(correoFijo){
@@ -13309,8 +13317,8 @@ function appBienvenida(correoFijo){
       return;
     }
     const pass = document.getElementById('bvPass');
-    if(tipo !== 'supervisor' && fpHuella(pass.value) !== APP_LLAVE){ pass.select(); return err('Clave incorrecta.'); }
-    const recordar = tipo !== 'supervisor' && document.getElementById('bvRecordar').checked;
+    if(tipo !== 'supervisor' && tipo !== 'frioteam' && fpHuella(pass.value) !== APP_LLAVE){ pass.select(); return err('Clave incorrecta.'); }
+    const recordar = tipo !== 'supervisor' && tipo !== 'frioteam' && document.getElementById('bvRecordar').checked;
     APP.usuario = { correo:c, nombre:appNombrePorCorreo(c) || (APP.usuario && APP.usuario.correo === c ? APP.usuario.nombre : ''), tipo:tipo, recordar:recordar,
       creado:(APP.usuario && APP.usuario.correo === c && APP.usuario.creado) || new Date().toISOString().slice(0, 10) };
     try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); if(tipo !== 'supervisor') sessionStorage.setItem(APP_SESION, '1'); }catch(er){}
@@ -13376,6 +13384,7 @@ function appAnim(el, cls, ms){
   clearTimeout(el._tr); el._tr = setTimeout(function(){ el.classList.remove(cls); }, ms || 900);
 }
 function appInicio(pantalla){
+  if(APP.vista === 'frioteam') pantalla = 'inventario';
   if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(undefined, true); APP.entrada = false; return; }
   const tabs = ((APP_VISTAS[APP.vista] || APP_VISTAS.supervisor).tabs || []).map(function(t){ return t[0]; });
   const antes = APP.enInicio ? APP.pantalla : null, nueva = APP_PANTALLAS[pantalla] ? pantalla : 'inicio';
@@ -15398,6 +15407,7 @@ function polarSugerencias(){
   s.innerHTML = polarChips().concat(['¿Qué puedes hacer?']).map(function(c){ return `<button type="button" data-q="${escapeHtml(c)}">${escapeHtml(c)}</button>`; }).join('');
 }
 function polarAbrir(texto, suave){
+  if(APP.vista === 'frioteam') return;   // Frioteam: solo Inventario, sin Leo
   const a = document.getElementById('asis');
   const yaAbierto = a.classList.contains('abierto') && !a.classList.contains('cerrando');
   clearTimeout(a._cierre); a.classList.remove('cerrando');
