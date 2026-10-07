@@ -15198,6 +15198,18 @@ function appCargarJsPdf(){
   });
   return APP_JSPDF;
 }
+// html2canvas 1.4 no entiende los colores "color(srgb …)" que el navegador calcula para color-mix(): el PDF
+// fallaba entero (07.10.2026, req 23405). En la copia que se fotografía se pasan a rgba().
+function appPdfColores(root, win){
+  const fix = function(v){ return v.replace(/color\(srgb\s+([\d.e+-]+)\s+([\d.e+-]+)\s+([\d.e+-]+)(?:\s*\/\s*([\d.e+-]+%?))?\)/g, function(m, r, g, b, a){
+    const al = a == null ? 1 : (/%$/.test(a) ? parseFloat(a) / 100 : +a);
+    return 'rgba(' + Math.round(+r * 255) + ',' + Math.round(+g * 255) + ',' + Math.round(+b * 255) + ',' + al + ')'; }); };
+  const props = ['color', 'backgroundColor', 'backgroundImage', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor', 'boxShadow', 'textDecorationColor', 'fill', 'stroke'];
+  [root].concat([].slice.call(root.querySelectorAll('*'))).forEach(function(el){
+    const cs = win.getComputedStyle(el);
+    props.forEach(function(k){ const v = cs[k]; if(v && v.indexOf('color(') !== -1){ const n = fix(v); el.style[k] = n.indexOf('color(') !== -1 ? (k === 'backgroundImage' || k === 'boxShadow' ? 'none' : 'transparent') : n; } });
+  });
+}
 async function appPanelPdf(){
   const el = document.getElementById('appOC');
   if(!el || !el.classList.contains('abierto')) return;
@@ -15217,6 +15229,7 @@ async function appPanelPdf(){
       c.scrollTop = 0; c.querySelectorAll('.oc-cab').forEach(function(h){ h.style.position = 'static'; });
       c.style.cssText += ';position:absolute;left:0;top:0;right:auto;bottom:auto;width:' + ancho + 'px;height:auto;max-height:none;overflow:visible;transform:none;box-shadow:none;animation:none;';
       c.querySelectorAll('[data-ocpdf], .oc-cab .atras').forEach(function(b){ b.remove(); });
+      appPdfColores(c, doc.defaultView || window);
       if(!medir) return;
       // Dónde se puede cortar la página: al empezar cada tarjeta, sección o fila (en px de pantalla).
       const y0 = c.getBoundingClientRect().top; alto = Math.ceil(c.getBoundingClientRect().height);
