@@ -1139,12 +1139,19 @@
     .m-bar i{grid-area:i;display:block;height:8px;border-radius:8px;background:var(--surface-2);overflow:hidden;} .m-bar em{display:block;height:100%;border-radius:8px;background:var(--brand-2);}
     .m-bar small{grid-area:s;font-size:11px;color:var(--muted);}
     .m-volver{background:none;border:0;color:var(--brand-ink);font-weight:800;font-size:13.5px;padding:0 2px 10px;cursor:pointer;font-family:inherit;}
-    .m-daily-nom{font-size:16px;font-weight:800;} .m-daily-nom small{font-size:11px;color:var(--muted);font-weight:700;margin-left:4px;}
-    .m-daily .m-tiles{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));}
+    .m-dd{margin-bottom:12px;} .m-dd-big{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .m-dd-big div{background:var(--surface-2);border-radius:14px;padding:12px 14px;} .m-dd-big b{display:block;font-size:30px;font-weight:900;line-height:1.1;color:var(--brand-ink);}
+    .m-dd-big span,.m-dd-nums span{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-top:3px;}
+    .m-dd-nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:10px;}
+    .m-dd-nums div{border:1px solid var(--border);border-radius:12px;padding:9px 12px;} .m-dd-nums b{display:block;font-size:22px;font-weight:900;line-height:1.1;color:var(--ink);} .m-dd-nums .rojo b{color:var(--red);}
+    .m-dp-cab{display:flex;align-items:center;gap:10px;} .m-dp-ini{width:40px;height:40px;border-radius:50%;background:var(--brand-2);color:#06123f;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .m-dp-tx{min-width:0;flex:1;} .m-dp-tx b{display:block;font-size:16.5px;font-weight:800;} .m-dp-tx small,.m-dp-monto small{font-size:11px;color:var(--muted);font-weight:700;}
+    .m-dp-monto{text-align:right;} .m-dp-monto b{display:block;font-size:20px;font-weight:900;color:var(--brand-ink);}
+    .m-dp-lista summary{cursor:pointer;list-style:none;font-size:13px;font-weight:800;color:var(--brand-ink);padding:10px 0 2px;} .m-dp-lista summary::-webkit-details-marker{display:none;}
+    .m-dp-lista summary::after{content:" ▾";} .m-dp-lista[open] summary::after{content:" ▴";}
     .m-daily-pend{margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--surface-2);font-size:12.5px;color:var(--ink-soft);}
     .m-link{background:none;border:0;padding:0;color:var(--brand-ink);font-weight:800;cursor:pointer;font-size:12px;text-decoration:underline;}
     .m-cal-nav button:disabled{opacity:.35;cursor:default;}
-    .m-daily-dia{font-size:17px;font-weight:800;margin-bottom:2px;}
     .m-cal-ley i.g1{background:rgba(62,198,172,.22);} .m-cal-ley i.g3{background:rgba(62,198,172,.7);} .m-cal-ley i.g4{background:var(--brand-2);} .m-cal-ley span i{margin-right:2px;}
     .m-fams{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
     .m-fam{display:flex;align-items:center;gap:12px;width:100%;margin:0;text-align:left;font-family:inherit;color:var(--ink);cursor:pointer;}
@@ -13483,28 +13490,39 @@ function appDailyDatos(dia){
 }
 function appDailyFechaTxt(dia){ const d = new Date(dia + 'T00:00:00Z');
   return APP_DIAS_SEM[d.getUTCDay()].replace(/^./, function(c){ return c.toUpperCase(); }) + ' ' + d.getUTCDate() + ' de ' + POLAR_MESES[d.getUTCMonth()]; }
+// Inicio: solo el calendario; al tocar un día se abre el detalle en otra pantalla con "‹" para volver
+// (07.10.2026, Piero: "esperaba que abra una nueva pestaña y que se pueda retroceder").
 function appDailyHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
-  const dia = APP_DAILY.dia || appDailyUltimo(), D = appDailyDatos(dia), l = D.lista;
+  const dia = APP_DAILY.dia || appDailyUltimo();
   if(APP_DAILY.anio == null){ APP_DAILY.anio = +dia.slice(0, 4); APP_DAILY.mes = +dia.slice(5, 7) - 1; }
-  const tot = function(k){ return appDailyTot(l, k); };
-  const montoTot = l.reduce(function(a, x){ return a + x.monto; }, 0);
-  const tile = function(t, v, cls){ return `<div><span>${t}</span><b class="${cls || ''}">${v}</b></div>`; };
-  const cab = appDailyCalHtml(dia) + `<div class="m-cal-det"><div class="m-daily-dia">📅 ${appDailyFechaTxt(dia)}</div>
-    <div class="m-cal-sub" style="text-align:left">Lo que hizo cada comprador ese día, según los datos de Nisira${dia === appDailyUltimo() ? ' · último día con datos' : ''}</div>
-    <div class="m-tiles">${tile('📝 Pedidos directos', appN(tot('ped')))}${tile('🧾 OC emitidas', appN(tot('oc')))}${tile('💰 Monto emitido', appUSD(montoTot))}${tile('✅ Pedidos cerrados', appN(tot('cer')))}${tile('📥 OC recibidas', appN(tot('rec')))}${tile('⏳ Pedidos sin OC al cierre', appN(appDailyTot(D.todos, 'pend')), appDailyTot(D.todos, 'pend') ? 'rojo' : '')}</div>
-    <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
-  if(!l.length) return '<div class="ini-card m-cal">' + cab + '<div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
+  return '<div class="ini-card m-cal">' + appDailyCalHtml(dia) + '</div>';
+}
+function appDailyAbrir(dia){ APP_DAILY.dia = dia; appRefrescarCal(); appListaAbrir('🗓️ Daily call in', appDailyFechaTxt(dia), appDailyDetHtml(dia)); }
+// Detalle del día: lo importante en grande y las listas (OC / pedidos) plegadas para que no se pierdan los números.
+function appDailyDetHtml(dia){
+  const D = appDailyDatos(dia), l = D.lista, tot = function(k){ return appDailyTot(l, k); };
+  const montoTot = l.reduce(function(a, x){ return a + x.monto; }, 0), pendEq = appDailyTot(D.todos, 'pend');
+  const num = function(v, t, cls){ return `<div class="${cls || ''}"><b>${v}</b><span>${t}</span></div>`; };
+  const hero = `<div class="oc-hero m-dd">
+      <div class="m-dd-big">${num(appN(tot('oc')), 'OC emitidas')}${num(appUSD(montoTot), 'monto emitido')}</div>
+      <div class="m-dd-nums">${num(appN(tot('cer')), '✅ pedidos cerrados')}${num(appN(tot('ped')), '📝 pedidos directos')}${num(appN(tot('rec')), '📥 OC recibidas')}${num(appN(pendEq), '⏳ pedidos sin OC al cierre', pendEq ? 'rojo' : '')}</div>
+      <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
+  if(!l.length) return hero + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
   const tarjeta = function(x){
-    const oc = [...x.oc.entries()];
-    return `<div class="m-cal-det m-daily"><div class="m-daily-nom">👤 ${escapeHtml(PD_PERSONAS[x.cod])} <small>${escapeHtml(x.cod)}</small></div>
-      <div class="m-tiles">${x.oc.size ? tile('🧾 OC emitidas', appN(x.oc.size)) : ''}${x.monto ? tile('💰 Monto', appUSD(x.monto)) : ''}${x.cer.size ? tile('✅ Pedidos cerrados', appN(x.cer.size)) : ''}${x.ped.size ? tile('📝 Pedidos directos', appN(x.ped.size)) : ''}${x.apr.size ? tile('👍 OC aprobadas', appN(x.apr.size)) : ''}${x.rec.size ? tile('📥 OC recibidas', appN(x.rec.size)) : ''}</div>
-      ${oc.length ? `<div class="m-det-t">🧾 OC emitidas</div>${oc.slice(0, 8).map(function(e){ const m = D.montoOC.get(e[0]);
-        return `<div class="m-det-f"><button type="button" class="mono m-link" data-oc="${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^000\d-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1].prov, 30))}${e[1].imp ? ' · 🌎' : ''}<b>${m ? appUSD(m) : ''}</b></div>`; }).join('')}${oc.length > 8 ? `<div class="m-det-f">… y ${oc.length - 8} OC más</div>` : ''}` : ''}
-      ${x.ped.size ? `<div class="m-det-t">📝 Pedidos directos (sin requerimiento)</div>${[...x.ped.entries()].slice(0, 6).map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^0001-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1], 40))}</div>`; }).join('')}${x.ped.size > 6 ? `<div class="m-det-f">… y ${x.ped.size - 6} más</div>` : ''}` : ''}
+    const nom = PD_PERSONAS[x.cod], ini = nom.split(' ').map(function(w){ return w.charAt(0); }).slice(0, 2).join('');
+    const oc = [...x.oc.entries()], ped = [...x.ped.entries()];
+    const nums = [[x.oc.size, 'OC emitidas'], [x.cer.size, 'pedidos cerrados'], [x.ped.size, 'pedidos directos'], [x.apr.size, 'OC aprobadas'], [x.rec.size, 'OC recibidas']]
+      .filter(function(n){ return n[0]; }).map(function(n){ return num(appN(n[0]), n[1]); }).join('');
+    const listas = (oc.length ? `<div class="m-det-t">🧾 OC emitidas</div>${oc.map(function(e){ const m = D.montoOC.get(e[0]);
+        return `<div class="m-det-f"><button type="button" class="mono m-link" data-oc="${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^000\d-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1].prov, 30))}${e[1].imp ? ' · 🌎' : ''}<b>${m ? appUSD(m) : ''}</b></div>`; }).join('')}` : '')
+      + (ped.length ? `<div class="m-det-t">📝 Pedidos directos (sin requerimiento)</div>${ped.map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^0001-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1], 40))}</div>`; }).join('')}` : '');
+    return `<div class="ini-card m-dp"><div class="m-dp-cab"><span class="m-dp-ini">${escapeHtml(ini)}</span><div class="m-dp-tx"><b>${escapeHtml(nom)}</b><small>${escapeHtml(x.cod)}</small></div>${x.monto ? `<div class="m-dp-monto"><b>${appUSD(x.monto)}</b><small>emitido</small></div>` : ''}</div>
+      <div class="m-dd-nums">${nums}</div>
+      ${listas ? `<details class="m-dp-lista"><summary>Ver ${oc.length ? oc.length + ' OC' : ''}${oc.length && ped.length ? ' y ' : ''}${ped.length ? ped.length + ' pedido' + (ped.length === 1 ? '' : 's') : ''}</summary>${listas}</details>` : ''}
       ${x.pend.size || x.venc.size ? `<div class="m-daily-pend">⏳ Al cierre del día: ${x.pend.size ? `<b>${appN(x.pend.size)}</b> pedido${x.pend.size === 1 ? '' : 's'} sin OC` : ''}${x.pend.size && x.venc.size ? ' · ' : ''}${x.venc.size ? `<b class="rojo">${appN(x.venc.size)}</b> OC nacional${x.venc.size === 1 ? '' : 'es'} vencida${x.venc.size === 1 ? '' : 's'}` : ''}</div>` : ''}
     </div>`; };
-  return '<div class="ini-card m-cal">' + cab + l.map(tarjeta).join('') + '</div>';
+  return hero + l.map(tarjeta).join('');
 }
 function appDailyCopiar(b){
   const dia = APP_DAILY.dia || appDailyUltimo(), l = appDailyDatos(dia).lista;
@@ -14097,6 +14115,7 @@ function appPanelMostrar(html){
     if(b.dataset.ocleo){ appOCCerrar(); return polarAbrir('OC ' + b.dataset.ocleo); }
     if(b.dataset.ocprov){ appOCCerrar(); return polarAbrir('correo de ' + b.dataset.ocprov); }
     if(b.dataset.ocpdf) return appPanelPdf();
+    if(b.dataset.dailycopia !== undefined) return appDailyCopiar(b);
   }); }
 }
 function appOCCerrar(){
@@ -14758,7 +14777,7 @@ function appClickInicio(e){
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
-  if(b.dataset.dailyfecha){ APP_DAILY.dia = b.dataset.dailyfecha; return appRefrescarCal(); }
+  if(b.dataset.dailyfecha) return appDailyAbrir(b.dataset.dailyfecha);
   if(b.dataset.dailymes){ appDailyMes(+b.dataset.dailymes); return appRefrescarCal(); }
   if(b.dataset.dailycopia !== undefined) return appDailyCopiar(b);
   if(b.dataset.req) return appAbrirReq(b.dataset.req);
