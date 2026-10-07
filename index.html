@@ -1180,7 +1180,7 @@
     body.vista-frioteam .asis-fab, body.vista-frioteam #asis, body.vista-frioteam .ini-pregunta{display:none!important;}
     .pry-nom{display:block;font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px;} .rqm-cab .pry-nom{color:inherit;opacity:.85;}
     .sku-estado{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-top:12px;} .sku-estado b{font-size:24px;font-weight:900;} .sku-estado span{font-size:13.5px;font-weight:700;color:var(--muted);} .sku-estado .rojo{color:#d03b3b;} .sku-estado .ambar{color:#b07a00;}
-    .sku-pry-nom{font-size:19px;font-weight:900;line-height:1.2;} .sku-presu{margin-top:12px;border-radius:14px;padding:12px 14px;background:color-mix(in srgb, #1baf7a 8%, var(--card));border:1px solid color-mix(in srgb, #1baf7a 30%, var(--border));}
+    .sku-pry-nom{font-size:19px;font-weight:900;line-height:1.2;} .sku-pry-id{display:inline-block;font-size:14px;font-weight:800;background:var(--bg, #eef2f7);border:1px solid var(--border);border-radius:8px;padding:2px 8px;vertical-align:middle;margin-left:4px;} .sku-presu{margin-top:12px;border-radius:14px;padding:12px 14px;background:color-mix(in srgb, #1baf7a 8%, var(--card));border:1px solid color-mix(in srgb, #1baf7a 30%, var(--border));}
     .sku-presu.ambar{background:color-mix(in srgb, #eda100 9%, var(--card));border-color:color-mix(in srgb, #eda100 35%, var(--border));} .sku-presu.rojo{background:color-mix(in srgb, #d03b3b 8%, var(--card));border-color:color-mix(in srgb, #d03b3b 35%, var(--border));}
     .sku-presu-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;} .sku-presu-top span{font-size:13px;font-weight:800;} .sku-presu-top b{font-size:24px;font-weight:900;}
     .sku-presu-part{font-size:12.5px;color:var(--ink-soft);margin-top:2px;} .sku-presu-uso{font-size:13px;margin-top:6px;} .sku-presu-uso .rojo{color:#d03b3b;} .sku-presu-pry{font-size:12.5px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);}
@@ -14837,9 +14837,9 @@ function appSkuAbrir(cod, ped, req){
   const cuerpo = `<div class="oc-hero"><div class="oc-num"><b>${e(fila.producto || cod)}</b></div>
       <small><span class="mono">${e(cod)}</span> · ${e(fila.familia || 'Sin familia')}</small>
       <div class="sku-estado"><b>${fila.cantPedido != null ? n(fila.cantPedido) + ' ' + um : '—'}</b><span class="${dh >= 5 ? 'rojo' : dh >= 3 ? 'ambar' : ''}">${fila.fPedido ? '⏳ esperando OC desde ' + appDDMM(fila.fPedido) + ' · ' + dh + ' d.h.' : ''}</span></div></div>
-    ${pryId || pry ? `<div class="ini-card sku-pry"><div class="ini-card-tit">🏗️ Proyecto</div>
-      <div class="sku-pry-nom">${e(pryNom || pry || '—')}</div>
-      <small class="sku-nota">${[pryId ? '<span class="mono">' + e(pryId) + '</span>' : '', pryNom && pry ? e(pry) : '', pInfo.e ? 'Estado ' + e(pInfo.e) : '', e(pInfo.dep || '')].filter(Boolean).join(' · ')}</small>
+    ${pryId || pry ? `<div class="ini-card sku-pry"><div class="ini-card-tit">🏢 Cliente y proyecto</div>
+      <div class="sku-pry-nom">${e(pry || pryNom || '—')}${pryId ? ' <span class="mono sku-pry-id">' + e(pryId) + '</span>' : ''}</div>
+      <small class="sku-nota">${[pryNom ? '🏗️ ' + e(pryNom) : '', pInfo.e ? 'Estado ' + e(pInfo.e) : '', e(pInfo.dep || '')].filter(Boolean).join(' · ')}</small>
       ${fila.tareaPry || pcPart > 0 ? `<div class="sku-presu ${appPresuCls(pctPart)}">
         <div class="sku-presu-top"><span>💼 Presupuesto costo de la partida</span><b>${pcPart > 0 ? fmtUSD(pcPart) : 'Sin presupuesto'}</b></div>
         ${fila.tareaPry ? `<div class="sku-presu-part">${e(fila.tareaPry)}${fila.estructura ? ' · <span class="mono">' + e(fila.estructura) + '</span>' : ''}</div>` : ''}
