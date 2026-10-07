@@ -1139,6 +1139,11 @@
     .m-bar i{grid-area:i;display:block;height:8px;border-radius:8px;background:var(--surface-2);overflow:hidden;} .m-bar em{display:block;height:100%;border-radius:8px;background:var(--brand-2);}
     .m-bar small{grid-area:s;font-size:11px;color:var(--muted);}
     .m-volver{background:none;border:0;color:var(--brand-ink);font-weight:800;font-size:13.5px;padding:0 2px 10px;cursor:pointer;font-family:inherit;}
+    .m-daily-nom{font-size:16px;font-weight:800;} .m-daily-nom small{font-size:11px;color:var(--muted);font-weight:700;margin-left:4px;}
+    .m-daily .m-tiles{grid-template-columns:repeat(auto-fit,minmax(110px,1fr));}
+    .m-daily-pend{margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--surface-2);font-size:12.5px;color:var(--ink-soft);}
+    .m-link{background:none;border:0;padding:0;color:var(--brand-ink);font-weight:800;cursor:pointer;font-size:12px;text-decoration:underline;}
+    .m-cal-nav button:disabled{opacity:.35;cursor:default;}
     .m-fams{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
     .m-fam{display:flex;align-items:center;gap:12px;width:100%;margin:0;text-align:left;font-family:inherit;color:var(--ink);cursor:pointer;}
     .m-fam-ic{font-size:26px;line-height:1;flex-shrink:0;} .m-fam-tx{display:flex;flex-direction:column;gap:3px;min-width:0;}
@@ -12789,7 +12794,7 @@ const APP_VISTAS = {
   gerencia:   { nombre:'Gerencia',   ico:'📊', desc:'Indicadores de logística y concentración de gasto.',
     // "Vista" se cambió por el avance de atención de los requerimientos por proyecto (29.09.2026, Piero).
     // La vista se sigue cambiando desde el botón de arriba.
-    tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Tiempos'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
+    tabs:[['inicio','🏠','Inicio'], ['daily','🗓️','Daily'], ['indicadores','⏱️','Tiempos'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
   supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
     // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
     // Solo Inicio y Mis req. (29.09.2026, Piero: "para el supervisor solo coloca inicio y mis req"). La vista
@@ -12803,7 +12808,7 @@ const APP_VISTAS = {
     tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones']] },
 };
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
-const APP_PANTALLAS = { otif:'OTIF', indicadores:'Tiempos', gasto:'Concentración de gasto', inventario:'Inventario',
+const APP_PANTALLAS = { otif:'OTIF', daily:'Daily call', indicadores:'Tiempos', gasto:'Concentración de gasto', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
@@ -13275,10 +13280,10 @@ function appSaludo(){
 // HTML de cada pantalla guardado por su estado (período, filtros, búsqueda): volver a una pestaña es
 // instantáneo. Se vacía solo cuando cambian los datos (appMemo).
 const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
-  pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
+  pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); }, daily:function(){ return appDailyHtml(); } };
 function appPantallaEstado(p){
   const e = { gasto:[APP_G, APP_CAL, APP_F.gasto], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
-    indicadores:[APP_F.indicadores], otif:[APP_F.otif] }[p];
+    indicadores:[APP_F.indicadores], otif:[APP_F.otif], daily:[APP_DAILY.dia] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0);
 }
 function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_PANT_FN[p]); }
@@ -13321,7 +13326,7 @@ function appRenderInicio(){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     if(APP.pantalla === 'inventario') setTimeout(appInvCompletar, 0);
     return;
-  } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'otif'){
+  } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'otif' || APP.pantalla === 'daily'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
@@ -13383,6 +13388,104 @@ function appOtifDatos(st){ rqPreparar(); return appMemo('otif|' + JSON.stringify
   return { l:l, enPlazo:enPlazo };
 }); }
 function appOtifPct(l){ return l.length ? l.filter(function(x){ return !x.tipo; }).length / l.length * 100 : null; }
+// ---------- Daily call (07.10.2026, Piero: "un módulo en gerencial para el daily call in… deben aparecer
+// en automático las cosas que cada uno hizo en el día, cada comprador, y así debe registrarse para cada
+// día, en base a la data: lo que generaron, pedidos cerrados, OC realizadas") ----------
+// No se guarda nada aparte: cada fecha ya está en los datos (fecha del pedido, de la OC, de la aprobación y
+// de la recepción), así que cualquier día pasado se vuelve a armar igual. Pedidos: quien lo generó
+// (ResponsablePedido). OC, aprobaciones, recepciones y vencidas: el comprador de la OC (UsuarioCompras).
+const APP_DAILY = { dia:'' };
+const APP_DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+function appDailyFilas(){
+  return getReqRows().concat(PEDIDO_SIN_REQ_ROWS || [], (PEDIDO_SIN_REQ_PEND || []).map(function(r){ return Object.assign({ esPedidoDirecto:true }, r); }));
+}
+function appDailyUltimo(){
+  return appMemo('dailyUlt', function(){
+    const corte = (DATA && DATA.corte) ? isoDay(DATA.corte) : isoDay(new Date());
+    let u = '';
+    appDailyFilas().forEach(function(r){ [r.fPedido, r.fOrden].forEach(function(d){ const k = isoDay(d); if(k && k <= corte && k > u) u = k; }); });
+    return u || corte;
+  });
+}
+function appDailyMover(n){
+  const d = new Date((APP_DAILY.dia || appDailyUltimo()) + 'T00:00:00Z');
+  do { d.setUTCDate(d.getUTCDate() + n); } while(d.getUTCDay() === 0);          // sin domingos
+  const k = isoDay(d), u = appDailyUltimo();
+  return k > u ? u : k;
+}
+function appDailyDatos(dia){
+  return appMemo('daily:' + dia, function(){
+    const P = new Map(), per = function(v){ const c = pdPersona(v); if(!PD_PERSONAS[c]) return null;
+      if(!P.has(c)) P.set(c, { cod:c, ped:new Map(), oc:new Map(), apr:new Set(), rec:new Set(), cer:new Set(), pend:new Set(), venc:new Set() }); return P.get(c); };
+    const ini = new Date(dia + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() - 120); const desde = isoDay(ini);
+    const filas = appDailyFilas(), porPed = new Map(), porOC = new Map();
+    filas.forEach(function(r){
+      const fp = isoDay(r.fPedido), fo = isoDay(r.fOrden), fb = isoDay(r.fAprob), fc = isoDay(r.fRecep), fx = isoDay(r.fCompromiso);
+      if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '' }); porPed.set(r.codPedido, g); }
+      if(fp === dia && r.codPedido){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.esPedidoDirecto ? 'pedido directo' : (r.codRequerimiento ? 'req ' + r.codRequerimiento.replace(/^0001-0*/, '') : '')); }
+      if(!r.codOrden || !r.usuarioCompras) return;
+      const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden);
+      const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fb:fb, fx:fx, imp:imp, rec:[], anul:/anul/i.test(r.estadoOrden || '') };
+      o.rec.push(fc); porOC.set(r.codOrden, o);
+    });
+    porOC.forEach(function(o, co){
+      const x = per(o.uc); if(!x || o.anul) return;
+      if(o.fo === dia) x.oc.set(co, o);
+      if(o.fb === dia) x.apr.add(co);
+      if(o.rec.indexOf(dia) !== -1) x.rec.add(co);
+      // Vencida al cierre del día: nacional, ya pasó su fecha pactada y alguna línea no había llegado.
+      if(!o.imp && o.fo && o.fo <= dia && o.fx && o.fx < dia && o.fo >= desde && o.rec.some(function(f){ return !f || f > dia; })) x.venc.add(co);
+    });
+    porPed.forEach(function(g, cp){
+      if(!g.fp || g.fp > dia || g.fp < desde) return;
+      const abiertas = g.l.filter(function(l){ return l.co ? (l.fo && l.fo > dia) : !/archiv|atendido/i.test(l.ep); });
+      if(abiertas.length){ const x = per(g.resp); if(x) x.pend.add(cp); return; }
+      // Cerrado ese día: la última línea pasó a OC ese día; se le anota al comprador de esa OC.
+      const ult = g.l.filter(function(l){ return l.fo; }).sort(function(a,b){ return a.fo < b.fo ? 1 : -1; })[0];
+      if(ult && ult.fo === dia){ const x = per(ult.uc); if(x) x.cer.add(cp); }
+    });
+    const montoOC = new Map(); ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.oc) montoOC.set(r.oc, (montoOC.get(r.oc) || 0) + (r.montoPEN || 0)); });
+    const lista = [...P.values()].map(function(x){ x.monto = [...x.oc.keys()].reduce(function(a, co){ return a + (montoOC.get(co) || 0); }, 0);
+      x.hizo = x.ped.size + x.oc.size + x.cer.size + x.apr.size + x.rec.size; return x; })
+      .filter(function(x){ return x.hizo || x.pend.size || x.venc.size; })
+      .sort(function(a,b){ return b.hizo - a.hizo || b.pend.size - a.pend.size; });
+    return { lista:lista, montoOC:montoOC };
+  });
+}
+function appDailyFechaTxt(dia){ const d = new Date(dia + 'T00:00:00Z');
+  return APP_DIAS_SEM[d.getUTCDay()].replace(/^./, function(c){ return c.toUpperCase(); }) + ' ' + d.getUTCDate() + ' de ' + POLAR_MESES[d.getUTCMonth()]; }
+function appDailyHtml(){
+  if(!gerAbierto) return APP_GER_LOCK;
+  const dia = APP_DAILY.dia || appDailyUltimo(), D = appDailyDatos(dia), l = D.lista;
+  const tot = function(k){ const u = new Set(); l.forEach(function(x){ x[k].forEach(function(v, key){ u.add(x[k] instanceof Map ? key : v); }); }); return u.size; };   // sin contar dos veces un pedido de dos personas
+  const montoTot = l.reduce(function(a, x){ return a + x.monto; }, 0);
+  const tile = function(t, v, cls){ return `<div><span>${t}</span><b class="${cls || ''}">${v}</b></div>`; };
+  const cab = `<div class="ini-card"><div class="m-cal-nav"><button type="button" data-dailydia="-1" aria-label="Día anterior">‹</button><b>${appDailyFechaTxt(dia)}</b><button type="button" data-dailydia="1" aria-label="Día siguiente" ${dia >= appDailyUltimo() ? 'disabled' : ''}>›</button></div>
+    <div class="m-cal-sub">Lo que hizo cada comprador ese día, según los datos de Nisira${dia === appDailyUltimo() ? ' · último día con datos' : ''}</div>
+    <div class="m-tiles">${tile('📝 Pedidos generados', appN(tot('ped')))}${tile('🧾 OC emitidas', appN(tot('oc')))}${tile('💰 Monto emitido', appUSD(montoTot))}${tile('✅ Pedidos cerrados', appN(tot('cer')))}${tile('📥 OC recibidas', appN(tot('rec')))}${tile('⏳ Pedidos sin OC al cierre', appN(tot('pend')), tot('pend') ? 'rojo' : '')}</div>
+    <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
+  if(!l.length) return cab + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
+  const tarjeta = function(x){
+    const oc = [...x.oc.entries()];
+    return `<div class="ini-card m-daily"><div class="m-daily-nom">👤 ${escapeHtml(PD_PERSONAS[x.cod])} <small>${escapeHtml(x.cod)}</small></div>
+      <div class="m-tiles">${tile('Pedidos generados', appN(x.ped.size))}${tile('OC emitidas', appN(x.oc.size))}${tile('Monto', x.monto ? appUSD(x.monto) : '—')}${tile('Pedidos cerrados', appN(x.cer.size))}${tile('OC aprobadas', appN(x.apr.size))}${tile('OC recibidas', appN(x.rec.size))}</div>
+      ${oc.length ? `<div class="m-det-t">🧾 OC emitidas</div>${oc.slice(0, 8).map(function(e){ const m = D.montoOC.get(e[0]);
+        return `<div class="m-det-f"><button type="button" class="mono m-link" data-oc="${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^000\d-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1].prov, 30))}${e[1].imp ? ' · 🌎' : ''}<b>${m ? appUSD(m) : ''}</b></div>`; }).join('')}${oc.length > 8 ? `<div class="m-det-f">… y ${oc.length - 8} OC más</div>` : ''}` : ''}
+      ${x.ped.size ? `<div class="m-det-t">📝 Pedidos generados</div>${[...x.ped.entries()].slice(0, 6).map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^0001-0*/, ''))}</button> ${escapeHtml(e[1])}</div>`; }).join('')}${x.ped.size > 6 ? `<div class="m-det-f">… y ${x.ped.size - 6} más</div>` : ''}` : ''}
+      ${x.pend.size || x.venc.size ? `<div class="m-daily-pend">⏳ Al cierre del día: ${x.pend.size ? `<b>${appN(x.pend.size)}</b> pedido${x.pend.size === 1 ? '' : 's'} sin OC` : ''}${x.pend.size && x.venc.size ? ' · ' : ''}${x.venc.size ? `<b class="rojo">${appN(x.venc.size)}</b> OC nacional${x.venc.size === 1 ? '' : 'es'} vencida${x.venc.size === 1 ? '' : 's'}` : ''}</div>` : ''}
+    </div>`; };
+  return cab + l.map(tarjeta).join('');
+}
+function appDailyCopiar(b){
+  const dia = APP_DAILY.dia || appDailyUltimo(), l = appDailyDatos(dia).lista;
+  const txt = ['*Daily de Compras · ' + appDailyFechaTxt(dia) + '*'].concat(l.map(function(x){
+    return '• ' + PD_PERSONAS[x.cod] + ': ' + x.ped.size + ' pedidos generados, ' + x.oc.size + ' OC emitidas' + (x.monto ? ' (' + appUSD(x.monto) + ')' : '') + ', ' + x.cer.size + ' pedidos cerrados, ' + x.rec.size + ' OC recibidas'
+      + (x.pend.size || x.venc.size ? '. Pendiente: ' + x.pend.size + ' pedidos sin OC, ' + x.venc.size + ' OC vencidas' : '') + '.'; })).join('\n');
+  const ok = function(){ b.textContent = '✅ Copiado'; setTimeout(function(){ b.textContent = '📋 Copiar resumen para el chat'; }, 1800); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function(){ window.prompt('Copia el resumen:', txt); });
+  else window.prompt('Copia el resumen:', txt);
+}
+
 function appOtifHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
   const D = appOtifDatos(APP_F.otif), l = D.l, n = l.length, pct = appOtifPct(l);
@@ -14697,6 +14800,8 @@ function appClickInicio(e){
   if(b.dataset.caldet) return appCalDetalle(b.dataset.caldet);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
+  if(b.dataset.dailydia){ APP_DAILY.dia = appDailyMover(+b.dataset.dailydia); return appRenderInicio(); }
+  if(b.dataset.dailycopia !== undefined) return appDailyCopiar(b);
   if(b.dataset.req) return appAbrirReq(b.dataset.req);
   if(b.dataset.pry) return appAbrirProyecto(b.dataset.pry);
   if(b.dataset.gper !== undefined){ APP_G.per = b.dataset.gper; return appRenderInicio(); }
