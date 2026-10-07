@@ -14785,7 +14785,7 @@ function appEntregadas(){ return appMemo('entregadas', function(){
   getReqRows().forEach(function(r){ add(r, r.cantOrden, r.cantRecep); });
   (PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ add(r, r.cantidadOrden, r.cantRecepcion); });
   const presu = appOCPresuMapa();
-  return [...M.values()].filter(function(o){ return !o.anul && (!o.pend || ocFinalizada(o.oc)) && (o.fr || ocFinalizada(o.oc)); }).map(function(o){
+  return [...M.values()].filter(function(o){ return o.anul || ((!o.pend || ocFinalizada(o.oc)) && (o.fr || ocFinalizada(o.oc))); }).map(function(o){
     o.persona = pdPersona(o.uc); o.fin = ocFinalizada(o.oc);
     o.f = o.fr || (o.fin && OC_FIN[o.oc].f ? fromIsoDay(String(OC_FIN[o.oc].f).slice(0, 10)) : null) || o.fo;
     o.atraso = o.fr && o.fx ? busdayCount(o.fx, o.fr) : null;
@@ -14822,6 +14822,7 @@ function appPendComprasHtml(soloLista){
   const EST = { venc:'Vencida', sem:'Esta semana', luego:'Más adelante' };
   // Entregadas: del año / mes elegido (por defecto el mes en curso); con el buscador, todas.
   const entAll = appEntregadas().filter(function(o){ return !APP_PC.persona || o.persona === APP_PC.persona; });
+  if(APP_PC.sec === 'ent') APP_PC.sec = 'venc';   // ya no es pestaña: las entregadas salen con el buscador (07.10.2026)
   const entY = +APP_PC.entAnio || c.getUTCFullYear(), entM = APP_PC.entMes === '0' ? 0 : (+APP_PC.entMes || (APP_PC.entAnio ? 0 : c.getUTCMonth() + 1));
   const entPer = entAll.filter(function(o){ return o.f && o.f.getUTCFullYear() === entY && (!entM || o.f.getUTCMonth() + 1 === entM); });
   const S = { venc:['🔴', 'Vencidas', 'vc', venc, 'Ya pasó la fecha de entrega · la más atrasada primero'], sem:['🟠', 'Esta semana', 'sm', sem, 'Entrega pactada hasta el domingo'],
@@ -14846,6 +14847,8 @@ function appPendComprasHtml(soloLista){
     const flag = o.fin && !o.fr ? '<em class="ok">✔ Finalizada</em>' : o.atraso == null ? '' : o.atraso > 0 ? '<em class="mal">' + o.atraso + ' d.h. tarde</em>' : '<em class="ok">A tiempo</em>';
     const pr = o.pr, prTxt = pr ? '💼 ' + fmtUSD(pr.usd) + ' en ' + pr.parts.size + ' partida' + (pr.parts.size === 1 ? '' : 's') + (pr.exc.size ? ' · ' + pr.exc.size + ' pasada' + (pr.exc.size === 1 ? '' : 's') : '') : '';
     const cl = [...o.clis], ids = [...o.ids];
+    if(o.anul) return appTarjetaHtml({ cls:'pd', n:i + 1, est:'Anulada', flag:'', fecha:o.fo ? 'Emitida ' + appDDMM(o.fo) : '', codLbl:'OC', cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']],
+      a:['Proveedor', polarCorta(appImpNombre(o.prov), 34)], b:['Cliente', [...o.clis].slice(0, 2).join(' · ') || '—'], pie:'📦 ' + o.n + ' ítem' + (o.n === 1 ? '' : 's'), quien:nom(o.persona) });
     return appTarjetaHtml({ cls:'en' + (pr && pr.exc.size ? ' en-exc' : ''), n:i + 1, est:o.fin && !o.fr ? 'Cerrada' : 'Entregada', flag:flag, fecha:(o.fr ? 'Llegó ' : 'Cerrada ') + appDDMM(o.f) + (o.f && o.f.getUTCFullYear() !== c.getUTCFullYear() ? '/' + String(o.f.getUTCFullYear()).slice(2) : ''), codLbl:'OC',
       cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', polarCorta(appImpNombre(o.prov), 34)],
       b:['Cliente', (cl.length ? polarCorta(cl.slice(0, 2).join(' · '), 34) + (cl.length > 2 ? ' +' + (cl.length - 2) : '') : 'Stock / sin proyecto') + (ids.length ? ' · ' + ids[0] + (ids.length > 1 ? ' +' + (ids.length - 1) : '') : '')],
@@ -14902,7 +14905,7 @@ function appPendComprasHtml(soloLista){
       const ws = q.split(' ').filter(Boolean), l = q ? entAll.filter(function(o){ return ws.every(function(w){ return o.txt.indexOf(w) !== -1 || polarCompacto(o.txt).indexOf(polarCompacto(w)) !== -1; }); }) : entPer;
       if(q && !l.length) return '';
       const tope = APP_PC.entTope, vis = l.slice(0, tope);
-      return `<div class="m-pl-tit"><span>✅ Entregadas${q ? ' (todas)' : ''}</span><b>${l.length}</b></div><div class="m-sec-nota">${S.ent[4]}</div>`
+      return `<div class="m-pl-tit"><span>✅ Entregadas, cerradas o anuladas</span><b>${l.length}</b></div><div class="m-sec-nota">Ya no están pendientes · la más reciente primero · toca una para ver su detalle y presupuesto</div>`
         + (q ? '' : entFiltros())
         + (!l.length ? '<div class="ini-vacio">No hay OC entregadas en este período.</div>' : '<div class="imp-linea">' + vis.map(cardEnt).join('') + '</div>')
         + (l.length > tope ? `<button type="button" class="ini-link" data-pcentmas="1">Ver ${Math.min(60, l.length - tope)} más · ${tope} de ${l.length} ›</button>` : '');
@@ -14920,8 +14923,10 @@ function appPendComprasHtml(soloLista){
   const lista = q ? (['venc', 'sem', 'luego', 'ped', 'ent'].map(bloque).join('') || `<div class="ini-vacio">No hay OC ni pedidos con "${escapeHtml(APP_PC.q)}".</div>`) : bloque(APP_PC.sec);
   if(soloLista) return lista;
   return appChips('pcper', APP_PC.persona, [['', 'Todos ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size]].concat([...personas.keys()].filter(Boolean).sort().map(function(p){ return [p, nom(p)]; })))
-    + `<div class="m-resumen cinco m-pl-tabs imp-tabs">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}${tile('ent')}</div>`
-    + `<div class="m-buscar"><input type="search" id="pcBusca" placeholder="🔍 OC, pedido, req., código, producto, proveedor o proyecto" value="${escapeHtml(APP_PC.q || '')}"></div>`
+    // Buscador general arriba (07.10.2026, Piero: "un buscador ahí general para todo, así se puede buscar
+    // cualquier OC"): pendientes y también las ya entregadas, cerradas o anuladas.
+    + `<div class="m-buscar pc-buscar-gen"><input type="search" id="pcBusca" placeholder="🔍 Buscar cualquier OC (pendiente o entregada), pedido, req., código, producto, proveedor o cliente" value="${escapeHtml(APP_PC.q || '')}"></div>`
+    + `<div class="m-resumen m-pl-tabs imp-tabs">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}</div>`
     + `<div id="pcLista">${lista}</div>`;
 }
 
