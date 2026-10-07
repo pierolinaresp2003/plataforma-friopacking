@@ -13479,18 +13479,22 @@ function appDailyDatos(dia){
       if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
       if(!r.codOrden || !r.usuarioCompras) return;
       const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden);
-      const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fx:fx, imp:imp, rec:[], sku:new Map(), anul:/anul/i.test(r.estadoOrden || '') };
+      const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fx:fx, fxD:r.fCompromiso, imp:imp, rec:[], sku:new Map(), anul:/anul/i.test(r.estadoOrden || '') };
       o.rec.push(fc); const k = r.codOrden + '|' + (r.idProducto || r.producto || '');
       if(!o.sku.has(k) && fp && fo && fo >= fp) o.sku.set(k, dias(fp, fo)); else if(!o.sku.has(k)) o.sku.set(k, null);
       porOC.set(r.codOrden, o);
     });
+    // OC vencidas con la MISMA regla de Pendientes de Compras (estado de Nisira + OC Finalizadas.xlsx + ETA de
+    // importaciones), 07.10.2026: antes salían 12 aquí y 3 en Pendientes.
+    const pendHoy = new Set(pdFilas().filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; })), diaD = new Date(dia + 'T00:00:00Z');
     porOC.forEach(function(o, co){
       const x = per(o.uc); if(!x || o.anul) return;
       // SKU hechos = líneas de las OC emitidas ese día; tiempo de emisión = días del pedido a la OC de cada línea.
       if(o.fo === dia){ x.oc.set(co, o); o.sku.forEach(function(d, k){ x.sku.add(k); if(d != null) x.dEmi.push(d); }); }
       const falta = o.rec.some(function(f){ return !f || f > dia; });
-      // Vencida al cierre del día: nacional, ya pasó su fecha pactada y alguna línea no había llegado.
-      if(!o.imp && o.fo && o.fo <= dia && o.fx && o.fx < dia && o.fo >= desde && falta) x.venc.add(co);
+      // Vencida al cierre del día: sigue pendiente hoy (o todavía le faltaba llegar algo ese día) y ya pasó su fecha.
+      if(o.fo && o.fo <= dia && !ocFinalizada(co) && !ocEnTransito(co) && (pendHoy.has(co) || o.rec.some(function(f){ return f && f > dia; }))){
+        const fv = ocFechaVale(co, o.fxD); if(fv && busdayCount(fv, diaD) > 0) x.venc.add(co); }
       // Agenda: OC que deben llegar el siguiente día hábil y todavía no llegan.
       if(o.fo && o.fo <= dia && o.fx === manana && falta) x.man.set(co, o);
     });
@@ -13560,7 +13564,7 @@ function appDailyPersonaHtml(dia, cod){
   const datos = (x.tEmi != null ? dato('⏱️', 'Tiempo de emisión (del pedido a la OC)', x.tEmi.toFixed(1) + ' días') : '')
     + dato('📅', 'OC que deben llegar el ' + fecha(D.manana), appN(man.length))
     + (x.viejo ? dato('🕰️', `Pedido más antiguo sin OC: <button type="button" class="mono m-link" data-q="pedido ${escapeHtml(x.viejo.cp)}">${escapeHtml(x.viejo.cp.replace(/^0001-0*/, ''))}</button> · falta ${escapeHtml(polarCorta(x.viejo.prod, 34))}${x.viejo.tot > 1 ? ` <small>(${x.viejo.n} de ${x.viejo.tot} ítems)</small>` : ''}`, x.viejo.d + ' días', x.viejo.d > 30 ? 'rojo' : '') : '')
-    + (x.venc.size ? dato('⚠️', 'OC nacionales vencidas al cierre del día', appN(x.venc.size), 'rojo') : '');
+    + (x.venc.size ? dato('⚠️', 'OC vencidas al cierre del día', appN(x.venc.size), 'rojo') : '');
   const plegable = function(t, html){ return html ? `<details class="m-dp-lista"><summary>${t}</summary>${html}</details>` : ''; };
   return `<div class="oc-hero m-dd"><div class="m-dp-cab">${appDailyAvatar(x, 'gr')}<div class="m-dp-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${['🥇', '🥈', '🥉'][i] || ('#' + (i + 1))} del día · ${x.pts} pts</small></div>${x.monto ? `<div class="m-dp-monto"><b>${appUSD(x.monto)}</b><small>emitido</small></div>` : ''}</div>
       <div class="m-dd-nums">${nums}</div></div>
