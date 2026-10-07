@@ -1171,6 +1171,17 @@
     .m-pp-ver{display:block;margin:4px 16px 12px auto;background:none;border:0;color:var(--brand-ink);font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit;padding:4px 0;} .m-pp-hizo .m-pp-ver{margin:8px 0 0 auto;}
     .m-pp-full table{width:100%;border-collapse:collapse;font-size:13px;} .m-pp-full td.pr{min-width:220px;} .m-pp-full th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:800;padding:6px 8px;border-bottom:2px solid var(--border);white-space:nowrap;}
     .m-pp-full td{padding:8px;border-top:1px solid var(--border);vertical-align:top;color:var(--ink);} .m-pp-full td.nw{white-space:nowrap;} .m-pp-full-cab{display:flex;align-items:center;gap:10px;font-size:15px;} .m-pp-full-cab span{margin-left:auto;font-weight:900;font-size:17px;color:var(--brand-ink);}
+    .m-tar{margin-top:16px;} .m-tar .m-pp-tit small{font-size:11.5px;color:var(--muted);font-weight:700;margin-left:6px;}
+    .m-tar-aviso{font-size:12.5px;color:var(--amber-ink);background:rgba(244,166,64,.12);border-radius:10px;padding:8px 10px;margin:6px 0;} .m-tar-vacio{font-size:12.5px;color:var(--muted);padding:6px 0;}
+    .m-tar-per{font-size:12px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin:12px 0 2px;}
+    .m-tar-f{display:grid;grid-template-columns:1fr;gap:8px;padding:10px 0;border-top:1px solid var(--border);} .m-tar-f.cerrada .m-tar-tx b{color:var(--muted);text-decoration:line-through;}
+    .m-tar-tx b{display:block;font-size:14px;font-weight:800;color:var(--ink);overflow-wrap:anywhere;} .m-tar-tx small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;}
+    .m-tar-est{display:flex;flex-wrap:wrap;gap:6px;} .m-tar-est button{border:1px solid var(--border);background:var(--card);color:var(--ink-soft);border-radius:16px;padding:5px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+    .m-tar-est button.on{background:var(--brand-ink);border-color:var(--brand-ink);color:#fff;}
+    .m-tar-com,.m-tar-nuevo{display:flex;gap:6px;} .m-tar-com input,.m-tar-nuevo input,.m-tar-nuevo select{flex:1;min-width:0;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;background:var(--card);color:var(--ink);}
+    .m-tar-nuevo select{flex:0 0 auto;max-width:170px;} .m-tar-nuevo{margin-top:12px;padding-top:12px;border-top:2px dashed var(--border);}
+    .m-tar-com button,.m-tar-nuevo button{border:0;border-radius:10px;padding:8px 12px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;background:var(--brand-ink);color:#fff;white-space:nowrap;} .m-tar-com .m-tar-x{background:var(--surface-2);color:var(--ink);}
+    .m-tar button:disabled{opacity:.5;cursor:default;}
     .m-pp-full-sub{display:block;color:var(--ink-soft);font-size:12px;margin:4px 0 8px;}
     @media (max-width:760px){ .m-pp-full thead{display:none;} .m-pp-full table,.m-pp-full tbody,.m-pp-full tr,.m-pp-full td{display:block;}
       .m-pp-full tr{border-top:1px solid var(--border);padding:8px 0;} .m-pp-full td{border:0;padding:2px 0;display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;overflow-wrap:anywhere;white-space:normal !important;} .m-pp-full td.pr{min-width:0;font-weight:700;} .m-pp-full td > .m-link{justify-self:start;}
@@ -13107,7 +13118,7 @@ const APP_PC_CSS = `
   body.app-pc .m-pp-hero{padding:26px 32px;} body.app-pc .m-pp-av{width:84px;height:84px;font-size:30px;} body.app-pc .m-pp-nom b{font-size:30px;} body.app-pc .m-pp-monto b{font-size:42px;}
   body.app-pc .m-pp-kpis{grid-template-columns:repeat(4,1fr);gap:14px;} body.app-pc .m-pp-kpi{padding:18px 20px;} body.app-pc .m-pp-kpi b{font-size:40px;}
   body.app-pc .m-pp-alertas{grid-template-columns:1.4fr 1fr 1fr;gap:14px;} body.app-pc .m-pp-al{padding:18px 20px;} body.app-pc .m-pp-al > b{font-size:40px;}
-  body.app-pc .m-pp-hizo{padding:18px 22px;}
+  body.app-pc .m-pp-hizo{padding:18px 22px;} body.app-pc .m-tar-f{grid-template-columns:minmax(0,1.3fr) auto minmax(0,1fr);align-items:center;}
 `;
 function appPcActivar(){
   if(!APP_EN_PC || document.getElementById('appPcCss')) return;
@@ -13559,7 +13570,7 @@ function appDailyHtml(){
   if(APP_DAILY.anio == null){ APP_DAILY.anio = +dia.slice(0, 4); APP_DAILY.mes = +dia.slice(5, 7) - 1; }
   return '<div class="ini-card m-cal">' + appDailyCalHtml(dia) + '</div>';
 }
-function appDailyAbrir(dia){ APP_DAILY.dia = dia; appRefrescarCal(); appListaAbrir('🗓️ Daily call in', appDailyFechaTxt(dia), appDailyDetHtml(dia)); document.getElementById('appOC').classList.add('ancho'); }
+function appDailyAbrir(dia){ APP_DAILY.dia = dia; appRefrescarCal(); appTareasCargar(); appListaAbrir('🗓️ Daily call in', appDailyFechaTxt(dia), appDailyDetHtml(dia)); document.getElementById('appOC').classList.add('ancho'); }
 function appDailyAvatar(x, cls){ const nom = PD_PERSONAS[x.cod], i = APP_DAILY_EQUIPO.indexOf(x.cod);
   return `<span class="m-dp-ini ${cls || ''}" style="background:${APP_DAILY_COLORES[i % APP_DAILY_COLORES.length]}">${escapeHtml(nom.split(' ').map(function(w){ return w.charAt(0); }).slice(0, 2).join(''))}</span>`; }
 // Día: resumen del equipo y el ranking; cada comprador se abre en su propia pantalla (‹ vuelve al día).
@@ -13571,14 +13582,14 @@ function appDailyDetHtml(dia){
       <div class="m-dd-big">${num(appN(tot('oc')), 'OC emitidas')}${num(appDailyMonto(montoTot) || '—', 'monto emitido')}</div>
       <div class="m-dd-nums">${num(appN(tot('sku')), '📦 SKU hechos')}${num(appN(tot('cer')), '✅ pedidos cerrados')}${num(appN(tot('ped')), '📝 pedidos directos')}</div>
       <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
-  if(!l.length) return hero + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
+  if(!l.length) return hero + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>' + appDailyTareasHtml(dia, '');
   const medalla = ['🥇', '🥈', '🥉'];
   const fila = function(x, i){ const det = [x.oc.size ? x.oc.size + ' OC' : '', x.sku.size ? x.sku.size + ' SKU' : '', x.cer.size ? x.cer.size + ' cerrados' : '', x.ped.size ? x.ped.size + ' directos' : ''].filter(Boolean).join(' · ');
     return `<button type="button" class="m-rk" data-dailyper="${escapeHtml(x.cod)}"><span class="m-rk-pos">${medalla[i] || (i + 1)}</span>${appDailyAvatar(x)}
       <span class="m-rk-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${det}${x.montoPEN ? ' · ' + appDailyMonto(x.monto) : ''}</small><i><em style="width:${Math.max(4, x.pts / max * 100).toFixed(0)}%;background:${APP_DAILY_COLORES[APP_DAILY_EQUIPO.indexOf(x.cod) % APP_DAILY_COLORES.length]}"></em></i></span>
       <span class="m-rk-pts"><b>${x.pts}</b><small>pts</small></span><span class="m-rk-ir">›</span></button>`; };
   return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día</div>${l.map(fila).join('')}
-    <div class="m-rk-nota">Puntos: 1 por SKU en OC, 2 por OC emitida, 1 por pedido cerrado y 1 por pedido directo. Toca a un comprador para ver su detalle.</div></div>`;
+    <div class="m-rk-nota">Puntos: 1 por SKU en OC, 2 por OC emitida, 1 por pedido cerrado y 1 por pedido directo. Toca a un comprador para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
 }
 // Pantalla del comprador (07.10.2026, Piero: "en la web está muy simple… usa todo el espacio, más grande y llamativo"):
 // franja con su color, 4 indicadores grandes, 3 alertas para el daily y las listas abiertas lado a lado en la PC.
@@ -13617,7 +13628,8 @@ function appDailyPersonaHtml(dia, cod){
         man.map(function(e){ const m = D.montoOC.get(e[0]); return `<div class="m-pp-tr">${nOC(e[0])}<span class="m-pp-prov">${escapeHtml(e[1].prov)}${e[1].imp ? ' 🌎' : ''}</span><b>${appDailyMonto(m)}</b></div>`; }).join(''), 'man')}
       ${col3('⚠️', '#e5484d', venc.length, 'OC vencidas al cierre', venc.length ? 'la más atrasada: ' + venc[0][1].d + ' d.h.' : 'ninguna vencida 👏',
         venc.map(function(e){ return `<div class="m-pp-tr">${nOC(e[0])}<span class="m-pp-prov">${escapeHtml(e[1].o.prov)}${e[1].o.imp ? ' 🌎' : ''}</span><b class="rojo">${e[1].d} d.h.</b></div>`; }).join(''), 'venc')}
-    </div>`;
+    </div>
+    ${appDailyTareasHtml(dia, x.cod)}`;
 }
 // Detalle completo de una tarjeta del comprador, sin cortar textos (07.10.2026, Piero: "las letras se cortan").
 function appDailyVerHtml(dia, cod, tipo){
@@ -13645,10 +13657,90 @@ function appDailyCopiar(b){
   const dia = APP_DAILY.dia || appDailyUltimo(), l = appDailyDatos(dia).lista;
   const txt = ['*Daily de Compras · ' + appDailyFechaTxt(dia) + '*'].concat(l.map(function(x, i){
     return (i + 1) + '. ' + PD_PERSONAS[x.cod] + ' (' + x.pts + ' pts): ' + x.oc.size + ' OC emitidas' + (x.montoPEN ? ' (' + appDailyMonto(x.monto) + ')' : '') + ', ' + x.sku.size + ' SKU hechos, ' + x.cer.size + ' pedidos cerrados, ' + x.ped.size + ' pedidos directos'
-      + (x.venc.size ? '. ' + x.venc.size + ' OC vencidas al cierre' : '') + '.'; })).join('\n');
+      + (x.venc.size ? '. ' + x.venc.size + ' OC vencidas al cierre' : '') + '.'; }))
+    .concat(appTareasDelDia(dia, '').length ? ['', '*Tareas*'].concat(appTareasDelDia(dia, '').map(function(t){ return '• ' + (PD_PERSONAS[t.cod] || t.cod).split(' ')[0] + ': ' + t.tarea + ' — ' + t.estado + (t.com ? ' (' + t.com + ')' : ''); })) : []).join('\n');
   const ok = function(){ b.textContent = '✅ Copiado'; setTimeout(function(){ b.textContent = '📋 Copiar resumen para el chat'; }, 1800); };
   if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function(){ window.prompt('Copia el resumen:', txt); });
   else window.prompt('Copia el resumen:', txt);
+}
+
+// ---------- Daily call in: tareas manuales (07.10.2026, Piero) ----------
+// Se anotan en el daily y se guardan solas en la hoja de Leo (pestaña "Daily tareas", Apps Script
+// polar-aprende.gs v5). Cualquiera del equipo puede agregar o actualizar; queda quién lo hizo. Lo que no
+// se cerró (Pendiente / En proceso) sigue apareciendo los días siguientes hasta que se marque.
+const APP_TAREAS = { lista:[], cargado:false, cargando:false, error:'', t:0, n:0 };
+const TAREA_ESTADOS = [['Pendiente', '🟡'], ['En proceso', '🔵'], ['Cumplida', '✅'], ['No cumplida', '❌']];
+try{ const c = JSON.parse(localStorage.getItem('fp-daily-tareas') || 'null'); if(c && c.lista) APP_TAREAS.lista = c.lista; }catch(err){}
+function tareaAbierta(t){ return t.estado === 'Pendiente' || t.estado === 'En proceso'; }
+function tareaYo(){ return [(APP.usuario && APP.usuario.correo) || '', polarMiNombre() || ''].filter(Boolean).join(' · '); }
+function appTareasCargar(forzar){
+  if(!POLAR_APRENDE_URL || APP_TAREAS.cargando || (!forzar && Date.now() - APP_TAREAS.t < 60000)) return;
+  APP_TAREAS.cargando = true;
+  fetch(POLAR_APRENDE_URL + '?accion=tareas&_=' + Date.now()).then(function(r){ return r.json(); }).then(function(d){
+    if(!d || !d.ok || !Array.isArray(d.tareas)) throw new Error('sin tareas');
+    const temp = APP_TAREAS.lista.filter(function(t){ return t.guardando; });
+    APP_TAREAS.lista = d.tareas.concat(temp); APP_TAREAS.cargado = true; APP_TAREAS.error = ''; APP_TAREAS.t = Date.now();
+    try{ localStorage.setItem('fp-daily-tareas', JSON.stringify({ lista:d.tareas })); }catch(err){}
+  }).catch(function(){ APP_TAREAS.error = 'No pude leer la hoja de tareas. Si es la primera vez, falta actualizar el Apps Script (polar-aprende.gs v5).'; })
+    .then(function(){ APP_TAREAS.cargando = false; appTareasPintar(); });
+}
+function appTareasEnviar(d){
+  return fetch(POLAR_APRENDE_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body:JSON.stringify(Object.assign({ tipo:'tarea', usuario:tareaYo() }, d)) }).then(function(r){ return r.json(); });
+}
+function appTareasPintar(){
+  document.querySelectorAll('#appOC [data-tareas]').forEach(function(c){
+    const nueva = c.querySelector('[data-tarnueva]'), txt = nueva ? nueva.value : '', sel = c.querySelector('[data-tarper]'), per = sel ? sel.value : '';
+    c.outerHTML = appDailyTareasHtml(c.dataset.dia, c.dataset.cod);
+    const n = document.querySelector(`#appOC [data-tareas][data-dia="${c.dataset.dia}"][data-cod="${c.dataset.cod}"]`);
+    if(n){ const i = n.querySelector('[data-tarnueva]'); if(i) i.value = txt; const s2 = n.querySelector('[data-tarper]'); if(s2 && per) s2.value = per; }
+  });
+}
+// Tareas que van ese día: las anotadas ese día + las de días anteriores que ese día seguían abiertas
+// (siguen abiertas hoy, o se cerraron ese día o después).
+function appTareasDelDia(dia, cod){
+  return APP_TAREAS.lista.filter(function(t){ return (!cod || t.cod === cod) && (t.dia === dia || (t.dia < dia && (tareaAbierta(t) || String(t.act || '').slice(0, 10) >= dia))); })
+    .sort(function(a, b){ return (tareaAbierta(b) ? 1 : 0) - (tareaAbierta(a) ? 1 : 0) || (a.dia < b.dia ? -1 : a.dia > b.dia ? 1 : 0); });
+}
+function appDailyTareasHtml(dia, cod){
+  const e = escapeHtml, l = appTareasDelDia(dia, cod), corto = function(k){ return k.slice(8, 10) + '/' + k.slice(5, 7); };
+  const fila = function(t){ const tmp = !!t.guardando;
+    return `<div class="m-tar-f${tareaAbierta(t) ? '' : ' cerrada'}"><div class="m-tar-tx"><b>${e(t.tarea)}</b>
+        <small>${t.dia < dia ? '⏪ desde ' + corto(t.dia) : 'anotada ese día'}${t.por ? ' · por ' + e(t.por.split(' · ').pop()) : ''}${tmp ? ' · guardando…' : ''}</small></div>
+      <div class="m-tar-est">${TAREA_ESTADOS.map(function(x){ return `<button type="button" data-tarest="${e(t.id)}" data-v="${x[0]}" class="${t.estado === x[0] ? 'on' : ''}"${tmp ? ' disabled' : ''}>${x[1]} ${x[0]}</button>`; }).join('')}</div>
+      <div class="m-tar-com"><input type="text" data-tarcomin="${e(t.id)}" value="${e(t.com || '')}" placeholder="¿Cómo quedó? (comentario)"${tmp ? ' disabled' : ''}><button type="button" data-tarcom="${e(t.id)}"${tmp ? ' disabled' : ''}>Guardar</button><button type="button" class="m-tar-x" data-tarborrar="${e(t.id)}" aria-label="Eliminar"${tmp ? ' disabled' : ''}>🗑️</button></div></div>`; };
+  const grupos = cod ? [[cod, l]] : APP_DAILY_EQUIPO.map(function(c){ return [c, l.filter(function(t){ return t.cod === c; })]; }).filter(function(g){ return g[1].length; });
+  const abiertas = l.filter(tareaAbierta).length;
+  return `<div class="ini-card m-tar" data-tareas="1" data-dia="${dia}" data-cod="${cod || ''}">
+    <div class="m-pp-tit">🗒️ Tareas del daily <small>${l.length ? abiertas + ' abierta' + (abiertas === 1 ? '' : 's') + ' · ' + (l.length - abiertas) + ' cerrada' + (l.length - abiertas === 1 ? '' : 's') + ' · ' : ''}se guardan en Drive</small></div>
+    ${APP_TAREAS.error ? `<div class="m-tar-aviso">⚠️ ${e(APP_TAREAS.error)}</div>` : (!APP_TAREAS.cargado && APP_TAREAS.cargando ? '<div class="m-tar-aviso">Cargando tareas…</div>' : '')}
+    ${grupos.map(function(g){ return (cod ? '' : `<div class="m-tar-per">${e(PD_PERSONAS[g[0]] || g[0])}</div>`) + g[1].map(fila).join(''); }).join('') || '<div class="m-tar-vacio">Sin tareas anotadas para este día.</div>'}
+    <div class="m-tar-nuevo">${cod ? '' : `<select data-tarper>${APP_DAILY_EQUIPO.map(function(c){ return `<option value="${c}">${e(PD_PERSONAS[c])}</option>`; }).join('')}</select>`}
+      <input type="text" data-tarnueva placeholder="Nueva tarea… (ej. seguir cotización de válvulas con Danfoss)" maxlength="400"><button type="button" data-taragregar>➕ Agregar</button></div>
+  </div>`;
+}
+function appTareaAccion(b, el){
+  const c = b.closest('[data-tareas]'); if(!c) return;
+  const dia = c.dataset.dia, buscar = function(id){ return APP_TAREAS.lista.find(function(t){ return t.id === id; }); };
+  const falla = function(){ appToast('No se pudo guardar en Drive. Revisa tu conexión.'); appTareasCargar(true); };
+  if(b.dataset.taragregar !== undefined){
+    const i = c.querySelector('[data-tarnueva]'), txt = (i.value || '').trim(); if(!txt) return i.focus();
+    const cod = c.dataset.cod || c.querySelector('[data-tarper]').value;
+    const t = { id:'tmp' + (++APP_TAREAS.n), dia:dia, cod:cod, tarea:txt, estado:'Pendiente', com:'', por:tareaYo(), guardando:true };
+    APP_TAREAS.lista.push(t); i.value = ''; appTareasPintar();
+    return appTareasEnviar({ accion:'crear', dia:dia, cod:cod, nombre:PD_PERSONAS[cod] || cod, tarea:txt }).then(function(r){
+      if(!r || !r.ok) throw new Error(); Object.assign(t, r.tarea); delete t.guardando; appTareasPintar(); }).catch(function(){
+      APP_TAREAS.lista = APP_TAREAS.lista.filter(function(x){ return x !== t; }); appTareasPintar(); falla(); });
+  }
+  const id = b.dataset.tarest || b.dataset.tarcom || b.dataset.tarborrar, t = buscar(id); if(!t) return;
+  if(b.dataset.tarborrar){ if(!window.confirm('¿Eliminar esta tarea de la hoja?')) return;
+    APP_TAREAS.lista = APP_TAREAS.lista.filter(function(x){ return x !== t; }); appTareasPintar();
+    return appTareasEnviar({ accion:'borrar', id:id }).then(function(r){ if(!r || !r.ok) throw new Error(); }).catch(falla); }
+  const inp = c.querySelector(`[data-tarcomin="${id}"]`);
+  if(b.dataset.tarest) t.estado = b.dataset.v;
+  t.com = inp ? inp.value.trim() : t.com; t.act = new Date().toLocaleDateString('sv-SE', { timeZone:'America/Lima' });
+  appTareasPintar(); if(b.dataset.tarcom) appToast('✅ Comentario guardado');
+  return appTareasEnviar({ accion:'actualizar', id:id, estado:t.estado, com:t.com }).then(function(r){ if(!r || !r.ok) throw new Error(); }).catch(falla);
 }
 
 function appOtifHtml(){
@@ -14225,7 +14317,8 @@ function appPanelMostrar(html){
   clearTimeout(el._cierre); el.classList.remove('cerrando'); el.classList.add('abierto'); el.scrollTop = 0;
   if(!el._ok){ el._ok = true; el.addEventListener('click', function(e){
     const b = e.target.closest('button'); if(!b) return;
-    if(b.dataset.occerrar){ if(el._pila && el._pila.length){ el.innerHTML = el._pila.pop(); el.scrollTop = 0; return; } return appOCCerrar(); }
+    if(b.dataset.occerrar){ if(el._pila && el._pila.length){ el.innerHTML = el._pila.pop(); el.scrollTop = 0; return appTareasPintar(); } return appOCCerrar(); }
+    if(b.dataset.taragregar !== undefined || b.dataset.tarest || b.dataset.tarcom || b.dataset.tarborrar) return appTareaAccion(b, el);
     if(b.dataset.oc){ (el._pila = el._pila || []).push(el.innerHTML); return appOCAbrir(b.dataset.oc, true); }
     if(b.dataset.dailyver){ const dia = APP_DAILY.dia || appDailyUltimo(), T = { sin:'📝 SKU sin OC al cierre', oc:'✅ Lo que hizo ese día', man:'📅 OC que llegan', venc:'⚠️ OC vencidas' }; (el._pila = el._pila || []).push(el.innerHTML);
       return appPanelMostrar(`<div class="oc-cab"><button type="button" class="atras" data-occerrar="1" aria-label="Volver">‹</button><div class="tx"><b>${T[b.dataset.dailyver]}</b><span>${escapeHtml(PD_PERSONAS[b.dataset.dailycod] || '')} · ${appDailyFechaTxt(dia)}</span></div></div><div class="oc-cuerpo">${appDailyVerHtml(dia, b.dataset.dailycod, b.dataset.dailyver)}</div>`); }
@@ -14237,7 +14330,11 @@ function appPanelMostrar(html){
     if(b.dataset.ocprov){ appOCCerrar(); return polarAbrir('correo de ' + b.dataset.ocprov); }
     if(b.dataset.ocpdf) return appPanelPdf();
     if(b.dataset.dailycopia !== undefined) return appDailyCopiar(b);
-  }); }
+  });
+  // Enter en las tareas del daily = Agregar / Guardar comentario
+  el.addEventListener('keydown', function(e){ if(e.key !== 'Enter') return; const i = e.target, c = i.closest && i.closest('[data-tareas]'); if(!c) return;
+    const b = i.dataset.tarnueva !== undefined ? c.querySelector('[data-taragregar]') : i.dataset.tarcomin ? c.querySelector(`[data-tarcom="${i.dataset.tarcomin}"]`) : null;
+    if(b){ e.preventDefault(); b.click(); } }); }
 }
 function appOCCerrar(){
   const el = document.getElementById('appOC');

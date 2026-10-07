@@ -16,6 +16,10 @@
  * Desde el 06.10.2026 (v4): cuando alguien marca 👎, Leo le pregunta "¿Qué esperabas ver?" y la respuesta
  * se guarda en la columna J. Es lo que Leo necesita para aprender a contestar bien esa consulta.
  *
+ * Desde el 07.10.2026 (v5): también guarda las TAREAS MANUALES del Daily call in en la pestaña "Daily tareas"
+ * (quién, qué tarea, estado Pendiente / En proceso / Cumplida / No cumplida y comentario de cómo quedó).
+ * La plataforma las lee con doGet?accion=tareas. Misma hoja, misma URL: solo hay que actualizar (abajo).
+ *
  * ACTUALIZAR (si ya estaba instalado): pega este archivo encima del anterior → Guardar →
  *   Implementar → Administrar implementaciones → ✏️ editar → Versión: Nueva versión → Implementar.
  *   Así la URL /exec sigue siendo la misma y no hay que tocar el index.html.
@@ -26,6 +30,7 @@ const HOJA = 'Preguntas';
 function doPost(e) {
   try {
     const d = JSON.parse(e.postData.contents || '{}');
+    if (d.tipo === 'tarea') return tareaGuardar(d);
     const pregunta = String(d.pregunta || '').trim().slice(0, 300);
     if (!pregunta) return salida({ ok: false });
     const libro = SpreadsheetApp.getActiveSpreadsheet();
@@ -65,5 +70,66 @@ function doPost(e) {
   }
 }
 
-function doGet() { return salida({ ok: true, servicio: 'Polar aprende' }); }
+function doGet(e) {
+  if (e && e.parameter && e.parameter.accion === 'tareas') return tareasLeer();
+  return salida({ ok: true, servicio: 'Polar aprende' });
+}
+
+// ---------- Daily call in: tareas manuales (07.10.2026) ----------
+const HOJA_TAREAS = 'Daily tareas';
+const COLS_TAREAS = ['ID', 'Día', 'Código', 'Comprador', 'Tarea', 'Estado', 'Comentario', 'Registró', 'Creada', 'Actualizada', 'Actualizó'];
+const ESTADOS = ['Pendiente', 'En proceso', 'Cumplida', 'No cumplida'];
+
+function hojaTareas() {
+  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  let h = libro.getSheetByName(HOJA_TAREAS);
+  if (!h) {
+    h = libro.insertSheet(HOJA_TAREAS);
+    h.appendRow(COLS_TAREAS);
+    h.setFrozenRows(1);
+    h.getRange(1, 1, 1, COLS_TAREAS.length).setFontWeight('bold').setBackground('#0a1e64').setFontColor('#ffffff');
+    h.getRange('B:B').setNumberFormat('@');   // el día se guarda como texto aaaa-mm-dd
+    h.setColumnWidth(5, 420); h.setColumnWidth(7, 320); h.setColumnWidth(4, 160);
+  }
+  return h;
+}
+function ahora() { return Utilities.formatDate(new Date(), 'America/Lima', 'yyyy-MM-dd HH:mm'); }
+function txt(v, n) { return String(v == null ? '' : v).trim().slice(0, n); }
+function diaTxt(v) { return v instanceof Date ? Utilities.formatDate(v, 'America/Lima', 'yyyy-MM-dd') : String(v || ''); }
+
+function tareasLeer() {
+  const h = hojaTareas(), n = h.getLastRow();
+  if (n < 2) return salida({ ok: true, tareas: [] });
+  const lim = new Date(); lim.setDate(lim.getDate() - 120);
+  const desde = Utilities.formatDate(lim, 'America/Lima', 'yyyy-MM-dd');
+  const filas = h.getRange(2, 1, n - 1, COLS_TAREAS.length).getValues();
+  const tareas = filas.filter(function (f) { return f[0] && diaTxt(f[1]) >= desde; }).map(function (f) {
+    return { id: String(f[0]), dia: diaTxt(f[1]), cod: String(f[2]), tarea: String(f[4]), estado: String(f[5] || 'Pendiente'),
+      com: String(f[6] || ''), por: String(f[7] || ''), creada: String(f[8] || ''), act: String(f[9] || ''), actpor: String(f[10] || '') };
+  });
+  return salida({ ok: true, tareas: tareas });
+}
+
+function tareaGuardar(d) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const h = hojaTareas(), quien = txt(d.usuario, 120);
+    if (d.accion === 'crear') {
+      const tarea = txt(d.tarea, 400), cod = txt(d.cod, 20), dia = txt(d.dia, 10);
+      if (!tarea || !cod || !/^\d{4}-\d{2}-\d{2}$/.test(dia)) return salida({ ok: false, error: 'faltan datos' });
+      const id = Utilities.getUuid().slice(0, 8);
+      h.appendRow([id, dia, cod, txt(d.nombre, 80), tarea, 'Pendiente', '', quien, ahora(), '', '']);
+      return salida({ ok: true, tarea: { id: id, dia: dia, cod: cod, tarea: tarea, estado: 'Pendiente', com: '', por: quien, creada: ahora(), act: '', actpor: '' } });
+    }
+    const id = txt(d.id, 20); if (!id) return salida({ ok: false, error: 'sin id' });
+    const celda = h.getRange('A:A').createTextFinder(id).matchEntireCell(true).findNext();
+    if (!celda) return salida({ ok: false, error: 'no existe' });
+    const fila = celda.getRow();
+    if (d.accion === 'borrar') { h.deleteRow(fila); return salida({ ok: true }); }
+    const estado = ESTADOS.indexOf(d.estado) !== -1 ? d.estado : h.getRange(fila, 6).getValue();
+    h.getRange(fila, 6, 1, 2).setValues([[estado, txt(d.com, 400)]]);
+    h.getRange(fila, 10, 1, 2).setValues([[ahora(), quien]]);
+    return salida({ ok: true });
+  } finally { lock.releaseLock(); }
+}
 function salida(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
