@@ -13074,6 +13074,8 @@ const APP_PC_CSS = `
   body.app-pc .m-fila:hover, body.app-pc .m-prod-cab:hover, body.app-pc .ind-fila:hover, body.app-pc .m-fam:hover{background:var(--surface-2);}
   body.app-pc .m-cal-dias button{aspect-ratio:auto;height:44px;font-size:14px;} body.app-pc .m-cal-dias button:hover{filter:brightness(.95);}
   body.app-pc .app-oc{inset:0 0 0 auto;width:min(760px, 100%);box-shadow:-20px 0 60px rgba(10,20,40,.25);}
+  body.app-pc .app-oc.ancho{inset:0;width:100%;box-shadow:none;} body.app-pc .app-oc.ancho .oc-cuerpo{max-width:1280px;padding:22px 32px 40px;}
+  body.app-pc .m-dp-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(400px, 1fr));gap:12px;align-items:start;} body.app-pc .m-dp-grid .ini-card{margin:0;}
 `;
 function appPcActivar(){
   if(!APP_EN_PC || document.getElementById('appPcCss')) return;
@@ -13403,6 +13405,8 @@ function appOtifPct(l){ return l.length ? l.filter(function(x){ return !x.tipo; 
 // de la recepción), así que cualquier día pasado se vuelve a armar igual. Pedidos: quien lo generó
 // (ResponsablePedido). OC, aprobaciones, recepciones y vencidas: el comprador de la OC (UsuarioCompras).
 const APP_DAILY = { dia:'', anio:null, mes:null };
+// El daily es solo de estos compradores (07.10.2026, Piero).
+const APP_DAILY_EQUIPO = ['PLINARES', 'MSIHUAIRO', 'CCHECA', 'JALTAMIRANO', 'JPOMEZ'];
 const APP_DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 function appDailyFilas(){
   return getReqRows().concat(PEDIDO_SIN_REQ_ROWS || [], (PEDIDO_SIN_REQ_PEND || []).map(function(r){ return Object.assign({ esPedidoDirecto:true }, r); }));
@@ -13426,7 +13430,7 @@ function appDailyMes(n){          // cambia de mes y selecciona su último día 
 }
 function appDailyTot(l, k){ const u = new Set(); l.forEach(function(x){ x[k].forEach(function(v, key){ u.add(x[k] instanceof Map ? key : v); }); }); return u.size; }   // sin contar dos veces un pedido de dos personas
 function appDailyActividad(dia){ const l = appDailyDatos(dia).lista;
-  return ['ped', 'oc', 'cer', 'apr', 'rec'].reduce(function(a, k){ return a + appDailyTot(l, k); }, 0); }
+  return ['ped', 'oc', 'cer'].reduce(function(a, k){ return a + appDailyTot(l, k); }, 0); }
 function appDailyCalHtml(dia){
   const u = appDailyUltimo(), a = APP_DAILY.anio, m = APP_DAILY.mes;
   const nDias = new Date(Date.UTC(a, m + 1, 0)).getUTCDate(), primero = (new Date(Date.UTC(a, m, 1)).getUTCDay() + 6) % 7;
@@ -13449,43 +13453,41 @@ function appDailyCalHtml(dia){
 }
 function appDailyDatos(dia){
   return appMemo('daily:' + dia, function(){
-    const P = new Map(), per = function(v){ const c = pdPersona(v); if(!PD_PERSONAS[c]) return null;
-      if(!P.has(c)) P.set(c, { cod:c, ped:new Map(), oc:new Map(), apr:new Set(), rec:new Set(), cer:new Set(), pend:new Set(), venc:new Set() }); return P.get(c); };
+    const P = new Map(), per = function(v){ const c = pdPersona(v); if(!PD_PERSONAS[c] || APP_DAILY_EQUIPO.indexOf(c) === -1) return null;
+      if(!P.has(c)) P.set(c, { cod:c, ped:new Map(), oc:new Map(), cer:new Set(), sku:new Set(), venc:new Set() }); return P.get(c); };
     const ini = new Date(dia + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() - 120); const desde = isoDay(ini);
     const filas = appDailyFilas(), porPed = new Map(), porOC = new Map();
     filas.forEach(function(r){
-      const fp = isoDay(r.fPedido), fo = isoDay(r.fOrden), fb = isoDay(r.fAprob), fc = isoDay(r.fRecep), fx = isoDay(r.fCompromiso);
+      const fp = isoDay(r.fPedido), fo = isoDay(r.fOrden), fc = isoDay(r.fRecep), fx = isoDay(r.fCompromiso);
       if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '' }); porPed.set(r.codPedido, g); }
       // Solo los pedidos DIRECTOS los genera el comprador; los que vienen de un requerimiento salen solos
       // (07.10.2026, Piero: "nosotros no generamos pedidos, estos vienen solos a partir de un req").
       if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
       if(!r.codOrden || !r.usuarioCompras) return;
       const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden);
-      const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fb:fb, fx:fx, imp:imp, rec:[], anul:/anul/i.test(r.estadoOrden || '') };
-      o.rec.push(fc); porOC.set(r.codOrden, o);
+      const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fx:fx, imp:imp, rec:[], sku:new Set(), anul:/anul/i.test(r.estadoOrden || '') };
+      o.rec.push(fc); o.sku.add(r.codOrden + '|' + (r.idProducto || r.producto || '')); porOC.set(r.codOrden, o);
     });
     porOC.forEach(function(o, co){
       const x = per(o.uc); if(!x || o.anul) return;
-      if(o.fo === dia) x.oc.set(co, o);
-      if(o.fb === dia) x.apr.add(co);
-      if(o.rec.indexOf(dia) !== -1) x.rec.add(co);
+      if(o.fo === dia){ x.oc.set(co, o); o.sku.forEach(function(k){ x.sku.add(k); }); }   // SKU hechos = líneas de las OC emitidas ese día
       // Vencida al cierre del día: nacional, ya pasó su fecha pactada y alguna línea no había llegado.
       if(!o.imp && o.fo && o.fo <= dia && o.fx && o.fx < dia && o.fo >= desde && o.rec.some(function(f){ return !f || f > dia; })) x.venc.add(co);
     });
     porPed.forEach(function(g, cp){
       if(!g.fp || g.fp > dia || g.fp < desde) return;
       const abiertas = g.l.filter(function(l){ return l.co ? (l.fo && l.fo > dia) : !/archiv|atendido/i.test(l.ep); });
-      if(abiertas.length){ const x = per(g.resp); if(x) x.pend.add(cp); return; }
+      if(abiertas.length) return;
       // Cerrado ese día: la última línea pasó a OC ese día; se le anota al comprador de esa OC.
       const ult = g.l.filter(function(l){ return l.fo; }).sort(function(a,b){ return a.fo < b.fo ? 1 : -1; })[0];
       if(ult && ult.fo === dia){ const x = per(ult.uc); if(x) x.cer.add(cp); }
     });
     const montoOC = new Map(); ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.oc) montoOC.set(r.oc, (montoOC.get(r.oc) || 0) + (r.montoPEN || 0)); });
     const lista = [...P.values()].map(function(x){ x.monto = [...x.oc.keys()].reduce(function(a, co){ return a + (montoOC.get(co) || 0); }, 0);
-      x.hizo = x.ped.size + x.oc.size + x.cer.size + x.apr.size + x.rec.size; return x; })
-      .sort(function(a,b){ return b.hizo - a.hizo || b.pend.size - a.pend.size; });
-    // Solo se muestran y cuentan los que hicieron algo ese día (07.10.2026, Piero); el pendiente del equipo es de todos.
-    return { lista:lista.filter(function(x){ return x.hizo; }), todos:lista, montoOC:montoOC };
+      x.hizo = x.ped.size + x.oc.size + x.cer.size; return x; })   // OC recibidas/aprobadas no cuentan: no son gestión del comprador ese día
+      .sort(function(a,b){ return b.hizo - a.hizo || b.monto - a.monto; });
+    // Solo se muestran y cuentan los que hicieron algo ese día (07.10.2026, Piero).
+    return { lista:lista.filter(function(x){ return x.hizo; }), montoOC:montoOC };
   });
 }
 function appDailyFechaTxt(dia){ const d = new Date(dia + 'T00:00:00Z');
@@ -13498,21 +13500,21 @@ function appDailyHtml(){
   if(APP_DAILY.anio == null){ APP_DAILY.anio = +dia.slice(0, 4); APP_DAILY.mes = +dia.slice(5, 7) - 1; }
   return '<div class="ini-card m-cal">' + appDailyCalHtml(dia) + '</div>';
 }
-function appDailyAbrir(dia){ APP_DAILY.dia = dia; appRefrescarCal(); appListaAbrir('🗓️ Daily call in', appDailyFechaTxt(dia), appDailyDetHtml(dia)); }
+function appDailyAbrir(dia){ APP_DAILY.dia = dia; appRefrescarCal(); appListaAbrir('🗓️ Daily call in', appDailyFechaTxt(dia), appDailyDetHtml(dia)); document.getElementById('appOC').classList.add('ancho'); }
 // Detalle del día: lo importante en grande y las listas (OC / pedidos) plegadas para que no se pierdan los números.
 function appDailyDetHtml(dia){
   const D = appDailyDatos(dia), l = D.lista, tot = function(k){ return appDailyTot(l, k); };
-  const montoTot = l.reduce(function(a, x){ return a + x.monto; }, 0), pendEq = appDailyTot(D.todos, 'pend');
+  const montoTot = l.reduce(function(a, x){ return a + x.monto; }, 0);
   const num = function(v, t, cls){ return `<div class="${cls || ''}"><b>${v}</b><span>${t}</span></div>`; };
   const hero = `<div class="oc-hero m-dd">
       <div class="m-dd-big">${num(appN(tot('oc')), 'OC emitidas')}${num(appUSD(montoTot), 'monto emitido')}</div>
-      <div class="m-dd-nums">${num(appN(tot('cer')), '✅ pedidos cerrados')}${num(appN(tot('ped')), '📝 pedidos directos')}${num(appN(tot('rec')), '📥 OC recibidas')}${num(appN(pendEq), '⏳ pedidos sin OC al cierre', pendEq ? 'rojo' : '')}</div>
+      <div class="m-dd-nums">${num(appN(tot('sku')), '📦 SKU hechos')}${num(appN(tot('cer')), '✅ pedidos cerrados')}${num(appN(tot('ped')), '📝 pedidos directos')}</div>
       <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
   if(!l.length) return hero + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
   const tarjeta = function(x){
     const nom = PD_PERSONAS[x.cod], ini = nom.split(' ').map(function(w){ return w.charAt(0); }).slice(0, 2).join('');
     const oc = [...x.oc.entries()], ped = [...x.ped.entries()];
-    const nums = [[x.oc.size, 'OC emitidas'], [x.cer.size, 'pedidos cerrados'], [x.ped.size, 'pedidos directos'], [x.apr.size, 'OC aprobadas'], [x.rec.size, 'OC recibidas']]
+    const nums = [[x.oc.size, 'OC emitidas'], [x.sku.size, 'SKU hechos'], [x.cer.size, 'pedidos cerrados'], [x.ped.size, 'pedidos directos']]
       .filter(function(n){ return n[0]; }).map(function(n){ return num(appN(n[0]), n[1]); }).join('');
     const listas = (oc.length ? `<div class="m-det-t">🧾 OC emitidas</div>${oc.map(function(e){ const m = D.montoOC.get(e[0]);
         return `<div class="m-det-f"><button type="button" class="mono m-link" data-oc="${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^000\d-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1].prov, 30))}${e[1].imp ? ' · 🌎' : ''}<b>${m ? appUSD(m) : ''}</b></div>`; }).join('')}` : '')
@@ -13520,15 +13522,15 @@ function appDailyDetHtml(dia){
     return `<div class="ini-card m-dp"><div class="m-dp-cab"><span class="m-dp-ini">${escapeHtml(ini)}</span><div class="m-dp-tx"><b>${escapeHtml(nom)}</b><small>${escapeHtml(x.cod)}</small></div>${x.monto ? `<div class="m-dp-monto"><b>${appUSD(x.monto)}</b><small>emitido</small></div>` : ''}</div>
       <div class="m-dd-nums">${nums}</div>
       ${listas ? `<details class="m-dp-lista"><summary>Ver ${oc.length ? oc.length + ' OC' : ''}${oc.length && ped.length ? ' y ' : ''}${ped.length ? ped.length + ' pedido' + (ped.length === 1 ? '' : 's') : ''}</summary>${listas}</details>` : ''}
-      ${x.pend.size || x.venc.size ? `<div class="m-daily-pend">⏳ Al cierre del día: ${x.pend.size ? `<b>${appN(x.pend.size)}</b> pedido${x.pend.size === 1 ? '' : 's'} sin OC` : ''}${x.pend.size && x.venc.size ? ' · ' : ''}${x.venc.size ? `<b class="rojo">${appN(x.venc.size)}</b> OC nacional${x.venc.size === 1 ? '' : 'es'} vencida${x.venc.size === 1 ? '' : 's'}` : ''}</div>` : ''}
+      ${x.venc.size ? `<div class="m-daily-pend">⏳ Al cierre del día: <b class="rojo">${appN(x.venc.size)}</b> OC nacional${x.venc.size === 1 ? '' : 'es'} vencida${x.venc.size === 1 ? '' : 's'}</div>` : ''}
     </div>`; };
-  return hero + l.map(tarjeta).join('');
+  return hero + '<div class="m-dp-grid">' + l.map(tarjeta).join('') + '</div>';
 }
 function appDailyCopiar(b){
   const dia = APP_DAILY.dia || appDailyUltimo(), l = appDailyDatos(dia).lista;
   const txt = ['*Daily de Compras · ' + appDailyFechaTxt(dia) + '*'].concat(l.map(function(x){
-    return '• ' + PD_PERSONAS[x.cod] + ': ' + x.oc.size + ' OC emitidas' + (x.monto ? ' (' + appUSD(x.monto) + ')' : '') + ', ' + x.cer.size + ' pedidos cerrados, ' + x.ped.size + ' pedidos directos, ' + x.rec.size + ' OC recibidas'
-      + (x.pend.size || x.venc.size ? '. Pendiente: ' + x.pend.size + ' pedidos sin OC, ' + x.venc.size + ' OC vencidas' : '') + '.'; })).join('\n');
+    return '• ' + PD_PERSONAS[x.cod] + ': ' + x.oc.size + ' OC emitidas' + (x.monto ? ' (' + appUSD(x.monto) + ')' : '') + ', ' + x.sku.size + ' SKU hechos, ' + x.cer.size + ' pedidos cerrados, ' + x.ped.size + ' pedidos directos'
+      + (x.venc.size ? '. ' + x.venc.size + ' OC vencidas al cierre' : '') + '.'; })).join('\n');
   const ok = function(){ b.textContent = '✅ Copiado'; setTimeout(function(){ b.textContent = '📋 Copiar resumen para el chat'; }, 1800); };
   if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function(){ window.prompt('Copia el resumen:', txt); });
   else window.prompt('Copia el resumen:', txt);
@@ -14122,7 +14124,7 @@ function appOCCerrar(){
   const el = document.getElementById('appOC');
   if(!el || !el.classList.contains('abierto')) return false;
   el.classList.add('cerrando'); clearTimeout(el._cierre);
-  el._cierre = setTimeout(function(){ el.classList.remove('abierto', 'cerrando'); }, 280);
+  el._cierre = setTimeout(function(){ el.classList.remove('abierto', 'cerrando', 'ancho'); }, 280);
   return true;
 }
 
