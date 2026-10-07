@@ -13473,7 +13473,7 @@ function appDailyDatos(dia){
     const filas = appDailyFilas(), porPed = new Map(), porOC = new Map();
     filas.forEach(function(r){
       const fp = isoDay(r.fPedido), fo = isoDay(r.fOrden), fc = isoDay(r.fRecep), fx = isoDay(r.fCompromiso);
-      if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, prod:r.producto || '', l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '' }); porPed.set(r.codPedido, g); }
+      if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '', pr:r.producto || '' }); porPed.set(r.codPedido, g); }
       // Solo los pedidos DIRECTOS los genera el comprador; los que vienen de un requerimiento salen solos
       // (07.10.2026, Piero: "nosotros no generamos pedidos, estos vienen solos a partir de un req").
       if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
@@ -13498,7 +13498,7 @@ function appDailyDatos(dia){
       if(!g.fp || g.fp > dia || g.fp < desde) return;
       const abiertas = g.l.filter(function(l){ return l.co ? (l.fo && l.fo > dia) : !/archiv|atendido/i.test(l.ep); });
       if(abiertas.length){ const x = per(g.resp), d = dias(g.fp, dia);   // el pedido más antiguo que sigue sin OC
-        if(x && (!x.viejo || d > x.viejo.d)) x.viejo = { cp:cp, d:d, prod:g.prod }; return; }
+        if(x && (!x.viejo || d > x.viejo.d)) x.viejo = { cp:cp, d:d, prod:abiertas[0].pr, n:abiertas.length, tot:g.l.length }; return; }   // se muestra el ítem que falta, no el primero del pedido
       // Cerrado ese día: la última línea pasó a OC ese día; se le anota al comprador de esa OC.
       const ult = g.l.filter(function(l){ return l.fo; }).sort(function(a,b){ return a.fo < b.fo ? 1 : -1; })[0];
       if(ult && ult.fo === dia){ const x = per(ult.uc); if(x) x.cer.add(cp); }
@@ -13559,7 +13559,7 @@ function appDailyPersonaHtml(dia, cod){
   const fecha = function(k){ const d = new Date(k + 'T00:00:00Z'); return APP_DIAS_SEM[d.getUTCDay()] + ' ' + d.getUTCDate(); };
   const datos = (x.tEmi != null ? dato('⏱️', 'Tiempo de emisión (del pedido a la OC)', x.tEmi.toFixed(1) + ' días') : '')
     + dato('📅', 'OC que deben llegar el ' + fecha(D.manana), appN(man.length))
-    + (x.viejo ? dato('🕰️', `Pedido más antiguo sin OC: <button type="button" class="mono m-link" data-q="pedido ${escapeHtml(x.viejo.cp)}">${escapeHtml(x.viejo.cp.replace(/^0001-0*/, ''))}</button> ${escapeHtml(polarCorta(x.viejo.prod, 30))}`, x.viejo.d + ' días', x.viejo.d > 30 ? 'rojo' : '') : '')
+    + (x.viejo ? dato('🕰️', `Pedido más antiguo sin OC: <button type="button" class="mono m-link" data-q="pedido ${escapeHtml(x.viejo.cp)}">${escapeHtml(x.viejo.cp.replace(/^0001-0*/, ''))}</button> · falta ${escapeHtml(polarCorta(x.viejo.prod, 34))}${x.viejo.tot > 1 ? ` <small>(${x.viejo.n} de ${x.viejo.tot} ítems)</small>` : ''}`, x.viejo.d + ' días', x.viejo.d > 30 ? 'rojo' : '') : '')
     + (x.venc.size ? dato('⚠️', 'OC nacionales vencidas al cierre del día', appN(x.venc.size), 'rojo') : '');
   const plegable = function(t, html){ return html ? `<details class="m-dp-lista"><summary>${t}</summary>${html}</details>` : ''; };
   return `<div class="oc-hero m-dd"><div class="m-dp-cab">${appDailyAvatar(x, 'gr')}<div class="m-dp-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${['🥇', '🥈', '🥉'][i] || ('#' + (i + 1))} del día · ${x.pts} pts</small></div>${x.monto ? `<div class="m-dp-monto"><b>${appUSD(x.monto)}</b><small>emitido</small></div>` : ''}</div>
