@@ -1193,7 +1193,7 @@
     .m-sec-tit{font-size:14px;font-weight:900;margin:14px 2px 8px;}
     .pr-barra i{display:block;height:7px;border-radius:4px;background:var(--border);overflow:hidden;margin-top:6px;} .pr-barra em{display:block;height:100%;border-radius:4px;background:#1baf7a;}
     .pr-barra.ambar em{background:#eda100;} .pr-barra.rojo em{background:#d03b3b;} .pr-fila .t{min-width:0;flex:1;} .pr-fila .rojo{color:#d03b3b;font-weight:800;}
-    .pr-chips{flex:1 1 220px;align-self:flex-end;} .pr-nota{display:block;margin:4px 2px 12px;}
+    .pr-chips{flex:1 1 220px;align-self:flex-end;} .pr-tile-btn{text-align:left;font:inherit;color:inherit;cursor:pointer;background:var(--surface-2);border:1px solid color-mix(in srgb, #d03b3b 30%, var(--border));border-radius:12px;padding:9px 10px;min-width:0;} .pr-tile-btn small{display:block;font-size:11.5px;color:#d03b3b;font-weight:700;margin-top:2px;} .pr-tile-btn:disabled{cursor:default;} .pr-nota{display:block;margin:4px 2px 12px;}
     .pr-part{border-top:1px solid var(--border);} .pr-part:first-child{border-top:0;} .pr-part summary{display:flex;gap:12px;align-items:center;padding:10px 2px;cursor:pointer;list-style:none;}
     .pr-part summary::-webkit-details-marker{display:none;} .pr-part summary .t{flex:1;min-width:0;} .pr-part summary .t b{display:block;font-size:13.5px;} .pr-part summary small{display:block;font-size:11.5px;color:var(--muted);}
     .pr-part summary .v{text-align:right;flex-shrink:0;} .pr-part summary .v b{display:block;font-size:14px;} .pr-part.rojo summary .v b{color:#d03b3b;} .pr-part.ambar summary .v b{color:#b07a00;}
@@ -14151,7 +14151,7 @@ function appFotoPresu(desde, hasta, cod, pryFn){ return appMemo('fpresu:' + desd
   const datos = appPresuDatos(), porId = new Map(datos.map(function(x){ return [x.id, x]; }));
   const partDe = function(r){ const x = porId.get(r.idProyecto); return x && r.estructura ? x.part.get(r.estructura + '|' + (r.tareaPry || '')) : null; };
   const en = function(d){ const k = isoDay(d); return k && k >= desde && k <= hasta; };
-  const o = { sol:0, solPart:new Set(), solPc:0, comUsd:0, comPres:0, comSin:0, comPart:new Set(), lineas:0 };
+  const o = { sol:0, solPart:new Set(), solPc:0, comUsd:0, comPres:0, comSin:0, comPart:new Set(), lineas:0, proyDe:new Map() };
   const vistos = new Set();
   getReqRows().forEach(function(r){
     if(pryFn && !pryFn(r)) return;
@@ -14161,7 +14161,7 @@ function appFotoPresu(desde, hasta, cod, pryFn){ return appMemo('fpresu:' + desd
     if(r.codOrden && en(r.fOrden) && r.cantOrden != null && r.precioUnit != null && (!cod || pdPersona(r.usuarioCompras) === cod)){
       const k = r.codOrden + '|' + r.idProducto + '|' + r.codRequerimiento; if(vistos.has(k)) return; vistos.add(k);
       const usd = appPresuUSD(r.cantOrden * r.precioUnit, r.moneda); o.comUsd += usd; o.lineas++;
-      if(pa && pa.pc > 0){ o.comPres += usd; o.comPart.add(pa); } else o.comSin += usd; }
+      if(pa && pa.pc > 0){ o.comPres += usd; o.comPart.add(pa); o.proyDe.set(pa, porId.get(r.idProyecto)); } else o.comSin += usd; }
   });
   const parts = [...o.comPart];
   o.partPc = parts.reduce(function(a, p){ return a + p.pc; }, 0); o.partUsd = parts.reduce(function(a, p){ return a + p.usd; }, 0);
@@ -14186,7 +14186,7 @@ function appFotoComprador(st){
       <div class="m-tiles"><div><span>📋 Solicitado</span><b>${appN(pr.sol)} SKU</b><small>${pr.solPart.size} partidas · presupuesto ${fmtUSD(pr.solPc)}</small></div>
         <div><span>🛒 Comprado en OC</span><b>${fmtUSD(pr.comUsd)}</b><small>${appN(pr.lineas)} líneas · ${fmtUSD(pr.comSin)} sin presupuesto</small></div></div>
       ${pr.comPart.size ? `<div class="sku-presu ${appPresuCls(pct)}"><div class="sku-presu-top"><span>Partidas en las que compró (${pr.comPart.size})</span><b>${pct.toFixed(0)}% usado</b></div>
-        ${appPresuBarra(pr.partUsd, pr.partPc)}<div class="sku-presu-uso">${fmtUSD(pr.partUsd)} en OC de ${fmtUSD(pr.partPc)} presupuestados (todas sus OC)${pr.partExc ? ' · <b class="rojo">' + pr.partExc + ' partida' + (pr.partExc === 1 ? '' : 's') + ' pasada' + (pr.partExc === 1 ? '' : 's') + '</b>' : ''}</div></div>` : '<div class="ini-vacio">Sin compras en partidas con presupuesto en este período.</div>'}
+        ${appPresuBarra(pr.partUsd, pr.partPc)}<div class="sku-presu-uso">${fmtUSD(pr.partUsd)} en OC de ${fmtUSD(pr.partPc)} presupuestados (todas sus OC)${pr.partExc ? ' · <button type="button" class="m-link rojo" data-prexc="foto">' + pr.partExc + ' partida' + (pr.partExc === 1 ? '' : 's') + ' pasada' + (pr.partExc === 1 ? '' : 's') + ' ›</button>' : ''}</div></div>` : '<div class="ini-vacio">Sin compras en partidas con presupuesto en este período.</div>'}
     </div>`;
 }
 // ===================================================================================================
@@ -14354,9 +14354,32 @@ function appPresuHtml(){
     <div class="m-buscar"><input type="search" id="prBusca" placeholder="🔍 Id de proyecto, cliente, nombre del proyecto, cotización o N° de req." value="${escapeHtml(APP_PR.q || '')}"></div>
     <div class="ini-card m-total"><span>Presupuesto costo vs. comprometido en OC · ${l.length} proyecto${l.length === 1 ? '' : 's'}${APP_PR.todos ? '' : ' activos'}</span><b>${pc > 0 ? (usd / pc * 100).toFixed(0) + '% usado' : '—'}</b>
       <small>${fmtUSD(usd)} en OC de ${fmtUSD(pc)} presupuestados · quedan ${fmtUSD(Math.max(0, pc - usd))}</small>${appPresuBarra(usd, pc)}
-      <div class="m-tiles"><div><span>Proyectos pasados</span><b class="${nExc ? 'rojo' : ''}">${nExc}</b></div><div><span>Partidas excedidas</span><b class="${exc ? 'rojo' : ''}">${exc}</b></div><div><span>OC sin presupuesto</span><b>${fmtUSD(fuera + sinP)}</b></div></div></div>
+      <div class="m-tiles"><div><span>Proyectos pasados</span><b class="${nExc ? 'rojo' : ''}">${nExc}</b></div><button type="button" class="pr-tile-btn" data-prexc="presu"${exc ? '' : ' disabled'}><span>Partidas excedidas</span><b class="${exc ? 'rojo' : ''}">${exc}</b>${exc ? '<small>ver cuáles ›</small>' : ''}</button><div><span>OC sin presupuesto</span><b>${fmtUSD(fuera + sinP)}</b></div></div></div>
     <div id="prLista">${appPresuLista()}</div>
     <small class="sku-nota pr-nota">Presupuesto costo de cada partida (R.LPY) en dólares; las OC en soles se pasan a dólares a S/ ${TIPO_CAMBIO.USD}. Comprometido = cantidad × precio unitario sin IGV de las OC de la partida. 🟢 menos de 80% · 🟡 80–100% · 🔴 pasado.</small>`;
+}
+// Partidas que ya pasaron su presupuesto (07.10.2026, Piero: "no me deja ver las partidas pasadas"): desde
+// el recuadro de Presupuesto (proyectos filtrados) o desde la foto de Indicadores (partidas donde compró).
+function appPresuExcedidas(origen){
+  let pares = [], sub = '';
+  if(origen === 'foto'){
+    const st = APP_F.indicadores, r = appFRango(st), cod = st.persona ? pdPersona(st.persona) : '';
+    const pr = appFotoPresu(r ? appIndIso(r.desde) : '1900-01-01', r ? appIndIso(r.hasta) : '2100-01-01', cod, appFPry(st.pry));
+    pr.comPart.forEach(function(p){ const x = pr.proyDe.get(p); if(x && p.usd > p.pc) pares.push({ x:x, p:p }); });
+    sub = (cod ? 'Donde compró ' + escapeHtml(PD_PERSONAS[cod] || cod) : 'Donde compraron los compradores') + ' · ' + escapeHtml(r ? r.label : 'todo lo cargado');
+  } else {
+    appPresuFiltrados().forEach(function(x){ x.part.forEach(function(p){ if(p.pc > 0 && p.usd > p.pc) pares.push({ x:x, p:p }); }); });
+    sub = APP_PR.todos ? 'Todos los proyectos' : 'Proyectos activos';
+  }
+  pares.sort(function(a, b){ return (b.p.usd - b.p.pc) - (a.p.usd - a.p.pc); });
+  const exceso = pares.reduce(function(a, y){ return a + y.p.usd - y.p.pc; }, 0);
+  appListaAbrir('🔴 Partidas pasadas', sub, `<div class="oc-hero"><div class="oc-num"><b>${pares.length}</b> partida${pares.length === 1 ? '' : 's'} · <b class="rojo">${fmtUSD(exceso)}</b> por encima</div>
+      <small>Ordenadas por cuánto se pasaron. Toca una para ver el proyecto y las OC de la partida.</small></div>
+    <div class="ini-card m-lista">${pares.length ? pares.slice(0, 300).map(function(y){ const pct = y.p.usd / y.p.pc * 100;
+      return appFilaHtml('data-prpry="' + escapeHtml(y.x.id) + '"', 'rojo', y.p.t || y.p.es,
+        '<span class="mono">' + escapeHtml(y.x.id) + '</span> · ' + escapeHtml(polarCorta(y.x.cli || y.x.n, 34)) + ' · <span class="mono">' + escapeHtml(y.p.es) + '</span>',
+        pct.toFixed(0) + '%', '+' + fmtUSD(y.p.usd - y.p.pc) + ' · ' + fmtUSD(y.p.usd) + ' de ' + fmtUSD(y.p.pc)); }).join('') : '<div class="ini-vacio">Ninguna partida pasada.</div>'}</div>
+    ${pares.length > 300 ? '<div class="m-sec-nota">Se muestran las 300 que más se pasaron.</div>' : ''}`);
 }
 function appPresuProyecto(id, req){
   const x = appPresuDatos().find(function(y){ return y.id === id; }); if(!x) return;
@@ -15517,6 +15540,7 @@ function appClickInicio(e){
   if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
   if(b.dataset.prpry) return appPresuProyecto(b.dataset.prpry, b.dataset.prreq || '');
+  if(b.dataset.prexc) return appPresuExcedidas(b.dataset.prexc);
   if(b.dataset.prtodos !== undefined){ APP_PR.todos = b.dataset.prtodos === '1'; APP_PR.cli = ''; return appRenderInicio(); }
   if(b.dataset.sku !== undefined) return appSkuAbrir(b.dataset.sku, b.dataset.skuped, b.dataset.skureq);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
