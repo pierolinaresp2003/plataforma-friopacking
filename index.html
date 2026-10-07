@@ -1336,6 +1336,9 @@
     .imp-tabs button.pc-sm{border-top-color:var(--amber);} .imp-tabs button.pc-sm b{color:var(--amber-ink, #b87400);}
     .imp-tabs button.pc-lu{border-top-color:#3565d9;} .imp-tabs button.pc-lu b{color:#3565d9;}
     .imp-tabs button.pc-pd{border-top-color:var(--ink-soft);} .imp-tabs button.pc-pd b{color:var(--ink-soft);}
+    .imp-tabs button.pc-en{border-top-color:#1baf7a;} .imp-tabs button.pc-en b{color:#13865d;} .m-resumen.cinco{grid-template-columns:repeat(5,1fr);}
+    .imp-card.en{border-left-color:#1baf7a;} .imp-card.en::before{border-color:#1baf7a;} .imp-card.en .imp-est{background:rgba(27,175,122,.13);color:#13865d;} .imp-card.en .imp-fechas{color:#13865d;}
+    .imp-card.en-exc .imp-pie span:first-child{color:#c23030;}
     .imp-card.vc{border-left-color:#d33;} .imp-card.vc::before{border-color:#d33;} .imp-card.vc .imp-est{background:rgba(220,60,60,.12);color:#d33;} .imp-card.vc .imp-fechas{color:#d33;}
     .imp-card.sm{border-left-color:var(--amber);} .imp-card.sm::before{border-color:var(--amber);} .imp-card.sm .imp-est{background:var(--amber-bg);color:#b87400;} .imp-card.sm .imp-fechas{color:#b87400;}
     .imp-card.lu{border-left-color:#3565d9;} .imp-card.lu::before{border-color:#3565d9;} .imp-card.lu .imp-est{background:rgba(53,101,217,.13);color:#3565d9;} .imp-card.lu .imp-fechas{color:#3565d9;}
@@ -13118,6 +13121,7 @@ function appConstruir(){
   });
   document.getElementById('section-inicio').addEventListener('change', function(e){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
+    if(e.target.id === 'pcEntAnio' || e.target.id === 'pcEntMes'){ if(e.target.id === 'pcEntAnio'){ APP_PC.entAnio = e.target.value; APP_PC.entMes = String(+e.target.value === appIndCorte().getUTCFullYear() ? appIndCorte().getUTCMonth() + 1 : 0); } else APP_PC.entMes = e.target.value; APP_PC.entTope = 60; return appRenderInicio(); }
     if(e.target.id === 'prCli' || e.target.id === 'prPry'){ APP_PR[e.target.id === 'prCli' ? 'cli' : 'pry'] = e.target.value; if(e.target.id === 'prCli') APP_PR.pry = ''; return appRenderInicio(); }
     const fb = e.target.closest && e.target.closest('[data-fbar]');
     if(fb && e.target.dataset.fcampo){ const st = APP_F[fb.dataset.fbar], c = e.target.dataset.fcampo, v = e.target.value;
@@ -14759,7 +14763,44 @@ function appOCCerrar(){
 }
 
 // ---------- Pendientes de Compras (Logística) ----------
-const APP_PC = { persona:'', sec:'venc', tope:20, q:'', fam:'' };
+const APP_PC = { persona:'', sec:'venc', tope:20, q:'', fam:'', entAnio:'', entMes:'', entTope:60 };
+// ---------- OC entregadas (07.10.2026, Piero: "falta un buscador para todas las OC que ya se entregaron") ----------
+// Una OC entregada = ninguna de sus líneas sigue pendiente (regla de Pendientes: estado de Nisira + lo
+// recibido + OC Finalizadas.xlsx) y no está anulada. Fecha de entrega = la última recepción en Lurín.
+function appEntregadas(){ return appMemo('entregadas', function(){
+  const M = new Map();
+  const add = function(r, q, qr){
+    if(!r.codOrden) return;
+    const o = M.get(r.codOrden) || { oc:r.codOrden, prov:r.proveedor || '', uc:r.usuarioCompras || '', fo:r.fOrden || null, fx:r.fCompromiso || null, fr:null, n:0, pend:false, anul:false, clis:new Set(), ids:new Set(), txt:[], vistos:new Set() };
+    const k = (r.idProducto || r.producto || '') + '|' + (r.codRequerimiento || r.codPedido || '');
+    if(!o.vistos.has(k)){ o.vistos.add(k); o.n++; o.txt.push(r.idProducto, r.producto, r.codRequerimiento, r.codPedido); }
+    if(pdOcPendiente({ codOrden:r.codOrden, estadoOrden:r.estadoOrden, cantOrden:q, cantRecep:qr, fRecep:r.fRecep })) o.pend = true;
+    if(/anul/i.test(r.estadoOrden || '')) o.anul = true;
+    if(r.fRecep && (!o.fr || r.fRecep > o.fr)) o.fr = r.fRecep;
+    if(!o.fo && r.fOrden) o.fo = r.fOrden; if(!o.fx && r.fCompromiso) o.fx = r.fCompromiso; if(!o.prov && r.proveedor) o.prov = r.proveedor; if(!o.uc && r.usuarioCompras) o.uc = r.usuarioCompras;
+    if(r.proyecto && !/^sin proyecto|^pedido directo/i.test(r.proyecto)) o.clis.add(appImpNombre(r.proyecto));
+    if(r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto)){ o.ids.add(r.idProyecto); const pi = pryInfo(r.idProyecto); if(pi && pi.cl) o.clis.add(appImpNombre(pi.cl)); }
+    M.set(r.codOrden, o);
+  };
+  getReqRows().forEach(function(r){ add(r, r.cantOrden, r.cantRecep); });
+  (PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ add(r, r.cantidadOrden, r.cantRecepcion); });
+  const presu = appOCPresuMapa();
+  return [...M.values()].filter(function(o){ return !o.anul && (!o.pend || ocFinalizada(o.oc)) && (o.fr || ocFinalizada(o.oc)); }).map(function(o){
+    o.persona = pdPersona(o.uc); o.fin = ocFinalizada(o.oc);
+    o.f = o.fr || (o.fin && OC_FIN[o.oc].f ? fromIsoDay(String(OC_FIN[o.oc].f).slice(0, 10)) : null) || o.fo;
+    o.atraso = o.fr && o.fx ? busdayCount(o.fx, o.fr) : null;
+    o.pr = presu.get(o.oc) || null;
+    o.txt = polarNorm([o.oc, o.prov, [...o.clis].join(' '), [...o.ids].join(' ')].concat(o.txt).join(' '));
+    delete o.vistos; return o;
+  }).sort(function(a, b){ return (b.f || 0) - (a.f || 0); });
+}); }
+// Presupuesto por OC: lo que pone en partidas con presupuesto y cuántas de esas partidas ya se pasaron.
+function appOCPresuMapa(){ return appMemo('ocpresu', function(){
+  const m = new Map();
+  appPresuDatos().forEach(function(x){ x.part.forEach(function(p){ p.ocs.forEach(function(o){
+    const y = m.get(o.oc) || { usd:0, parts:new Set(), exc:new Set() }; y.usd += o.usd; y.parts.add(p); if(p.pc > 0 && p.usd > p.pc) y.exc.add(p); m.set(o.oc, y); }); }); });
+  return m;
+}); }
 function appPendComprasHtml(soloLista){
   const hoy = new Date(), c = appIndCorte(), finSem = isoWeekStart(c); finSem.setUTCDate(finSem.getUTCDate() + 6);
   const todas = pdFilas();
@@ -14779,8 +14820,13 @@ function appPendComprasHtml(soloLista){
   const nom = function(p){ return (PD_PERSONAS[p] || p || '—').split(' ')[0]; };
   const prysTxt = function(x){ const l = [...x.prys].map(appImpNombre); return l.length ? polarCorta(l.slice(0, 2).join(' · '), 40) + (l.length > 2 ? ' +' + (l.length - 2) : '') : ''; };
   const EST = { venc:'Vencida', sem:'Esta semana', luego:'Más adelante' };
+  // Entregadas: del año / mes elegido (por defecto el mes en curso); con el buscador, todas.
+  const entAll = appEntregadas().filter(function(o){ return !APP_PC.persona || o.persona === APP_PC.persona; });
+  const entY = +APP_PC.entAnio || c.getUTCFullYear(), entM = APP_PC.entMes === '0' ? 0 : (+APP_PC.entMes || (APP_PC.entAnio ? 0 : c.getUTCMonth() + 1));
+  const entPer = entAll.filter(function(o){ return o.f && o.f.getUTCFullYear() === entY && (!entM || o.f.getUTCMonth() + 1 === entM); });
   const S = { venc:['🔴', 'Vencidas', 'vc', venc, 'Ya pasó la fecha de entrega · la más atrasada primero'], sem:['🟠', 'Esta semana', 'sm', sem, 'Entrega pactada hasta el domingo'],
-    luego:['🔵', 'Más adelante', 'lu', luego, 'Entrega después de esta semana'], ped:['⚪', 'Pedidos sin OC', 'pd', pl, 'Compras todavía no emite la orden · el más antiguo primero'] };
+    luego:['🔵', 'Más adelante', 'lu', luego, 'Entrega después de esta semana'], ped:['⚪', 'Pedidos sin OC', 'pd', pl, 'Compras todavía no emite la orden · el más antiguo primero'],
+    ent:['✅', 'Entregadas', 'en', entPer, 'Ya llegaron a Lurín o se cerraron · la más reciente primero · toca una para ver su detalle y presupuesto'] };
   if(!S[APP_PC.sec]) APP_PC.sec = 'venc';
   const cardOC = function(o, i, k){
     const imp = o.oc.indexOf('0002-') === 0, tr = ocEnTransito(o.oc);
@@ -14796,6 +14842,22 @@ function appPendComprasHtml(soloLista){
       pie:pie + ' · ' + o.n + ' ítem' + (o.n === 1 ? '' : 's') + (imp && !tr ? ' · 🌎 importación' : ''), quien:nom(o.persona) });
   };
   // En "Pedidos sin OC" el número es la cantidad de SKU del listado, no de pedidos (06.10.2026, Piero).
+  const cardEnt = function(o, i){
+    const flag = o.fin && !o.fr ? '<em class="ok">✔ Finalizada</em>' : o.atraso == null ? '' : o.atraso > 0 ? '<em class="mal">' + o.atraso + ' d.h. tarde</em>' : '<em class="ok">A tiempo</em>';
+    const pr = o.pr, prTxt = pr ? '💼 ' + fmtUSD(pr.usd) + ' en ' + pr.parts.size + ' partida' + (pr.parts.size === 1 ? '' : 's') + (pr.exc.size ? ' · ' + pr.exc.size + ' pasada' + (pr.exc.size === 1 ? '' : 's') : '') : '';
+    const cl = [...o.clis], ids = [...o.ids];
+    return appTarjetaHtml({ cls:'en' + (pr && pr.exc.size ? ' en-exc' : ''), n:i + 1, est:o.fin && !o.fr ? 'Cerrada' : 'Entregada', flag:flag, fecha:(o.fr ? 'Llegó ' : 'Cerrada ') + appDDMM(o.f) + (o.f && o.f.getUTCFullYear() !== c.getUTCFullYear() ? '/' + String(o.f.getUTCFullYear()).slice(2) : ''), codLbl:'OC',
+      cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', polarCorta(appImpNombre(o.prov), 34)],
+      b:['Cliente', (cl.length ? polarCorta(cl.slice(0, 2).join(' · '), 34) + (cl.length > 2 ? ' +' + (cl.length - 2) : '') : 'Stock / sin proyecto') + (ids.length ? ' · ' + ids[0] + (ids.length > 1 ? ' +' + (ids.length - 1) : '') : '')],
+      pie:'📦 ' + o.n + ' ítem' + (o.n === 1 ? '' : 's') + (o.fo ? ' · emitida ' + appDDMM(o.fo) : '') + (prTxt ? ' · ' + prTxt : ''), quien:nom(o.persona) });
+  };
+  const entFiltros = function(){
+    const op = function(v, t, sel){ return `<option value="${v}"${String(v) === String(sel) ? ' selected' : ''}>${t}</option>`; };
+    const ys = [...new Set(entAll.map(function(o){ return o.f ? o.f.getUTCFullYear() : null; }).filter(Boolean).concat([c.getUTCFullYear()]))].sort(function(a, b){ return b - a; });
+    let an = ''; ys.forEach(function(y){ an += op(y, y, entY); });
+    let ms = op(0, 'Todo el año', entM); for(let m = 1; m <= (entY === c.getUTCFullYear() ? c.getUTCMonth() + 1 : 12); m++) ms += op(m, POLAR_MESES[m - 1].charAt(0).toUpperCase() + POLAR_MESES[m - 1].slice(1), entM);
+    return `<div class="m-filtros"><label><span>📅 Año</span><select class="ini-select" id="pcEntAnio">${an}</select></label><label><span>🗓️ Mes (de entrega)</span><select class="ini-select" id="pcEntMes">${ms}</select></label></div>`;
+  };
   const tile = function(k){ const x = S[k]; return `<button type="button" class="pc-${x[2]}${APP_PC.sec === k && !APP_PC.q ? ' sel' : ''}" data-pcsec="${k}"><b>${k === 'ped' ? items.length : x[3].length}</b><span>${k === 'ped' ? 'SKU sin OC' : x[1]}</span></button>`; };
   // Pedidos sin OC como listado: una fila por SKU, el pedido más antiguo primero (05.10.2026, Piero).
   const items = filas.filter(function(r){ return r.tipo !== 'oc'; }).sort(function(a,b){ return ((a.fPedido || 0) - (b.fPedido || 0)) || String(a.codPedido).localeCompare(String(b.codPedido)); });
@@ -14836,6 +14898,15 @@ function appPendComprasHtml(soloLista){
     return q.split(' ').filter(Boolean).every(function(w){ return t.indexOf(w) !== -1 || polarCompacto(t).indexOf(polarCompacto(w)) !== -1; }); };
   const ocHit = new Set(); if(q) filas.forEach(function(r){ if(r.tipo === 'oc' && pasa(r)) ocHit.add(r.codOrden); });
   const bloque = function(k){
+    if(k === 'ent'){
+      const ws = q.split(' ').filter(Boolean), l = q ? entAll.filter(function(o){ return ws.every(function(w){ return o.txt.indexOf(w) !== -1 || polarCompacto(o.txt).indexOf(polarCompacto(w)) !== -1; }); }) : entPer;
+      if(q && !l.length) return '';
+      const tope = APP_PC.entTope, vis = l.slice(0, tope);
+      return `<div class="m-pl-tit"><span>✅ Entregadas${q ? ' (todas)' : ''}</span><b>${l.length}</b></div><div class="m-sec-nota">${S.ent[4]}</div>`
+        + (q ? '' : entFiltros())
+        + (!l.length ? '<div class="ini-vacio">No hay OC entregadas en este período.</div>' : '<div class="imp-linea">' + vis.map(cardEnt).join('') + '</div>')
+        + (l.length > tope ? `<button type="button" class="ini-link" data-pcentmas="1">Ver ${Math.min(60, l.length - tope)} más · ${tope} de ${l.length} ›</button>` : '');
+    }
     const x = S[k]; let l = k === 'ped' ? items : x[3];
     if(q) l = k === 'ped' ? l.filter(pasa) : l.filter(function(o){ return ocHit.has(o.oc); });
     const famChips = k === 'ped' && l.length ? appChips('skufam', APP_PC.fam || '', [['', 'Todas las familias']].concat(skuGrupos(l).map(function(e){ return [e[0], e[0].charAt(0) + e[0].slice(1).toLowerCase() + ' · ' + e[1].length]; }))) : '';
@@ -14846,10 +14917,10 @@ function appPendComprasHtml(soloLista){
         : '<div class="imp-linea">' + l.slice(0, tope).map(function(o, i){ return cardOC(o, i, k); }).join('') + '</div>')
       + (l.length > tope ? `<button type="button" class="ini-link" data-pcmas="1">Ver más (${appN(l.length - tope)} restantes) ›</button>` : '');
   };
-  const lista = q ? (['venc', 'sem', 'luego', 'ped'].map(bloque).join('') || `<div class="ini-vacio">No hay pendientes con "${escapeHtml(APP_PC.q)}".</div>`) : bloque(APP_PC.sec);
+  const lista = q ? (['venc', 'sem', 'luego', 'ped', 'ent'].map(bloque).join('') || `<div class="ini-vacio">No hay OC ni pedidos con "${escapeHtml(APP_PC.q)}".</div>`) : bloque(APP_PC.sec);
   if(soloLista) return lista;
   return appChips('pcper', APP_PC.persona, [['', 'Todos ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size]].concat([...personas.keys()].filter(Boolean).sort().map(function(p){ return [p, nom(p)]; })))
-    + `<div class="m-resumen m-pl-tabs imp-tabs">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}</div>`
+    + `<div class="m-resumen cinco m-pl-tabs imp-tabs">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}${tile('ent')}</div>`
     + `<div class="m-buscar"><input type="search" id="pcBusca" placeholder="🔍 OC, pedido, req., código, producto, proveedor o proyecto" value="${escapeHtml(APP_PC.q || '')}"></div>`
     + `<div id="pcLista">${lista}</div>`;
 }
@@ -15575,6 +15646,7 @@ function appClickInicio(e){
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
   if(b.dataset.prpry) return appPresuProyecto(b.dataset.prpry, b.dataset.prreq || '');
   if(b.dataset.prexc) return appPresuExcedidas(b.dataset.prexc);
+  if(b.dataset.pcentmas){ APP_PC.entTope += 60; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true); return; }
   if(b.dataset.prtodos !== undefined){ APP_PR.todos = b.dataset.prtodos === '1'; APP_PR.cli = ''; return appRenderInicio(); }
   if(b.dataset.sku !== undefined) return appSkuAbrir(b.dataset.sku, b.dataset.skuped, b.dataset.skureq);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
