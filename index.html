@@ -1165,7 +1165,6 @@
     .m-cal-ley i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;} .m-cal-ley i.g2{background:rgba(62,198,172,.45);}
     .m-cal-ley i.pt{border-radius:50%;width:7px;height:7px;background:var(--brand-ink);} .m-cal-ley i.pt.rojo{background:var(--red);}
     .m-cal-det{border-top:1px solid var(--border);margin-top:8px;padding-top:10px;} .m-cal-det > b{font-size:13.5px;}
-    .m-cal-det .m-tiles{grid-template-columns:1fr 1fr;margin-top:8px;}
     /* Buscador y chips */
     .m-buscar input{display:block;width:100%;box-sizing:border-box;border:1px solid var(--border);background:var(--card);color:var(--ink);border-radius:14px;padding:13px 14px;font-size:16px;font-family:inherit;margin-bottom:10px;box-shadow:var(--shadow);}
     /* Productos */
@@ -12796,7 +12795,7 @@ const APP_VISTAS = {
   gerencia:   { nombre:'Gerencia',   ico:'📊', desc:'Indicadores de logística y concentración de gasto.',
     // "Vista" se cambió por el avance de atención de los requerimientos por proyecto (29.09.2026, Piero).
     // La vista se sigue cambiando desde el botón de arriba.
-    tabs:[['inicio','🏠','Inicio'], ['daily','🗓️','Daily'], ['indicadores','⏱️','Tiempos'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
+    tabs:[['inicio','🏠','Inicio'], ['indicadores','⏱️','Tiempos'], ['polar'], ['gasto','💰','Gasto'], ['otif','🎯','OTIF']] },
   supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
     // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
     // Solo Inicio y Mis req. (29.09.2026, Piero: "para el supervisor solo coloca inicio y mis req"). La vista
@@ -12810,7 +12809,7 @@ const APP_VISTAS = {
     tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones']] },
 };
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
-const APP_PANTALLAS = { otif:'OTIF', daily:'Daily call', indicadores:'Tiempos', gasto:'Concentración de gasto', inventario:'Inventario',
+const APP_PANTALLAS = { otif:'OTIF', indicadores:'Tiempos', gasto:'Concentración de gasto', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
@@ -13282,10 +13281,10 @@ function appSaludo(){
 // HTML de cada pantalla guardado por su estado (período, filtros, búsqueda): volver a una pestaña es
 // instantáneo. Se vacía solo cuando cambian los datos (appMemo).
 const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
-  pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); }, daily:function(){ return appDailyHtml(); } };
+  pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
-  const e = { gasto:[APP_G, APP_CAL, APP_F.gasto], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
-    indicadores:[APP_F.indicadores], otif:[APP_F.otif], daily:[APP_DAILY.dia, APP_DAILY.mes] }[p];
+  const e = { gasto:[APP_G, APP_F.gasto], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
+    indicadores:[APP_F.indicadores], otif:[APP_F.otif] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0);
 }
 function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_PANT_FN[p]); }
@@ -13328,7 +13327,7 @@ function appRenderInicio(){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     if(APP.pantalla === 'inventario') setTimeout(appInvCompletar, 0);
     return;
-  } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'otif' || APP.pantalla === 'daily'){
+  } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'otif'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
@@ -13435,11 +13434,11 @@ function appDailyCalHtml(dia){
     celdas += `<button type="button" data-dailyfecha="${k}" class="g${nivel}${k === dia ? ' sel' : ''}${k === u ? ' hoy' : ''}" title="${v} movimiento${v === 1 ? '' : 's'}">${d}</button>`;
   }
   const mesTxt = POLAR_MESES[m].charAt(0).toUpperCase() + POLAR_MESES[m].slice(1);
-  return `<div class="ini-card m-cal"><div class="m-cal-nav"><button type="button" data-dailymes="-1" aria-label="Mes anterior">‹</button><b>${mesTxt} ${a}</b><button type="button" data-dailymes="1" aria-label="Mes siguiente" ${isoDay(new Date(Date.UTC(a, m + 1, 1))) > u ? 'disabled' : ''}>›</button></div>
+  return `<div class="ini-card-tit">🗓️ Daily call in</div><div class="m-cal-nav"><button type="button" data-dailymes="-1" aria-label="Mes anterior">‹</button><b>${mesTxt} ${a}</b><button type="button" data-dailymes="1" aria-label="Mes siguiente" ${isoDay(new Date(Date.UTC(a, m + 1, 1))) > u ? 'disabled' : ''}>›</button></div>
     <div class="m-cal-sub">Toca un día para ver qué hizo cada comprador</div>
     <div class="m-cal-sem">${['L','M','M','J','V','S','D'].map(function(x){ return '<span>' + x + '</span>'; }).join('')}</div>
     <div class="m-cal-dias">${celdas}</div>
-    <div class="m-cal-ley"><span>Menos</span><span><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i></span><span>Más actividad</span></div></div>`;
+    <div class="m-cal-ley"><span>Menos</span><span><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i></span><span>Más actividad</span></div>`;
 }
 function appDailyDatos(dia){
   return appMemo('daily:' + dia, function(){
@@ -13491,21 +13490,21 @@ function appDailyHtml(){
   const tot = function(k){ return appDailyTot(l, k); };
   const montoTot = l.reduce(function(a, x){ return a + x.monto; }, 0);
   const tile = function(t, v, cls){ return `<div><span>${t}</span><b class="${cls || ''}">${v}</b></div>`; };
-  const cab = appDailyCalHtml(dia) + `<div class="ini-card"><div class="m-daily-dia">📅 ${appDailyFechaTxt(dia)}</div>
+  const cab = appDailyCalHtml(dia) + `<div class="m-cal-det"><div class="m-daily-dia">📅 ${appDailyFechaTxt(dia)}</div>
     <div class="m-cal-sub" style="text-align:left">Lo que hizo cada comprador ese día, según los datos de Nisira${dia === appDailyUltimo() ? ' · último día con datos' : ''}</div>
     <div class="m-tiles">${tile('📝 Pedidos directos', appN(tot('ped')))}${tile('🧾 OC emitidas', appN(tot('oc')))}${tile('💰 Monto emitido', appUSD(montoTot))}${tile('✅ Pedidos cerrados', appN(tot('cer')))}${tile('📥 OC recibidas', appN(tot('rec')))}${tile('⏳ Pedidos sin OC al cierre', appN(appDailyTot(D.todos, 'pend')), appDailyTot(D.todos, 'pend') ? 'rojo' : '')}</div>
     <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
-  if(!l.length) return cab + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
+  if(!l.length) return '<div class="ini-card m-cal">' + cab + '<div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
   const tarjeta = function(x){
     const oc = [...x.oc.entries()];
-    return `<div class="ini-card m-daily"><div class="m-daily-nom">👤 ${escapeHtml(PD_PERSONAS[x.cod])} <small>${escapeHtml(x.cod)}</small></div>
+    return `<div class="m-cal-det m-daily"><div class="m-daily-nom">👤 ${escapeHtml(PD_PERSONAS[x.cod])} <small>${escapeHtml(x.cod)}</small></div>
       <div class="m-tiles">${x.oc.size ? tile('🧾 OC emitidas', appN(x.oc.size)) : ''}${x.monto ? tile('💰 Monto', appUSD(x.monto)) : ''}${x.cer.size ? tile('✅ Pedidos cerrados', appN(x.cer.size)) : ''}${x.ped.size ? tile('📝 Pedidos directos', appN(x.ped.size)) : ''}${x.apr.size ? tile('👍 OC aprobadas', appN(x.apr.size)) : ''}${x.rec.size ? tile('📥 OC recibidas', appN(x.rec.size)) : ''}</div>
       ${oc.length ? `<div class="m-det-t">🧾 OC emitidas</div>${oc.slice(0, 8).map(function(e){ const m = D.montoOC.get(e[0]);
         return `<div class="m-det-f"><button type="button" class="mono m-link" data-oc="${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^000\d-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1].prov, 30))}${e[1].imp ? ' · 🌎' : ''}<b>${m ? appUSD(m) : ''}</b></div>`; }).join('')}${oc.length > 8 ? `<div class="m-det-f">… y ${oc.length - 8} OC más</div>` : ''}` : ''}
       ${x.ped.size ? `<div class="m-det-t">📝 Pedidos directos (sin requerimiento)</div>${[...x.ped.entries()].slice(0, 6).map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^0001-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1], 40))}</div>`; }).join('')}${x.ped.size > 6 ? `<div class="m-det-f">… y ${x.ped.size - 6} más</div>` : ''}` : ''}
       ${x.pend.size || x.venc.size ? `<div class="m-daily-pend">⏳ Al cierre del día: ${x.pend.size ? `<b>${appN(x.pend.size)}</b> pedido${x.pend.size === 1 ? '' : 's'} sin OC` : ''}${x.pend.size && x.venc.size ? ' · ' : ''}${x.venc.size ? `<b class="rojo">${appN(x.venc.size)}</b> OC nacional${x.venc.size === 1 ? '' : 'es'} vencida${x.venc.size === 1 ? '' : 's'}` : ''}</div>` : ''}
     </div>`; };
-  return cab + l.map(tarjeta).join('');
+  return '<div class="ini-card m-cal">' + cab + l.map(tarjeta).join('') + '</div>';
 }
 function appDailyCopiar(b){
   const dia = APP_DAILY.dia || appDailyUltimo(), l = appDailyDatos(dia).lista;
@@ -13839,78 +13838,7 @@ function appGastoProv(prov){
 }
 
 // ---------- Calendario (Gerencia) ----------
-// Piero (30.09.2026): "¿no podrás colocar algo tipo calendario?". Mes con cada día coloreado por lo que se
-// compró y un punto por las OC que tenían que llegar ese día (rojo si alguna quedó pendiente). Al tocar un
-// día se ve el detalle: gasto, OC que llegan, requerimientos nuevos y salidas a obra.
-const APP_CAL = { anio:null, mes:null, dia:null };
-function appCalDatos(anio, mes){ rqPreparar(); return appMemo('cal' + anio + '-' + mes, function(){ return appCalDatosCalc(anio, mes); }); }
-function appCalDatosCalc(anio, mes){
-  const dias = {};
-  const d0 = new Date(Date.UTC(anio, mes, 1)), d1 = new Date(Date.UTC(anio, mes + 1, 0));
-  const k = function(d){ return d.getUTCDate(); };
-  const en = function(d){ return d && d >= d0 && d <= d1; };
-  const dia = function(n){ return dias[n] = dias[n] || { gasto:0, ocs:new Set(), pend:new Set(), reqs:new Set(), sal:new Set() }; };
-  ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.anio === anio && r.mes === mes + 1) dia(r.dia).gasto += r.montoPEN || 0; });
-  // Pendiente = la misma regla de Compras → Pendientes, mirando la línea misma (antes se cruzaba con
-  // pdFilas y se perdían OC abiertas que no tienen requerimiento en el Reporte Maestro).
-  // Importaciones: solo cuentan el día de la ETA (con zarpe); la fecha de entrega del proveedor no es la
-  // llegada real (06.10.2026, Piero).
-  polarLineasOC().forEach(function(r){ const f = ocFechaVale(r.codOrden, r.fCompromiso); if(en(f)){ const x = dia(k(f)); x.ocs.add(r.codOrden); if(pdOcPendiente(r)) x.pend.add(r.codOrden); } });
-  rqPreparar();
-  RQ.filas.forEach(function(r){ if(en(r.fReq)) dia(k(r.fReq)).reqs.add(r.codRequerimiento); if(en(r.fSalida)) dia(k(r.fSalida)).sal.add(r.codRequerimiento); });
-  return dias;
-}
-// Detalle de lo que pasó un día del calendario (gasto por proveedor, OC que llegaban, req. nuevos, salidas).
-function appCalDetalle(tipo){
-  const a = APP_CAL.anio, m = APP_CAL.mes, d = APP_CAL.dia, x = appCalDatos(a, m)[d];
-  const fecha = d + ' de ' + POLAR_MESES[m] + ' ' + a;
-  if(!x) return appToast('No hay movimientos ese día.');
-  if(tipo === 'gasto'){
-    const g = ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){ return r.anio === a && r.mes === m + 1 && r.dia === d; });
-    const prov = appAgrupar(g, 'proveedor'), tot = g.reduce(function(s, r){ return s + (r.montoPEN || 0); }, 0);
-    return appListaAbrir('💰 Gasto del día', fecha, `<div class="oc-hero"><div class="oc-num"><b>${appUSD(tot)}</b> · ${g.length} líneas</div><small>Toca un proveedor para ver sus OC.</small></div>
-      <div class="ini-card">${appBarras(prov.slice(0, 20), tot, function(f){ return 'data-q="compras a ' + escapeHtml(f[0]) + '"'; })}</div>`);
-  }
-  if(tipo === 'ocs'){
-    const info = new Map(); polarLineasOC().forEach(function(r){ if(x.ocs.has(r.codOrden) && !info.has(r.codOrden)) info.set(r.codOrden, r); });
-    const l = [...x.ocs].sort(function(p, q){ return (x.pend.has(q) ? 1 : 0) - (x.pend.has(p) ? 1 : 0); });
-    return appListaAbrir('🧾 OC que llegaban', fecha, `<div class="ini-card m-lista">${l.map(function(o){ const r = info.get(o) || {};
-      return appFilaHtml('data-oc="' + escapeHtml(o) + '"', x.pend.has(o) ? 'rojo' : 'verde', polarCorta(appImpNombre(r.proveedor), 40), 'OC ' + escapeHtml(o.replace(/^000\d-0*/, '')) + (r.proyecto ? ' · ' + escapeHtml(polarCorta(appImpNombre(r.proyecto), 30)) : ''), x.pend.has(o) ? 'Pendiente' : 'Llegó', ''); }).join('')}</div>`);
-  }
-  const cods = tipo === 'reqs' ? x.reqs : x.sal;
-  const g = new Map(); rqPreparar(); RQ.filas.forEach(function(r){ if(!cods.has(r.codRequerimiento)) return; const y = g.get(r.codRequerimiento) || { r:r, n:0, falta:0 }; y.n++; if(!rqItemListo(r)) y.falta++; g.set(r.codRequerimiento, y); });
-  return appListaAbrir(tipo === 'reqs' ? '📝 Requerimientos nuevos' : '🚚 Salidas a obra', fecha, `<div class="ini-card m-lista">${[...g.values()].map(function(y){
-    return appFilaHtml('data-ocreq="' + escapeHtml(y.r.codRequerimiento) + '"', y.falta ? 'ambar' : 'verde', polarCorta(appImpNombre(y.r.proyecto), 40), 'Req ' + escapeHtml(y.r.codRequerimiento.replace(/^0001-0*/, '')) + ' · ' + escapeHtml(polarCorta(y.r.responsable || '', 22)) + ' · ' + y.n + ' ítem' + (y.n === 1 ? '' : 's'), y.falta ? 'Faltan ' + y.falta : 'Completo', ''); }).join('')}</div>`);
-}
-function appRefrescarCal(){ const c = document.getElementById('iniCal'); if(c) c.innerHTML = appCalendarioHtml(); }
-function appCalendarioHtml(){
-  const c = appIndCorte();
-  if(APP_CAL.anio == null){ APP_CAL.anio = c.getUTCFullYear(); APP_CAL.mes = c.getUTCMonth(); APP_CAL.dia = c.getUTCDate(); }
-  const a = APP_CAL.anio, m = APP_CAL.mes, dias = appCalDatos(a, m);
-  const nDias = new Date(Date.UTC(a, m + 1, 0)).getUTCDate(), primero = (new Date(Date.UTC(a, m, 1)).getUTCDay() + 6) % 7;
-  const maxG = Math.max.apply(null, Object.values(dias).map(function(x){ return x.gasto; }).concat([1]));
-  let celdas = '';
-  for(let i = 0; i < primero; i++) celdas += '<span></span>';
-  for(let d = 1; d <= nDias; d++){
-    const x = dias[d], nivel = x && x.gasto ? Math.min(4, 1 + Math.floor(x.gasto / maxG * 3.99)) : 0;
-    const hoy = a === c.getUTCFullYear() && m === c.getUTCMonth() && d === c.getUTCDate();
-    celdas += `<button type="button" data-cal="${d}" class="g${nivel}${d === APP_CAL.dia ? ' sel' : ''}${hoy ? ' hoy' : ''}">${d}${x && x.ocs.size ? `<i class="${x.pend.size ? 'rojo' : ''}"></i>` : ''}</button>`;
-  }
-  const x = dias[APP_CAL.dia] || { gasto:0, ocs:new Set(), pend:new Set(), reqs:new Set(), sal:new Set() };
-  const fecha = new Date(Date.UTC(a, m, APP_CAL.dia || 1));
-  const tot = Object.values(dias).reduce(function(s, y){ return s + y.gasto; }, 0);
-  return `<div class="ini-card m-cal"><div class="ini-card-tit">📅 Calendario</div>
-      <div class="m-cal-nav"><button type="button" data-calmes="-1">‹</button><b>${POLAR_MESES[m].charAt(0).toUpperCase() + POLAR_MESES[m].slice(1)} ${a}</b><button type="button" data-calmes="1">›</button></div>
-      <div class="m-cal-sub">Gasto del mes ${appUSD(tot)}</div>
-      <div class="m-cal-sem">${['L','M','M','J','V','S','D'].map(function(s){ return '<span>' + s + '</span>'; }).join('')}</div>
-      <div class="m-cal-dias">${celdas}</div>
-      <div class="m-cal-ley"><span><i class="g2"></i>gasto del día</span><span><i class="pt"></i>OC por llegar</span><span><i class="pt rojo"></i>OC pendiente</span></div>
-      <div class="m-cal-det"><b>${fecha.getUTCDate()} de ${POLAR_MESES[m]}</b>
-        <div class="m-tiles"><button type="button" data-caldet="gasto"><span>💰 Gasto ›</span><b>${x.gasto ? appUSD(x.gasto) : '—'}</b></button><button type="button" data-caldet="ocs"><span>🧾 OC que llegan ›</span><b>${x.ocs.size}${x.pend.size ? ` <small class="rojo">${x.pend.size} pend.</small>` : ''}</b></button>
-          <button type="button" data-caldet="reqs"><span>📝 Req. nuevos ›</span><b>${x.reqs.size}</b></button><button type="button" data-caldet="sal"><span>🚚 Salidas a obra ›</span><b>${x.sal.size}</b></button></div>
-        ${x.pend.size ? `<div class="asis-acc">${[...x.pend].slice(0, 4).map(function(o){ return `<button type="button" data-oc="${escapeHtml(o)}">OC ${escapeHtml(o.replace(/^000\d-0*/, ''))}</button>`; }).join('')}</div>` : ''}
-      </div></div>`;
-}
+function appRefrescarCal(){ const c = document.getElementById('iniCal'); if(c) c.innerHTML = appDailyHtml(); }
 
 // ---------- Inventario (Logística) ----------
 const APP_INV = { f:'reponer', q:'', sel:'', tope:30, fam:'' };
@@ -14788,7 +14716,7 @@ function appInicioGerencia(){
     }
   }
   return `<div class="ini-card"><div class="ini-card-tit">⏱️ Indicadores · semana actual</div>${kpis || '<div class="ini-vacio">Sin datos de indicadores.</div>'}</div>
-    <div id="iniCal">${appCalendarioHtml()}</div>
+    <div id="iniCal">${appDailyHtml()}</div>
     <div class="ini-card"><div class="ini-card-tit">💰 Concentración de gasto · semana actual</div>${gastoPer}${gasto}</div>`;
 }
 
@@ -14828,11 +14756,10 @@ function appClickInicio(e){
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
   if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
-  if(b.dataset.caldet) return appCalDetalle(b.dataset.caldet);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
-  if(b.dataset.dailyfecha){ APP_DAILY.dia = b.dataset.dailyfecha; return appRenderInicio(); }
-  if(b.dataset.dailymes){ appDailyMes(+b.dataset.dailymes); return appRenderInicio(); }
+  if(b.dataset.dailyfecha){ APP_DAILY.dia = b.dataset.dailyfecha; return appRefrescarCal(); }
+  if(b.dataset.dailymes){ appDailyMes(+b.dataset.dailymes); return appRefrescarCal(); }
   if(b.dataset.dailycopia !== undefined) return appDailyCopiar(b);
   if(b.dataset.req) return appAbrirReq(b.dataset.req);
   if(b.dataset.pry) return appAbrirProyecto(b.dataset.pry);
@@ -14842,8 +14769,6 @@ function appClickInicio(e){
   if(b.dataset.otiftipo) return appOtifDetalle('', b.dataset.otiftipo);
   if(b.dataset.gorig !== undefined){ APP_G.orig = b.dataset.gorig; return appRenderInicio(); }
   if(b.dataset.gfam !== undefined){ APP_G.fam = b.dataset.gfam; appRenderInicio(); return window.scrollTo(0, 0); }
-  if(b.dataset.calmes){ APP_CAL.mes += Number(b.dataset.calmes); if(APP_CAL.mes < 0){ APP_CAL.mes = 11; APP_CAL.anio--; } if(APP_CAL.mes > 11){ APP_CAL.mes = 0; APP_CAL.anio++; } APP_CAL.dia = 1; return appRefrescarCal(); }
-  if(b.dataset.cal){ APP_CAL.dia = Number(b.dataset.cal); return appRefrescarCal(); }
   if(b.dataset.invf !== undefined){ APP_INV.f = b.dataset.invf; APP_INV.q = ''; APP_INV.tope = 30; APP_INV.sel = ''; return appRenderInicio(); }
   if(b.dataset.invfam !== undefined){ APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   // Abrir o cerrar un producto repinta solo esa tarjeta: la lista completa son miles.
