@@ -15042,7 +15042,9 @@ function appSkuCorreo(el, abrir){
 }
 function appSkuAbrir(cod, ped, req){
   const fila = pdFilas().find(function(r){ return r.idProducto === cod && r.codPedido === ped && (!req || r.req === req); })
-    || pdFilas().find(function(r){ return r.idProducto === cod; }) || {};
+    || pdFilas().find(function(r){ return r.idProducto === cod; })
+    || (function(){ const a = (typeof rqStockDe === 'function' && rqStockDe(cod)) || {}, h = appSkuHistorial(cod)[0] || {};   // desde Leo, sin pedido pendiente
+      return { producto:a.descripcion || h.pr || '', unidad:a.unidad || h.um || '', familia:FAMILIA_BY_PRODUCTO[cod] || '' }; })();
   const e = escapeHtml, hoy = new Date(), dh = fila.fPedido ? Math.max(0, busdayCount(fila.fPedido, hoy) || 0) : 0;
   const st = appSkuStock(cod), hist = appSkuHistorial(cod), ult = hist[0];
   const pryId = fila.idProyecto && !/^SIN PROYECTO/i.test(fila.idProyecto) ? fila.idProyecto : '';
@@ -15980,6 +15982,11 @@ function polarAccion(e){
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
   if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
+  // 07.10.2026: presupuesto, partidas pasadas, ficha del SKU y Daily desde Leo.
+  if(b.dataset.presu){ const pp = b.dataset.presu.split('|'); return appPresuProyecto(pp[0], pp[1] || ''); }
+  if(b.dataset.presuexc !== undefined){ APP_PR.todos = b.dataset.presuexc === 'todos'; APP_PR.cli = ''; APP_PR.pry = ''; APP_PR.q = ''; return appPresuExcedidas('presu'); }
+  if(b.dataset.sku) return appSkuAbrir(b.dataset.sku);
+  if(b.dataset.dailyfecha) return appDailyAbrir(b.dataset.dailyfecha);
   const ir = function(fn){ polarCerrar(); fn(); };
   if(b.dataset.req) return ir(function(){ appAbrirReq(b.dataset.req); });
   if(b.dataset.pry) return ir(function(){ appAbrirProyecto(b.dataset.pry); });
@@ -16081,6 +16088,10 @@ function polarAyuda(){
     🧾 <b>Compras:</b> "OC 12203", "OC vencidas de Carolina", "¿cuál es la OC más atrasada?", "OC sin aprobar", "¿cuántas importaciones llegan este mes?", "¿cuándo llega el compresor?", "¿qué le falta llegar a Danfoss?", "pedidos sin OC"<br>
     🏭 <b>Proveedores:</b> "¿a quién le compramos compresores?", "último precio de panel 100", "correo de Perfiles Metálicos", "¿qué proveedor demora más?", "¿cuánto tarda una importación?"<br>
     📊 <b>Gerencia</b> (con la clave): "¿cómo vamos esta semana?", "indicador más bajo", "este mes vs el anterior", "gasto de septiembre en paneles", "top proveedores", "compras del proyecto 36"<br>
+    💼 <b>Presupuesto:</b> "presupuesto del PRY2026-0000028", "presupuesto de Bomarea", "presupuesto del req 23405", "partidas pasadas", "¿qué proyectos se pasaron del presupuesto?"<br>
+    🗓️ <b>Daily call in:</b> "puntos del daily este mes", "puntos de Carolina en septiembre", "ranking de compradores este año"<br>
+    🏢 <b>Cliente y proyecto:</b> busca por PRY, por cliente ("Bomarea") o por el nombre del proyecto ("packing de uva")<br>
+    📦 <b>Ficha de un producto:</b> "002000900006" → stock, último precio y la ficha con la evolución del precio<br>
     📥 <b>Excel:</b> "excel del proyecto 36", "excel de pendientes de Melissa", "excel de reposición", "excel de indicadores"</p>
     <p>No hace falta escribir exacto: entiendo errores de tipeo, otras formas de decirlo y fechas como "hoy", "esta semana", "mes pasado" o "agosto".</p>
     <p>💬 Sigo el hilo: "gasto de septiembre" → "¿y en agosto?"; "pendientes de Melissa" → "¿y de Carolina?"; "OC 12203" → "¿y el proveedor?".</p>`;
@@ -16111,7 +16122,8 @@ const POLAR_COMUNES = ('zarpar fabricacion fabricando embarcado embarcada dashbo
   + 'demora demoran demoro tarda tardan atraso atrasos emision emitir emitio emitieron emitidas generacion aprobacion lurin '
   + 'enviaron enviado enviados salieron llegaron despacharon atendieron atendidos compraron compro pidio pidieron ingresaron '
   + 'valorizado comparado versus importaciones reservo reservado mayores principales top resumen '
-  + 'atrasado atrasados atrasada atrasadas retrasado retrasados demorado demorados comprado comprados comprada comprar gastado pasada anterior proxima siguiente actual').split(' ');
+  + 'atrasado atrasados atrasada atrasadas retrasado retrasados demorado demorados comprado comprados comprada comprar gastado pasada anterior proxima siguiente actual '
+  + 'presupuesto presupuestos partida partidas pasadas excedida excedidas excedido puntos daily ranking ficha cliente clientes').split(' ');
 let POLAR_VOCAB = null;
 function polarVocab(){
   const filas = (RQ.filas || []).length, prods = (ALMACEN_DATA && ALMACEN_DATA.rows) ? ALMACEN_DATA.rows.length : 0;
@@ -17378,7 +17390,7 @@ function polarResponder1(texto){
   // vista Supervisor: "¿cuántas importaciones llegan este mes?" no tenía respuesta).
   // Desde el 05.10.2026 el supervisor consulta todo menos precios (antes: solo requerimientos y proyectos).
   const soloReqs = false;
-  if(polarSinPrecios() && /precio|costo|cuesta|monto|gasto|gastado|gastamos|invirti|inversion|valorizado|cuanto (se )?(pago|pagamos|compro|compramos)|indicador|kpi/.test(q)) return polarCandado();
+  if(polarSinPrecios() && /precio|costo|cuesta|monto|gasto|gastado|gastamos|invirti|inversion|valorizado|cuanto (se )?(pago|pagamos|compro|compramos)|indicador|kpi|presupuest|partidas? (pasad|excedid)/.test(q)) return polarCandado();
   const fueraDeAlcance = '<p>En la vista <b>Supervisor</b> te ayudo con tus <b>requerimientos</b> y <b>proyectos</b> 📋</p><p>Escríbeme tu N° de requerimiento (por ejemplo <span class="mono">23303</span>), tu proyecto (PRY… o el nombre del cliente) o pregúntame por "mis requerimientos".</p>';
   const p = polarPeriodoDe(q), foco = polarFocoDe(qr);
   const quiereProducto = (/stock|kardex|consumo|consume|rotacion|precio|costo|cuesta|movimiento|ingresos de|salidas de/.test(q) || /(a que|a quien|que|cual) proveedor|quien(es)? nos (vende|provee)|a quien le (compramos|compran)|donde (compramos|se compra)/.test(qr)) && !/requerimiento|\boc\b|\bpedido\b|proyecto|\bpry\b/.test(q);
@@ -17392,6 +17404,18 @@ function polarResponder1(texto){
       if(appReqPdf(cod)){ appPanelPdf(); return `<p>📄 Listo, armé el PDF del requerimiento <b class="mono">${escapeHtml(cod)}</b> con todos sus ítems.</p>`; } }
   }
   if(/excel|exporta|descarg|xlsx/.test(q)) return polarExportar(q, T);
+  // Presupuesto vs. OC (07.10.2026): por PRY, por req., por OC, por cliente, o el resumen con las partidas pasadas.
+  if(/presupuest|partidas? (pasad|excedid|sobrepasad)|se pas(o|aron) del presupuesto|excedid/.test(qr)){
+    const pryP = polarCodProyecto(T); if(pryP) return polarPresupuesto(pryP, '');
+    const mReq = qr.match(/\b(?:req|requerimiento)\s*(?:0001-)?0*(\d{4,7})\b/) || (!/\boc\b|orden/.test(qr) && qr.match(/\b0*(\d{5})\b/));
+    if(mReq) return polarPresuReq(mReq[1]);
+    const mOC = qr.match(/\b(?:oc|orden(?: de compra)?)\s*(000\d-)?0*(\d{3,7})\b/);
+    if(mOC){ const oc = (mOC[1] || '0001-') + mOC[2].padStart(7, '0'); appOCAbrir(oc); return `<p>💼 Abrí la <b>OC ${escapeHtml(mOC[2])}</b>: en su detalle está el presupuesto de cada partida que toca.</p>`; }
+    const pal = polarPalabrasProducto(qr).filter(function(w){ return !/^(presupuesto|presupuestos|partida|partidas|pasada|pasadas|pasado|excedida|excedidas|excedido|cliente|proyecto|proyectos|como|va|van|del|de|la|el|los|las|se|paso|pasaron|cuanto|cuantas|cuantos|que|hay|ver|dame|muestrame|costo|usado|activos?)$/.test(w); });
+    return (pal.length ? polarPresuCliente(pal) : null) || polarPresuGeneral(/cerrad|todos los proyectos/.test(qr));
+  }
+  // Daily call in: puntos y ranking de compradores en un período (07.10.2026).
+  if(/\bdaily\b|puntos|ranking/.test(qr) && /\bdaily\b|puntos|ranking|compradores?/.test(qr) && !/excel/.test(qr)) return polarDailyPuntos(polarPersonaEn(q, true), p);
   if(!soloReqs && /\bbooking\b|\betd\b|\beta\b|embarc|zarp/.test(q) && !/cuanto tarda|demora|promedio|\boc\s*\d/.test(q)) return polarImportaciones(q, p);
   let prod = T.match(/\b\d{12}\b/), codNota = '';
   if(!prod){ const m9 = T.match(/\b\d{9,11}\b/); const cp = m9 ? polarCodigoParecido(m9[0]) : null; if(cp){ prod = [cp]; codNota = cp === m9[0].padStart(12, '0') ? '' : `<p class="asis-nota">Usé el código <b class="mono">${escapeHtml(cp)}</b> (el más parecido a ${escapeHtml(m9[0])}).</p>`; } }
@@ -17403,6 +17427,7 @@ function polarResponder1(texto){
 
   // Proyecto por código o por número ("proyecto 36"), con sus sub-preguntas.
   const sobrePry = function(id){
+    if(/presupuest|partida/.test(q) && !soloReqs) return polarPresupuesto(id, '');
     if(/gasto|monto|compras del|comprado|gastado|compramos|invirtio|inversion|cuanto (se )?compro/.test(q) && !soloReqs) return polarGastoProyecto(id, p);
     rqPreparar();
     const filas = RQ.filas.filter(function(r){ return r.idProyecto === id; });
@@ -17764,7 +17789,79 @@ function polarProyectoPorNombre(palabras){
 }
 
 // ---------- Producto / stock ----------
+
+// ---------- Leo: presupuesto y Daily (07.10.2026, Piero: "actualiza a Leo con todas las nuevas funciones") ----------
+function polarPresuKpis(usd, pc, exc){ const pct = pc > 0 ? usd / pc * 100 : null;
+  return `<div class="asis-kpis"><div><b style="color:${pct == null ? 'inherit' : pct > 100 ? 'var(--red)' : pct >= 80 ? '#b07a00' : '#13865d'}">${pct == null ? '—' : pct.toFixed(0) + '%'}</b><span>usado</span></div><div><b>${fmtUSD(usd)}</b><span>en OC</span></div><div><b>${pc > 0 ? fmtUSD(pc) : '—'}</b><span>presupuesto costo</span></div>${exc != null ? `<div><b style="color:${exc ? 'var(--red)' : 'inherit'}">${exc}</b><span>partidas pasadas</span></div>` : ''}</div>`; }
+function polarPresupuesto(id, req){
+  const x = appPresuDatos().find(function(y){ return y.id === id; });
+  POLAR.nuevoRef = id; POLAR.nuevoRefTxt = id;
+  if(!x) return `<p>El proyecto <b class="mono">${escapeHtml(id)}</b> no tiene presupuesto cargado (columnas de R.LPY en el Reporte Maestro).</p>`;
+  const parts = [...x.part.values()].filter(function(p){ return !req || p.reqs.has(req); });
+  const pas = parts.filter(function(p){ return p.pc > 0 && p.usd > p.pc; }).sort(function(a, b){ return (b.usd - b.pc) - (a.usd - a.pc); });
+  const filaP = function(p){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(p.t || p.es, 48))}</div><div class="q"><b style="color:var(--red)">${(p.usd / p.pc * 100).toFixed(0)}%</b> · ${fmtUSD(p.usd)} de ${fmtUSD(p.pc)} · se pasó ${fmtUSD(p.usd - p.pc)}</div></div>`; };
+  const usdR = req ? parts.reduce(function(a, p){ return a + (p.usdReq.get(req) || 0); }, 0) : 0;
+  return `<div class="cab">💼 ${escapeHtml(polarCorta(x.n, 40))}</div><div class="sub"><span class="mono">${escapeHtml(id)}</span> · ${escapeHtml(polarCorta(x.cli || '', 34))}${x.e ? ' · ' + escapeHtml(x.e) : ''}${req ? ' · Req ' + escapeHtml(req) : ''}</div>
+    ${polarPresuKpis(x.usd, x.pc, x.exc)}
+    ${req ? `<p>El req. <b>${escapeHtml(req)}</b> toca <b>${parts.length}</b> partida${parts.length === 1 ? '' : 's'} y lleva <b>${fmtUSD(usdR)}</b> en OC.</p>` : ''}
+    ${x.usdSinPresu + x.fuera > 0 && !req ? `<p class="asis-nota">Además hay ${fmtUSD(x.usdSinPresu + x.fuera)} en OC sin presupuesto (partidas en 0 o fuera de partida).</p>` : ''}
+    ${pas.length ? '<p><b>🔴 Partidas pasadas' + (req ? ' de este req.' : '') + ':</b></p>' + pas.slice(0, 4).map(filaP).join('') + polarMas(pas, 4, filaP, 'partidas') : '<p>✅ Ninguna partida' + (req ? ' de este req.' : '') + ' se pasó de su presupuesto.</p>'}
+    <div class="asis-acc">${polarBtn('presu', id + '|' + (req || ''), '💼 Ver presupuesto completo')}${polarBtn('q', id, 'Avance del proyecto')}</div>`;
+}
+function polarPresuReq(n){
+  rqPreparar();
+  const cod = '0001-' + String(n).padStart(7, '0'), f = RQ.filas.find(function(r){ return r.codRequerimiento === cod && r.idProyecto && pryNombre(r.idProyecto); });
+  if(!f) return `<p>No encontré presupuesto para el req. <b class="mono">${escapeHtml(n)}</b>: o no existe, o su proyecto no tiene partidas en R.LPY.</p>`;
+  return polarPresupuesto(f.idProyecto, String(+n));
+}
+function polarPresuCliente(pal){
+  const l = appPresuDatos().filter(function(x){ const t = polarNorm(x.cli + ' ' + x.n + ' ' + x.id); return pal.every(function(w){ return polarNombreCalza(t, w); }); });
+  if(!l.length) return null;
+  if(l.length === 1) return polarPresupuesto(l[0].id, '');
+  const act = l.filter(function(x){ return x.activo; }), base = act.length ? act : l;
+  const usd = base.reduce(function(a, x){ return a + x.usd; }, 0), pc = base.reduce(function(a, x){ return a + x.pc; }, 0), exc = base.reduce(function(a, x){ return a + x.exc; }, 0);
+  const fila = function(x){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(x.n, 40))} <span class="mono">${escapeHtml(x.id)}</span>${x.activo ? '' : ' · cerrado'}</div><div class="q">${x.pct == null ? 'sin presupuesto' : '<b>' + x.pct.toFixed(0) + '%</b> usado'} · ${fmtUSD(x.usd)} de ${fmtUSD(x.pc)}${x.exc ? ' · <b style="color:var(--red)">' + x.exc + ' pasadas</b>' : ''} ${polarBtn('presu', x.id + '|', 'ver')}</div></div>`; };
+  base.sort(function(a, b){ return (b.pct || 0) - (a.pct || 0); });
+  return `<div class="cab">💼 ${escapeHtml(polarCorta(base[0].cli || 'Proyectos', 40))}</div><div class="sub">${base.length} proyecto${base.length === 1 ? '' : 's'}${act.length ? ' activos' : ''}</div>
+    ${polarPresuKpis(usd, pc, exc)}${base.slice(0, 5).map(fila).join('')}${polarMas(base, 5, fila, 'proyectos')}`;
+}
+function polarPresuGeneral(todos){
+  const l = appPresuDatos().filter(function(x){ return todos || x.activo; });
+  if(!l.length) return '<p>No hay presupuesto cargado. Carga el Reporte Maestro con las columnas de R.PRY / R.LPY.</p>';
+  const usd = l.reduce(function(a, x){ return a + x.usd; }, 0), pc = l.reduce(function(a, x){ return a + x.pc; }, 0), exc = l.reduce(function(a, x){ return a + x.exc; }, 0);
+  const pasados = l.filter(function(x){ return x.pct != null && x.pct > 100; }).sort(function(a, b){ return b.pct - a.pct; });
+  const top = (pasados.length ? pasados : l.filter(function(x){ return x.pct != null; }).sort(function(a, b){ return b.pct - a.pct; })).slice(0, 5);
+  POLAR.nuevoRef = 'presupuesto'; POLAR.nuevoRefTxt = 'presupuesto';
+  return `<div class="cab">💼 Presupuesto vs. OC</div><div class="sub">${l.length} proyectos${todos ? '' : ' activos'} · presupuesto costo en dólares</div>
+    ${polarPresuKpis(usd, pc, exc)}
+    <p><b>${pasados.length ? '🔴 Proyectos que ya se pasaron:' : 'Los que más han usado:'}</b></p>
+    ${top.map(function(x){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(x.n, 40))} <span class="mono">${escapeHtml(x.id)}</span></div><div class="q">${escapeHtml(polarCorta(x.cli, 30))} · <b>${x.pct.toFixed(0)}%</b> · ${fmtUSD(x.usd)} de ${fmtUSD(x.pc)} ${polarBtn('presu', x.id + '|', 'ver')}</div></div>`; }).join('')}
+    <div class="asis-acc">${exc ? polarBtn('presuexc', todos ? 'todos' : '', '🔴 Ver las ' + exc + ' partidas pasadas') : ''}${RQ_MOVIL.matches ? polarBtn('pantalla', 'presu', '💼 Abrir Presupuesto') : ''}</div>`;
+}
+function polarDailyPuntos(cod, p){
+  const per = p || polarPeriodoDe('este mes'), desde = appIndIso(per.desde), hasta = appIndIso(per.hasta > appIndCorte() ? appIndCorte() : per.hasta);
+  const l = appDailyRango(desde, hasta, null), max = Math.max.apply(null, l.map(function(x){ return x.pts; }).concat([1]));
+  POLAR.nuevoRef = 'daily'; POLAR.nuevoRefTxt = 'daily call in';
+  const det = function(x){ return x.oc.size + ' OC · ' + x.sku.size + ' SKU · ' + x.cer.size + ' cerrados' + (x.ped.size ? ' · ' + x.ped.size + ' directos' : ''); };
+  if(cod){ const i = l.findIndex(function(x){ return x.cod === cod; }), x = l[i];
+    if(!x) return `<p>${escapeHtml(PD_PERSONAS[cod] || cod)} no tiene puntos del Daily en ${escapeHtml(per.label)}.</p>`;
+    return `<div class="cab">🗓️ ${escapeHtml(PD_PERSONAS[cod] || cod)}</div><div class="sub">Daily call in · ${escapeHtml(per.label)}</div>
+      <div class="asis-kpis"><div><b>${appN(x.pts)}</b><span>puntos</span></div><div><b>${i + 1}.º</b><span>de ${l.length}</span></div><div><b>${x.oc.size}</b><span>OC emitidas</span></div><div><b>${x.sku.size}</b><span>SKU hechos</span></div></div>
+      <p>${det(x)}.</p><p class="asis-nota">Puntos: 2 por OC emitida, 1 por SKU puesto en OC, 1 por pedido cerrado y 1 por pedido directo.</p>`; }
+  if(!l.length) return `<p>No hay actividad de compradores en ${escapeHtml(per.label)}.</p>`;
+  return `<div class="cab">🗓️ Ranking del Daily call in</div><div class="sub">${escapeHtml(per.label)} · ${appN(l.reduce(function(a, x){ return a + x.pts; }, 0))} puntos en total</div>
+    ${l.map(function(x, i){ return `<div class="asis-item"><div class="d">${['🥇','🥈','🥉'][i] || (i + 1) + '.'} <b>${escapeHtml(PD_PERSONAS[x.cod] || x.cod)}</b> · ${appN(x.pts)} pts</div><div class="q">${det(x)}</div><div class="asis-avance"><i><em style="width:${(x.pts / max * 100).toFixed(0)}%"></em></i></div></div>`; }).join('')}
+    <p class="asis-nota">Puntos: 2 por OC emitida, 1 por SKU puesto en OC, 1 por pedido cerrado y 1 por pedido directo.</p>
+    <div class="asis-acc">${polarBtn('dailyfecha', appDailyUltimo(), '🗓️ Daily del último día')}</div>`;
+}
 function polarProducto(cod){
+  const html = polarProducto0(cod), h = appSkuHistorial(cod)[0];
+  if(!html || polarSinPrecios()) return html;
+  // Último precio y botón a la ficha del SKU (07.10.2026).
+  return html + (h ? `<p>💲 Último precio: <b>${escapeHtml(appSkuPrecio(h.pu, h.mon))}</b> c/u con ${escapeHtml(polarCorta(h.prov, 30))} (${appDDMM(h.f)}/${String(h.f.getUTCFullYear()).slice(2)}).</p>` : '')
+    + `<div class="asis-acc">${polarBtn('sku', cod, '📦 Ficha: precio, evolución y presupuesto')}</div>`;
+}
+function polarProducto0(cod){
   const p = rqStockDe(cod);
   if(!p) return `<p>No encontré el código <b class="mono">${escapeHtml(cod)}</b> en el Reporte Almacén.</p>`;
   POLAR.nuevoRef = p.codigo; POLAR.nuevoRefTxt = polarCorta(p.descripcion || p.codigo, 40);
@@ -17841,6 +17938,8 @@ function polarOC(cod){
   return `<div class="cab">OC <span class="mono">${escapeHtml(cod.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(polarCorta(f0.proveedor || 'sin proveedor', 32))}</div>
     <div class="sub">${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden).replace(/ \d{4}$/, '') : ''}${impI ? (impI.etd ? ' · zarpó ' + rqFecha(impI.etd).replace(/ \d{4}$/, '') + ' · ETA ' + (f ? rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : 'por definir') : impI.fReal ? ' · lista en fábrica ' + rqFecha(impI.fReal).replace(/ \d{4}$/, '') + ' · zarpe por definir' : (impI.fRef ? ' · entrega del proveedor en fábrica para el zarpe, estimada ' + rqFecha(impI.fRef).replace(/ \d{4}$/, '') : ' · entrega del proveedor por definir')) : (f ? ' · entrega ' + rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : '')}${f0.origen === 'importado' || impI ? ' · 🌎 importación' : ''}${f0.usuarioCompras ? ' · comprador ' + escapeHtml(PD_PERSONAS[pdPersona(f0.usuarioCompras)] || f0.usuarioCompras) : ''}</div>
     ${fin ? `<p><span class="asis-est ok">✔ Finalizada (OC Finalizadas.xlsx)</span>${[OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).length ? '<small> · ' + escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · ')) + '</small>' : ''}</p>` : est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? (impI ? ' · proveedor atrasado' : ' · atrasada') : (enTr && !/atendido completo/i.test(est) ? (impI.etd ? ' · en tránsito' : ' · lista en fábrica') : '')}</span></p>` : ''}
+    ${(function(){ if(polarSinPrecios()) return ''; const pr = appOCPresuMapa().get(cod); if(!pr) return '';
+      return `<p>💼 Pone <b>${fmtUSD(pr.usd)}</b> en ${pr.parts.size} partida${pr.parts.size === 1 ? '' : 's'} del presupuesto${pr.exc.size ? ' · <b style="color:var(--red)">' + pr.exc.size + ' ya pasada' + (pr.exc.size === 1 ? '' : 's') + '</b>' : ''}.</p>`; })()}
     ${items.slice(0, 5).map(filaI).join('')}
     ${polarMas(items, 5, filaI, 'ítems')}
     <div class="asis-acc">${RQ_MOVIL.matches ? polarBtn('oc', cod, '📄 Ver cómo va la OC') : ''}${polarBtn('q', 'proveedor ' + (f0.proveedor || ''), 'Proveedor')}${reqs.slice(0, 2).map(function(r){ return polarBtn('q', r, 'Req ' + escapeHtml(r.replace(/^0001-0*/, ''))); }).join('')}</div>`;
