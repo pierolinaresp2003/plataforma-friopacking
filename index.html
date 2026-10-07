@@ -1144,6 +1144,8 @@
     .m-daily-pend{margin-top:10px;padding:8px 10px;border-radius:10px;background:var(--surface-2);font-size:12.5px;color:var(--ink-soft);}
     .m-link{background:none;border:0;padding:0;color:var(--brand-ink);font-weight:800;cursor:pointer;font-size:12px;text-decoration:underline;}
     .m-cal-nav button:disabled{opacity:.35;cursor:default;}
+    .m-daily-dia{font-size:17px;font-weight:800;margin-bottom:2px;}
+    .m-cal-ley i.g1{background:rgba(62,198,172,.22);} .m-cal-ley i.g3{background:rgba(62,198,172,.7);} .m-cal-ley i.g4{background:var(--brand-2);} .m-cal-ley span i{margin-right:2px;}
     .m-fams{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
     .m-fam{display:flex;align-items:center;gap:12px;width:100%;margin:0;text-align:left;font-family:inherit;color:var(--ink);cursor:pointer;}
     .m-fam-ic{font-size:26px;line-height:1;flex-shrink:0;} .m-fam-tx{display:flex;flex-direction:column;gap:3px;min-width:0;}
@@ -13283,7 +13285,7 @@ const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, inventario:fun
   pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); }, daily:function(){ return appDailyHtml(); } };
 function appPantallaEstado(p){
   const e = { gasto:[APP_G, APP_CAL, APP_F.gasto], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
-    indicadores:[APP_F.indicadores], otif:[APP_F.otif], daily:[APP_DAILY.dia] }[p];
+    indicadores:[APP_F.indicadores], otif:[APP_F.otif], daily:[APP_DAILY.dia, APP_DAILY.mes] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0);
 }
 function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_PANT_FN[p]); }
@@ -13394,7 +13396,7 @@ function appOtifPct(l){ return l.length ? l.filter(function(x){ return !x.tipo; 
 // No se guarda nada aparte: cada fecha ya está en los datos (fecha del pedido, de la OC, de la aprobación y
 // de la recepción), así que cualquier día pasado se vuelve a armar igual. Pedidos: quien lo generó
 // (ResponsablePedido). OC, aprobaciones, recepciones y vencidas: el comprador de la OC (UsuarioCompras).
-const APP_DAILY = { dia:'' };
+const APP_DAILY = { dia:'', anio:null, mes:null };
 const APP_DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 function appDailyFilas(){
   return getReqRows().concat(PEDIDO_SIN_REQ_ROWS || [], (PEDIDO_SIN_REQ_PEND || []).map(function(r){ return Object.assign({ esPedidoDirecto:true }, r); }));
@@ -13407,11 +13409,37 @@ function appDailyUltimo(){
     return u || corte;
   });
 }
-function appDailyMover(n){
-  const d = new Date((APP_DAILY.dia || appDailyUltimo()) + 'T00:00:00Z');
-  do { d.setUTCDate(d.getUTCDate() + n); } while(d.getUTCDay() === 0);          // sin domingos
-  const k = isoDay(d), u = appDailyUltimo();
-  return k > u ? u : k;
+function appDailyMes(n){          // cambia de mes y selecciona su último día con datos
+  const u = appDailyUltimo(); let m = APP_DAILY.mes + n, a = APP_DAILY.anio;
+  if(m < 0){ m = 11; a--; } if(m > 11){ m = 0; a++; }
+  const fin = isoDay(new Date(Date.UTC(a, m + 1, 0)));
+  if(isoDay(new Date(Date.UTC(a, m, 1))) > u) return;
+  const d = new Date((fin > u ? u : fin) + 'T00:00:00Z');                  // sin fines de semana vacíos
+  while(d.getUTCDate() > 1 && [0, 6].indexOf(d.getUTCDay()) !== -1 && !appDailyActividad(isoDay(d))) d.setUTCDate(d.getUTCDate() - 1);
+  APP_DAILY.anio = a; APP_DAILY.mes = m; APP_DAILY.dia = isoDay(d);
+}
+function appDailyTot(l, k){ const u = new Set(); l.forEach(function(x){ x[k].forEach(function(v, key){ u.add(x[k] instanceof Map ? key : v); }); }); return u.size; }   // sin contar dos veces un pedido de dos personas
+function appDailyActividad(dia){ const l = appDailyDatos(dia).lista;
+  return ['ped', 'oc', 'cer', 'apr', 'rec'].reduce(function(a, k){ return a + appDailyTot(l, k); }, 0); }
+function appDailyCalHtml(dia){
+  const u = appDailyUltimo(), a = APP_DAILY.anio, m = APP_DAILY.mes;
+  const nDias = new Date(Date.UTC(a, m + 1, 0)).getUTCDate(), primero = (new Date(Date.UTC(a, m, 1)).getUTCDay() + 6) % 7;
+  const act = {}; for(let d = 1; d <= nDias; d++){ const k = isoDay(new Date(Date.UTC(a, m, d))); if(k <= u) act[d] = appDailyActividad(k); }
+  const max = Math.max.apply(null, Object.values(act).concat([1]));   // fin de semana sin datos: no cuenta
+  let celdas = ''; for(let i = 0; i < primero; i++) celdas += '<span></span>';
+  for(let d = 1; d <= nDias; d++){
+    const k = isoDay(new Date(Date.UTC(a, m, d))), v = act[d];
+    const finde = [0, 6].indexOf(new Date(Date.UTC(a, m, d)).getUTCDay()) !== -1;
+    if(v == null || (finde && !v)){ celdas += `<button type="button" disabled style="opacity:.35;cursor:default">${d}</button>`; continue; }
+    const nivel = v ? Math.min(4, Math.ceil(v / max * 4)) : 0;
+    celdas += `<button type="button" data-dailyfecha="${k}" class="g${nivel}${k === dia ? ' sel' : ''}${k === u ? ' hoy' : ''}" title="${v} movimiento${v === 1 ? '' : 's'}">${d}</button>`;
+  }
+  const mesTxt = POLAR_MESES[m].charAt(0).toUpperCase() + POLAR_MESES[m].slice(1);
+  return `<div class="ini-card m-cal"><div class="m-cal-nav"><button type="button" data-dailymes="-1" aria-label="Mes anterior">‹</button><b>${mesTxt} ${a}</b><button type="button" data-dailymes="1" aria-label="Mes siguiente" ${isoDay(new Date(Date.UTC(a, m + 1, 1))) > u ? 'disabled' : ''}>›</button></div>
+    <div class="m-cal-sub">Toca un día para ver qué hizo cada comprador</div>
+    <div class="m-cal-sem">${['L','M','M','J','V','S','D'].map(function(x){ return '<span>' + x + '</span>'; }).join('')}</div>
+    <div class="m-cal-dias">${celdas}</div>
+    <div class="m-cal-ley"><span>Menos</span><span><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i></span><span>Más actividad</span></div></div>`;
 }
 function appDailyDatos(dia){
   return appMemo('daily:' + dia, function(){
@@ -13449,9 +13477,9 @@ function appDailyDatos(dia){
     const montoOC = new Map(); ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.oc) montoOC.set(r.oc, (montoOC.get(r.oc) || 0) + (r.montoPEN || 0)); });
     const lista = [...P.values()].map(function(x){ x.monto = [...x.oc.keys()].reduce(function(a, co){ return a + (montoOC.get(co) || 0); }, 0);
       x.hizo = x.ped.size + x.oc.size + x.cer.size + x.apr.size + x.rec.size; return x; })
-      .filter(function(x){ return x.hizo || x.pend.size || x.venc.size; })
       .sort(function(a,b){ return b.hizo - a.hizo || b.pend.size - a.pend.size; });
-    return { lista:lista, montoOC:montoOC };
+    // Solo se muestran y cuentan los que hicieron algo ese día (07.10.2026, Piero); el pendiente del equipo es de todos.
+    return { lista:lista.filter(function(x){ return x.hizo; }), todos:lista, montoOC:montoOC };
   });
 }
 function appDailyFechaTxt(dia){ const d = new Date(dia + 'T00:00:00Z');
@@ -13459,18 +13487,19 @@ function appDailyFechaTxt(dia){ const d = new Date(dia + 'T00:00:00Z');
 function appDailyHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
   const dia = APP_DAILY.dia || appDailyUltimo(), D = appDailyDatos(dia), l = D.lista;
-  const tot = function(k){ const u = new Set(); l.forEach(function(x){ x[k].forEach(function(v, key){ u.add(x[k] instanceof Map ? key : v); }); }); return u.size; };   // sin contar dos veces un pedido de dos personas
+  if(APP_DAILY.anio == null){ APP_DAILY.anio = +dia.slice(0, 4); APP_DAILY.mes = +dia.slice(5, 7) - 1; }
+  const tot = function(k){ return appDailyTot(l, k); };
   const montoTot = l.reduce(function(a, x){ return a + x.monto; }, 0);
   const tile = function(t, v, cls){ return `<div><span>${t}</span><b class="${cls || ''}">${v}</b></div>`; };
-  const cab = `<div class="ini-card"><div class="m-cal-nav"><button type="button" data-dailydia="-1" aria-label="Día anterior">‹</button><b>${appDailyFechaTxt(dia)}</b><button type="button" data-dailydia="1" aria-label="Día siguiente" ${dia >= appDailyUltimo() ? 'disabled' : ''}>›</button></div>
-    <div class="m-cal-sub">Lo que hizo cada comprador ese día, según los datos de Nisira${dia === appDailyUltimo() ? ' · último día con datos' : ''}</div>
-    <div class="m-tiles">${tile('📝 Pedidos directos', appN(tot('ped')))}${tile('🧾 OC emitidas', appN(tot('oc')))}${tile('💰 Monto emitido', appUSD(montoTot))}${tile('✅ Pedidos cerrados', appN(tot('cer')))}${tile('📥 OC recibidas', appN(tot('rec')))}${tile('⏳ Pedidos sin OC al cierre', appN(tot('pend')), tot('pend') ? 'rojo' : '')}</div>
+  const cab = appDailyCalHtml(dia) + `<div class="ini-card"><div class="m-daily-dia">📅 ${appDailyFechaTxt(dia)}</div>
+    <div class="m-cal-sub" style="text-align:left">Lo que hizo cada comprador ese día, según los datos de Nisira${dia === appDailyUltimo() ? ' · último día con datos' : ''}</div>
+    <div class="m-tiles">${tile('📝 Pedidos directos', appN(tot('ped')))}${tile('🧾 OC emitidas', appN(tot('oc')))}${tile('💰 Monto emitido', appUSD(montoTot))}${tile('✅ Pedidos cerrados', appN(tot('cer')))}${tile('📥 OC recibidas', appN(tot('rec')))}${tile('⏳ Pedidos sin OC al cierre', appN(appDailyTot(D.todos, 'pend')), appDailyTot(D.todos, 'pend') ? 'rojo' : '')}</div>
     <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
   if(!l.length) return cab + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>';
   const tarjeta = function(x){
     const oc = [...x.oc.entries()];
     return `<div class="ini-card m-daily"><div class="m-daily-nom">👤 ${escapeHtml(PD_PERSONAS[x.cod])} <small>${escapeHtml(x.cod)}</small></div>
-      <div class="m-tiles">${tile('Pedidos directos', appN(x.ped.size))}${tile('OC emitidas', appN(x.oc.size))}${tile('Monto', x.monto ? appUSD(x.monto) : '—')}${tile('Pedidos cerrados', appN(x.cer.size))}${tile('OC aprobadas', appN(x.apr.size))}${tile('OC recibidas', appN(x.rec.size))}</div>
+      <div class="m-tiles">${x.oc.size ? tile('🧾 OC emitidas', appN(x.oc.size)) : ''}${x.monto ? tile('💰 Monto', appUSD(x.monto)) : ''}${x.cer.size ? tile('✅ Pedidos cerrados', appN(x.cer.size)) : ''}${x.ped.size ? tile('📝 Pedidos directos', appN(x.ped.size)) : ''}${x.apr.size ? tile('👍 OC aprobadas', appN(x.apr.size)) : ''}${x.rec.size ? tile('📥 OC recibidas', appN(x.rec.size)) : ''}</div>
       ${oc.length ? `<div class="m-det-t">🧾 OC emitidas</div>${oc.slice(0, 8).map(function(e){ const m = D.montoOC.get(e[0]);
         return `<div class="m-det-f"><button type="button" class="mono m-link" data-oc="${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^000\d-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1].prov, 30))}${e[1].imp ? ' · 🌎' : ''}<b>${m ? appUSD(m) : ''}</b></div>`; }).join('')}${oc.length > 8 ? `<div class="m-det-f">… y ${oc.length - 8} OC más</div>` : ''}` : ''}
       ${x.ped.size ? `<div class="m-det-t">📝 Pedidos directos (sin requerimiento)</div>${[...x.ped.entries()].slice(0, 6).map(function(e){ return `<div class="m-det-f"><button type="button" class="mono m-link" data-q="pedido ${escapeHtml(e[0])}">${escapeHtml(e[0].replace(/^0001-0*/, ''))}</button> ${escapeHtml(polarCorta(e[1], 40))}</div>`; }).join('')}${x.ped.size > 6 ? `<div class="m-det-f">… y ${x.ped.size - 6} más</div>` : ''}` : ''}
@@ -14802,7 +14831,8 @@ function appClickInicio(e){
   if(b.dataset.caldet) return appCalDetalle(b.dataset.caldet);
   if(b.dataset.q !== undefined) return polarAbrir(b.dataset.q || undefined);
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
-  if(b.dataset.dailydia){ APP_DAILY.dia = appDailyMover(+b.dataset.dailydia); return appRenderInicio(); }
+  if(b.dataset.dailyfecha){ APP_DAILY.dia = b.dataset.dailyfecha; return appRenderInicio(); }
+  if(b.dataset.dailymes){ appDailyMes(+b.dataset.dailymes); return appRenderInicio(); }
   if(b.dataset.dailycopia !== undefined) return appDailyCopiar(b);
   if(b.dataset.req) return appAbrirReq(b.dataset.req);
   if(b.dataset.pry) return appAbrirProyecto(b.dataset.pry);
