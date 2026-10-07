@@ -1177,6 +1177,7 @@
     .sku-ped span{display:block;font-size:11px;font-weight:800;color:var(--muted);} .sku-ped b{display:block;font-size:14px;font-weight:800;color:var(--ink);margin-top:2px;overflow-wrap:anywhere;} .sku-ped b.rojo{color:var(--red);}
     .sku-stock div.ok b{color:var(--green);} .sku-nota{display:block;margin-top:8px;color:var(--muted);font-size:12px;} .sku-ult{margin-top:10px;font-size:13px;color:var(--ink-soft);}
     .sku-ley{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 2px;font-size:12px;color:var(--ink-soft);font-weight:700;} .sku-ley i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;}
+    .pry-nom{display:block;font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px;} .rqm-cab .pry-nom{color:inherit;opacity:.85;}
     .sku-graf{position:relative;margin-top:6px;} .sku-graf svg{display:block;width:100%;height:auto;overflow:visible;}
     .sku-grid{stroke:var(--border);stroke-width:1;vector-effect:non-scaling-stroke;} .sku-eje{font-size:11px;fill:var(--muted);font-family:inherit;}
     .sku-linea{fill:none;stroke:var(--ink-soft);stroke-opacity:.45;stroke-width:2;vector-effect:non-scaling-stroke;} .sku-pt{stroke:var(--card);stroke-width:2;vector-effect:non-scaling-stroke;}
@@ -2284,6 +2285,43 @@ let PEDIDO_SIN_REQ_ROWS = [];
 // Líneas de PedidoSinReq.xlsx para Compras → Pendientes (28.09.2026): a diferencia de
 // PEDIDO_SIN_REQ_ROWS trae también los pedidos que todavía no tienen OC, y el estado/recepción de la OC.
 let PEDIDO_SIN_REQ_PEND = [];
+// ---------- Datos del proyecto (07.10.2026, Piero) ----------
+// La columna F de Reporte Maestro se llamaba "NombreProyecto" pero siempre trajo el CLIENTE; ahora se llama
+// "NombreCliente". Lo que la plataforma guarda como "proyecto" (py) es ese cliente. El proyecto real llega en
+// las columnas nuevas de la hoja R.PRY: Reporte Maestro BG:BN (+ partida BO:BR) y PedidoSinReq AF:AN, por IdProyecto.
+let PRY_INFO_RM = {}, PRY_INFO_PSR = {}, PRY_INFO_SNAP = {};
+function pryInfo(id){ id = String(id || '').trim(); return id ? (PRY_INFO_RM[id] || PRY_INFO_PSR[id] || PRY_INFO_SNAP[id] || null) : null; }
+function pryNombre(id){ const x = pryInfo(id); return (x && x.n) || ''; }
+function pryTodos(){ return Object.assign({}, PRY_INFO_SNAP, PRY_INFO_PSR, PRY_INFO_RM); }
+// Solo coincidencia exacta: "Fecha" o "Estado" a secas no deben caer en FechaRequerimiento / EstadoPedido.
+function pryColumnas(h){
+  const ex = function(ns){ for(const n of ns){ const i = h.findIndex(function(x){ return (x || '').toString().trim().toLowerCase() === n.toLowerCase(); }); if(i !== -1) return i; } return -1; };
+  return { id:ex(['IdProyecto']), nom:ex(['NombrePry']), cot:ex(['Cotización','Cotizacion']), idc:ex(['IdCliente']), f:ex(['Fecha']), e:ex(['Estado']),
+    dep:ex(['Departamento']), fc:ex(['FechaCierre']), rf:ex(['Refrigerante']),
+    es:ex(['Estructura']), tp:ex(['TareaPry']), pvt:ex(['PresupuestoVenta']), pct:ex(['PresupuestoCosto']) };
+}
+function pryLeer(dest, r, c, id, cliente){
+  id = String(id || '').trim(); if(!id || id === '-' || c.nom === -1) return;
+  const t = function(i){ const v = (i !== -1 && r[i] != null) ? String(r[i]).trim() : ''; return (v === '-' || v.charAt(0) === '#') ? '' : v; };
+  const n = t(c.nom); if(!n) return;
+  const x = dest[id] || (dest[id] = { n:n });
+  const set = function(k, v){ if(v && !x[k]) x[k] = v; };
+  set('cq', t(c.cot)); set('ic', t(c.idc)); set('e', t(c.e)); set('dep', t(c.dep)); set('rf', t(c.rf));
+  set('cl', cliente && !/^sin proyecto|^pedido directo/i.test(cliente) ? cliente : '');
+  set('f', c.f !== -1 ? isoDay(parseExcelDate(r[c.f])) : ''); set('fc', c.fc !== -1 ? isoDay(parseExcelDate(r[c.fc])) : '');
+}
+// Partida del proyecto de una línea (BO:BR de Reporte Maestro).
+function pryPartida(r, c){
+  const t = function(i){ const v = (i !== -1 && r[i] != null) ? String(r[i]).trim() : ''; return (v === '-' || v.charAt(0) === '#') ? '' : v; };
+  const num = function(i){ const v = t(i); return (v !== '' && !isNaN(Number(v))) ? Math.round(Number(v) * 100) / 100 : null; };
+  return { estructura:t(c.es), tareaPry:t(c.tp), presVenta:num(c.pvt), presCosto:num(c.pct) };
+}
+// "Estado Pendiente · LIMA · Refrigerante AMONIACO · CPY 0001-0001099"
+function pryLinea(id){ const x = pryInfo(id); if(!x) return '';
+  return [x.e ? 'Estado ' + x.e : '', x.dep, x.rf ? 'Refrigerante ' + x.rf : '', x.cq, x.fc ? 'Cierre ' + x.fc.split('-').reverse().join('/') : ''].filter(Boolean).join(' · '); }
+// Celda "Cliente / Proyecto": el cliente y debajo el nombre real del proyecto.
+function pryCelda(cliente, id){ const n = pryNombre(id);
+  return ((cliente == null || cliente === '') ? '—' : escapeHtml(String(cliente))) + (n ? '<br><small class="pry-nom">🏗️ ' + escapeHtml(n) + '</small>' : ''); }
 // ---------- Catálogo maestro de productos (Articulos.xlsx / MasterArt, Nisira) ----------
 // Fuente de verdad para Familia/Subfamilia por IdProducto — reemplaza la adivinanza por palabras
 // clave como primer criterio (pedido de Piero, 07.09.2026, tras auditar el archivo real: 15,511 de
@@ -3030,6 +3068,7 @@ function buildSnapshot(){
     supervisores: SUPERVISOR_MAIL || null,
     accesos: SUPERVISOR_ROL || null,
     ocFinalizadas: Object.keys(OC_FIN).length ? OC_FIN : null,   // OC Finalizadas.xlsx (30.09.2026)
+    proyectos: pryTodos(),   // datos del proyecto por IdProyecto (07.10.2026)
     filename: DATA.filename,
     corte: DATA.corte ? DATA.corte.toISOString() : null,
     excluded: DATA.excluded,
@@ -3086,13 +3125,14 @@ function buildSnapshot(){
         qo: r.cantOrden, qr: r.cantRecep, g: r.guia, fx2: r.factura,
         fs: isoDay(r.fSalida), qs: r.cantSalida, gs: r.docSalida, so: r.sedeSalida || '',
         fob: isoDay(r.fObra), qob: r.cantObra, gob: r.docObra,
+        es: r.estructura || undefined, tp: r.tareaPry || undefined, ptv: r.presVenta == null ? undefined : r.presVenta, ptc: r.presCosto == null ? undefined : r.presCosto,
       })),
       // Pedidos directos de PedidoSinReq.xlsx (04.09.2026 ronda 37) — OC que Reporte Maestro.xlsx nunca
       // trae (ver PEDIDO_SIN_REQ_ROWS). Se publican aparte para que el Reporte de Compras por responsable
       // las siga mostrando en el link público sin que cada persona tenga que volver a cargar ese Excel.
       pedidoDirecto: (PEDIDO_SIN_REQ_ROWS||[]).map(r => ({
         pr: r.producto, ip: r.idProducto, fa: r.familia, uc: r.usuarioCompras, rp: r.responsableD1,
-        cp: r.codPedido, co: r.codOrden,
+        cp: r.codPedido, co: r.codOrden, ipy: r.idProyecto || undefined,
         fp: isoDay(r.fPedido), fo: isoDay(r.fOrden), fb: isoDay(r.fAprob), fc: isoDay(r.fRecep), fx: isoDay(r.fCompromiso),
         d2: r.d2, d3: r.d3, d4: r.d4, d4c: r.d4cumple,
         mn: r.moneda, mo: r.montoNativo==null?null:Math.round(r.montoNativo*100)/100, cd: r.condiciones,
@@ -3102,7 +3142,7 @@ function buildSnapshot(){
       })),
       // Compras → Pendientes (28.09.2026): solo las líneas de PedidoSinReq que siguen abiertas.
       pendDirecto: PEDIDO_SIN_REQ_PEND.filter(r => pdOcAbierta(r) || pdPedidoAbierto(r)).map(r => ({
-        cp: r.codPedido, fp: isoDay(r.fPedido), ep: r.estadoPedido, rp: r.responsablePedido, qp: r.cantPedido,
+        cp: r.codPedido, ipy: r.idProyecto || undefined, fp: isoDay(r.fPedido), ep: r.estadoPedido, rp: r.responsablePedido, qp: r.cantPedido,
         co: r.codOrden, eo: r.estadoOrden, uc: r.usuarioCompras, pv: r.proveedor, ip: r.idProducto,
         pr: r.producto, u: r.unidad, qo: r.cantOrden, qr: r.cantRecep,
         fo: isoDay(r.fOrden), fx: isoDay(r.fCompromiso), fc: isoDay(r.fRecep),
@@ -3334,6 +3374,7 @@ function loadFromSnapshot(snap){
   if(snap.supervisores) SUPERVISOR_MAIL = snap.supervisores;
   if(snap.accesos) SUPERVISOR_ROL = snap.accesos;
   if(snap.ocFinalizadas) OC_FIN = snap.ocFinalizadas;
+  PRY_INFO_SNAP = snap.proyectos || {}; PRY_INFO_RM = {}; PRY_INFO_PSR = {};
   const isLegacyProcesoSnapshot = !(snap.procesoSchemaVersion >= 2);
   if(isLegacyProcesoSnapshot && snap.proceso && snap.proceso.rows && snap.proceso.rows.length){
     console.warn('Snapshot publicado con un formato antiguo de "proceso" (sin procesoSchemaVersion >= 2) — se ignoró el campo "rp" heredado de cada fila y se usó JCENTENO por defecto para el Indicador 1. Vuelve a publicar ("Guardar y compartir") con el archivo actual para actualizar el link.');
@@ -3389,6 +3430,7 @@ function loadFromSnapshot(snap){
       guia: r.g || '', factura: r.fx2 || '',
       fSalida: fromIsoDay(r.fs), cantSalida: (r.qs!=null ? r.qs : null), docSalida: r.gs || '', sedeSalida: r.so || rqSedeDe('', r.gs),
       fObra: fromIsoDay(r.fob), cantObra: (r.qob!=null ? r.qob : null), docObra: r.gob || '',
+      estructura: r.es || '', tareaPry: r.tp || '', presVenta: (r.ptv!=null ? r.ptv : null), presCosto: (r.ptc!=null ? r.ptc : null),
     })) : [],
     // "alertas" no existe en snapshots publicados antes de esta función (01.09.2026) — queda vacío en
     // ese caso, simplemente no se muestran alertas hasta que se vuelva a publicar con el archivo actual.
@@ -3402,7 +3444,7 @@ function loadFromSnapshot(snap){
   // no las suma hasta que se vuelva a publicar con ambos archivos cargados). origen se recalcula por
   // CodOrden (no se publica aparte: es una función pura del código, ver origenForDocumento).
   PEDIDO_SIN_REQ_ROWS = (snap.proceso && snap.proceso.pedidoDirecto) ? snap.proceso.pedidoDirecto.map(r => ({
-    proyecto: "SIN PROYECTO (compra de almacén)", producto: r.pr, idProducto: r.ip, familia: r.fa || 'Sin familia',
+    proyecto: "SIN PROYECTO (compra de almacén)", idProyecto: r.ipy || '', producto: r.pr, idProducto: r.ip, familia: r.fa || 'Sin familia',
     proveedor: r.pv || "", cantidadOrden: (r.qo != null ? r.qo : null), cantRecepcion: (r.qr != null ? r.qr : null), unidad: r.um || "", estadoOrden: r.eo || "",
     origen: origenForDocumento(r.co), responsablePedido: r.rp || "", usuarioCompras: r.uc,
     responsableSalida: "", codRequerimiento: "", codPedido: r.cp, codOrden: r.co, camino: 'compra',
@@ -3413,7 +3455,7 @@ function loadFromSnapshot(snap){
     etd: fromIsoDay(r.et), fEntregaRef: fromIsoDay(r.fer), fEntregaReal: fromIsoDay(r.fe), esPedidoDirecto: true,
   })) : [];
   PEDIDO_SIN_REQ_PEND = (snap.proceso && snap.proceso.pendDirecto) ? snap.proceso.pendDirecto.map(r => ({
-    codPedido: r.cp || '', fPedido: fromIsoDay(r.fp), estadoPedido: r.ep || '', responsablePedido: r.rp || '',
+    codPedido: r.cp || '', idProyecto: r.ipy || '', fPedido: fromIsoDay(r.fp), estadoPedido: r.ep || '', responsablePedido: r.rp || '',
     cantPedido: (r.qp!=null ? r.qp : null), codOrden: r.co || '', estadoOrden: r.eo || '', usuarioCompras: r.uc || '',
     proveedor: r.pv || '', idProducto: r.ip || '', producto: r.pr || '', unidad: r.u || '',
     cantOrden: (r.qo!=null ? r.qo : null), cantRecep: (r.qr!=null ? r.qr : null),
@@ -3676,7 +3718,7 @@ function processWorkbook(wb, filename){
     familia: findCol(headerRow, ["NombreFamilia","Familia"]),
     proveedor: findCol(headerRow, ["NombreProveedor","Proveedor"]),
     rucProveedor: findCol(headerRow, ["RucProveedor","RUC Proveedor","RUC"]),
-    nombreProyecto: findCol(headerRow, ["NombreProyecto"]),
+    nombreProyecto: findCol(headerRow, ["NombreCliente","NombreProyecto"]),   // F: es el cliente (07.10.2026)
     idProyecto: findCol(headerRow, ["IdProyecto"]),
     estadoReq: findCol(headerRow, ["EstadoRequerimiento"]),
     estadoPedido: findCol(headerRow, ["EstadoPedido"]),
@@ -3728,6 +3770,8 @@ function processWorkbook(wb, filename){
     fechaIngreso: findCol(headerRow, ["FechaIngreso"]),
   };
 
+  const colPry = pryColumnas(headerRow);   // BG:BR, datos del proyecto (07.10.2026)
+  PRY_INFO_RM = {};
   const dataRows = rows.slice(headerRowIdx+1);
   let totalRows = 0, excluded = 0;
   const allOrders = []; // nacionales + importadas, mismo criterio de tardanza (usado por "Proveedores Fuera de Tiempo")
@@ -3939,7 +3983,8 @@ function processWorkbook(wb, filename){
       // Nisira escribe "sin dato" como un guion, no como celda vacía — se normaliza para que la
       // pantalla muestre "—" y no un "-" suelto que parece un documento real.
       const txt = (i)=>{ const v = i!==-1 ? (r[i]||"").toString().trim() : ""; return (v === "-" || v.charAt(0) === "#") ? "" : v; };
-      reqRows.push({
+      pryLeer(PRY_INFO_RM, r, colPry, txt(col.idProyecto), txt(col.nombreProyecto));
+      reqRows.push(Object.assign(pryPartida(r, colPry), {
         fReq, codRequerimiento: col.codRequerimiento!==-1 ? txt(col.codRequerimiento) : "",
         responsable: txt(col.nombreResponsable),
         obs: txt(col.obsReq),
@@ -3975,7 +4020,7 @@ function processWorkbook(wb, filename){
         fObra: col.fechaIngreso!==-1 ? parseExcelDate(r[col.fechaIngreso]) : null,
         cantObra: numOrNull(col.cantidadIngreso!==-1 ? r[col.cantidadIngreso] : null),
         docObra: txt(col.docDestino),
-      });
+      }));
 
       if(d1==null && d2==null && d3==null && d4==null && d6==null) continue; // nada calculable
 
@@ -4117,6 +4162,8 @@ function processPedidoSinReq(wb, filename){
     fEntregaRef: findCol(headerRow, ["F. Entrega Ref","F Entrega Ref"]),
     fEntregaReal: findCol(headerRow, ["F. Entrega Real","F Entrega Real"]),
   };
+  const colPry = pryColumnas(headerRow);   // AF:AN, datos del proyecto (07.10.2026)
+  PRY_INFO_PSR = {};
   const dataRows = rows.slice(headerRowIdx+1);
   const map = {};
   const ordenRows = [];
@@ -4133,13 +4180,15 @@ function processPedidoSinReq(wb, filename){
     if(!cp) continue;
     const resp = col.responsablePedido!==-1 ? (r[col.responsablePedido]||"").toString().trim() : "";
     if(resp) { map[cp] = resp; n++; }
+    const idPry = colPry.id !== -1 ? sinBasura(r[colPry.id]) : '';
+    pryLeer(PRY_INFO_PSR, r, colPry, idPry, '');
 
     // Compras → Pendientes (28.09.2026): todas las líneas, tengan OC o no.
     {
       const t = (i)=>{ const v = i!==-1 ? (r[i]==null ? '' : String(r[i])).trim() : ''; return (v === '-' || v.charAt(0) === '#') ? '' : v; };
       const num = (i)=>{ const v = t(i); return (v !== '' && !isNaN(Number(v))) ? Number(v) : null; };
       pendRows.push({
-        codPedido: cp, fPedido: col.fechaPedido!==-1 ? parseExcelDate(r[col.fechaPedido]) : null,
+        codPedido: cp, idProyecto: idPry, fPedido: col.fechaPedido!==-1 ? parseExcelDate(r[col.fechaPedido]) : null,
         estadoPedido: t(col.estadoPedido), responsablePedido: resp, cantPedido: num(col.cantidadPedido),
         codOrden: t(col.codOrden), estadoOrden: t(col.estadoOrden), usuarioCompras: t(col.usuarioCompras),
         proveedor: t(col.nombreProveedor), idProducto: t(col.idProducto), producto: t(col.producto),
@@ -4168,7 +4217,7 @@ function processPedidoSinReq(wb, filename){
     const fRecepDiaAt = fRecepAt ? new Date(Date.UTC(fRecepAt.getUTCFullYear(), fRecepAt.getUTCMonth(), fRecepAt.getUTCDate())) : null;
     const fLimite4At = limite4For({ fOrden: fOrdenAt, fAprob: fAprobAt, fCompromiso: fCompromisoAt });
     ordenRows.push({
-      proyecto: "SIN PROYECTO (compra de almacén)",
+      proyecto: "SIN PROYECTO (compra de almacén)", idProyecto: idPry,
       producto: col.producto!==-1 ? (r[col.producto]||"").toString() : "(sin descripción)",
       idProducto: idProductoAt,
       // PedidoSinReq.xlsx no trae Familia — se resuelve por IdProducto contra Reporte Maestro.xlsx (ver
@@ -10206,7 +10255,7 @@ function openDrilldown(ind, rows, groupLabel){
   document.getElementById('procDetailTitle').textContent = 'Indicador ' + ind.num + ' — ' + ind.stage + (groupLabel ? ' · ' + groupLabel : '');
   document.getElementById('procDetailNote').innerHTML = 'Mostrando ' + capped.length.toLocaleString('es-PE') + ' de ' + withVal.length.toLocaleString('es-PE') + ' líneas con dato' + (ocDistintas!=null ? ' (' + ocDistintas.toLocaleString('es-PE') + ' OC distintas — el indicador se calcula por OC, no por línea)' : '') + (sorted.length>500?' (ordenadas por mayor desvío)':'') + (withoutVal>0 ? ' · ' + withoutVal.toLocaleString('es-PE') + ' más sin información para este indicador' : '') + (pendingRows.length>0 ? ' · ' + pendingRows.length.toLocaleString('es-PE') + ' pendientes de llegar (se listan al final)' : '') + (regRows.length>0 ? ' · ' + regRows.length.toLocaleString('es-PE') + ' excluidas del cálculo por regularización (se listan al final)' : '') + (impRows.length>0 ? ' · ' + impRows.length.toLocaleString('es-PE') + ' importaciones excluidas del cálculo (se listan al final)' : '') + '.';
   const table = document.getElementById('tableDrilldown');
-  table.querySelector('thead').innerHTML = '<tr><th>Requerimiento</th><th>Proyecto</th><th>Cód. producto</th><th>Descripción</th><th>Pedido</th><th>OC</th><th>Proveedor</th><th>Responsable</th><th>Fecha inicial</th><th>Fecha final</th><th>Días hábiles</th><th>Meta</th><th>Estado</th></tr>';
+  table.querySelector('thead').innerHTML = '<tr><th>Requerimiento</th><th>Cliente</th><th>Cód. producto</th><th>Descripción</th><th>Pedido</th><th>OC</th><th>Proveedor</th><th>Responsable</th><th>Fecha inicial</th><th>Fecha final</th><th>Días hábiles</th><th>Meta</th><th>Estado</th></tr>';
   function rowHtml(r, forced){
     const d = forced ? forced.dias : r[ind.key];
     const cumple = forced ? null : indCumple(ind, r);
@@ -10927,7 +10976,7 @@ function crtVistaProyectos(cont){
     <div class="crt-th"><div>Proyecto</div><div>Cliente</div><div>Requerim.</div><div>Productos</div><div>Con certificado</div></div>
     ${[...prys.entries()].sort((a,b)=>b[1].filas.length-a[1].filas.length).map(([id,p])=>`
       <button class="crt-tr" data-crtpry="${escapeHtml(id)}">
-        <div class="id">${crtMarca(id)}</div>
+        <div class="id">${crtMarca(id)}${pryNombre(id) ? '<small class="pry-nom">' + escapeHtml(pryNombre(id)) + '</small>' : ''}</div>
         <div class="nom">${crtMarca(p.nombre)}</div>
         <div class="crt-num">${new Set(p.filas.map(f=>f.req)).size}</div>
         <div class="crt-num">${p.filas.length}</div>
@@ -11550,13 +11599,13 @@ function rqVistaTarjetas(cont, filas){
   const faltaTxt = soloFalta ? `<div class="rqm-falta">${orden.length ? '⏳ Faltan <b>' + orden.length + '</b> de ' + todo.length + ' ítems' : '✅ Todo ya llegó a obra'}</div>` : '';
   const cab = unSoloReq ? `<div class="rqm-cab">
       <div class="rqm-cab-top"><span class="rqm-num">${escapeHtml(r0.codRequerimiento)}</span><span class="rqm-fecha">${rqFecha(r0.fReq)}</span></div>
-      <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>
+      <div class="rqm-pry">${pryCelda(r0.proyecto, r0.idProyecto)}</div>
       <div class="rqm-resp">Pidió <b>${rqTxt(r0.responsable)}</b> · ${todo.length} ítem${todo.length === 1 ? '' : 's'}</div>${faltaTxt}
       ${cruce.length ? `<div class="rqm-falta">📦 <b>${cruce.length}</b> ítem${cruce.length === 1 ? '' : 's'} con stock en camino sin REQ (ver en la tarjeta)</div>` : ''}
       <button type="button" class="rqm-falta rq-pdf-btn" data-reqpdf="${escapeHtml(r0.codRequerimiento)}">📄 Exportar a PDF</button>
     </div>` : (soloFalta && pryUnico ? `<div class="rqm-cab">
       <div class="rqm-cab-top"><span class="rqm-num">${escapeHtml(r0.idProyecto || '')}</span><span class="rqm-fecha">${reqs.length} req.</span></div>
-      <div class="rqm-pry">${rqTxt(r0.proyecto)}</div>${faltaTxt}
+      <div class="rqm-pry">${pryCelda(r0.proyecto, r0.idProyecto)}</div>${faltaTxt}
     </div>` : '');
 
   const listosVer = listos;
@@ -11630,7 +11679,7 @@ function rqVistaItem(cont, filas){
       <td>${rqFecha(r.fReq)}</td>
       <td><span class="cod">${escapeHtml(r.codRequerimiento)}</span></td>
       <td>${rqTxt(r.responsable)}</td>
-      <td class="desc">${rqTxt(r.proyecto)}</td>
+      <td class="desc">${pryCelda(r.proyecto, r.idProyecto)}</td>
       <td><span class="rq-est ${rqClaseEstado(r.estadoCalc)}" title="Estado en Nisira: ${escapeHtml(r.estado)}">${escapeHtml(r.estadoCalc)}</span></td>
       <td>${r.via ? `<span class="rq-via ${r.via === 'Directo' ? 'dir' : 'ped'}">${r.via}</span>` : '—'}
         ${r.mixtoItem ? '<span class="rq-mix" title="De este mismo ítem una parte salió del stock del almacén y la otra se compró con OC: esta línea es solo una de las dos partes.">ítem partido: directo + pedido</span>' : ''}</td>
@@ -11675,7 +11724,7 @@ function rqVistaItem(cont, filas){
           <th colspan="3" class="t6">6 · Recepción en obra</th>
         </tr>
         <tr>
-          <th>F. Req.</th><th>N° Req.</th><th>Responsable</th><th>Proyecto</th><th>Estado</th><th>Vía</th>
+          <th>F. Req.</th><th>N° Req.</th><th>Responsable</th><th>Cliente / Proyecto</th><th>Estado</th><th>Vía</th>
           <th>Código</th><th>Descripción</th><th class="num">Cant.</th><th>UM</th>
           <th>N° Pedido</th><th>F. Pedido</th><th class="num">Cant. pedida</th><th>Resp. Pedido</th>
           <th>N° OC</th><th>Origen</th><th>Usuario Compras</th><th>Proveedor</th>
@@ -11720,7 +11769,7 @@ function rqLlenarFiltros(){
     rows.forEach(function(r){ if(!m.has(r.idProyecto)) m.set(r.idProyecto, r.proyecto); });
     const lista = [...m.entries()].sort(function(a,b){ return String(a[1]).localeCompare(String(b[1]), 'es'); });
     selP.innerHTML = '<option value="all">Proyecto: todos</option>' + lista.map(function(e){
-      return `<option value="${escapeHtml(e[0])}">${escapeHtml(e[0])} · ${escapeHtml(e[1])}</option>`; }).join('');
+      return `<option value="${escapeHtml(e[0])}">${escapeHtml(e[0])} · ${escapeHtml(pryNombre(e[0]) ? pryNombre(e[0]) + ' — ' + e[1] : e[1])}</option>`; }).join('');
     if([...m.keys()].indexOf(actual) !== -1) selP.value = actual;
     selP.dataset.listo = String(rows.length);
   }
@@ -11738,17 +11787,19 @@ function rqExportar(){
 // requerimiento (29.09.2026): mismas columnas que el botón ⬇ Exportar del módulo.
 function rqLibroExcel(filas, wb){
   const aoa = [[
-    'F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Estado','Estado en Nisira',
+    'F. Requerimiento','N° Requerimiento','Responsable','Id Proyecto','Proyecto','Cliente','Estado','Estado en Nisira',
     'Vía','¿Ítem partido?','Código','Descripción','Cantidad','UM','Familia',
     'N° Pedido','F. Pedido','Cant. pedida','Resp. Pedido',
     'N° OC','Origen','Usuario Compras','Proveedor','F. Emisión OC','F. Aprobación OC','F. Entrega pactada',
     'Cant. recepcionada','F. Recepción almacén','Guía Proveedor','Factura',
     'Cant. salida','F. Salida almacén','Guía de salida',
-    'Cant. recibida en obra','F. Recepción en obra','Guía de obra']];
+    'Cant. recibida en obra','F. Recepción en obra','Guía de obra',
+    'Estado proyecto','Departamento','Refrigerante','Cotización','Partida (estructura)','Tarea del proyecto','Presupuesto costo','Presupuesto venta']];
   const f = (d)=> d ? fmtDate(d) : '';
   const n = (v)=> v==null ? '' : v;
   filas.forEach(function(r){
-    aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, r.proyecto, r.estadoCalc, r.estado,
+    const pi = pryInfo(r.idProyecto) || {};
+    aoa.push([f(r.fReq), r.codRequerimiento, r.responsable, r.idProyecto, pi.n || '', r.proyecto, r.estadoCalc, r.estado,
       r.via, r.mixtoItem ? 'Sí — el mismo ítem se partió: directo + pedido' : '',
       r.idProducto, r.producto, n(r.cantidad), r.unidad, r.familia,
       r.codPedido, f(r.fPedido), n(r.cantPedido), r.responsablePedido,
@@ -11756,10 +11807,11 @@ function rqLibroExcel(filas, wb){
       f(r.fOrden), f(r.fAprob), f(r.fCompromiso),
       n(r.cantRecep), f(r.fRecep), r.guia, r.factura,
       n(r.cantSalida), f(r.fSalida), r.docSalida,
-      n(r.cantObra), f(r.fObra), r.docObra]);
+      n(r.cantObra), f(r.fObra), r.docObra,
+      pi.e || '', pi.dep || '', pi.rf || '', pi.cq || '', r.estructura || '', r.tareaPry || '', n(r.presCosto), n(r.presVenta)]);
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{wch:12},{wch:15},{wch:24},{wch:17},{wch:32},{wch:32},{wch:22},
+  ws['!cols'] = [{wch:12},{wch:15},{wch:24},{wch:17},{wch:32},{wch:32},{wch:32},{wch:22},
     {wch:10},{wch:28},{wch:15},{wch:50},{wch:11},{wch:8},{wch:26},
     {wch:15},{wch:12},{wch:13},{wch:22},
     {wch:15},{wch:11},{wch:16},{wch:32},{wch:12},{wch:14},{wch:15},
@@ -12443,7 +12495,7 @@ function pdFilasCalc(){
       idProducto: r.idProducto, producto: r.producto, unidad: r.unidad, codPedido: r.codPedido,
       fPedido: r.fPedido, cantPedido: r.cantPedido, codOrden: r.codOrden, estadoOrden: r.estadoOrden,
       proveedor: r.proveedor, cantOrden: r.cantOrden, cantRecep: r.cantRecep, fOrden: r.fOrden,
-      fCompromiso: r.fCompromiso };
+      fCompromiso: r.fCompromiso, estructura: r.estructura, tareaPry: r.tareaPry, presVenta: r.presVenta, presCosto: r.presCosto };
     if(pdOcPendiente(r)) out.push(Object.assign({ tipo:'oc', persona: pdPersona(r.usuarioCompras) }, base));
     else if(pdPedidoAbierto(r)) out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, base));
   });
@@ -12607,7 +12659,7 @@ function drawPendientes(){
       const f = pdFalta(r);
       return `<tr>
         <td class="req">${reqTd(r)}</td>
-        <td class="pry">${rqTxt(r.proyecto)}</td>
+        <td class="pry">${pryCelda(r.proyecto, r.idProyecto)}</td>
         <td class="prod"><span class="cod">${rqTxt(r.idProducto)}</span> ${rqTxt(r.producto)}</td>
         ${PD.tab === 'oc'
           ? `<td class="num">${rqNum(r.cantOrden)} <small>${rqTxt(r.unidad)}</small></td>
@@ -12617,7 +12669,7 @@ function drawPendientes(){
     }).join('');
     return `<div class="card pd-card ${d.urg}">
       <div class="pd-cab">${cab}</div>${quien}
-      <table class="pd-items"><thead><tr><th>N° Req.</th><th>Proyecto</th><th>Producto</th>${PD.tab === 'oc' ? '<th class="num">Cant. OC</th><th class="num">Falta</th>' : '<th class="num">Cant. pedida</th>'}</tr></thead>
+      <table class="pd-items"><thead><tr><th>N° Req.</th><th>Cliente / Proyecto</th><th>Producto</th>${PD.tab === 'oc' ? '<th class="num">Cant. OC</th><th class="num">Falta</th>' : '<th class="num">Cant. pedida</th>'}</tr></thead>
       <tbody>${filasItems}</tbody></table>
     </div>`;
   }).join('');
@@ -12641,15 +12693,15 @@ function pdExportar(){
   const hoy = new Date();
   let aoa;
   if(PD.tab === 'oc'){
-    aoa = [['Persona','N° OC','Estado OC','N° Requerimiento','Proyecto','Proveedor','Código','Descripción','UM',
+    aoa = [['Persona','N° OC','Estado OC','N° Requerimiento','Cliente','Proyecto','Proveedor','Código','Descripción','UM',
       'Cant. OC','Recibido','Falta','F. Emisión','F. Entrega pactada','Días hábiles vs. entrega (+ vencida)']];
-    filas.forEach(function(r){ aoa.push([pdEtiquetaPersona(r.persona), r.codOrden, pdEstadoOC(r), r.req || 'Directo', r.proyecto,
+    filas.forEach(function(r){ aoa.push([pdEtiquetaPersona(r.persona), r.codOrden, pdEstadoOC(r), r.req || 'Directo', r.proyecto, pryNombre(r.idProyecto),
       r.proveedor, r.idProducto, r.producto, r.unidad, n(r.cantOrden), (r.cantRecep && r.cantRecep > 0) ? r.cantRecep : 0,
       n(pdFalta(r)), f(r.fOrden), f(r.fCompromiso), r.fCompromiso ? busdayCount(r.fCompromiso, hoy) : '']); });
   } else {
-    aoa = [['Persona','N° Pedido','F. Pedido','Días hábiles sin OC','N° Requerimiento','Proyecto','Código','Descripción','UM','Cant. pedida']];
+    aoa = [['Persona','N° Pedido','F. Pedido','Días hábiles sin OC','N° Requerimiento','Cliente','Proyecto','Código','Descripción','UM','Cant. pedida']];
     filas.forEach(function(r){ aoa.push([pdEtiquetaPersona(r.persona), r.codPedido, f(r.fPedido),
-      r.fPedido ? busdayCount(r.fPedido, hoy) : '', r.req || 'Directo', r.proyecto, r.idProducto, r.producto, r.unidad, n(r.cantPedido)]); });
+      r.fPedido ? busdayCount(r.fPedido, hoy) : '', r.req || 'Directo', r.proyecto, pryNombre(r.idProyecto), r.idProducto, r.producto, r.unidad, n(r.cantPedido)]); });
   }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb = XLSX.utils.book_new();
@@ -13667,14 +13719,14 @@ function appDailyVerHtml(dia, cod, tipo){
       return '<tr>' + fl.map(function(c, k){ return `<td data-l="${cab[k]}"${c[1] ? ' class="' + c[1] + '"' : ''}>${c[0]}</td>`; }).join('') + '</tr>'; }).join('')}</tbody></table>`; };
   const card = function(html){ return `<div class="ini-card m-pp-full">${html}</div>`; };
   const prys = function(o){ return [...o.prys].map(appImpNombre).map(e).join('<br>') || '—'; };
-  if(tipo === 'sin') return card(tabla(['Pedido', 'Producto', 'Cantidad', 'Req.', 'Proyecto', 'Fecha pedido', 'Espera'],
+  if(tipo === 'sin') return card(tabla(['Pedido', 'Producto', 'Cantidad', 'Req.', 'Cliente', 'Fecha pedido', 'Espera'],
     x.sinOC.slice().sort(function(a, b){ return b.d - a.d; }).map(function(r){ return [[nPd(r.cp)], [e(r.pr), 'pr'], [q(r.q, r.um), 'nw'], [e((r.req || '—').replace(/^0001-0*/, '')), 'mono'], [e(appImpNombre(r.pry))], [f(r.fp), 'nw'], ['<b>' + (r.d ? r.d + ' d.h.' : 'del día') + '</b>', 'nw']]; })));
   if(tipo === 'oc') return [...x.oc.entries()].map(function(en){ const o = en[1], m = D.montoOC.get(en[0]);
       return card(`<div class="m-pp-full-cab">${nOC(en[0])} <b>${e(o.prov)}</b>${o.imp ? ' 🌎' : ''}<span>${appDailyMonto(m)}</span></div><small class="m-pp-full-sub">${prys(o)}</small>`
         + tabla(['Producto', 'Cantidad', 'Pedido'], o.items.map(function(it){ return [[e(it.pr), 'pr'], [q(it.q, it.um), 'nw'], [nPd(it.cp)]]; }))); }).join('')
     + (x.ped.size ? card(tabla(['Pedido directo', 'Producto'], [...x.ped.entries()].map(function(p){ return [[nPd(p[0])], [e(p[1]), 'pr']]; }))) : '');
   const lista = tipo === 'venc' ? [...x.venc.entries()].map(function(v){ return [v[0], v[1].o, v[1].d]; }) : [...x.man.entries()].map(function(v){ return [v[0], v[1], null]; });
-  return card(tabla(['OC', 'Proveedor', 'Proyecto', 'Emitida', 'Entrega pactada', tipo === 'venc' ? 'Atraso' : 'Monto'], lista.map(function(v){ const o = v[1], m = D.montoOC.get(v[0]);
+  return card(tabla(['OC', 'Proveedor', 'Cliente', 'Emitida', 'Entrega pactada', tipo === 'venc' ? 'Atraso' : 'Monto'], lista.map(function(v){ const o = v[1], m = D.montoOC.get(v[0]);
     return [[nOC(v[0])], [e(o.prov) + (o.imp ? ' 🌎' : ''), 'pr'], [prys(o)], [o.fo ? rqFecha(new Date(o.fo + 'T00:00:00Z')) : '—', 'nw'], [f(ocFechaVale(v[0], o.fxD)), 'nw'],
       ['<b' + (tipo === 'venc' ? ' class="rojo"' : '') + '>' + (tipo === 'venc' ? v[2] + ' d.h.' : (appDailyMonto(m) || '—')) + '</b>', 'nw']]; })));
 }
@@ -13890,7 +13942,7 @@ function appFBarra(pant, opc){
   if(opc.pry){ const o = appFPryOpts();
     h += sel('pry', '🏗️ Proyecto / cliente', op('', 'Todos', st.pry)
       + (o.cli.length ? '<optgroup label="Clientes (todos sus proyectos)">' + o.cli.map(function(e){ return op('c:' + e[0], e[1].n, st.pry); }).join('') + '</optgroup>' : '')
-      + '<optgroup label="Proyectos">' + o.pry.map(function(e){ return op('p:' + e[0], polarCorta(e[1], 40) + ' · ' + e[0], st.pry); }).join('') + '</optgroup>'); }
+      + '<optgroup label="Proyectos">' + o.pry.map(function(e){ return op('p:' + e[0], polarCorta(pryNombre(e[0]) ? pryNombre(e[0]) + ' – ' + e[1] : e[1], 48) + ' · ' + e[0], st.pry); }).join('') + '</optgroup>'); }
   const cambio = JSON.stringify(st) !== JSON.stringify(APP_F0[pant]);
   return `<div class="m-filtros" data-fbar="${pant}">${h}${cambio ? `<button type="button" class="m-filtros-x" data-flimpiar="${pant}">✕ Quitar filtros</button>` : ''}</div>`;
 }
@@ -14418,7 +14470,7 @@ function appPendComprasHtml(soloLista){
       : o.f ? (o.d === 0 ? '📅 Vence hoy' : '📅 Faltan ' + (-o.d) + ' d.h.') : '📅 Sin fecha de entrega';
     const fecha = imp ? (ii.etd ? (o.f ? 'ETA ' + appDDMM(o.f) : 'ETA por definir') : ii.fReal ? 'Zarpe por definir' : (ii.fRef ? 'Entrega en fábrica ' + appDDMM(ii.fRef) : 'Entrega en fábrica por definir')) : (o.f ? 'Entrega ' + appDDMM(o.f) : 'Sin fecha');
     return appTarjetaHtml({ cls:S[k][2], n:i + 1, est:EST[k], flag:flag, fecha:fecha, codLbl:'OC',
-      cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', polarCorta(appImpNombre(o.prov), 34)], b:['Proyecto', prysTxt(o)],
+      cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', polarCorta(appImpNombre(o.prov), 34)], b:['Cliente', prysTxt(o)],
       pie:pie + ' · ' + o.n + ' ítem' + (o.n === 1 ? '' : 's') + (imp && !tr ? ' · 🌎 importación' : ''), quien:nom(o.persona) });
   };
   // En "Pedidos sin OC" el número es la cantidad de SKU del listado, no de pedidos (06.10.2026, Piero).
@@ -14428,13 +14480,13 @@ function appPendComprasHtml(soloLista){
   // Cada SKU con lo que hace falta para cotizar (06.10.2026, Piero): PRY, quién lo pidió y la observación
   // del requerimiento. Agrupados por familia de producto (bloque de abajo).
   const filaSku = function(r){
-    const pry = /^pedido directo/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : appImpNombre(r.proyecto || '');
-    const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '';
+    const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', pryN = pryNombre(pryId);
+    const pry = /^pedido directo/i.test(r.proyecto || '') ? (pryN ? '' : 'Stock / sin proyecto') : appImpNombre(r.proyecto || '');
     const quien = r.solicitante ? r.solicitante.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }) : '';
     const dh = r.fPedido ? Math.max(0, busdayCount(r.fPedido, hoy) || 0) : 0;
     return appFilaHtml('data-sku="' + escapeHtml(r.idProducto || '') + '" data-skuped="' + escapeHtml(r.codPedido || '') + '" data-skureq="' + escapeHtml(r.req || '') + '"', dh >= 5 ? 'rojo' : dh >= 3 ? 'ambar' : 'verde', r.producto || r.idProducto,
       '<span class="mono">' + escapeHtml(r.idProducto || '') + '</span> · Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.req ? ' · Req ' + escapeHtml(r.req.replace(/^000\d-0*/, '')) : '')
-        + (pryId ? ' · <span class="mono">' + escapeHtml(pryId) + '</span>' : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 34)) : '')
+        + (pryId ? ' · <span class="mono">' + escapeHtml(pryId) + '</span>' : '') + (pryN ? ' 🏗️ ' + escapeHtml(polarCorta(pryN, 34)) : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 34)) : '')
         + (quien ? '<span class="sku-quien">👷 Solicitó: <b>' + escapeHtml(quien) + '</b></span>' : '')
         + (r.directo ? '<span class="sku-quien">🛒 <b>Pedido directo</b> · sin requerimiento</span>' : '')
         + (r.obs ? '<span class="sku-obs">📝 ' + escapeHtml(r.obs) + '</span>' : ''),
@@ -14597,8 +14649,13 @@ function appSkuAbrir(cod, ped, req){
     || pdFilas().find(function(r){ return r.idProducto === cod; }) || {};
   const e = escapeHtml, hoy = new Date(), dh = fila.fPedido ? Math.max(0, busdayCount(fila.fPedido, hoy) || 0) : 0;
   const st = appSkuStock(cod), hist = appSkuHistorial(cod), ult = hist[0];
-  const pry = /^pedido directo/i.test(fila.proyecto || '') ? 'Stock / sin proyecto' : appImpNombre(fila.proyecto || '');
   const pryId = fila.idProyecto && !/^SIN PROYECTO/i.test(fila.idProyecto) ? fila.idProyecto : '';
+  // Columna F = cliente (07.10.2026); el proyecto real sale de R.PRY por IdProyecto.
+  const pInfo = pryInfo(pryId) || {}, pryNom = pInfo.n || '';
+  const pry = /^pedido directo/i.test(fila.proyecto || '') ? (pInfo.cl ? appImpNombre(pInfo.cl) : 'Stock / sin proyecto') : appImpNombre(fila.proyecto || '');
+  const pryDatos = pryLinea(pryId);
+  const partida = [fila.tareaPry, fila.estructura ? 'partida ' + fila.estructura : ''].filter(Boolean).join(' · ');
+  const presu = [fila.presCosto != null ? 'costo ' + appN(fila.presCosto) : '', fila.presVenta != null ? 'venta ' + appN(fila.presVenta) : ''].filter(Boolean).join(' · ');
   const quien = fila.solicitante ? fila.solicitante.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }) : '';
   const tile = function(t, v, cls){ return `<div class="${cls || ''}"><span>${t}</span><b>${v}</b></div>`; };
   const n = function(v){ return appN(Math.round(v * 100) / 100); }, um = e(fila.unidad || (ult && ult.um) || '');
@@ -14628,11 +14685,12 @@ function appSkuAbrir(cod, ped, req){
       <div class="sku-ped">
         <div><span>Pedido</span><b><button type="button" class="m-link mono" data-q="pedido ${e(fila.codPedido || '')}">${e(String(fila.codPedido || '—').replace(/^000\d-0*/, ''))}</button></b></div>
         <div><span>Requerimiento</span><b>${fila.req ? `<button type="button" class="m-link mono" data-ocreq="${e(fila.req)}">${e(fila.req.replace(/^000\d-0*/, ''))}</button>` : '—'}</b></div>
-        <div><span>PRY</span><b class="mono">${e(pryId || '—')}</b></div>
-        <div><span>Proyecto</span><b>${e(pry || '—')}</b></div>
+        <div><span>Proyecto${pryId ? ' · <span class="mono">' + e(pryId) + '</span>' : ''}</span><b>${e(pryNom || pryId || '—')}</b></div>
+        <div><span>Cliente</span><b>${e(pry || '—')}</b></div>
         <div><span>Cantidad pedida</span><b>${fila.cantPedido != null ? n(fila.cantPedido) + ' ' + um : '—'}</b></div>
         <div><span>Esperando OC</span><b class="${dh >= 5 ? 'rojo' : ''}">${fila.fPedido ? 'desde ' + appDDMM(fila.fPedido) + ' · ' + dh + ' d.h.' : '—'}</b></div>
       </div>
+      ${pryDatos ? `<div class="sku-quien">🏗️ ${e(pryDatos)}</div>` : ''}${partida ? `<div class="sku-quien">🧩 Partida: <b>${e(partida)}</b>${presu ? ' · presupuesto ' + e(presu) : ''}</div>` : ''}
       ${quien ? `<div class="sku-quien">👷 Solicitó: <b>${e(quien)}</b></div>` : ''}${fila.obs ? `<div class="sku-obs">📝 ${e(fila.obs)}</div>` : ''}</div>
     <div class="ini-card"><div class="ini-card-tit">🏬 Stock en sedes</div>
       <div class="m-tiles sku-stock">${tile('Lima', n(st.lima) + ' ' + um, st.lima ? 'ok' : '')}${tile('Ica', n(st.ica) + ' ' + um, st.ica ? 'ok' : '')}${tile('Trujillo', n(st.trujillo) + ' ' + um, st.trujillo ? 'ok' : '')}${tile('En tránsito', n(st.transito) + ' ' + um)}</div>
@@ -14899,7 +14957,7 @@ function appReqPdf(cod){
       <div class="asis-estados">${appChipsEstado(est)}</div>
       ${pend.length ? `<div class="rqp-ley"><span class="verde">🟢 ${nSem('verde')} con stock en Lima</span><span class="amarillo">🟡 ${nSem('amarillo')} con stock en camino o parcial en Lima</span><span class="rojo">🔴 ${nSem('rojo')} en revisión sin stock</span></div>` : ''}</div>
     <div class="ini-card"><div class="ini-card-tit">📋 Datos del requerimiento</div>
-      ${dato(r0.proyecto, 'Proyecto' + (r0.idProyecto ? ' · ' + escapeHtml(r0.idProyecto) : ''))}${dato(r0.responsable, 'Solicitante')}${dato(rqFecha(r0.fReq), 'Fecha del requerimiento')}${dato(r0.obs, 'Observación')}</div>
+      ${dato(pryNombre(r0.idProyecto) || (r0.idProyecto ? r0.idProyecto : ''), 'Proyecto' + (r0.idProyecto && pryNombre(r0.idProyecto) ? ' · ' + escapeHtml(r0.idProyecto) : ''))}${dato(r0.proyecto, 'Cliente')}${dato(pryLinea(r0.idProyecto), 'Datos del proyecto')}${dato(r0.responsable, 'Solicitante')}${dato(rqFecha(r0.fReq), 'Fecha del requerimiento')}${dato(r0.obs, 'Observación')}</div>
     ${sec('⏳ Pendientes', 'ambar', pend)}${sec('✅ Atendidos', 'verde', listos)}`);
   return true;
 }
@@ -14998,7 +15056,7 @@ function appPendLogLista(){
     if(g.parcial) pie += ' · ya llegó una parte';
     return appTarjetaHtml({ cls:g.k, n:g.n, est:APP_IMP_SEC[g.k][1], flag:flag, fecha:fechas, codLbl:'OC',
       cods:g.ocs.map(function(oc){ return [oc.replace(/^0002-0*/, ''), 'data-oc="' + escapeHtml(oc) + '"']; }),
-      a:['Proveedor', polarCorta(appImpNombre(g.prov), 34)], b:['Proyecto', prys.length ? polarCorta(prys.slice(0, 2).join(' · '), 40) + (prys.length > 2 ? ' +' + (prys.length - 2) : '') : ''],
+      a:['Proveedor', polarCorta(appImpNombre(g.prov), 34)], b:['Cliente', prys.length ? polarCorta(prys.slice(0, 2).join(' · '), 40) + (prys.length > 2 ? ' +' + (prys.length - 2) : '') : ''],
       pie:pie, quien:[...g.personas].map(nom).filter(Boolean).join(' · ') });
   };
   const claves = q ? ['tr', 'em', 'bk'] : [APP_PL.sec];
@@ -17262,7 +17320,8 @@ function polarResumenProyecto(filas, idPry){
   const pendReqs = reqs.filter(function(y){ return y.faltan > 0; });
   const faltan = pendReqs.reduce(function(a, y){ return a + y.faltan; }, 0), n = filas.length, pct = n ? Math.round((n - faltan) / n * 100) : 0;
   const filaR = function(y){ return `<div class="asis-it"><div class="n"><span class="mono">${escapeHtml(y.cod.replace(/^0001-0*/, ''))}</span> · ${rqFecha(y.fReq).replace(/ \d{4}$/, '')} · faltan ${y.faltan} de ${y.n}</div><div class="s">${appChipsEstado(y.estFalta)} ${polarBtn('q', y.cod, 'ver')}</div></div>`; };
-  return `<div class="cab">${escapeHtml(polarCorta(filas[0].proyecto || idPry, 40))}</div><div class="sub"><span class="mono">${escapeHtml(idPry)}</span> · ${reqs.length} req.</div>
+  const pN = pryNombre(idPry), pL = pryLinea(idPry);
+  return `<div class="cab">${escapeHtml(polarCorta(pN || filas[0].proyecto || idPry, 40))}</div><div class="sub"><span class="mono">${escapeHtml(idPry)}</span>${pN && filas[0].proyecto ? ' · ' + escapeHtml(polarCorta(filas[0].proyecto, 36)) : ''} · ${reqs.length} req.</div>${pL ? `<div class="sub">🏗️ ${escapeHtml(pL)}</div>` : ''}
     <div class="asis-avance"><i><em style="width:${pct}%"></em></i><span>${faltan ? `<b>Faltan ${faltan} ítems</b> en ${pendReqs.length} req.` : '<b>✅ Todo salió a obra</b>'} · ${pct}% atendido</span></div>
     ${pendReqs.slice(0, 5).map(filaR).join('')}
     ${polarMas(pendReqs, 5, filaR, 'requerimientos')}
@@ -17273,8 +17332,8 @@ function polarProyectoPorNombre(palabras){
   rqPreparar();
   const ids = new Map();
   RQ.filas.forEach(function(r){
-    const n = polarNorm(r.proyecto);
-    if(n && r.idProyecto && palabras.every(function(w){ return polarNombreCalza(n, w); }) && !ids.has(r.idProyecto)) ids.set(r.idProyecto, r.proyecto);
+    const n = polarNorm((r.proyecto || '') + ' ' + pryNombre(r.idProyecto));
+    if(n.trim() && r.idProyecto && palabras.every(function(w){ return polarNombreCalza(n, w); }) && !ids.has(r.idProyecto)) ids.set(r.idProyecto, r.proyecto);
   });
   if(!ids.size && palabras.length >= 2){
     // No exacto: basta con que calcen todas las palabras menos una.
@@ -17300,7 +17359,7 @@ function polarProyectoPorNombre(palabras){
       + `<div class="asis-acc">${[...ids.entries()].sort(function(a,b){ return a[0] < b[0] ? 1 : -1; }).slice(0, 6).map(function(e){ return polarBtn('q', e[0], escapeHtml(e[0])); }).join('')}</div>`;
   }
   const opts = [...ids.entries()].sort(function(a,b){ return a[0] < b[0] ? 1 : -1; }).slice(0, 6).map(function(e){
-    return polarBtn('q', e[0], escapeHtml(polarCorta(e[1], 34)) + ' · ' + escapeHtml(e[0]));
+    return polarBtn('q', e[0], escapeHtml(polarCorta(pryNombre(e[0]) ? pryNombre(e[0]) + ' – ' + e[1] : e[1], 44)) + ' · ' + escapeHtml(e[0]));
   }).join('');
   return `<p>Encontré ${ids.size} proyectos con ese nombre. ¿Cuál es?</p><div class="asis-acc">${opts}</div>`;
 }
@@ -17547,12 +17606,12 @@ function polarExcelReqs(filas, titulo, sub){
 function polarExcelPendientes(persona, f){
   const hoy = new Date();
   const filas = polarFiltrarPorFecha(pdFilas().filter(function(r){ return !persona || r.persona === persona; }), f);
-  const aoa = [['Tipo', 'Persona', 'N° OC', 'Estado OC', 'N° Pedido', 'N° Req.', 'Proyecto', 'Código', 'Descripción', 'UM',
+  const aoa = [['Tipo', 'Persona', 'N° OC', 'Estado OC', 'N° Pedido', 'N° Req.', 'Cliente', 'Proyecto', 'Código', 'Descripción', 'UM',
     'Cant. OC', 'Recibido', 'Falta', 'Proveedor', 'F. entrega pactada', 'Días hábiles vencida']];
   filas.forEach(function(r){
     const d = r.tipo === 'oc' && r.fCompromiso ? busdayCount(r.fCompromiso, hoy) : null;
     aoa.push([r.tipo === 'oc' ? 'OC por llegar' : 'Pedido sin OC', pdEtiquetaPersona(r.persona), r.codOrden || '', r.estadoOrden || '',
-      r.codPedido || '', r.req || '', r.proyecto || '', r.idProducto || '', r.producto || '', r.unidad || '',
+      r.codPedido || '', r.req || '', r.proyecto || '', pryNombre(r.idProyecto), r.idProducto || '', r.producto || '', r.unidad || '',
       r.cantOrden == null ? '' : r.cantOrden, r.cantRecep == null ? '' : r.cantRecep, pdFalta(r) == null ? '' : pdFalta(r),
       r.proveedor || '', r.fCompromiso ? fmtDate(r.fCompromiso) : '', d > 0 ? d : '']);
   });
