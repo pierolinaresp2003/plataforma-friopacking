@@ -14615,18 +14615,16 @@ function appPendComprasHtml(soloLista){
   const items = filas.filter(function(r){ return r.tipo !== 'oc'; }).sort(function(a,b){ return ((a.fPedido || 0) - (b.fPedido || 0)) || String(a.codPedido).localeCompare(String(b.codPedido)); });
   // Cada SKU con lo que hace falta para cotizar (06.10.2026, Piero): PRY, quién lo pidió y la observación
   // del requerimiento. Agrupados por familia de producto (bloque de abajo).
+  // Fila corta (07.10.2026, Piero: "hay demasiado texto"): producto, pedido y proyecto en una línea, la
+  // cantidad y la espera a la derecha. Lo demás (código, req., PRY, cliente, quién pidió, observación)
+  // está en la ficha del SKU al tocarla.
   const filaSku = function(r){
-    const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', pryN = pryNombre(pryId);
-    const pry = /^pedido directo/i.test(r.proyecto || '') ? (pryN ? '' : 'Stock / sin proyecto') : appImpNombre(r.proyecto || '');
-    const quien = r.solicitante ? r.solicitante.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }) : '';
+    const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '';
+    const pry = pryNombre(pryId) || (/^pedido directo/i.test(r.proyecto || '') ? '' : appImpNombre(r.proyecto || ''));
     const dh = r.fPedido ? Math.max(0, busdayCount(r.fPedido, hoy) || 0) : 0;
     return appFilaHtml('data-sku="' + escapeHtml(r.idProducto || '') + '" data-skuped="' + escapeHtml(r.codPedido || '') + '" data-skureq="' + escapeHtml(r.req || '') + '"', dh >= 5 ? 'rojo' : dh >= 3 ? 'ambar' : 'verde', r.producto || r.idProducto,
-      '<span class="mono">' + escapeHtml(r.idProducto || '') + '</span> · Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.req ? ' · Req ' + escapeHtml(r.req.replace(/^000\d-0*/, '')) : '')
-        + (pryId ? ' · <span class="mono">' + escapeHtml(pryId) + '</span>' : '') + (pryN ? ' 🏗️ ' + escapeHtml(polarCorta(pryN, 34)) : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 34)) : '')
-        + (quien ? '<span class="sku-quien">👷 Solicitó: <b>' + escapeHtml(quien) + '</b></span>' : '')
-        + (r.directo ? '<span class="sku-quien">🛒 <b>Pedido directo</b> · sin requerimiento</span>' : '')
-        + (r.obs ? '<span class="sku-obs">📝 ' + escapeHtml(r.obs) + '</span>' : ''),
-      r.cantPedido != null ? appN(r.cantPedido) + ' ' + escapeHtml(r.unidad || '') : '—', 'desde ' + appDDMM(r.fPedido) + ' · ' + polarDh(r.fPedido) + ' · ' + escapeHtml(r.persona ? nom(r.persona) : 'sin comprador asignado'));
+      'Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.directo ? ' · 🛒 directo' : '') + (pry ? ' · ' + escapeHtml(polarCorta(pry, 30)) : ''),
+      r.cantPedido != null ? appN(r.cantPedido) + ' ' + escapeHtml(r.unidad || '') : '—', polarDh(r.fPedido) + (r.persona ? ' · ' + escapeHtml(nom(r.persona)) : ''));
   };
   // Pedidos sin OC agrupados por familia de producto: lo que se cotiza junto, junto (06.10.2026, Piero).
   // Cada familia es un bloque con su color (franja, encabezado y borde de cada fila) y arriba una fila de
