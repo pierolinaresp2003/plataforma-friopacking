@@ -13120,7 +13120,13 @@ function appConstruir(){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
     if(e.target.id === 'prCli' || e.target.id === 'prPry'){ APP_PR[e.target.id === 'prCli' ? 'cli' : 'pry'] = e.target.value; if(e.target.id === 'prCli') APP_PR.pry = ''; return appRenderInicio(); }
     const fb = e.target.closest && e.target.closest('[data-fbar]');
-    if(fb && e.target.dataset.fcampo){ const st = APP_F[fb.dataset.fbar], c = e.target.dataset.fcampo; st[c] = e.target.value;
+    if(fb && e.target.dataset.fcampo){ const st = APP_F[fb.dataset.fbar], c = e.target.dataset.fcampo, v = e.target.value;
+      if(c === 'anio'){ if(v === 'custom'){ st.per = 'custom'; } else if(!v){ st.per = 'todo'; st.anio = ''; st.mes = ''; } else { st.anio = v; st.per = st.mes ? 'ym' : 'anio'; }
+        if(st.per === 'custom' && !st.desde && !st.hasta){ const r = appFRango({ per:'mes' }); st.desde = appIndIso(r.desde); st.hasta = appIndIso(appIndCorte()); }
+        return appRenderInicio(); }
+      if(c === 'mes'){ if(st.per !== 'ym' && st.per !== 'anio'){ const r = appFRango(st); st.anio = String(r ? r.desde.getUTCFullYear() : appIndCorte().getUTCFullYear()); }
+        st.mes = v; st.per = v ? 'ym' : 'anio'; return appRenderInicio(); }
+      st[c] = v;
       if(c === 'per' && st.per === 'custom' && !st.desde && !st.hasta){ const r = appFRango({ per:'mes' }); st.desde = appIndIso(r.desde); st.hasta = appIndIso(appIndCorte()); }
       appRenderInicio(); }
   });
@@ -13953,7 +13959,8 @@ function appFRango(st){
   else if(st.per === 'mes'){ a = D(Y, M, 1); b = D(Y, M + 1, 0); lbl = 'Mes de ' + POLAR_MESES[M]; }
   else if(st.per === 'mesAnt'){ a = D(Y, M - 1, 1); b = D(Y, M, 0); lbl = 'Mes de ' + POLAR_MESES[a.getUTCMonth()]; }
   else if(st.per === 'tri'){ a = D(Y, M - 2, 1); b = D(Y, M + 1, 0); lbl = 'Últimos 3 meses'; }
-  else if(st.per === 'anio'){ a = D(Y, 0, 1); b = D(Y, 11, 31); lbl = 'Año ' + Y; }
+  else if(st.per === 'anio'){ const y = +st.anio || Y; a = D(y, 0, 1); b = D(y, 11, 31); lbl = 'Año ' + y; }
+  else if(st.per === 'ym' && st.mes){ const y = +st.anio || Y, m = +st.mes - 1; a = D(y, m, 1); b = D(y, m + 1, 0); lbl = POLAR_MESES[m].charAt(0).toUpperCase() + POLAR_MESES[m].slice(1) + ' ' + y; }
   else if(st.per === 'custom' && (st.desde || st.hasta)){ a = st.desde ? new Date(st.desde + 'T00:00:00Z') : null; b = st.hasta ? new Date(st.hasta + 'T00:00:00Z') : null; lbl = 'Personalizado'; }
   else return null;
   const label = lbl + (a && b ? ' · del ' + fmt(a) + ' al ' + fmt(b) : a ? ' · desde el ' + fmt(a) : ' · hasta el ' + fmt(b));
@@ -13977,17 +13984,18 @@ function appFBarra(pant, opc){
   const st = APP_F[pant];
   const op = function(v, t, s){ return `<option value="${escapeHtml(v)}"${v === s ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
   const sel = function(campo, lbl, ops){ return `<label><span>${lbl}</span><select class="ini-select" data-fcampo="${campo}">${ops}</select></label>`; };
-  // Período agrupado de lo más corto a lo más largo y con las fechas que abarca (06.10.2026, Piero: "no se
-  // entienden los filtros de período, están desordenados").
-  const dd = function(d){ return d.getUTCDate() + ' ' + MESES_CORTOS[d.getUTCMonth()].toLowerCase(); };
-  const rg = function(k){ const r = appFRango({ per:k }); return r.desde.getUTCMonth() === r.hasta.getUTCMonth() ? r.desde.getUTCDate() + ' al ' + dd(r.hasta) : dd(r.desde) + ' al ' + dd(r.hasta); };
-  const mesN = function(k){ return POLAR_MESES[appFRango({ per:k }).desde.getUTCMonth()]; };
-  const grp = function(t, l){ return '<optgroup label="' + t + '">' + l.map(function(x){ return op(x[0], x[1], st.per); }).join('') + '</optgroup>'; };
-  let h = sel('per', '📅 Período', grp('Por día', [['dia', 'Último día con datos · ' + dd(new Date(appDailyUltimo() + 'T00:00:00Z'))]]) + grp('Por semana (lunes a domingo)', [['semana', 'Esta semana · ' + rg('semana')], ['semanaAnt', 'Semana pasada · ' + rg('semanaAnt')]])
-    + grp('Por mes', [['mes', 'Este mes · ' + mesN('mes')], ['mesAnt', 'Mes pasado · ' + mesN('mesAnt')], ['tri', 'Últimos 3 meses · ' + mesN('tri') + ' a ' + mesN('mes')]])
-    + grp('Por año', [['anio', 'Este año · ' + appIndCorte().getUTCFullYear()], ['todo', 'Todo lo cargado']])
-    + grp('A tu medida', [['custom', '📆 Elegir fechas (desde / hasta)']]));
-  if(st.per === 'custom') h += `<label><span>Desde</span><input type="date" class="ini-select" data-fcampo="desde" value="${escapeHtml(st.desde)}"></label><label><span>Hasta</span><input type="date" class="ini-select" data-fcampo="hasta" value="${escapeHtml(st.hasta)}"></label>`;
+  // Período = Año + Mes, y aparte Personalizado (07.10.2026, Piero: "este filtro es horrible, no se entiende
+  // nada: solo pon año, mes y aparte el personalizado"). Lo que estaba elegido antes (semana, etc.) se
+  // muestra como el año y mes que le corresponden.
+  const c0 = appIndCorte(), r0 = appFRango(st), custom = st.per === 'custom';
+  const anioSel = custom ? 'custom' : String(st.per === 'todo' ? '' : (+st.anio || (r0 ? r0.desde.getUTCFullYear() : c0.getUTCFullYear())));
+  const mesSel = custom || st.per === 'anio' || st.per === 'todo' || st.per === 'tri' ? '' : String(st.per === 'ym' ? st.mes : (r0 ? r0.desde.getUTCMonth() + 1 : ''));
+  let anios = ''; for(let y = c0.getUTCFullYear(); y >= 2020; y--) anios += op(String(y), String(y), anioSel);
+  let h = sel('anio', '📅 Año', anios + op('', 'Todos los años', anioSel) + op('custom', '📆 Personalizado (elegir fechas)', anioSel));
+  if(!custom){ const yv = +anioSel || 0, tope = yv === c0.getUTCFullYear() ? c0.getUTCMonth() + 1 : 12;
+    let meses = op('', 'Todo el año', mesSel); for(let m = 1; m <= (yv ? tope : 12); m++) meses += op(String(m), POLAR_MESES[m - 1].charAt(0).toUpperCase() + POLAR_MESES[m - 1].slice(1), mesSel);
+    if(yv) h += sel('mes', '🗓️ Mes', meses); }
+  if(custom) h += `<label><span>Desde</span><input type="date" class="ini-select" data-fcampo="desde" value="${escapeHtml(st.desde)}"></label><label><span>Hasta</span><input type="date" class="ini-select" data-fcampo="hasta" value="${escapeHtml(st.hasta)}"></label>`;
   if(opc.orig) h += sel('orig', '🌎 Origen', op('todo', 'Nacional e importado', st.orig) + op('nacional', 'Nacional', st.orig) + op('importado', 'Importado', st.orig));
   if(opc.persona) h += sel('persona', '🧑‍💼 Comprador', op('', 'Todos', st.persona) + appFPersonas().filter(function(v){ return !opc.compradores || APP_DAILY_EQUIPO.indexOf(pdPersona(v)) !== -1; }).map(function(v){ return op(v, appFNomPersona(v), st.persona); }).join(''));
   if(opc.pry){ const o = appFPryOpts();
