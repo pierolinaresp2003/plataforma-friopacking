@@ -1162,6 +1162,7 @@
     .m-pp-kpi{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:14px 16px;border-left:5px solid var(--c);} .m-pp-kpi i{font-style:normal;font-size:20px;}
     .m-pp-kpi b{display:block;font-size:32px;font-weight:900;line-height:1.05;margin-top:4px;color:var(--ink);} .m-pp-kpi span{display:block;font-size:13px;font-weight:800;color:var(--ink-soft);} .m-pp-kpi small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;}
     .m-pp-kpi.cero{opacity:.55;} .m-pp-tit{font-size:15px;font-weight:900;margin:2px 2px 8px;color:var(--ink);}
+    .m-rk-sub{margin-top:14px;padding-top:12px;border-top:1px dashed var(--border);}
     .m-pp-alertas{display:grid;grid-template-columns:1fr;gap:12px;align-items:start;}
     .m-pp-al{display:flex;align-items:center;gap:12px;border-radius:16px;padding:14px 16px;background:var(--card);box-shadow:var(--shadow);border-top:4px solid var(--c);}
     .m-pp-al > i{font-style:normal;font-size:26px;} .m-pp-al div{flex:1;min-width:0;} .m-pp-al p{margin:0;font-size:14px;font-weight:800;color:var(--ink);} .m-pp-al small{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px;} .m-pp-al > b{font-size:34px;font-weight:900;color:var(--c);line-height:1;} .m-pp-col.ok .m-pp-al > b{color:var(--green);}
@@ -12478,7 +12479,7 @@ const PD = { tab:'oc', q:'', urg:'all', tope:40 };
 const PD_PERSONAS = {
   CCHECA:'Carolina Checa', MSIHUAIRO:'Melissa Sihuairo', JALTAMIRANO:'Jaime Altamirano',
   JPOMEZ:'José Pomez', MLUJAN:'Manuel Luján', PLINARES:'Piero Linares', JCENTENO:'Javier Centeno',
-  KALBUJAR:'Katherine Albujar', CMORA:'Camila Mora',
+  KALBUJAR:'Katherine Albujar', CMORA:'Camila Mora', JCASARINO:'José Casarino',
 };
 function pdPersona(v){
   const n = sinAcentos(String(v||'')).toUpperCase().replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();
@@ -13579,7 +13580,8 @@ function appRenderInicio(){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
-  else if(appEsLogistica(v)) cuerpo = appInicioGerencia() + appMemo('iniLog', function(){ return appInicioLogistica('logistica'); });
+  // Compras y Almacén: siempre el calendario del daily arriba (12.10.2026, Piero), sin los indicadores de la semana.
+  else if(appEsLogistica(v)) cuerpo = `<div id="iniCal">${appDailyHtml()}</div>` + appMemo('iniLog', function(){ return appInicioLogistica('logistica'); });
   else cuerpo = appInicioSupervisor();
   const corte = (DATA && DATA.corte) ? 'Datos al ' + fmtDate(DATA.corte) : '';
   // Supervisor: solo lo que sirve (29.09.2026, Piero: "hay demasiadas cosas, simplifícalo"): buscar su
@@ -13644,9 +13646,16 @@ function appOtifPct(l){ return l.length ? l.filter(function(x){ return !x.tipo; 
 // de la recepción), así que cualquier día pasado se vuelve a armar igual. Pedidos: quien lo generó
 // (ResponsablePedido). OC, aprobaciones, recepciones y vencidas: el comprador de la OC (UsuarioCompras).
 const APP_DAILY = { dia:'', anio:null, mes:null };
-// El daily es solo de estos compradores (07.10.2026, Piero).
-const APP_DAILY_EQUIPO = ['PLINARES', 'MSIHUAIRO', 'CCHECA', 'JALTAMIRANO', 'JPOMEZ', 'MLUJAN', 'CMORA'];
-const APP_DAILY_COLORES = ['#3ec6ac', '#6c8cff', '#f4a640', '#e66b8a', '#8a6cf0', '#2fa7d8', '#7cbf4f'];
+// Quiénes se evalúan en el daily (12.10.2026, Piero): Compras (con Comex dentro) y Almacén por separado.
+const APP_DAILY_COMPRAS = ['PLINARES', 'CCHECA', 'MSIHUAIRO', 'JALTAMIRANO', 'JPOMEZ'];
+const APP_DAILY_COMEX = ['CMORA', 'JCASARINO'];
+const APP_DAILY_ALMACEN = ['JCENTENO', 'KALBUJAR'];
+const APP_DAILY_EQUIPO = APP_DAILY_COMPRAS.concat(APP_DAILY_COMEX);          // el daily de Compras (y Gerencia)
+const APP_DAILY_TODOS = APP_DAILY_EQUIPO.concat(APP_DAILY_ALMACEN);
+const APP_DAILY_COLORES = ['#3ec6ac', '#6c8cff', '#f4a640', '#e66b8a', '#8a6cf0', '#2fa7d8', '#7cbf4f', '#d9822b', '#4c9be8'];
+function appDailyEsAlm(){ return APP.vista === 'almacen'; }
+function appDailyEquipo(){ return appDailyEsAlm() ? APP_DAILY_ALMACEN : APP_DAILY_EQUIPO; }
+function appDailyColor(cod){ return APP_DAILY_COLORES[Math.max(0, APP_DAILY_TODOS.indexOf(cod)) % APP_DAILY_COLORES.length]; }
 // Puntos del día para ordenar a los compradores (07.10.2026, Piero: "dale una jerarquía para saber quién
 // hizo más ese día"): 1 por SKU puesto en OC, 2 por OC emitida y 1 por pedido directo (los pedidos cerrados no suman).
 function appDailySuma(l){ return l.reduce(function(a, m){ if(m){ a.s += m.s; a.d += m.d; } return a; }, { s:0, d:0 }); }
@@ -13661,7 +13670,7 @@ function appDailyUltimo(){
   return appMemo('dailyUlt', function(){
     const corte = (DATA && DATA.corte) ? isoDay(DATA.corte) : isoDay(new Date());
     let u = '';
-    appDailyFilas().forEach(function(r){ [r.fPedido, r.fOrden].forEach(function(d){ const k = isoDay(d); if(k && k <= corte && k > u) u = k; }); });
+    appDailyFilas().forEach(function(r){ [r.fPedido, r.fOrden, r.fSalida].forEach(function(d){ const k = isoDay(d); if(k && k <= corte && k > u) u = k; }); });
     return u || corte;
   });
 }
@@ -13675,7 +13684,7 @@ function appDailyMes(n){          // cambia de mes y selecciona su último día 
   APP_DAILY.anio = a; APP_DAILY.mes = m; APP_DAILY.dia = isoDay(d);
 }
 function appDailyTot(l, k){ const u = new Set(); l.forEach(function(x){ x[k].forEach(function(v, key){ u.add(x[k] instanceof Map ? key : v); }); }); return u.size; }   // sin contar dos veces un pedido de dos personas
-function appDailyActividad(dia){ return appDailyDatos(dia).lista.reduce(function(a, x){ return a + x.pts; }, 0); }
+function appDailyActividad(dia){ return (appDailyEsAlm() ? appDailyAlmDatos(dia) : appDailyDatos(dia)).lista.reduce(function(a, x){ return a + x.pts; }, 0); }
 function appDailyCalHtml(dia){
   const u = appDailyUltimo(), a = APP_DAILY.anio, m = APP_DAILY.mes;
   const nDias = new Date(Date.UTC(a, m + 1, 0)).getUTCDate(), primero = (new Date(Date.UTC(a, m, 1)).getUTCDay() + 6) % 7;
@@ -13691,7 +13700,7 @@ function appDailyCalHtml(dia){
   }
   const mesTxt = POLAR_MESES[m].charAt(0).toUpperCase() + POLAR_MESES[m].slice(1);
   return `<div class="ini-card-tit">🗓️ Daily call in</div><div class="m-cal-nav"><button type="button" data-dailymes="-1" aria-label="Mes anterior">‹</button><b>${mesTxt} ${a}</b><button type="button" data-dailymes="1" aria-label="Mes siguiente" ${isoDay(new Date(Date.UTC(a, m + 1, 1))) > u ? 'disabled' : ''}>›</button></div>
-    <div class="m-cal-sub">Toca un día para ver qué hizo cada comprador</div>
+    <div class="m-cal-sub">Toca un día para ver qué hizo cada ${appDailyEsAlm() ? 'persona de Almacén' : 'comprador'}</div>
     <div class="m-cal-sem">${['L','M','M','J','V','S','D'].map(function(x){ return '<span>' + x + '</span>'; }).join('')}</div>
     <div class="m-cal-dias">${celdas}</div>
     <div class="m-cal-ley"><span>Menos</span><span><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i></span><span>Más actividad</span></div>`;
@@ -13768,10 +13777,11 @@ function appDailyHtml(){
   return '<div class="ini-card m-cal">' + appDailyCalHtml(dia) + '</div>';
 }
 function appDailyAbrir(dia){ APP_DAILY.dia = dia; appRefrescarCal(); appTareasCargar(); appListaAbrir('🗓️ Daily call in', appDailyFechaTxt(dia), appDailyDetHtml(dia)); document.getElementById('appOC').classList.add('ancho'); }
-function appDailyAvatar(x, cls){ const nom = PD_PERSONAS[x.cod], i = APP_DAILY_EQUIPO.indexOf(x.cod);
-  return `<span class="m-dp-ini ${cls || ''}" style="background:${APP_DAILY_COLORES[i % APP_DAILY_COLORES.length]}">${escapeHtml(nom.split(' ').map(function(w){ return w.charAt(0); }).slice(0, 2).join(''))}</span>`; }
+function appDailyAvatar(x, cls){ const nom = PD_PERSONAS[x.cod];
+  return `<span class="m-dp-ini ${cls || ''}" style="background:${appDailyColor(x.cod)}">${escapeHtml(nom.split(' ').map(function(w){ return w.charAt(0); }).slice(0, 2).join(''))}</span>`; }
 // Día: resumen del equipo y el ranking; cada comprador se abre en su propia pantalla (‹ vuelve al día).
 function appDailyDetHtml(dia){
+  if(appDailyEsAlm()) return appDailyAlmDetHtml(dia);
   const D = appDailyDatos(dia), l = D.lista, tot = function(k){ return appDailyTot(l, k); };
   const montoTot = appDailySuma(l.map(function(x){ return x.monto; })), max = l.length ? l[0].pts : 1;
   const num = function(v, t, cls){ return `<div class="${cls || ''}"><b>${v}</b><span>${t}</span></div>`; };
@@ -13783,17 +13793,21 @@ function appDailyDetHtml(dia){
   const medalla = ['🥇', '🥈', '🥉'];
   const fila = function(x, i){ const det = [x.oc.size ? x.oc.size + ' OC' : '', x.sku.size ? x.sku.size + ' SKU' : '', x.ped.size ? x.ped.size + ' directos' : ''].filter(Boolean).join(' · ');
     return `<button type="button" class="m-rk" data-dailyper="${escapeHtml(x.cod)}"><span class="m-rk-pos">${medalla[i] || (i + 1)}</span>${appDailyAvatar(x)}
-      <span class="m-rk-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${det}${x.montoPEN ? ' · ' + appDailyMonto(x.monto) : ''}</small><i><em style="width:${Math.max(4, x.pts / max * 100).toFixed(0)}%;background:${APP_DAILY_COLORES[APP_DAILY_EQUIPO.indexOf(x.cod) % APP_DAILY_COLORES.length]}"></em></i></span>
+      <span class="m-rk-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${det}${x.montoPEN ? ' · ' + appDailyMonto(x.monto) : ''}</small><i><em style="width:${Math.max(4, x.pts / max * 100).toFixed(0)}%;background:${APP_DAILY_COLORES[APP_DAILY_TODOS.indexOf(x.cod) % APP_DAILY_COLORES.length]}"></em></i></span>
       <span class="m-rk-pts"><b>${x.pts}</b><small>pts</small></span><span class="m-rk-ir">›</span></button>`; };
-  return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día</div>${l.map(fila).join('')}
+  // Comex (Camila Mora y José Casarino) va dentro de Compras, en su propio bloque (12.10.2026, Piero).
+  const lc = l.filter(function(x){ return APP_DAILY_COMEX.indexOf(x.cod) === -1; }), lx = l.filter(function(x){ return APP_DAILY_COMEX.indexOf(x.cod) !== -1; });
+  return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día · Compras</div>${lc.length ? lc.map(fila).join('') : '<div class="ini-vacio">Sin movimientos ese día.</div>'}
+    <div class="ini-card-tit m-rk-sub">🌎 Comex</div>${lx.length ? lx.map(fila).join('') : '<div class="ini-vacio">Sin movimientos de Comex ese día.</div>'}
     <div class="m-rk-nota">Puntos: 1 por SKU en OC, 2 por OC emitida y 1 por pedido directo. Toca a un comprador para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
 }
 // Pantalla del comprador (07.10.2026, Piero: "en la web está muy simple… usa todo el espacio, más grande y llamativo"):
 // franja con su color, 4 indicadores grandes, 3 alertas para el daily y las listas abiertas lado a lado en la PC.
 function appDailyPersonaHtml(dia, cod){
+  if(APP_DAILY_ALMACEN.indexOf(cod) !== -1) return appDailyAlmPersonaHtml(dia, cod);
   const D = appDailyDatos(dia), l = D.lista, i = l.findIndex(function(x){ return x.cod === cod; }), x = l[i];
   if(!x) return '<div class="ini-card"><div class="ini-vacio">Sin movimientos ese día.</div></div>';
-  const col = APP_DAILY_COLORES[APP_DAILY_EQUIPO.indexOf(x.cod) % APP_DAILY_COLORES.length];
+  const col = appDailyColor(x.cod);
   const nom = PD_PERSONAS[x.cod], ini = nom.split(' ').map(function(w){ return w.charAt(0); }).slice(0, 2).join('');
   const oc = [...x.oc.entries()], ped = [...x.ped.entries()], man = [...x.man.entries()], venc = [...x.venc.entries()].sort(function(a, b){ return b[1].d - a[1].d; });
   const sin = x.sinOC.slice().sort(function(a, b){ return b.d - a.d; }), nPed = new Set(sin.map(function(e){ return e.cp; })).size;
@@ -13828,6 +13842,68 @@ function appDailyPersonaHtml(dia, cod){
     </div>
     ${appDailyTareasHtml(dia, x.cod)}`;
 }
+// ---------- Daily de Almacén (12.10.2026, Piero: "para almacén se evalúa a Katherine Albujar y Javier
+// Centeno") ----------
+// Lo que hace cada uno sale de los mismos datos, con los responsables de los indicadores:
+//   Javier Centeno   → genera los pedidos a partir de los requerimientos (Indicador 1, Req → Pedido).
+//   Katherine Albujar → despacha a obra (Indicador 6, salida de almacén con guía).
+// Puntos: 2 por pedido generado o guía de salida y 1 por ítem.
+function appDailyAlmDatos(dia){
+  return appMemo('dailyAlm:' + dia, function(){
+    rqPreparar();
+    const ini = new Date(dia + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() - 120); const desde = isoDay(ini);
+    const diaD = new Date(dia + 'T00:00:00Z'), dh = function(f){ return Math.max(0, busdayCount(f, diaD) || 0); };
+    const J = { cod:'JCENTENO', alm:true, grupos:new Map(), items:0, pend:[] }, K = { cod:'KALBUJAR', alm:true, grupos:new Map(), items:0, pend:[] };
+    RQ.filas.forEach(function(r){
+      if(r.estadoCalc === 'Archivado') return;
+      const fr = isoDay(r.fReq), fp = isoDay(r.fPedido), fc = isoDay(r.fRecep), fs = isoDay(r.fSalida) || isoDay(r.fObra);
+      if(r.codPedido && fp === dia){ const g = J.grupos.get(r.codPedido) || { k:r.codPedido, req:r.codRequerimiento || '', pry:r.proyecto || '', n:0, pr:[] }; g.n++; g.pr.push(r.producto || ''); J.grupos.set(r.codPedido, g); J.items++; }
+      if(isoDay(r.fSalida) === dia){ const k = r.docSalida || ('Sin guía · req ' + String(r.codRequerimiento || '').replace(/^0001-0*/, '')); const g = K.grupos.get(k) || { k:k, req:r.codRequerimiento || '', pry:r.proyecto || '', sede:r.sedeSalida || '', n:0, pr:[] }; g.n++; g.pr.push(r.producto || ''); K.grupos.set(k, g); K.items++; }
+      // Para el daily: al cierre de ese día, req. todavía sin pedido ni salida (Javier) y lo que ya llegó a Lurín y no sale a obra (Katherine).
+      if(fr && fr <= dia && fr >= desde && (!fp || fp > dia) && (!fs || fs > dia) && !r.codOrden) J.pend.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fReq) });
+      if(fc && fc <= dia && fc >= desde && (!fs || fs > dia)) K.pend.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fRecep) });
+    });
+    [J, K].forEach(function(x){ x.n = x.grupos.size; x.pts = 2 * x.n + x.items; });
+    return { lista:[J, K].filter(function(x){ return x.pts; }).sort(function(a, b){ return b.pts - a.pts; }), todos:[J, K] };
+  });
+}
+const APP_ALM_TXT = { JCENTENO:{ q:'pedidos generados', u:'pedido', ic:'📝', it:'ítems pedidos', sub:'a partir de requerimientos', al:'Req. sin pedido al cierre', alsub:'en revisión, sin pedido ni salida', ok:'todo con pedido 👏' },
+  KALBUJAR:{ q:'guías de salida', u:'guía', ic:'🚚', it:'ítems despachados', sub:'salidas a obra', al:'Por despachar al cierre', alsub:'ya en Lurín, sin salida a obra', ok:'nada por despachar 👏' } };
+function appDailyAlmDetHtml(dia){
+  const D = appDailyAlmDatos(dia), l = D.lista, T = D.todos, max = l.length ? l[0].pts : 1;
+  const num = function(v, t){ return `<div><b>${v}</b><span>${t}</span></div>`; };
+  const hero = `<div class="oc-hero m-dd">
+      <div class="m-dd-big">${num(appN(T[0].n), '📝 pedidos generados')}${num(appN(T[1].n), '🚚 guías de salida')}</div>
+      <div class="m-dd-nums">${num(appN(T[0].items), '📦 ítems pedidos')}${num(appN(T[1].items), '📦 ítems despachados')}</div>
+      <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
+  if(!l.length) return hero + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de Almacén registrados ese día.</div></div>' + appDailyTareasHtml(dia, '');
+  const medalla = ['🥇', '🥈'];
+  const fila = function(x, i){ const t = APP_ALM_TXT[x.cod];
+    return `<button type="button" class="m-rk" data-dailyper="${escapeHtml(x.cod)}"><span class="m-rk-pos">${medalla[i] || (i + 1)}</span>${appDailyAvatar(x)}
+      <span class="m-rk-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${x.n} ${x.n === 1 ? t.u : t.q} · ${x.items} ítem${x.items === 1 ? '' : 's'}</small><i><em style="width:${Math.max(4, x.pts / max * 100).toFixed(0)}%;background:${appDailyColor(x.cod)}"></em></i></span>
+      <span class="m-rk-pts"><b>${x.pts}</b><small>pts</small></span><span class="m-rk-ir">›</span></button>`; };
+  return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día</div>${l.map(fila).join('')}
+    <div class="m-rk-nota">Puntos: 2 por pedido generado o guía de salida y 1 por ítem. Toca a una persona para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
+}
+function appDailyAlmPersonaHtml(dia, cod){
+  const D = appDailyAlmDatos(dia), x = D.todos.find(function(y){ return y.cod === cod; }), i = D.lista.indexOf(x), t = APP_ALM_TXT[cod], col = appDailyColor(cod);
+  const nom = PD_PERSONAS[cod], ini = nom.split(' ').map(function(w){ return w.charAt(0); }).slice(0, 2).join(''), e = escapeHtml;
+  const kpi = function(ic, v, tt, sub){ return `<div class="m-pp-kpi${v ? '' : ' cero'}" style="--c:${col}"><i>${ic}</i><b>${appN(v)}</b><span>${tt}</span><small>${sub}</small></div>`; };
+  const nReq = function(r){ return r ? `<button type="button" class="mono m-link" data-ocreq="${e(r)}">${e(r.replace(/^0001-0*/, ''))}</button>` : '—'; };
+  const hizo = [...x.grupos.values()].map(function(g){ return `<div class="m-pp-tr"><span class="mono">${e(cod === 'JCENTENO' ? g.k.replace(/^0001-0*/, '') : g.k)}</span><span class="m-pp-prov">${e(polarCorta(appImpNombre(g.pry), 40))}${g.sede ? ' · desde ' + e(g.sede) : ''}</span><span class="m-pp-sub">req ${nReq(g.req)}</span><b>${g.n} ítem${g.n === 1 ? '' : 's'}</b></div>`; }).join('');
+  const porReq = new Map(); x.pend.forEach(function(p){ const g = porReq.get(p.req) || { req:p.req, pry:p.pry, d:p.d, n:0, pr:p.pr }; g.n++; g.d = Math.max(g.d, p.d); porReq.set(p.req, g); });
+  const pend = [...porReq.values()].sort(function(a, b){ return b.d - a.d; });
+  const filasPend = pend.slice(0, 40).map(function(g){ const c = g.d > 10 ? 'var(--red)' : g.d > 2 ? '#f4a640' : col;
+    return `<div class="m-pp-tr">${nReq(g.req)}<span class="m-pp-prov">${e(polarCorta(g.pr, 38))}${g.n > 1 ? ` <small>y ${g.n - 1} más</small>` : ''}</span><span class="m-pp-sub">${e(polarCorta(appImpNombre(g.pry), 22))}</span><b style="color:${c}">${g.d} d.h.</b></div>`; }).join('');
+  return `<div class="m-pp-hero" style="--c:${col}"><span class="m-pp-av">${e(ini)}</span>
+      <div class="m-pp-nom"><b>${e(nom)}</b><span>${i >= 0 ? (['🥇 1.º', '🥈 2.º'][i] || '#' + (i + 1)) + ' del día · ' : ''}${x.pts} pts</span><small>${appDailyFechaTxt(dia)}</small></div>
+      <div class="m-pp-monto"><b>${appN(x.items)}</b><small>${t.it}</small></div></div>
+    <div class="m-pp-kpis">${kpi(t.ic, x.n, t.q.charAt(0).toUpperCase() + t.q.slice(1), t.sub)}${kpi('📦', x.items, t.it.charAt(0).toUpperCase() + t.it.slice(1), 'líneas de requerimiento')}</div>
+    ${hizo ? `<div class="ini-card m-pp-hizo"><div class="m-pp-tit">✅ Lo que hizo ese día</div>${hizo}</div>` : ''}
+    <div class="m-pp-tit">📌 Para el daily</div>
+    <div class="ini-card m-pp-col${pend.length ? '' : ' ok'}" style="--c:#f4a640"><div class="m-pp-al"><i>⏳</i><div><p>${t.al}</p><small>${pend.length ? pend.length + ' requerimiento' + (pend.length === 1 ? '' : 's') + ' · ' + x.pend.length + ' ítems · el más antiguo lleva ' + pend[0].d + ' d.h.' : t.ok}</small></div><b>${appN(pend.length)}</b></div>${filasPend}</div>
+    ${appDailyTareasHtml(dia, cod)}`;
+}
 // Detalle completo de una tarjeta del comprador, sin cortar textos (07.10.2026, Piero: "las letras se cortan").
 function appDailyVerHtml(dia, cod, tipo){
   const D = appDailyDatos(dia), x = D.lista.find(function(y){ return y.cod === cod; }); if(!x) return '';
@@ -13851,8 +13927,9 @@ function appDailyVerHtml(dia, cod, tipo){
       ['<b' + (tipo === 'venc' ? ' class="rojo"' : '') + '>' + (tipo === 'venc' ? v[2] + ' d.h.' : (appDailyMonto(m) || '—')) + '</b>', 'nw']]; })));
 }
 function appDailyCopiar(b){
-  const dia = APP_DAILY.dia || appDailyUltimo(), l = appDailyDatos(dia).lista;
-  const txt = ['*Daily de Compras · ' + appDailyFechaTxt(dia) + '*'].concat(l.map(function(x, i){
+  const dia = APP_DAILY.dia || appDailyUltimo(), alm = appDailyEsAlm(), l = (alm ? appDailyAlmDatos(dia) : appDailyDatos(dia)).lista;
+  const txt = ['*Daily de ' + (alm ? 'Almacén' : 'Compras') + ' · ' + appDailyFechaTxt(dia) + '*'].concat(l.map(function(x, i){
+    if(x.alm){ const t = APP_ALM_TXT[x.cod]; return (i + 1) + '. ' + PD_PERSONAS[x.cod] + ' (' + x.pts + ' pts): ' + x.n + ' ' + t.q + ', ' + x.items + ' ' + t.it + (x.pend.length ? '. ' + t.al + ': ' + x.pend.length + ' ítems' : '') + '.'; }
     return (i + 1) + '. ' + PD_PERSONAS[x.cod] + ' (' + x.pts + ' pts): ' + x.oc.size + ' OC emitidas' + (x.montoPEN ? ' (' + appDailyMonto(x.monto) + ')' : '') + ', ' + x.sku.size + ' SKU hechos, ' + x.ped.size + ' pedidos directos'
       + (x.venc.size ? '. ' + x.venc.size + ' OC vencidas al cierre' : '') + '.'; }))
     .concat(appTareasDelDia(dia, '').length ? ['', '*Tareas*'].concat(appTareasDelDia(dia, '').map(function(t){ return '• ' + (PD_PERSONAS[t.cod] || t.cod).split(' ')[0] + ': ' + t.tarea + ' — ' + t.estado + (t.com ? ' (' + t.com + ')' : ''); })) : []).join('\n');
@@ -13872,7 +13949,7 @@ function tareaAbierta(t){ return t.estado === 'Pendiente' || t.estado === 'En pr
 // Solo cada comprador anota y actualiza SUS tareas (07.10.2026, Piero): se reconoce por el correo con que entró
 // (plinares@… = PLINARES). Los demás solo las ven.
 function tareaMiCod(){ const u = APP.usuario ? appUsuarioDe(APP.usuario.correo).toUpperCase() : '';
-  if(APP_DAILY_EQUIPO.indexOf(u) !== -1) return u; const p = pdPersona(polarMiNombre()); return APP_DAILY_EQUIPO.indexOf(p) !== -1 ? p : ''; }
+  if(APP_DAILY_TODOS.indexOf(u) !== -1) return u; const p = pdPersona(polarMiNombre()); return APP_DAILY_TODOS.indexOf(p) !== -1 ? p : ''; }
 function tareaYo(){ return [(APP.usuario && APP.usuario.correo) || '', polarMiNombre() || ''].filter(Boolean).join(' · '); }
 function appTareasCargar(forzar){
   if(!POLAR_APRENDE_URL || APP_TAREAS.cargando || (!forzar && Date.now() - APP_TAREAS.t < 60000)) return;
@@ -13913,7 +13990,7 @@ function appDailyTareasHtml(dia, cod){
         <small>${t.dia < dia ? '⏪ desde ' + corto(t.dia) : 'anotada ese día'}${t.por ? ' · por ' + e(t.por.split(' · ').pop()) : ''}${tmp ? ' · guardando…' : ''}</small></div>
       <div class="m-tar-est">${TAREA_ESTADOS.map(function(x){ return `<button type="button" data-tarest="${e(t.id)}" data-v="${x[0]}" class="${t.estado === x[0] ? 'on' : ''}"${tmp ? ' disabled' : ''}>${x[1]} ${x[0]}</button>`; }).join('')}</div>
       <div class="m-tar-com"><input type="text" data-tarcomin="${e(t.id)}" value="${e(t.com || '')}" placeholder="¿Cómo quedó? (comentario)"${tmp ? ' disabled' : ''}><button type="button" data-tarcom="${e(t.id)}"${tmp ? ' disabled' : ''}>Guardar</button><button type="button" class="m-tar-x" data-tarborrar="${e(t.id)}" aria-label="Eliminar"${tmp ? ' disabled' : ''}>🗑️</button></div></div>`; };
-  const grupos = cod ? [[cod, l]] : APP_DAILY_EQUIPO.map(function(c){ return [c, l.filter(function(t){ return t.cod === c; })]; }).filter(function(g){ return g[1].length; });
+  const grupos = cod ? [[cod, l]] : appDailyEquipo().map(function(c){ return [c, l.filter(function(t){ return t.cod === c; })]; }).filter(function(g){ return g[1].length; });
   const abiertas = l.filter(tareaAbierta).length;
   return `<div class="ini-card m-tar" data-tareas="1" data-dia="${dia}" data-cod="${cod || ''}">
     <div class="m-pp-tit">🗒️ Tareas del daily <small>${l.length ? abiertas + ' abierta' + (abiertas === 1 ? '' : 's') + ' · ' + (l.length - abiertas) + ' cerrada' + (l.length - abiertas === 1 ? '' : 's') + ' · ' : ''}se guardan en Drive</small></div>
