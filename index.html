@@ -13022,11 +13022,12 @@ const APP_VISTAS = {
   // Compras y Almacén (12.10.2026, Piero: "tanto compras como almacén ahora tengan las subvistas de gerencial
   // y las funciones que estaban en la vista logística"; la de Supervisor es Leo, así que no se ofrece). La
   // vista Logística se quitó: quien tenía ese acceso entra a Compras (ver appTipoNorm).
-  compras:    { nombre:'Compras',    ico:'🛒', desc:'Compras, importaciones, inventario e indicadores.',
+  compras:    { nombre:'Compras',    ico:'🛒', desc:'Compras, importaciones, indicadores, gasto y presupuesto.',
     // Orden de Piero (12.10.2026): Inicio, Indicadores, Compras, Importaciones y Gasto + Presupuesto en una sola pestaña.
     tabs:[['inicio','🏠','Inicio'], ['indicadores','📊','Indicadores'], ['pendcompras','🛒','Compras'], ['polar'], ['pendlog','🚢','Importaciones'], ['gastopresu','💰','Gasto y presupuesto']] },
-  almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Inventario, compras, importaciones e indicadores.',
-    tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones'], ['polar'], ['indicadores','📊','Indicadores'], ['gasto','💰','Gasto'], ['presu','💼','Presupuesto'], ['otif','🎯','OTIF']] },
+  almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Inventario, indicadores y OTIF.',
+    // Mismo orden que Compras, sin Compras, Importaciones, Gasto ni Presupuesto (12.10.2026, Piero).
+    tabs:[['inicio','🏠','Inicio'], ['indicadores','📊','Indicadores'], ['polar'], ['inventario','📦','Inventario'], ['otif','🎯','OTIF']] },
 };
 // El acceso "Logística" de antes es ahora Compras.
 function appTipoNorm(t){ return t === 'logistica' ? 'compras' : t; }
@@ -13557,7 +13558,7 @@ function appPrecalentar(){
     q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appPantallaHtml('otif'); }, function(){ appPantallaHtml('gasto'); });
   }
   if(appEsLogistica(v)){
-    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog' + v, function(){ return appInicioLogistica(v === 'compras' ? 'compras' : 'logistica'); }); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
+    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog' + v, function(){ return appInicioLogistica(v); }); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
       function(){ appImpDatos(); }, function(){ appPantallaHtml('pendlog'); });
   }
   const pausa = window.requestIdleCallback ? function(fn){ requestIdleCallback(fn, { timeout:1500 }); } : function(fn){ setTimeout(fn, 60); };
@@ -13590,7 +13591,7 @@ function appRenderInicio(){
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
   // Compras y Almacén: siempre el calendario del daily arriba (12.10.2026, Piero), sin los indicadores de la semana.
-  else if(appEsLogistica(v)) cuerpo = `<div id="iniCal">${appDailyHtml()}</div>` + appMemo('iniLog' + v, function(){ return appInicioLogistica(v === 'compras' ? 'compras' : 'logistica'); });   // Compras sin lo de inventario
+  else if(appEsLogistica(v)) cuerpo = `<div id="iniCal">${appDailyHtml()}</div>` + appMemo('iniLog' + v, function(){ return appInicioLogistica(v); });   // Compras sin lo de inventario
   else cuerpo = appInicioSupervisor();
   const corte = (DATA && DATA.corte) ? 'Datos al ' + fmtDate(DATA.corte) : '';
   // Supervisor: solo lo que sirve (29.09.2026, Piero: "hay demasiadas cosas, simplifícalo"): buscar su
@@ -16255,7 +16256,7 @@ function polarChips(){
   if(v === 'gerencia') return ['¿Cómo vamos esta semana?', 'Indicador más bajo', 'Gasto de este mes', 'Top proveedores'];
   if(v === 'logistica') return ['OC por llegar esta semana', '¿Qué se queda sin stock?', 'Pedidos sin OC', 'OC vencidas'];
   if(v === 'compras') return ['OC por llegar esta semana', 'Pedidos sin OC', 'OC vencidas', 'Estatus de embarques', '¿Cómo vamos esta semana?'];
-  if(v === 'almacen') return ['¿Qué se queda sin stock?', 'Qué reponer', 'OC por llegar esta semana', '¿Cómo vamos esta semana?'];
+  if(v === 'almacen') return ['¿Qué se queda sin stock?', 'Qué reponer', '¿Cómo vamos esta semana?'];
   return ['Mis requerimientos', 'Mis requerimientos atrasados', req ? '¿Cómo va el ' + req + '?' : '¿Qué salió a obra esta semana?'];
 }
 function polarSugerencias(){
