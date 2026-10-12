@@ -1732,7 +1732,7 @@
     .ix-kpis > div{background:var(--surface-2);border-radius:12px;padding:12px 12px;min-width:0;overflow:hidden;} .ix-kpis b{display:block;font-size:clamp(17px,4.4vw,24px);white-space:nowrap;font-weight:800;color:var(--ink);line-height:1.1;} .ix-kpis span{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-top:3px;} .ix-kpis small{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;opacity:.85;}
     .ix-kpis .ac b{color:var(--accent, #2a78d6);} .ix-kpis .ok b{color:#13865d;} .ix-kpis .late b{color:#c77a12;} .ix-kpis .warn b{color:#d33;} .ix-kpis .pr-rojo b{color:#d33;} .ix-kpis .pr-ambar b{color:#c77a12;} .ix-kpis .pr-verde b{color:#13865d;}
     .ix-rank{margin-top:14px;} .ix-rh,.ix-r{display:grid;grid-template-columns:26px minmax(0,1fr) 46px 52px 56px 56px;gap:6px;align-items:center;} .ix-rh{font-size:10px;letter-spacing:0;font-weight:700;color:var(--ink-soft);text-transform:uppercase;padding:0 0 6px;border-bottom:1px solid var(--border);}
-    .ix-rh span:nth-child(n+3),.ix-r > span:nth-child(n+3),.ix-r > b{text-align:right;} .ix-r{padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;} .ix-r:last-child{border-bottom:0;}
+    .ix-rh span:nth-child(n+3),.ix-r > span:nth-child(n+3),.ix-r > b{text-align:right;} .ix-rank.alm .ix-rh,.ix-rank.alm .ix-r{grid-template-columns:26px minmax(0,1fr) 52px 46px 46px 52px 56px;} .ix-r{padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;} .ix-r:last-child{border-bottom:0;}
     .ix-r .t b{display:block;font-size:14px;font-weight:700;} .ix-r .t i{display:block;height:5px;border-radius:3px;background:var(--surface-2);margin-top:5px;overflow:hidden;} .ix-r .t em{display:block;height:100%;background:var(--accent, #2a78d6);border-radius:3px;} .ix-r > b{font-size:16px;font-weight:800;}
     .ix-btn{margin-top:12px;border:0;background:var(--accent, #2a78d6);color:#fff;font-weight:700;font-size:13.5px;padding:10px 16px;border-radius:10px;cursor:pointer;} .ix-tip{margin-top:12px;font-size:12.5px;color:var(--ink-soft);} .ix-sub{font-size:12.5px;color:var(--ink-soft);margin-top:6px;}
     .ix .pr-barra{margin-top:12px;} .ix-seg{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:14px;background:var(--surface-2);gap:2px;} .ix-seg em{display:block;height:100%;}
@@ -13280,6 +13280,9 @@ function appConstruir(){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
     if(e.target.id === 'pcPer'){ APP_PC.persona = e.target.value; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
     if(e.target.id === 'pcEntAnio' || e.target.id === 'pcEntMes'){ if(e.target.id === 'pcEntAnio'){ APP_PC.entAnio = e.target.value; APP_PC.entMes = String(+e.target.value === appIndCorte().getUTCFullYear() ? appIndCorte().getUTCMonth() + 1 : 0); } else APP_PC.entMes = e.target.value; APP_PC.entTope = 60; return appRenderInicio(); }
+    if(e.target.id === 'arSub'){ APP_AR.sub = e.target.value; return appRenderInicio(); }
+    if(e.target.id === 'arPer'){ APP_AR.per = e.target.value; if(APP_AR.per === 'custom' && !APP_AR.desde){ const p = almPeriodo(); APP_AR.desde = p.desde; APP_AR.hasta = p.hasta; } return appRenderInicio(); }
+    if(e.target.id === 'arSuc'){ APP_AR[APP_AR.sub === 'jav' ? 'sucJ' : 'suc'] = e.target.value; return appRenderInicio(); }
     if(e.target.dataset.ardesde || e.target.dataset.arhasta){ APP_AR[e.target.dataset.ardesde ? 'desde' : 'hasta'] = e.target.value; return appRenderInicio(); }
     if(e.target.id === 'prCli' || e.target.id === 'prPry'){ APP_PR[e.target.id === 'prCli' ? 'cli' : 'pry'] = e.target.value; if(e.target.id === 'prCli') APP_PR.pry = ''; return appRenderInicio(); }
     const fb = e.target.closest && e.target.closest('[data-fbar]');
@@ -16177,20 +16180,25 @@ function almUSD(v){ return '$' + Math.round(v || 0).toLocaleString('en-US'); }
 // ---------- Pantalla "Recepción y despacho" (vista Almacén) ----------
 function appAlmRepHtml(){
   // Dos reportes en una pestaña (12.10.2026): el de Katherine y el análisis semanal que presenta Javier.
-  const sub = `<div class="ind-chips gp-tabs"><button type="button" data-arsub="kat" class="${APP_AR.sub !== 'jav' ? 'on' : ''}">🚚 Recepción y despacho · Katherine</button><button type="button" data-arsub="jav" class="${APP_AR.sub === 'jav' ? 'on' : ''}">📊 Análisis semanal · Javier</button></div>`;
-  return sub + appAlmRepCuerpo();
+  // Filtros en listas desplegables, como en Compras (12.10.2026, Piero: "mejora esa parte de los filtros").
+  const jav = APP_AR.sub === 'jav', op = function(v, t, sel){ return `<option value="${v}"${v === sel ? ' selected' : ''}>${t}</option>`; };
+  const P = almMovRows().length ? almPeriodo() : { desde:'', hasta:'' }, suc = jav ? (APP_AR.sucJ || 'ALL') : (APP_AR.suc || 'LIM');
+  const sedes = Object.keys(ALM_SEDES).concat(jav ? ['ALL'] : []);
+  const filtros = `<div class="m-filtros">
+      <label><span>📑 Reporte</span><select class="ini-select" id="arSub">${op('kat', 'Recepción y despacho · Katherine', jav ? 'jav' : 'kat')}${op('jav', 'Análisis semanal · Javier', jav ? 'jav' : 'kat')}</select></label>
+      <label><span>📅 Período</span><select class="ini-select" id="arPer">${[['semana', 'Última semana'], ['semanaAnt', 'Semana anterior'], ['mes', 'Mes'], ['custom', 'Personalizado (elegir fechas)']].map(function(x){ return op(x[0], x[1], APP_AR.per || 'semana'); }).join('')}</select></label>
+      ${APP_AR.per === 'custom' ? `<label><span>Desde</span><input type="date" class="ini-select" data-ardesde="1" value="${escapeHtml(P.desde)}"></label><label><span>Hasta</span><input type="date" class="ini-select" data-arhasta="1" value="${escapeHtml(P.hasta)}"></label>` : ''}
+      <label><span>🏬 Sede</span><select class="ini-select" id="arSuc">${sedes.map(function(k){ return op(k, k === 'ALL' ? 'Todas las sedes' : ALM_SEDES[k], suc); }).join('')}</select></label></div>`;
+  return filtros + appAlmRepCuerpo();
 }
 function appAlmRepCuerpo(){
   if(!almMovRows().length) return '<div class="ini-card"><div class="ini-vacio">Carga <b>Reporte Almacen.xlsx</b> (hojas Ingresos y Movimientos) y publica para ver la recepción y el despacho.</div></div>';
   const R = almRep(), r = R.rec, d = R.des, e = escapeHtml;
-  const chip = function(v, t){ return `<button type="button" data-arper="${v}" class="${(APP_AR.per || 'semana') === v ? 'on' : ''}">${t}</button>`; };
   const bar = function(l, max){ return l.map(function(x){ return `<div class="ini-bar"><span>${e(x[0])}</span><i><em style="width:${max ? (x[1] / max * 100).toFixed(1) : 0}%"></em></i><b>${almUSD(x[1])}</b></div>`; }).join(''); };
   const dias = function(vals, fmt){ const max = Math.max.apply(null, vals.concat([1]));
     return `<div class="ar-dias">${vals.map(function(v, i){ return `<div><b>${fmt(v)}</b><i><em style="height:${Math.max(3, v / max * 100).toFixed(0)}%"></em></i><small>${almFechaCorta(R.eje[i])}</small></div>`; }).join('')}</div>`; };
   const t = function(v, s){ return `<div><span>${s}</span><b>${v}</b></div>`; };
-  return `<div class="ind-chips ar-chips">${chip('semana', 'Última semana')}${chip('semanaAnt', 'Semana anterior')}${chip('mes', 'Mes')}${chip('custom', '📆 Personalizado')}</div>
-    ${(APP_AR.per === 'custom') ? `<div class="ar-fechas"><label><span>Desde</span><input type="date" class="ini-select" data-ardesde="1" value="${e(R.P.desde)}"></label><label><span>Hasta</span><input type="date" class="ini-select" data-arhasta="1" value="${e(R.P.hasta)}"></label></div>` : ''}
-    ${APP_AR.sub === 'jav' ? appAlmAnaHtml() : `<div class="ind-chips ar-chips">${Object.keys(ALM_SEDES).map(function(k){ return `<button type="button" data-arsuc="${k}" class="${R.suc === k ? 'on' : ''}">${ALM_SEDES[k]}</button>`; }).join('')}</div>
+  return `${APP_AR.sub === 'jav' ? appAlmAnaHtml() : `
     <div class="ini-card m-total"><span>${e(R.sede)} · ${e(almPerTxt(R))}</span><b>${almUSD(r.valor + d.valor)}</b><small>valor movilizado (US$) · recibido ${almUSD(r.valor)} · despachado ${almUSD(d.valor)}</small>
       <button type="button" class="ini-link" data-arimg="1">🖼️ Generar las 5 imágenes del reporte ›</button></div>
     ${!R.hay ? '<div class="ini-card"><div class="ini-vacio">No hay movimientos en ese período.</div></div>' : `
@@ -16370,7 +16378,7 @@ function appAlmAnaHtml(){
   const cnt = function(v){ return appN(v); };
   const eqF = R.eq.map(function(x){ const yo = APP_DAILY_ALMACEN.indexOf(x.cod) !== -1;
     return `<tr class="${yo ? 'an-yo' : ''}"><td>${x.n ? e(yo ? PD_PERSONAS[x.cod] : almTitulo(x.n)) : '<i>Sin responsable</i>'}</td><td>${e([...x.sedes].join(', '))}</td><td class="num">${appN(x.grc.size)}</td><td class="num">${appN(x.grr.size)}</td><td class="num">${appN(x.lin)}</td></tr>`; }).join('');
-  return `<div class="ind-chips ar-chips">${Object.keys(ALM_SEDES).concat(['ALL']).map(function(k){ return `<button type="button" data-arsucj="${k}" class="${R.suc === k ? 'on' : ''}">${k === 'ALL' ? 'Todas las sedes' : ALM_SEDES[k]}</button>`; }).join('')}</div>
+  return `
     <div class="ini-card m-total"><span>${e(R.sede)} · ${e(almPerTxt(R))}</span><b>${appN(M.gS)} salidas · ${appN(M.gI)} ingresos</b><small>${appN(q.n)} requerimientos · despachado ${almSoles(M.sS)} · recibido ${almSoles(M.sI)}</small>
       <button type="button" class="ini-link" data-anaimg="1">🖼️ Generar las 4 imágenes del análisis ›</button></div>
     ${!R.hay ? '<div class="ini-card"><div class="ini-vacio">No hay movimientos en ese período.</div></div>' : `
@@ -16634,12 +16642,13 @@ function appFotoAlmacen(st){
     return almCerrar(T).sort(function(a, b){ return b.pts - a.pts; });
   });
   const max = Math.max.apply(null, L.map(function(x){ return x.pts; }).concat([1])), tot = function(k){ return L.reduce(function(a, x){ return a + (k === 'pts' ? x.pts : x[k].size); }, 0); };
-  return `<div class="ini-card foto">
-      <div class="ini-card-tit">📸 Foto de Almacén <small>${escapeHtml(r ? r.label : 'todo lo cargado')}</small></div>
-      <div class="m-tiles foto-kpi foto-k4"><div class="pts"><span>🗓️ Puntos Daily call in</span><b>${appN(tot('pts'))}</b></div><div><span>📝 Pedidos generados</span><b>${appN(tot('ped'))}</b></div><div><span>📥 Guías de recepción</span><b>${appN(tot('grc'))}</b></div><div><span>🚚 Guías de salida</span><b>${appN(tot('grr'))}</b></div></div>
-      <div class="foto-rank">${L.map(function(x, i){
-        return `<div class="foto-fila"><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${almDailyDet(x)} · ${appN(x.items)} ítems</small><i><em style="width:${(x.pts / max * 100).toFixed(1)}%"></em></i></span><b class="p">${appN(x.pts)}<small>pts</small></b></div>`; }).join('')}</div>
-      <small class="sku-nota">Puntos como en el Daily de Almacén: 1 por pedido generado o guía (recepción o salida) y 1 por ítem, sumados en el período. Las guías van a quien figura como RESPONSABLE en el Reporte Almacén.</small></div>`;
+  // Mismo diseño simple que la foto de los compradores (12.10.2026, Piero): números grandes, ranking en tabla, nota en el ⓘ.
+  const k = function(v, t, cls){ return `<div class="${cls || ''}"><b>${v}</b><span>${t}</span></div>`; };
+  return `<div class="ini-card ix">
+      <div class="ix-head"><b>📸 Almacén</b><span>${escapeHtml(r ? r.label : 'todo lo cargado')}</span><i class="ix-info" title="Puntos como en el Daily de Almacén: 1 por pedido generado o guía (recepción o salida) y 1 por ítem, sumados en el período. Las guías van a quien figura como RESPONSABLE en el Reporte Almacén.">ⓘ</i></div>
+      <div class="ix-kpis cuatro">${k(appN(tot('pts')), 'Puntos', 'ac')}${k(appN(tot('ped')), 'Pedidos generados')}${k(appN(tot('grc')), 'Guías de recepción')}${k(appN(tot('grr')), 'Guías de salida')}</div>
+      <div class="ix-rank alm"><div class="ix-rh"><span></span><span>Persona</span><span>Pedidos</span><span>GRC</span><span>GRR</span><span>Ítems</span><span>Puntos</span></div>${L.map(function(x, i){
+        return `<div class="ix-r"><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><i><em style="width:${(x.pts / max * 100).toFixed(1)}%"></em></i></span><span>${appN(x.ped.size)}</span><span>${appN(x.grc.size)}</span><span>${appN(x.grr.size)}</span><span>${appN(x.items)}</span><b>${appN(x.pts)}</b></div>`; }).join('')}</div></div>`;
 }
 
 // ---------- Inicio: Supervisor ----------
