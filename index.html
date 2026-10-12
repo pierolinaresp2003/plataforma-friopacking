@@ -16067,7 +16067,9 @@ function almRep(){
     const ocs = new Map(); I.forEach(function(m){ if(!ocs.has(m.oc)) ocs.set(m.oc, /^0002/.test(m.oc) ? 'imp' : 'nac'); });
     const trans = new Map(); S.forEach(function(m){ if(!m.tr && !m.pl) return; const k = m.f + '|' + m.tr + '|' + m.pl; if(!trans.has(k)) trans.set(k, { f:m.f, tr:m.tr, propio:/FRIOPACKING/i.test(m.tr) }); });
     const porDia = function(l, fn){ return eje.map(function(k){ return fn(l.filter(function(m){ return m.f === k; }), k); }); };
-    const pry = new Set(S.map(function(m){ return m.py; }).filter(Boolean)), cli = new Set(S.map(function(m){ return m.cl; }).filter(Boolean)), req = new Set(S.map(function(m){ return m.rq; }).filter(Boolean));
+    // Como en el informe de Katherine: las órdenes de producción (OPR) no cuentan como proyecto ni como requerimiento.
+    const SP = S.filter(function(m){ return !/^OPR/i.test(m.py || ''); });
+    const pry = new Set(SP.map(function(m){ return m.py; }).filter(Boolean)), cli = new Set(S.map(function(m){ return m.cl; }).filter(Boolean)), req = new Set(SP.map(function(m){ return m.rq; }).filter(Boolean));
     const T = [...trans.values()];
     return { P:P, suc:suc, sede:ALM_SEDES[suc], eje:eje, hay:L.length > 0,
       rec:{ valor:suma(I), oc:ocs.size, grc:grc.size, prov:new Set(I.map(function(m){ return m.pv; })).size, items:I.length,
