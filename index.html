@@ -1726,6 +1726,7 @@
     .arh-vacio{font-size:16px;color:#5b6780;padding:20px 0;text-align:center;}
     .arh-deco{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(160deg,transparent 55%,#3f86ea 55%,#1f5fd1 75%,#0b2a7a 100%);opacity:.85;pointer-events:none;}
     .arh-hoja .arh-card,.arh-hoja .arh-kpis{z-index:1;}
+    .arh-sede.arh-sede-s{font-size:58px;max-width:470px;line-height:1.02;} .arh-nota-pie{position:relative;z-index:1;margin-top:14px;font-size:14px;color:#5b6780;} .arh-sem .arh-kpi b{font-size:30px;}
     .arh-firma{position:relative;z-index:2;margin-top:18px;display:inline-block;background:#0b2a7a;color:#fff;border-radius:12px;padding:10px 18px;font-size:15px;} .arh-firma b{font-weight:800;}
     .arh-card.arh-nota{font-size:17px;color:#1d2a4d;padding:14px 20px;} .arh-card.arh-nota b{color:#0b2a7a;font-size:20px;}
     .arh-kpis + .arh-kpis{margin-top:12px;} .arh-dos + .arh-kpis, .arh-card + .arh-kpis{margin-top:18px;}
@@ -13709,11 +13710,11 @@ function appDailyEsAlm(){ return APP.vista === 'almacen'; }
 function appDailyEquipo(){ return appDailyEsAlm() ? APP_DAILY_ALMACEN : APP_DAILY_EQUIPO; }
 function appDailyColor(cod){ return APP_DAILY_COLORES[Math.max(0, APP_DAILY_TODOS.indexOf(cod)) % APP_DAILY_COLORES.length]; }
 // Puntos del día para ordenar a los compradores (07.10.2026, Piero: "dale una jerarquía para saber quién
-// hizo más ese día"): 1 por SKU puesto en OC, 2 por OC emitida y 1 por pedido directo (los pedidos cerrados no suman).
+// hizo más ese día"): 1 por SKU puesto en OC, 1 por OC emitida y 1 por pedido directo (12.10.2026, Piero; los pedidos cerrados no suman).
 function appDailySuma(l){ return l.reduce(function(a, m){ if(m){ a.s += m.s; a.d += m.d; } return a; }, { s:0, d:0 }); }
 function appDailyMonto(m){ return m ? [m.s ? fmtPEN(m.s) : '', m.d ? fmtUSD(m.d) : ''].filter(Boolean).join(' + ') : ''; }   // cada moneda en lo suyo, sin convertir
 // Los pedidos cerrados ya no suman ni se muestran (12.10.2026, Piero: "es redundar en puntaje" / "siguen ahí, no te dije que se quitaban?").
-function appDailyPts(x){ return x.sku.size + 2 * x.oc.size + x.ped.size; }
+function appDailyPts(x){ return x.sku.size + x.oc.size + x.ped.size; }
 const APP_DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 function appDailyFilas(){
   return getReqRows().concat(PEDIDO_SIN_REQ_ROWS || [], (PEDIDO_SIN_REQ_PEND || []).map(function(r){ return Object.assign({ esPedidoDirecto:true }, r); }));
@@ -13772,7 +13773,7 @@ function appDailyDatos(dia){
       if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '' }); porPed.set(r.codPedido, g); }
       // Solo los pedidos DIRECTOS los genera el comprador; los que vienen de un requerimiento salen solos
       // (07.10.2026, Piero: "nosotros no generamos pedidos, estos vienen solos a partir de un req").
-      if(r.codPedido && fp && fp <= dia && r.codOrden && fo && fo > dia){ const x = per(r.responsablePedido); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:dh(r.fPedido), req:r.codRequerimiento || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '' }); }
+      if(r.codPedido && fp && fp <= dia && r.codOrden && fo && fo > dia){ const x = per(r.responsablePedido); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:dh(r.fPedido), req:r.codRequerimiento || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '', fa:r.familia || '' }); }
       if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
       if(!r.codOrden || !r.usuarioCompras) return;
       const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden);
@@ -13785,7 +13786,7 @@ function appDailyDatos(dia){
     // importaciones), 07.10.2026: antes salían 12 aquí y 3 en Pendientes.
     const pendHoy = new Set(pdFilas().filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; }));
     pdFilas().forEach(function(r){ const fp = isoDay(r.fPedido); if(r.tipo !== 'ped' || (fp && fp > dia)) return;   // cada línea cuenta, como en Pendientes
-      const x = per(r.persona); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:fp ? dh(r.fPedido) : 0, req:r.req || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '' }); });
+      const x = per(r.persona); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:fp ? dh(r.fPedido) : 0, req:r.req || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '', fa:r.familia || '' }); });
     porOC.forEach(function(o, co){
       const x = per(o.uc); if(!x || o.anul) return;
       // SKU hechos = líneas de las OC emitidas ese día.
@@ -13815,7 +13816,7 @@ function appDailyDatos(dia){
       x.hizo = x.ped.size + x.oc.size + x.sku.size; x.pts = appDailyPts(x); return x; })
       .filter(function(x){ return x.hizo; })   // solo se muestran y cuentan los que hicieron algo ese día
       .sort(function(a,b){ return b.pts - a.pts || b.montoPEN - a.montoPEN; });
-    return { lista:lista, montoOC:montoOC, manana:manana };
+    return { lista:lista, montoOC:montoOC, manana:manana, todos:P };   // todos: también los que no hicieron nada ese día (resumen del comprador)
   });
 }
 function appDailyFechaTxt(dia){ const d = new Date(dia + 'T00:00:00Z');
@@ -13851,7 +13852,7 @@ function appDailyDetHtml(dia){
   const lc = l.filter(function(x){ return APP_DAILY_COMEX.indexOf(x.cod) === -1; }), lx = l.filter(function(x){ return APP_DAILY_COMEX.indexOf(x.cod) !== -1; });
   return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día · Compras</div>${lc.length ? lc.map(fila).join('') : '<div class="ini-vacio">Sin movimientos ese día.</div>'}
     <div class="ini-card-tit m-rk-sub">🌎 Comex</div>${lx.length ? lx.map(fila).join('') : '<div class="ini-vacio">Sin movimientos de Comex ese día.</div>'}
-    <div class="m-rk-nota">Puntos: 1 por SKU en OC, 2 por OC emitida y 1 por pedido directo. Toca a un comprador para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
+    <div class="m-rk-nota">Puntos: 1 por OC emitida, 1 por SKU en OC y 1 por pedido directo. Toca a un comprador para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
 }
 // Pantalla del comprador (07.10.2026, Piero: "en la web está muy simple… usa todo el espacio, más grande y llamativo"):
 // franja con su color, 4 indicadores grandes, 3 alertas para el daily y las listas abiertas lado a lado en la PC.
@@ -13899,13 +13900,13 @@ function appDailyPersonaHtml(dia, cod){
 //   Pedidos generados a partir de requerimientos → Javier Centeno (Indicador 1, Req → Pedido).
 //   Guías de recepción (GRC) y de salida (GRR) → quien figura en la columna RESPONSABLE de las hojas Ingresos y
 //   Movimientos de Reporte Almacen.xlsx (12.10.2026: Marycarmen genera la mayoría en Lurín).
-// Puntos: 2 por pedido generado o guía y 1 por ítem.
+// Puntos: 1 por pedido generado o guía y 1 por ítem (12.10.2026, Piero: la misma lógica que los compradores).
 function almPersona(n){ n = sinAcentos(String(n || '')).toUpperCase();
   return /CENTENO/.test(n) ? 'JCENTENO' : /KATHERINE/.test(n) ? 'KALBUJAR' : /CONDORI/.test(n) ? 'MCONDORI' : ''; }
 function almGuiaGrupo(mapa, m){ const g = mapa.get(m.d) || { k:m.d, t:m.t, quien:m.t === 'i' ? m.pv : m.cl, pry:m.py || '', req:m.rq || '', oc:m.oc || '', sede:ALM_SEDES[m.s] || '', n:0, pr:[] };
   g.n++; g.pr.push(m.c); mapa.set(m.d, g); return g; }
 function almPersonasVacias(){ return APP_DAILY_ALMACEN.map(function(cod){ return { cod:cod, alm:true, ped:new Map(), grc:new Map(), grr:new Map(), items:0, pend:[] }; }); }
-function almCerrar(L){ L.forEach(function(x){ x.n = x.ped.size + x.grc.size + x.grr.size; x.pts = 2 * x.n + x.items; }); return L; }
+function almCerrar(L){ L.forEach(function(x){ x.n = x.ped.size + x.grc.size + x.grr.size; x.pts = x.n + x.items; }); return L; }
 function appDailyAlmDatos(dia){
   return appMemo('dailyAlm:' + dia, function(){
     rqPreparar();
@@ -13949,7 +13950,7 @@ function appDailyAlmDetHtml(dia){
       <span class="m-rk-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${almDailyDet(x)} · ${x.items} ítem${x.items === 1 ? '' : 's'}</small><i><em style="width:${Math.max(4, x.pts / max * 100).toFixed(0)}%;background:${appDailyColor(x.cod)}"></em></i></span>
       <span class="m-rk-pts"><b>${x.pts}</b><small>pts</small></span><span class="m-rk-ir">›</span></button>`; };
   return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día</div>${l.map(fila).join('')}
-    <div class="m-rk-nota">Puntos: 2 por pedido generado o guía (recepción o salida) y 1 por ítem. Las guías van a quien figura como RESPONSABLE en el Reporte Almacén. Toca a una persona para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
+    <div class="m-rk-nota">Puntos: 1 por pedido generado o guía (recepción o salida) y 1 por ítem. Las guías van a quien figura como RESPONSABLE en el Reporte Almacén. Toca a una persona para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
 }
 function appDailyAlmPersonaHtml(dia, cod){
   const D = appDailyAlmDatos(dia), x = D.todos.find(function(y){ return y.cod === cod; }), i = D.lista.indexOf(x), t = APP_ALM_TXT[cod], col = appDailyColor(cod);
@@ -14328,8 +14329,10 @@ function appIndicadoresHtml(){
       ${st.n ? '<div class="ind-ver">Ver los ' + st.n + ' casos ›</div>' : ''}
     </div>`;
   }).join('');
+  const comex = !alm && (!st.persona || pdPersona(st.persona) === 'CMORA') ? appComexHtml(st) : '';
   return `${barra}
     ${foto}
+    ${comex}
     <div class="m-sec-tit">⏱️ Tiempos ${alm ? 'de Almacén' : 'del comprador'}</div>
     <div class="ini-card ind-res"><div class="ind-per-txt">${escapeHtml(per.largo)}</div>
       <div class="ind-res-n"><div class="ok"><b>${cuenta.ok}</b><span>✅ Bien<small>80% o más a tiempo</small></span></div>
@@ -14344,7 +14347,7 @@ function appIndicadoresHtml(){
 // ---------- Foto del comprador (Indicadores, 07.10.2026, Piero) ----------
 // "Esta parte es como una foto para ver cómo va el comprador en general": puntos del Daily call in sumados
 // en el período elegido (año, mes, día o a medida), lo comprado y el presupuesto de lo solicitado.
-// Puntos = los mismos del Daily, en una sola pasada: 2 por OC emitida, 1 por SKU puesto en OC, 1 por pedido
+// Puntos = los mismos del Daily, en una sola pasada: 1 por OC emitida, 1 por SKU puesto en OC, 1 por pedido
 // cerrado (al comprador de su última OC) y 1 por pedido directo.
 function appDailyRango(desde, hasta, pryFn){ return appMemo('drango:' + desde + hasta + (pryFn ? APP_F.indicadores.pry : ''), function(){
   const P = new Map(), per = function(v){ const c = pdPersona(v); if(APP_DAILY_EQUIPO.indexOf(c) === -1) return null;
@@ -14396,7 +14399,7 @@ function appFotoPresu(desde, hasta, cod, pryFn){ return appMemo('fpresu:' + desd
 function appFotoComprador(st){
   const r = appFRango(st), desde = r ? appIndIso(r.desde) : '1900-01-01', hasta = r ? appIndIso(r.hasta) : '2100-01-01';
   const cod = st.persona ? pdPersona(st.persona) : '', pryFn = appFPry(st.pry);
-  const lista = appDailyRango(desde, hasta, pryFn), mios = cod ? lista.filter(function(x){ return x.cod === cod; }) : lista;
+  const lista = appDailyRango(desde, hasta, pryFn).filter(function(x){ return x.cod !== 'CMORA'; }), mios = cod ? lista.filter(function(x){ return x.cod === cod; }) : lista;   // Camila se mide aparte (Comex)
   const sum = function(k){ return mios.reduce(function(a, x){ return a + (k === 'pts' ? x.pts : x[k].size); }, 0); };
   const pr = appFotoPresu(desde, hasta, cod, pryFn), max = Math.max.apply(null, lista.map(function(x){ return x.pts; }).concat([1]));
   const rank = !cod && lista.length ? `<div class="foto-rank">${lista.map(function(x, i){
@@ -14406,7 +14409,8 @@ function appFotoComprador(st){
       <div class="ini-card-tit">📸 Foto ${cod ? 'de ' + escapeHtml(PD_PERSONAS[cod] || cod) : 'de los compradores'} <small>${escapeHtml(r ? r.label : 'todo lo cargado')}</small></div>
       <div class="m-tiles foto-kpi"><div class="pts"><span>🗓️ Puntos Daily call in</span><b>${appN(sum('pts'))}</b></div><div><span>🧾 OC emitidas</span><b>${appN(sum('oc'))}</b></div><div><span>📦 SKU hechos</span><b>${appN(sum('sku'))}</b></div></div>
       ${rank}
-      <small class="sku-nota">Puntos como en el Daily: 2 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo, sumados en el período.</small></div>
+      ${cod && APP_DAILY_COMPRAS.indexOf(cod) !== -1 ? `<button type="button" class="ini-link" data-cmpimg="${escapeHtml(cod)}">🖼️ Generar el resumen de ${escapeHtml(PD_PERSONAS[cod])} en imágenes ›</button>` : '<small class="sku-nota">Elige un comprador en el filtro de arriba para generar su resumen en imágenes.</small>'}
+      <small class="sku-nota">Puntos como en el Daily: 1 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo, sumados en el período.</small></div>
     <div class="ini-card foto-presu"><div class="ini-card-tit">💼 Presupuesto <small>solicitado vs. comprado en el período</small></div>
       <div class="m-tiles"><div><span>📋 Solicitado</span><b>${appN(pr.sol)} SKU</b><small>${pr.solPart.size} partidas · presupuesto ${fmtUSD(pr.solPc)}</small></div>
         <div><span>🛒 Comprado en OC</span><b>${fmtUSD(pr.comUsd)}</b><small>${appN(pr.lineas)} líneas · ${fmtUSD(pr.comSin)} sin presupuesto</small></div></div>
@@ -16374,6 +16378,141 @@ function appAlmAnaImagenes(){
   return appGenerarImagenes(almAnaHojas(R), { caja:'arh-caja', hoja:'.arh-hoja', ancho:768, nombre:'Analisis ' + R.sede + ' ' + R.P.desde + ' al ' + R.P.hasta,
     titulo:'Análisis semanal · ' + R.sede, sub:almPerTxt(R), sec:function(el, i){ return tit[i] || ''; } });
 }
+// ---------- Resumen del comprador en imágenes (12.10.2026, Piero: "como debe ser el resumen de los compradores,
+// sigue el mismo estilo que hiciste para Katherine") ----------
+// 3 hojas por comprador y período: 1) OC emitidas, SKU, tiempo de emisión, origen, monto y condición de pago ·
+// 2) Nivel de aviso de entrega: recepciones de sus OC (semáforo solo Lurín, contra la fecha comprometida;
+// ETA en importaciones) · 3) Pedidos sin OC al corte (la misma lista de "SKU sin OC" del Daily).
+const CMP_COND = ['Contado', 'Crédito 1–30 días', 'Crédito 31–60 días', 'Crédito más de 60 días', 'Anticipo + saldo', 'Otra / sin dato'];
+const CMP_IGV = 1.18;   // el monto se muestra con IGV (lo nacional; la importación no lleva IGV)
+function cmpCond(t){ const b = creditoBucketFor(t); if(/ANTICIPO|ADELANTO|%/i.test(t || '')) return 4;
+  return { 'Contado':0, 'Crédito 0-30 días':1, 'Crédito 30-60 días':2, 'Crédito 60+ días':3 }[b] != null ? { 'Contado':0, 'Crédito 0-30 días':1, 'Crédito 30-60 días':2, 'Crédito 60+ días':3 }[b] : 5; }
+function appCmpRep(cod, desde, hasta){
+  return appMemo('cmpRep:' + cod + desde + hasta, function(){
+    const en = function(d){ return d && d >= desde && d <= hasta; }, O = new Map(), duenio = new Map(), cond = new Map();
+    polarLineasOC().forEach(function(r){ if(r.codOrden && r.condiciones && !cond.has(r.codOrden)) cond.set(r.codOrden, r.condiciones); });
+    appDailyFilas().forEach(function(r){
+      if(!r.codOrden || !r.usuarioCompras || /anul/i.test(r.estadoOrden || '')) return;
+      const c = pdPersona(r.usuarioCompras); duenio.set(r.codOrden, c); if(c !== cod) return;
+      const o = O.get(r.codOrden) || { co:r.codOrden, fo:isoDay(r.fOrden), fOrden:r.fOrden, fp:null, imp:r.origen === 'importado' || /^0002-/.test(r.codOrden), fx:r.fCompromiso, sku:new Set(), mon:monedaLabel(r.moneda), sum:0 };
+      if(r.fPedido && (!o.fp || r.fPedido < o.fp)) o.fp = r.fPedido;
+      if(!o.fx && r.fCompromiso) o.fx = r.fCompromiso;
+      o.sku.add(r.idProducto || r.producto || ''); if(r.cantOrden != null && r.precioUnit != null) o.sum += r.cantOrden * r.precioUnit;
+      O.set(r.codOrden, o); });
+    // 1) OC emitidas en el período.
+    const E = [...O.values()].filter(function(o){ return en(o.fo); });
+    const emi = E.filter(function(o){ return o.fp; }).map(function(o){ return Math.max(0, busdayCount(o.fp, o.fOrden) || 0); });
+    const gasto = new Map(); ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(!r.oc || !O.has(r.oc) || !(r.montoNativo > 0)) return;
+      const g = gasto.get(r.oc) || { mon:monedaLabel(r.moneda), v:0, pen:0 }; g.v += r.montoNativo; g.pen += r.montoPEN || 0; gasto.set(r.oc, g); });
+    const m = { s:0, d:0, sPen:0, dPen:0 };
+    E.forEach(function(o){ const g = gasto.get(o.co), mon = g ? g.mon : o.mon, v = g ? g.v : o.sum, igv = o.imp ? 1 : CMP_IGV;
+      const pen = g && g.v ? g.pen / g.v * v : (mon === 'S/' ? v : v * TIPO_CAMBIO.USD);
+      if(mon === 'S/'){ m.s += v * igv; m.sPen += pen * igv; } else { m.d += v * igv; m.dPen += pen * igv; } });
+    const cc = CMP_COND.map(function(){ return 0; }); E.forEach(function(o){ cc[cmpCond(cond.get(o.co))]++; });
+    // 2) Recepciones del período de sus OC (hoja Ingresos del Reporte Almacén: guía, sede y fecha).
+    const docs = { LIM:new Set(), TRU:new Set(), ICA:new Set() }, ocsRec = new Set(), lurin = new Map();
+    almMovRows().forEach(function(x){ if(x.t !== 'i' || !x.oc || !en(x.f) || duenio.get(x.oc) !== cod) return;
+      if(docs[x.s]) docs[x.s].add(x.d); ocsRec.add(x.oc);
+      if(x.s === 'LIM' && (!lurin.has(x.oc) || x.f < lurin.get(x.oc))) lurin.set(x.oc, x.f); });
+    const sem = [0, 0, 0, 0], desdeEmi = []; let impL = 0;
+    lurin.forEach(function(f, co){ const o = O.get(co); if(!o) return; const fr = new Date(f + 'T00:00:00Z');
+      if(o.fOrden) desdeEmi.push(Math.max(0, busdayCount(o.fOrden, fr) || 0)); if(o.imp) impL++;
+      const fv = ocFechaVale(co, o.fx), t = fv ? busdayCount(fv, fr) || 0 : 0;
+      sem[t <= 0 ? 0 : t <= 2 ? 1 : t <= 5 ? 2 : 3]++; });
+    // 3) Pedidos sin OC al corte (lo mismo que el Daily muestra como "SKU sin OC al cierre").
+    const corte = hasta > appDailyUltimo() ? appDailyUltimo() : hasta, yo = appDailyDatos(corte).todos.get(cod), sin = yo ? yo.sinOC : [];
+    const cuenta = function(k){ const mp = new Map(); sin.forEach(function(x){ const v = x[k] || 'Sin dato'; mp.set(v, (mp.get(v) || 0) + 1); }); return [...mp.entries()].sort(function(a, b){ return b[1] - a[1]; }); };
+    const prom = function(l){ return l.length ? l.reduce(function(a, b){ return a + b; }, 0) / l.length : null; };
+    return { cod:cod, nom:PD_PERSONAS[cod] || cod, P:{ desde:desde, hasta:hasta }, eje:[hasta], corte:corte,
+      oc:E.length, sku:E.reduce(function(a, o){ return a + o.sku.size; }, 0), emi:prom(emi), nac:E.filter(function(o){ return !o.imp; }).length, imp:E.filter(function(o){ return o.imp; }).length,
+      monto:m, cond:cc,
+      rec:{ docs:docs, nDocs:docs.LIM.size + docs.TRU.size + docs.ICA.size, ocs:ocsRec.size, lurin:lurin.size, desdeEmi:prom(desdeEmi), sem:sem, impL:impL },
+      sin:{ sku:sin.length, ped:new Set(sin.map(function(x){ return x.cp; })).size, cli:cuenta('pry'), fam:cuenta('fa') } };
+  });
+}
+function cmpDh(v){ return v == null ? '—' : v.toFixed(1) + ' d.h.'; }
+function cmpHojas(R){
+  const n = function(v){ return Math.round(v || 0).toLocaleString('en-US'); }, pc = function(a, b){ return b ? (a / b * 100).toFixed(1) + '%' : '0%'; };
+  const cab = function(num, pill, sub, ilus){ return arhCab({ sede:R.nom, P:R.P, eje:R.eje }, num, pill, sub, ilus).replace('class="arh-sede"', 'class="arh-sede arh-sede-s"'); };
+  const pie = '<div class="arh-deco"></div>', tPen = R.monto.sPen + R.monto.dPen;
+  const h1 = `<div class="arh-hoja">${cab('', 'Reporte de Compras', 'Actividad del período · origen · monto · condición de pago', 'estante')}
+      <div class="arh-kpis tres">${arhKpi('doc', ARH.navy, n(R.oc), 'Órdenes de compra generadas')}${arhKpi('caja', ARH.teal, n(R.sku), 'SKU hechos')}${arhKpi('cal2', ARH.amber, cmpDh(R.emi), 'Tiempo de emisión promedio')}</div>
+      <div class="arh-card"><h3>Origen de compras</h3><p>Por número de OC</p>
+        <div class="arh-dona">${arhDona(R.nac, R.imp, ARH.teal, ARH.navy, R.oc)}<div><div><i style="background:${ARH.teal}"></i>Nacional · ${pc(R.nac, R.oc)}<b>${R.nac} OC</b></div><div><i style="background:${ARH.navy}"></i>Importado · ${pc(R.imp, R.oc)}<b>${R.imp} OC</b></div></div></div></div>
+      <div class="arh-card"><h3>Monto comprado (con IGV)</h3><p>Participación convertida a soles con el tipo de cambio de cada OC</p>
+        <div class="arh-kpis dos">${arhKpi('dolar', ARH.amber, pc(R.monto.sPen, tPen), 'Soles<small>' + almSoles(R.monto.s) + '</small>')}${arhKpi('dolar', ARH.blue, pc(R.monto.dPen, tPen), 'Dólares<small>US' + almUSD(R.monto.d) + '</small>')}</div></div>
+      <div class="arh-card"><h3>Condición de pago</h3><p>Por número de OC</p>${arhBarras(CMP_COND.map(function(c, i){ return [c + ' · ' + pc(R.cond[i], R.oc), R.cond[i]]; }).filter(function(x, i){ return i < 5 || x[1]; }), function(v){ return v + ' OC'; })}</div>
+      <div class="arh-nota-pie">Emisión: desde el pedido más antiguo vinculado hasta la OC, en días hábiles.</div>${pie}</div>`;
+  const s = R.rec.sem;
+  const h2 = `<div class="arh-hoja">${cab('', 'Nivel de aviso de entrega', 'Recepciones de sus OC en el período', 'camion')}
+      <div class="arh-kpis dos">${arhKpi('doc', ARH.navy, n(R.rec.lurin) + ' OC', 'Con recepción en Lurín')}${arhKpi('cal2', ARH.teal, cmpDh(R.rec.desdeEmi), 'Tiempo promedio desde la emisión')}</div>
+      <div class="arh-card"><h3>Semáforo de entrega</h3><p>OC recibidas en Lurín contra la fecha comprometida (ETA en importaciones)</p>
+        <div class="arh-kpis cuatro arh-sem">${arhKpi('cal2', ARH.navy, n(s[0]), 'A tiempo')}${arhKpi('cal2', '#22a06b', n(s[1]), 'Leve<small>1–2 d.h. tarde</small>')}${arhKpi('cal2', '#f08c1a', n(s[2]), 'Media<small>3–5 d.h. tarde</small>')}${arhKpi('cal2', '#e5484d', n(s[3]), 'Crítica<small>más de 5 d.h. tarde</small>')}</div></div>
+      <div class="arh-card"><h3>Recepciones por sede</h3><p>Guías de recepción de sus OC</p>
+        <div class="arh-kpis tres">${arhKpi('cajas', ARH.navy, n(R.rec.docs.LIM.size), 'Lurín')}${arhKpi('cajas', ARH.teal, n(R.rec.docs.TRU.size), 'Trujillo')}${arhKpi('cajas', ARH.amber, n(R.rec.docs.ICA.size), 'Ica')}</div>
+        <div class="arh-kpis dos">${arhKpi('doc', ARH.navy, n(R.rec.nDocs), 'Documentos de recepción')}${arhKpi('clip', ARH.blue, n(R.rec.ocs), 'OC distintas')}</div></div>
+      <div class="arh-nota-pie">Semáforo: solo Lurín.${R.rec.impL ? ' El promedio incluye ' + R.rec.impL + ' OC importada' + (R.rec.impL === 1 ? '' : 's') + '.' : ''} Días hábiles, sin fines de semana ni feriados.</div>${pie}</div>`;
+  const z = R.sin, top = function(l){ return l.slice(0, 8); };
+  const h3 = `<div class="arh-hoja">${cab('', 'Pedidos pendientes sin OC', 'Pendientes acumulados al ' + almFechaCorta(R.corte) + ' ' + R.corte.slice(0, 4), 'estante')}
+      <div class="arh-kpis dos">${arhKpi('doc', ARH.blue, n(z.sku) + ' SKU', 'Pendientes al corte<small>sin orden de compra</small>')}${arhKpi('clip', ARH.navy, n(z.ped), 'Pedidos pendientes')}</div>
+      <div class="arh-kpis dos">${arhKpi('gente', ARH.teal, n(z.cli.length), 'Clientes involucrados')}${arhKpi('caja', ARH.amber, n(z.fam.length), 'Familias involucradas')}</div>
+      <div class="arh-card"><h3>Clientes involucrados</h3><p>SKU sin OC por cliente</p>${arhBarras(top(z.cli), function(v){ return v + ' SKU'; })}</div>
+      <div class="arh-card"><h3>Familias</h3><p>SKU sin OC por familia</p>${arhBarras(top(z.fam), function(v){ return v + ' SKU'; })}</div>
+      <div class="arh-nota-pie">Pendientes acumulados al corte, con la misma regla de Pendientes de Compras y del Daily.</div>${pie}</div>`;
+  return [h1, h2, h3];
+}
+function appCmpImagenes(cod){
+  const st = APP_F.indicadores, r = appFRango(st), desde = r ? appIndIso(r.desde) : '2026-01-01', hasta = r ? appIndIso(r.hasta) : isoDay(appIndCorte());
+  const R = appCmpRep(cod, desde, hasta), tit = ['Reporte de compras', 'Nivel de aviso de entrega', 'Pedidos sin OC'];
+  return appGenerarImagenes(cmpHojas(R), { caja:'arh-caja', hoja:'.arh-hoja', ancho:768, nombre:'Resumen ' + R.nom + ' ' + desde + ' al ' + hasta,
+    titulo:'Resumen de ' + R.nom, sub:almPerTxt(R), sec:function(el, i){ return tit[i] || ''; } });
+}
+// ---------- Comex · Camila Mora en Indicadores (12.10.2026, Piero: "a ella se le debe medir en base al Excel de
+// importaciones que se carga aparte") ----------
+// Del seguimiento de contenedores (EMB_DATA): estado de los embarques al corte, cobertura (OC de importación
+// abiertas que están en su Excel), fechas completas, ETA vencidas y el tiempo de la llegada (ETA) al ingreso en
+// almacén (primera guía de recepción de sus OC), para los embarques que llegaron en el período.
+const CMX_META_INGRESO = 5;   // días hábiles de referencia de la llegada al ingreso
+function appComexHtml(st){
+  const E = EMB_DATA.rows || [];
+  if(!E.length) return `<div class="m-sec-tit">🌎 Comex · Camila Mora</div><div class="ini-card"><div class="ini-vacio">Carga el Excel de seguimiento de contenedores (Camila) para medir Comex.</div></div>`;
+  const r = appFRango(st), desde = r ? appIndIso(r.desde) : '1900-01-01', hasta = r ? appIndIso(r.hasta) : '2100-01-01', hoy = isoDay(appIndCorte());
+  const D = appMemo('comex:' + desde + hasta, function(){
+    const ing = new Map(); almMovRows().forEach(function(x){ if(x.t === 'i' && x.oc){ (ing.get(x.oc) || ing.set(x.oc, []).get(x.oc)).push(x.f); } });
+    const est = { tr:0, arr:0, zar:0, otro:0 }, ocs = new Set(); let conFechas = 0, vivos = 0, etaVenc = 0; const tiempos = [], sinIngreso = [];
+    E.forEach(function(e){ (e.oc || []).forEach(function(o){ ocs.add(o); });
+      const es = String(e.es || '').toUpperCase();
+      if(/TRANSITO/.test(es)) est.tr++; else if(/ARRIBO/.test(es)) est.arr++; else if(/EMBARCAR|BOOKING/.test(es)) est.zar++; else est.otro++;
+      if(!/ARRIBO/.test(es)){ vivos++; if(e.et && e.ea) conFechas++; if(/TRANSITO/.test(es) && e.ea && e.ea < hoy) etaVenc++; }
+      if(/ARRIBO/.test(es) && e.ea && e.ea >= desde && e.ea <= hasta){
+        const fs = [].concat.apply([], (e.oc || []).map(function(o){ return ing.get(o) || []; })).filter(function(f){ return f >= (e.et || '0'); }).sort();
+        if(fs.length) tiempos.push(Math.max(0, busdayCount(new Date(e.ea + 'T00:00:00Z'), new Date(fs[0] + 'T00:00:00Z')) || 0)); else sinIngreso.push(e); } });
+    // Cobertura: OC de importación todavía pendientes (Pendientes de Compras) que están en su Excel.
+    const abiertas = new Set(pdFilas().filter(function(x){ return x.tipo === 'oc' && /^0002-/.test(x.codOrden || ''); }).map(function(x){ return x.codOrden; }));
+    const cubiertas = [...abiertas].filter(function(c){ return ocs.has(c); }).length;
+    const b = [0, 0, 0, 0]; tiempos.forEach(function(t){ b[t <= 2 ? 0 : t <= CMX_META_INGRESO ? 1 : t <= 10 ? 2 : 3]++; });
+    return { n:E.length, ocs:ocs.size, est:est, vivos:vivos, conFechas:conFechas, etaVenc:etaVenc, abiertas:abiertas.size, cubiertas:cubiertas,
+      tiempos:tiempos, prom:tiempos.length ? tiempos.reduce(function(a, x){ return a + x; }, 0) / tiempos.length : null, enMeta:tiempos.filter(function(t){ return t <= CMX_META_INGRESO; }).length, b:b, sinIngreso:sinIngreso.length };
+  });
+  const t = function(v, tt, sub){ return `<div><span>${tt}</span><b>${v}</b>${sub ? '<small>' + sub + '</small>' : ''}</div>`; };
+  const pct = function(a, b2){ return b2 ? Math.round(a / b2 * 100) + '%' : '—'; };
+  const max = Math.max.apply(null, D.b.concat([1]));
+  const bar = function(l, v){ return `<div class="ini-bar"><span>${l}</span><i><em style="width:${(v / max * 100).toFixed(1)}%"></em></i><b>${v}</b></div>`; };
+  const cls = function(p){ return p == null ? '' : p >= 80 ? 'ok' : p >= 50 ? 'late' : 'warn'; }, pMeta = D.tiempos.length ? Math.round(D.enMeta / D.tiempos.length * 100) : null;
+  return `<div class="m-sec-tit">🌎 Comex · Camila Mora <small>según su Excel de seguimiento de contenedores</small></div>
+    <div class="ini-card ind-card ${cls(pMeta)}">
+      <div class="ind-top"><span class="ind-area">IMPORTACIONES</span>${pMeta != null ? `<span class="ind-est ${cls(pMeta)}">${appIndEstado(pMeta)}</span>` : ''}</div>
+      <div class="ind-nom">De la llegada al ingreso en almacén</div>
+      <div class="ind-que">Días hábiles desde la ETA del embarque hasta la primera guía de recepción de sus OC (embarques que llegaron en el período). Referencia: ${CMX_META_INGRESO} días hábiles.</div>
+      ${D.tiempos.length ? `<div class="ind-big"><div><b class="${cls(pMeta)}">${pMeta}%</b><span>dentro de ${CMX_META_INGRESO} d.h.</span><small>${D.enMeta} de ${D.tiempos.length} embarques</small></div>
+        <div><b>${D.prom.toFixed(1)}</b><span>días háb. promedio</span><small>${D.sinIngreso ? D.sinIngreso + ' llegado' + (D.sinIngreso === 1 ? '' : 's') + ' sin ingreso todavía' : 'todos con ingreso'}</small></div></div>
+        ${bar('0 a 2 d.h.', D.b[0])}${bar('3 a ' + CMX_META_INGRESO + ' d.h.', D.b[1])}${bar('6 a 10 d.h.', D.b[2])}${bar('Más de 10 d.h.', D.b[3])}` : '<div class="ini-vacio">Ningún embarque llegó en este período.</div>'}
+    </div>
+    <div class="ini-card"><div class="ini-card-tit">📦 Seguimiento al corte</div>
+      <div class="m-tiles">${t(appN(D.n), 'Embarques en su Excel', appN(D.ocs) + ' OC')}${t(appN(D.est.tr), '🚢 En tránsito')}${t(appN(D.est.zar), '🛳️ Por zarpar', 'por embarcar o booking')}${t(appN(D.est.arr), '✅ Arribados')}</div>
+      <div class="m-tiles">${t(pct(D.cubiertas, D.abiertas), 'Cobertura', D.cubiertas + ' de ' + D.abiertas + ' OC de importación abiertas')}${t(pct(D.conFechas, D.vivos), 'Con ETD y ETA', D.conFechas + ' de ' + D.vivos + ' embarques en curso')}${t(appN(D.etaVenc), '⛔ ETA vencida', 'en tránsito con la ETA pasada')}</div>
+      <div class="av-nota">Cobertura = OC de importación pendientes que ya están en su seguimiento. Las que faltan no tienen ETD/ETA en la app.</div></div>`;
+}
 // Foto de Almacén en Indicadores (12.10.2026, Piero: "en los indicadores de almacén solo sale lo que corresponde
 // a almacén"): lo del Daily de Almacén (Javier, Katherine y Marycarmen) sumado en el período.
 function appFotoAlmacen(st){
@@ -16394,7 +16533,7 @@ function appFotoAlmacen(st){
       <div class="m-tiles foto-kpi foto-k4"><div class="pts"><span>🗓️ Puntos Daily call in</span><b>${appN(tot('pts'))}</b></div><div><span>📝 Pedidos generados</span><b>${appN(tot('ped'))}</b></div><div><span>📥 Guías de recepción</span><b>${appN(tot('grc'))}</b></div><div><span>🚚 Guías de salida</span><b>${appN(tot('grr'))}</b></div></div>
       <div class="foto-rank">${L.map(function(x, i){
         return `<div class="foto-fila"><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${almDailyDet(x)} · ${appN(x.items)} ítems</small><i><em style="width:${(x.pts / max * 100).toFixed(1)}%"></em></i></span><b class="p">${appN(x.pts)}<small>pts</small></b></div>`; }).join('')}</div>
-      <small class="sku-nota">Puntos como en el Daily de Almacén: 2 por pedido generado o guía (recepción o salida) y 1 por ítem, sumados en el período. Las guías van a quien figura como RESPONSABLE en el Reporte Almacén.</small></div>`;
+      <small class="sku-nota">Puntos como en el Daily de Almacén: 1 por pedido generado o guía (recepción o salida) y 1 por ítem, sumados en el período. Las guías van a quien figura como RESPONSABLE en el Reporte Almacén.</small></div>`;
 }
 
 // ---------- Inicio: Supervisor ----------
@@ -16622,6 +16761,7 @@ function appClickInicio(e){
   if(b.dataset.arsub){ APP_AR.sub = b.dataset.arsub; return appRenderInicio(); }
   if(b.dataset.arsucj){ APP_AR.sucJ = b.dataset.arsucj; return appRenderInicio(); }
   if(b.dataset.anaimg){ appAlmAnaImagenes(); return; }
+  if(b.dataset.cmpimg){ appCmpImagenes(b.dataset.cmpimg); return; }
   if(b.dataset.plsec){ APP_PL.sec = b.dataset.plsec; APP_PL.q = ''; APP_PL.tope = 15; return appRenderInicio(); }
   if(b.dataset.plmas){ APP_PL.tope += 30; const l = document.getElementById('plLista'); if(l) l.innerHTML = appPendLogLista(); return; }
   if(b.dataset.pantalla) return appInicio(b.dataset.pantalla);
@@ -18810,11 +18950,11 @@ function polarDailyPuntos(cod, p){
     if(!x) return `<p>${escapeHtml(PD_PERSONAS[cod] || cod)} no tiene puntos del Daily en ${escapeHtml(per.label)}.</p>`;
     return `<div class="cab">🗓️ ${escapeHtml(PD_PERSONAS[cod] || cod)}</div><div class="sub">Daily call in · ${escapeHtml(per.label)}</div>
       <div class="asis-kpis"><div><b>${appN(x.pts)}</b><span>puntos</span></div><div><b>${i + 1}.º</b><span>de ${l.length}</span></div><div><b>${x.oc.size}</b><span>OC emitidas</span></div><div><b>${x.sku.size}</b><span>SKU hechos</span></div></div>
-      <p>${det(x)}.</p><p class="asis-nota">Puntos: 2 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo.</p>`; }
+      <p>${det(x)}.</p><p class="asis-nota">Puntos: 1 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo.</p>`; }
   if(!l.length) return `<p>No hay actividad de compradores en ${escapeHtml(per.label)}.</p>`;
   return `<div class="cab">🗓️ Ranking del Daily call in</div><div class="sub">${escapeHtml(per.label)} · ${appN(l.reduce(function(a, x){ return a + x.pts; }, 0))} puntos en total</div>
     ${l.map(function(x, i){ return `<div class="asis-item"><div class="d">${['🥇','🥈','🥉'][i] || (i + 1) + '.'} <b>${escapeHtml(PD_PERSONAS[x.cod] || x.cod)}</b> · ${appN(x.pts)} pts</div><div class="q">${det(x)}</div><div class="asis-avance"><i><em style="width:${(x.pts / max * 100).toFixed(0)}%"></em></i></div></div>`; }).join('')}
-    <p class="asis-nota">Puntos: 2 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo.</p>
+    <p class="asis-nota">Puntos: 1 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo.</p>
     <div class="asis-acc">${polarBtn('dailyfecha', appDailyUltimo(), '🗓️ Daily del último día')}</div>`;
 }
 function polarProducto(cod){
