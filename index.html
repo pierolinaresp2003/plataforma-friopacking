@@ -1157,7 +1157,7 @@
     .m-pp-nom{flex:1;min-width:0;} .m-pp-nom b{display:block;font-size:21px;font-weight:900;line-height:1.15;} .m-pp-nom span{display:inline-block;margin-top:7px;background:rgba(255,255,255,.22);border-radius:20px;padding:4px 11px;font-size:12.5px;font-weight:800;} .m-pp-nom small{display:block;margin-top:6px;font-size:12px;opacity:.85;font-weight:600;}
     .m-pp-monto{text-align:right;flex-shrink:0;} .m-pp-monto b{display:block;font-size:26px;font-weight:900;line-height:1;} .m-pp-monto small{font-size:11.5px;opacity:.85;font-weight:700;}
     @media (max-width:640px){ .m-pp-hero{flex-wrap:wrap;} .m-pp-monto{flex-basis:100%;text-align:left;padding-top:12px;border-top:1px solid rgba(255,255,255,.28);} .m-pp-monto b{font-size:24px;overflow-wrap:anywhere;} }
-    .m-pp-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;}
+    .m-pp-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;} .m-pp-kpis > :last-child:nth-child(odd){grid-column:1/-1;}
     .m-pp-kpi{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:14px 16px;border-left:5px solid var(--c);} .m-pp-kpi i{font-style:normal;font-size:20px;}
     .m-pp-kpi b{display:block;font-size:32px;font-weight:900;line-height:1.05;margin-top:4px;color:var(--ink);} .m-pp-kpi span{display:block;font-size:13px;font-weight:800;color:var(--ink-soft);} .m-pp-kpi small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;}
     .m-pp-kpi.cero{opacity:.55;} .m-pp-tit{font-size:15px;font-weight:900;margin:2px 2px 8px;color:var(--ink);}
@@ -13291,7 +13291,7 @@ const APP_PC_CSS = `
   body.app-pc .app-oc{inset:0 0 0 auto;width:min(760px, 100%);box-shadow:-20px 0 60px rgba(10,20,40,.25);}
   body.app-pc .app-oc.ancho{inset:0;width:100%;box-shadow:none;} body.app-pc .app-oc.ancho .oc-cuerpo{max-width:1280px;padding:22px 32px 40px;}
   body.app-pc .m-pp-hero{padding:26px 32px;} body.app-pc .m-pp-av{width:84px;height:84px;font-size:30px;} body.app-pc .m-pp-nom b{font-size:30px;} body.app-pc .m-pp-monto b{font-size:42px;}
-  body.app-pc .m-pp-kpis{grid-template-columns:repeat(4,1fr);gap:14px;} body.app-pc .m-pp-kpi{padding:18px 20px;} body.app-pc .m-pp-kpi b{font-size:40px;}
+  body.app-pc .m-pp-kpis{grid-template-columns:repeat(3,1fr);gap:14px;} body.app-pc .m-pp-kpis > :last-child{grid-column:auto;} body.app-pc .m-pp-kpi{padding:18px 20px;} body.app-pc .m-pp-kpi b{font-size:40px;}
   body.app-pc .m-pp-alertas{grid-template-columns:1.4fr 1fr 1fr;gap:14px;} body.app-pc .m-pp-al{padding:18px 20px;} body.app-pc .m-pp-al > b{font-size:40px;}
   body.app-pc .sku-ped{grid-template-columns:repeat(3,minmax(0,1fr));} body.app-pc .m-pp-hizo{padding:18px 22px;} body.app-pc .m-tar-f{grid-template-columns:minmax(0,1.3fr) auto minmax(0,1fr);align-items:center;}
 `;
@@ -13634,7 +13634,7 @@ const APP_DAILY_COLORES = ['#3ec6ac', '#6c8cff', '#f4a640', '#e66b8a', '#8a6cf0'
 // hizo más ese día"): 1 por SKU puesto en OC, 2 por OC emitida y 1 por pedido directo (los pedidos cerrados no suman).
 function appDailySuma(l){ return l.reduce(function(a, m){ if(m){ a.s += m.s; a.d += m.d; } return a; }, { s:0, d:0 }); }
 function appDailyMonto(m){ return m ? [m.s ? fmtPEN(m.s) : '', m.d ? fmtUSD(m.d) : ''].filter(Boolean).join(' + ') : ''; }   // cada moneda en lo suyo, sin convertir
-// Los pedidos cerrados ya no suman (12.10.2026, Piero: "es redundar en puntaje"); se siguen mostrando como dato.
+// Los pedidos cerrados ya no suman ni se muestran (12.10.2026, Piero: "es redundar en puntaje" / "siguen ahí, no te dije que se quitaban?").
 function appDailyPts(x){ return x.sku.size + 2 * x.oc.size + x.ped.size; }
 const APP_DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 function appDailyFilas(){
@@ -13734,7 +13734,7 @@ function appDailyDatos(dia){
     const faltan = new Set(); P.forEach(function(x){ x.oc.forEach(function(o, co){ if(!montoOC.has(co)) faltan.add(co); }); });
     if(faltan.size) polarLineasOC().forEach(function(r){ if(faltan.has(r.codOrden)) sumar(montoOC, r.codOrden, r); });
     const lista = [...P.values()].map(function(x){ x.monto = appDailySuma([...x.oc.keys()].map(function(co){ return montoOC.get(co); })); x.montoPEN = x.monto.s + x.monto.d * TIPO_CAMBIO.USD;
-      x.hizo = x.ped.size + x.oc.size + x.cer.size; x.pts = appDailyPts(x); return x; })
+      x.hizo = x.ped.size + x.oc.size + x.sku.size; x.pts = appDailyPts(x); return x; })
       .filter(function(x){ return x.hizo; })   // solo se muestran y cuentan los que hicieron algo ese día
       .sort(function(a,b){ return b.pts - a.pts || b.montoPEN - a.montoPEN; });
     return { lista:lista, montoOC:montoOC, manana:manana };
@@ -13760,11 +13760,11 @@ function appDailyDetHtml(dia){
   const num = function(v, t, cls){ return `<div class="${cls || ''}"><b>${v}</b><span>${t}</span></div>`; };
   const hero = `<div class="oc-hero m-dd">
       <div class="m-dd-big">${num(appN(tot('oc')), 'OC emitidas')}${num(appDailyMonto(montoTot) || '—', 'monto emitido')}</div>
-      <div class="m-dd-nums">${num(appN(tot('sku')), '📦 SKU hechos')}${num(appN(tot('cer')), '✅ pedidos cerrados')}${num(appN(tot('ped')), '📝 pedidos directos')}</div>
+      <div class="m-dd-nums">${num(appN(tot('sku')), '📦 SKU hechos')}${num(appN(tot('ped')), '📝 pedidos directos')}</div>
       <div class="asis-acc"><button type="button" data-dailycopia="">📋 Copiar resumen para el chat</button></div></div>`;
   if(!l.length) return hero + '<div class="ini-card"><div class="ini-vacio">No hay movimientos de compradores registrados ese día.</div></div>' + appDailyTareasHtml(dia, '');
   const medalla = ['🥇', '🥈', '🥉'];
-  const fila = function(x, i){ const det = [x.oc.size ? x.oc.size + ' OC' : '', x.sku.size ? x.sku.size + ' SKU' : '', x.cer.size ? x.cer.size + ' cerrados' : '', x.ped.size ? x.ped.size + ' directos' : ''].filter(Boolean).join(' · ');
+  const fila = function(x, i){ const det = [x.oc.size ? x.oc.size + ' OC' : '', x.sku.size ? x.sku.size + ' SKU' : '', x.ped.size ? x.ped.size + ' directos' : ''].filter(Boolean).join(' · ');
     return `<button type="button" class="m-rk" data-dailyper="${escapeHtml(x.cod)}"><span class="m-rk-pos">${medalla[i] || (i + 1)}</span>${appDailyAvatar(x)}
       <span class="m-rk-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${det}${x.montoPEN ? ' · ' + appDailyMonto(x.monto) : ''}</small><i><em style="width:${Math.max(4, x.pts / max * 100).toFixed(0)}%;background:${APP_DAILY_COLORES[APP_DAILY_EQUIPO.indexOf(x.cod) % APP_DAILY_COLORES.length]}"></em></i></span>
       <span class="m-rk-pts"><b>${x.pts}</b><small>pts</small></span><span class="m-rk-ir">›</span></button>`; };
@@ -13797,7 +13797,7 @@ function appDailyPersonaHtml(dia, cod){
   return `<div class="m-pp-hero" style="--c:${col}"><span class="m-pp-av">${escapeHtml(ini)}</span>
       <div class="m-pp-nom"><b>${escapeHtml(nom)}</b><span>${['🥇 1.º', '🥈 2.º', '🥉 3.º'][i] || ('#' + (i + 1))} del día · ${x.pts} pts</span><small>${appDailyFechaTxt(dia)}</small></div>
       <div class="m-pp-monto"><b>${appDailyMonto(x.monto) || '—'}</b><small>emitido ese día</small></div></div>
-    <div class="m-pp-kpis">${kpi('🧾', x.oc.size, 'OC emitidas', provs ? provs + ' proveedor' + (provs === 1 ? '' : 'es') : 'ese día')}${kpi('📦', x.sku.size, 'SKU hechos', 'líneas puestas en OC')}${kpi('✅', x.cer.size, 'Pedidos cerrados', 'quedaron con OC completa')}${kpi('📝', x.ped.size, 'Pedidos directos', 'sin requerimiento')}</div>
+    <div class="m-pp-kpis">${kpi('🧾', x.oc.size, 'OC emitidas', provs ? provs + ' proveedor' + (provs === 1 ? '' : 'es') : 'ese día')}${kpi('📦', x.sku.size, 'SKU hechos', 'líneas puestas en OC')}${kpi('📝', x.ped.size, 'Pedidos directos', 'sin requerimiento')}</div>
     ${oc.length || ped.length ? `<div class="ini-card m-pp-hizo"><div class="m-pp-tit">✅ Lo que hizo ese día</div>${filasOC}${filasPed}${ver('oc', oc.length + ped.length)}</div>` : ''}
     <div class="m-pp-tit">📌 Para el daily</div>
     <div class="m-pp-alertas">
@@ -13836,7 +13836,7 @@ function appDailyVerHtml(dia, cod, tipo){
 function appDailyCopiar(b){
   const dia = APP_DAILY.dia || appDailyUltimo(), l = appDailyDatos(dia).lista;
   const txt = ['*Daily de Compras · ' + appDailyFechaTxt(dia) + '*'].concat(l.map(function(x, i){
-    return (i + 1) + '. ' + PD_PERSONAS[x.cod] + ' (' + x.pts + ' pts): ' + x.oc.size + ' OC emitidas' + (x.montoPEN ? ' (' + appDailyMonto(x.monto) + ')' : '') + ', ' + x.sku.size + ' SKU hechos, ' + x.cer.size + ' pedidos cerrados, ' + x.ped.size + ' pedidos directos'
+    return (i + 1) + '. ' + PD_PERSONAS[x.cod] + ' (' + x.pts + ' pts): ' + x.oc.size + ' OC emitidas' + (x.montoPEN ? ' (' + appDailyMonto(x.monto) + ')' : '') + ', ' + x.sku.size + ' SKU hechos, ' + x.ped.size + ' pedidos directos'
       + (x.venc.size ? '. ' + x.venc.size + ' OC vencidas al cierre' : '') + '.'; }))
     .concat(appTareasDelDia(dia, '').length ? ['', '*Tareas*'].concat(appTareasDelDia(dia, '').map(function(t){ return '• ' + (PD_PERSONAS[t.cod] || t.cod).split(' ')[0] + ': ' + t.tarea + ' — ' + t.estado + (t.com ? ' (' + t.com + ')' : ''); })) : []).join('\n');
   const ok = function(){ b.textContent = '✅ Copiado'; setTimeout(function(){ b.textContent = '📋 Copiar resumen para el chat'; }, 1800); };
@@ -14235,11 +14235,11 @@ function appFotoComprador(st){
   const sum = function(k){ return mios.reduce(function(a, x){ return a + (k === 'pts' ? x.pts : x[k].size); }, 0); };
   const pr = appFotoPresu(desde, hasta, cod, pryFn), max = Math.max.apply(null, lista.map(function(x){ return x.pts; }).concat([1]));
   const rank = !cod && lista.length ? `<div class="foto-rank">${lista.map(function(x, i){
-    return `<div class="foto-fila"><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${escapeHtml(PD_PERSONAS[x.cod] || x.cod)}</b><small>${x.oc.size} OC · ${x.sku.size} SKU · ${x.cer.size} cerrados${x.ped.size ? ' · ' + x.ped.size + ' directos' : ''}</small><i><em style="width:${(x.pts / max * 100).toFixed(1)}%"></em></i></span><b class="p">${appN(x.pts)}<small>pts</small></b></div>`; }).join('')}</div>` : '';
+    return `<div class="foto-fila"><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${escapeHtml(PD_PERSONAS[x.cod] || x.cod)}</b><small>${x.oc.size} OC · ${x.sku.size} SKU${x.ped.size ? ' · ' + x.ped.size + ' directos' : ''}</small><i><em style="width:${(x.pts / max * 100).toFixed(1)}%"></em></i></span><b class="p">${appN(x.pts)}<small>pts</small></b></div>`; }).join('')}</div>` : '';
   const pct = pr.partPc > 0 ? pr.partUsd / pr.partPc * 100 : null;
   return `<div class="ini-card foto">
       <div class="ini-card-tit">📸 Foto ${cod ? 'de ' + escapeHtml(PD_PERSONAS[cod] || cod) : 'de los compradores'} <small>${escapeHtml(r ? r.label : 'todo lo cargado')}</small></div>
-      <div class="m-tiles foto-kpi"><div class="pts"><span>🗓️ Puntos Daily call in</span><b>${appN(sum('pts'))}</b></div><div><span>🧾 OC emitidas</span><b>${appN(sum('oc'))}</b></div><div><span>📦 SKU hechos</span><b>${appN(sum('sku'))}</b></div><div><span>✅ Pedidos cerrados</span><b>${appN(sum('cer'))}</b></div></div>
+      <div class="m-tiles foto-kpi"><div class="pts"><span>🗓️ Puntos Daily call in</span><b>${appN(sum('pts'))}</b></div><div><span>🧾 OC emitidas</span><b>${appN(sum('oc'))}</b></div><div><span>📦 SKU hechos</span><b>${appN(sum('sku'))}</b></div></div>
       ${rank}
       <small class="sku-nota">Puntos como en el Daily: 2 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo, sumados en el período.</small></div>
     <div class="ini-card foto-presu"><div class="ini-card-tit">💼 Presupuesto <small>solicitado vs. comprado en el período</small></div>
@@ -18219,7 +18219,7 @@ function polarDailyPuntos(cod, p){
   const per = p || polarPeriodoDe('este mes'), desde = appIndIso(per.desde), hasta = appIndIso(per.hasta > appIndCorte() ? appIndCorte() : per.hasta);
   const l = appDailyRango(desde, hasta, null), max = Math.max.apply(null, l.map(function(x){ return x.pts; }).concat([1]));
   POLAR.nuevoRef = 'daily'; POLAR.nuevoRefTxt = 'daily call in';
-  const det = function(x){ return x.oc.size + ' OC · ' + x.sku.size + ' SKU · ' + x.cer.size + ' cerrados' + (x.ped.size ? ' · ' + x.ped.size + ' directos' : ''); };
+  const det = function(x){ return x.oc.size + ' OC · ' + x.sku.size + ' SKU' + (x.ped.size ? ' · ' + x.ped.size + ' directos' : ''); };
   if(cod){ const i = l.findIndex(function(x){ return x.cod === cod; }), x = l[i];
     if(!x) return `<p>${escapeHtml(PD_PERSONAS[cod] || cod)} no tiene puntos del Daily en ${escapeHtml(per.label)}.</p>`;
     return `<div class="cab">🗓️ ${escapeHtml(PD_PERSONAS[cod] || cod)}</div><div class="sub">Daily call in · ${escapeHtml(per.label)}</div>
