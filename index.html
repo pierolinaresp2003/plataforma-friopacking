@@ -14181,6 +14181,7 @@ const APP_DCI = { lista:[], cargado:false, cargando:false, error:'', t:0, n:0, f
 const DCI_PRIO = { Alta:'#e5484d', Media:'#1f8fd6', Baja:'#1baf7a' };
 try{ const c = JSON.parse(localStorage.getItem('fp-dci') || 'null'); if(c && c.lista) APP_DCI.lista = c.lista; }catch(err){}
 function dciArea(cod){ return APP_DAILY_ALMACEN.indexOf(cod) !== -1 ? 'Almacén' : APP_DAILY_COMEX.indexOf(cod) !== -1 ? 'Comex' : 'Compras'; }
+function dciPuede(cod){ return !!cod && (dciArea(cod) === 'Almacén') === (APP.vista === 'almacen'); }
 function dciHoy(){ return new Date().toLocaleDateString('sv-SE', { timeZone:'America/Lima' }); }
 function appDciCargar(forzar){
   if(!POLAR_APRENDE_URL || APP_DCI.cargando || (!forzar && Date.now() - APP_DCI.t < 60000)) return;
@@ -14219,7 +14220,7 @@ function dciCard(x, n, yo){
 }
 function appDciHtml(){
   appDciCargar(false);
-  const e = escapeHtml, yo = tareaMiCod(), hoy = dciHoy(), alm = APP.vista === 'almacen';
+  const e = escapeHtml, hoy = dciHoy(), alm = APP.vista === 'almacen', yo0 = tareaMiCod(), yo = dciPuede(yo0) ? yo0 : '';
   if(APP_DCI.fArea == null) APP_DCI.fArea = alm ? 'Almacén' : '';
   const dia = APP_DCI.fDia || hoy, mios = APP_DCI.lista.filter(function(x){ return x.cod === yo && x.dia === hoy; }).sort(function(a, b){ return String(a.creada || '9').localeCompare(String(b.creada || '9')); });
   const equipo = APP_DAILY_TODOS.filter(function(c){ return !APP_DCI.fArea || dciArea(c) === APP_DCI.fArea; });
@@ -14239,7 +14240,7 @@ function appDciHtml(){
           <div class="dci-fila"><label class="dci-blin"><span>⛔ Bloqueos (opcional)</span><input type="text" data-dciv="bl" maxlength="600" placeholder="¿Algo te impide avanzar?"></label>
             <label><span>Prioridad</span><select data-dciv="pr">${op('Alta', 'Alta', 'Media')}${op('Media', 'Media', 'Media')}${op('Baja', 'Baja', 'Media')}</select></label>
             <button type="button" class="ix-btn" data-dciagregar="1">➕ Registrar</button></div></div>`
-        : '<div class="dci-card dci-vacio">🔒 Entra con tu usuario del equipo para registrar tu Daily Call In.</div>'}
+        : `<div class="dci-card dci-vacio">🔒 ${yo0 ? 'Tu Daily Call In se registra en el módulo ' + (dciArea(yo0) === 'Almacén' ? 'Almacén' : 'Compras') + '.' : 'Entra con tu usuario del equipo para registrar tu Daily Call In.'}</div>`}
       <div class="dci-sec">Equipo</div>
       <div class="m-filtros dci-filtros">
         <label><span>🧑‍💼 Colaborador</span><select class="ini-select" id="dciCod">${op('', 'Todos', APP_DCI.fCod)}${equipo.map(function(c){ return op(c, PD_PERSONAS[c] || c, APP_DCI.fCod); }).join('')}</select></label>
@@ -14255,6 +14256,7 @@ function appDciAccion(b){
     const v = function(k){ const i = c.querySelector(`[data-dciv="${k}"]`); return i ? i.value.trim() : ''; };
     const av = v('av'), tr = v('tr'), bl = v('bl'), pr = v('pr') || 'Media', cod = tareaMiCod();
     if(!cod) return appToast('Entra con tu usuario del equipo.');
+    if(!dciPuede(cod)) return appToast('Tu Daily Call In se registra en el módulo ' + (dciArea(cod) === 'Almacén' ? 'Almacén' : 'Compras') + '.');
     if(!av && !tr) return appToast('Escribe qué avanzaste o en qué trabajarás.');
     const x = { id:'tmp' + (++APP_DCI.n), dia:dciHoy(), cod:cod, nombre:PD_PERSONAS[cod], area:dciArea(cod), av:av, tr:tr, bl:bl, pr:pr, com:[], creada:'', guardando:true };
     APP_DCI.lista.push(x); c.querySelectorAll('[data-dciv="av"],[data-dciv="tr"],[data-dciv="bl"]').forEach(function(i){ i.value = ''; }); appDciPintar();
