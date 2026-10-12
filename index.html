@@ -13084,7 +13084,9 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 // Gerencia y Logística piden la clave del módulo Gerencial). Se guarda solo en ese celular: la plataforma
 // es una página estática, no hay un servidor con la lista de usuarios. Qué vistas ve cada tipo:
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
-const APP_ACCESO = { gerencia:['gerencia','compras','almacen'], logistica:['compras','almacen'], compras:['compras','almacen'], almacen:['almacen','compras'], supervisor:['supervisor'], frioteam:['frioteam'] };
+// La vista Gerencia ya no existe (12.10.2026, Piero): Compras y Almacén tienen lo gerencial; el acceso Gerencia entra a Compras.
+const APP_ACCESO = { gerencia:['compras','almacen'], logistica:['compras','almacen'], compras:['compras','almacen'], almacen:['almacen','compras'], supervisor:['supervisor'], frioteam:['frioteam'] };
+function appVistaInicial(t){ return (APP_ACCESO[t] || [t])[0]; }
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
 // y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
 // solo entran los correos que están ahí. Los de Supervisor entran directo; Logística y Gerencial ponen la
@@ -13142,11 +13144,11 @@ function appRevisarAcceso(){
   APP.usuario.tipo = t;
   try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); }catch(err){}
   if(!appVeGerencial(t)){ gerAbierto = false; try{ sessionStorage.removeItem(GER_SESION); }catch(err){} }
-  APP.vista = t; try{ localStorage.setItem('fp-vista', t); }catch(err){}   // cambió su acceso: entra a su vista
+  APP.vista = appVistaInicial(t); try{ localStorage.setItem('fp-vista', APP.vista); }catch(err){}   // cambió su acceso: entra a su vista
   if(appNecesitaClave()) appBienvenida(APP.usuario.correo);                // subió a Logística/Gerencia: clave
 }
 if(APP.usuario){
-  if(APP_ACCESO[APP.usuario.tipo].indexOf(APP.vista) === -1) APP.vista = APP.usuario.tipo;
+  if(APP_ACCESO[APP.usuario.tipo].indexOf(APP.vista) === -1) APP.vista = appVistaInicial(APP.usuario.tipo);
   // Gerencia con la clave ya puesta (acceso guardado o en esta sesión): no se le vuelve a pedir.
   if(appVeGerencial(APP.usuario.tipo) && RQ_MOVIL.matches && !appNecesitaClave()){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(err){} }
 } else APP.vista = null;
@@ -13440,7 +13442,7 @@ function appBienvenida(correoFijo){
   correo.oninput = function(){
     const t = tipoDe(correo.value), a = document.getElementById('bvAcceso');
     a.hidden = !t;
-    if(t) a.innerHTML = `${APP_VISTAS[t].ico} Acceso: <b>${APP_VISTAS[t].nombre}</b>` + (APP_ACCESO[t].length > 1 ? ` <small>(también ${APP_ACCESO[t].slice(1).map(function(k){ return APP_VISTAS[k].nombre; }).join(' y ')})</small>` : '');
+    if(t) a.innerHTML = `${APP_VISTAS[t].ico} Acceso: <b>${APP_VISTAS[t].nombre}</b>` + (APP_ACCESO[t].filter(function(k){ return k !== t; }).length ? ` <small>(${t === 'gerencia' ? 'vistas' : 'también'} ${APP_ACCESO[t].filter(function(k){ return k !== t; }).map(function(k){ return APP_VISTAS[k].nombre; }).join(' y ')})</small>` : '');
     document.getElementById('bvClave').hidden = !t || t === 'supervisor' || t === 'frioteam';
     err('');
   };
@@ -13473,7 +13475,7 @@ function appBienvenida(correoFijo){
     if(appVeGerencial(tipo)){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(er){} }
     pass.value = '';
     const bt = document.querySelector('#bvForm .bv-entrar'); if(bt) bt.classList.add('cargando');
-    setTimeout(function(){ appElegirVista(tipo); }, 420);   // un respiro para que se vea que está entrando
+    setTimeout(function(){ appElegirVista(appVistaInicial(tipo)); }, 420);   // un respiro para que se vea que está entrando
   };
 }
 
