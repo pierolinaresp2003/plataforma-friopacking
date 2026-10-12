@@ -16148,6 +16148,26 @@ function ctwHojas(){
 let APP_IMP_IMGS = [];
 // Genera imágenes PNG numeradas a partir de hojas HTML y las muestra en un panel para compartir o descargar
 // (embarques 12.10.2026; reporte de Almacén 12.10.2026).
+// ZIP sin compresión (los PNG ya vienen comprimidos), sin librerías.
+const ZIP_CRC = (function(){ const t = new Uint32Array(256); for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function zipGuardar(archivos){
+  return Promise.all(archivos.map(function(a){ return a.blob.arrayBuffer(); })).then(function(bufs){
+    const d = new Date(), hora = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), dia = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    const partes = [], central = []; let off = 0;
+    archivos.forEach(function(a, i){
+      const nom = new TextEncoder().encode(a.nombre), dat = new Uint8Array(bufs[i]); let crc = 0xFFFFFFFF;
+      for(let j = 0; j < dat.length; j++) crc = ZIP_CRC[(crc ^ dat[j]) & 255] ^ (crc >>> 8); crc = (crc ^ 0xFFFFFFFF) >>> 0;
+      const cab = function(central){ const b = new DataView(new ArrayBuffer(central ? 46 : 30)); let p = 0;
+        const u32 = function(v){ b.setUint32(p, v, true); p += 4; }, u16 = function(v){ b.setUint16(p, v, true); p += 2; };
+        u32(central ? 0x02014b50 : 0x04034b50); if(central) u16(20); u16(20); u16(0x0800); u16(0); u16(hora); u16(dia); u32(crc); u32(dat.length); u32(dat.length); u16(nom.length); u16(0);
+        if(central){ u16(0); u16(0); u16(0); u32(0); u32(off); } return b.buffer; };
+      central.push(cab(true), nom); partes.push(cab(false), nom, dat); off += 30 + nom.length + dat.length;
+    });
+    const tam = central.reduce(function(s, x){ return s + x.byteLength; }, 0), fin = new DataView(new ArrayBuffer(22));
+    fin.setUint32(0, 0x06054b50, true); fin.setUint16(8, archivos.length, true); fin.setUint16(10, archivos.length, true); fin.setUint32(12, tam, true); fin.setUint32(16, off, true);
+    return new Blob(partes.concat(central, [fin.buffer]), { type:'application/zip' });
+  });
+}
 async function appGenerarImagenes(hojas, cfg){
   if(typeof html2canvas !== 'function'){ appToast('No se pudieron preparar las imágenes: revisa tu conexión.'); return; }
   appToast('Preparando las imágenes…');
@@ -16168,11 +16188,14 @@ async function appGenerarImagenes(hojas, cfg){
   const archivos = L.map(function(x){ return new File([x.blob], x.nombre, { type:'image/png' }); });
   const puedeCompartir = !!(navigator.canShare && navigator.canShare({ files:archivos }));
   appListaAbrir('🖼️ ' + escapeHtml(cfg.titulo), n + ' imagen' + (n === 1 ? '' : 'es') + ' · ' + escapeHtml(cfg.sub || ''),
-    `<div class="imp-imgs-acc">${puedeCompartir ? '<button type="button" class="ini-link" data-impimgcomp="1">📤 Compartir las ' + n + ' (WhatsApp)</button>' : ''}<button type="button" class="ini-link" data-impimgdesc="1">⬇️ Descargar las ${n}</button></div>
+    `<div class="imp-imgs-acc">${puedeCompartir ? '<button type="button" class="ini-link" data-impimgcomp="1">📤 Compartir las ' + n + ' (WhatsApp)</button>' : ''}<button type="button" class="ini-link" data-impimgdesc="1">🗜️ Descargar las ${n} en ZIP</button></div>
     ${L.map(function(x, i){ return `<div class="imp-img"><div class="imp-img-t"><b>Imagen ${i + 1} de ${n}</b><span>${escapeHtml(x.sec)}</span><button type="button" class="ini-link" data-impimg="${i}">⬇️ Descargar</button></div><img src="${x.url}" alt="Imagen ${i + 1} de ${n}"></div>`; }).join('')}`);
   const panel = document.getElementById('appOC'); panel.classList.add('ancho');   // en la PC, a pantalla completa
   panel.querySelectorAll('[data-impimg]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); const x = L[+b.dataset.impimg]; descargarBlob(x.blob, x.nombre); }); });
-  const todas = function(){ L.forEach(function(x, i){ setTimeout(function(){ descargarBlob(x.blob, x.nombre); }, i * 500); }); };
+  // Todas juntas en un ZIP: "Reporte CD Lurin ... .zip" con "01 - Resumen ejecutivo.png", "02 - ..." adentro.
+  const todas = function(){ const base = sinAcentos(cfg.nombre).replace(/[\\/:*?"<>|]/g, '-');
+    zipGuardar(L.map(function(x, i){ const s = sinAcentos(x.sec || '').replace(/^\d+\s*·\s*/, '').replace(/[\\/:*?"<>|·]/g, '-').trim();
+      return { nombre:String(i + 1).padStart(2, '0') + ' - ' + (s || base) + '.png', blob:x.blob }; })).then(function(z){ descargarBlob(z, base + '.zip'); }); };
   const bd = panel.querySelector('[data-impimgdesc]'); if(bd) bd.addEventListener('click', function(ev){ ev.stopPropagation(); todas(); });
   const bc = panel.querySelector('[data-impimgcomp]'); if(bc) bc.addEventListener('click', function(ev){ ev.stopPropagation();
     navigator.share({ files:archivos, title:cfg.nombre }).catch(function(){}); });
