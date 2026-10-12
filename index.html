@@ -1390,6 +1390,7 @@
     .ind-fila .p.ok,.ind-big b.ok{color:var(--brand-ink);} .ind-fila .p.late,.ind-big b.late{color:var(--amber-ink);} .ind-fila .p.warn,.ind-big b.warn{color:var(--red);} .ind-fila .p.muted{color:var(--muted);}
     .ind-chips{display:flex;gap:6px;overflow-x:auto;margin:0 -2px 12px;padding:2px;scrollbar-width:none;} .ind-chips::-webkit-scrollbar{display:none;}
     .ind-chips button{flex-shrink:0;background:var(--card);border:1px solid var(--border);color:var(--ink);border-radius:20px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+    .gp-tabs{margin-bottom:12px;}
     .ind-chips button.on{background:var(--brand);border-color:var(--brand);color:#fff;}
     .ind-res-n{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
     .ind-res-n div{border-radius:12px;padding:10px 8px;background:var(--surface-2);text-align:center;}
@@ -13022,7 +13023,8 @@ const APP_VISTAS = {
   // y las funciones que estaban en la vista logística"; la de Supervisor es Leo, así que no se ofrece). La
   // vista Logística se quitó: quien tenía ese acceso entra a Compras (ver appTipoNorm).
   compras:    { nombre:'Compras',    ico:'🛒', desc:'Compras, importaciones, inventario e indicadores.',
-    tabs:[['inicio','🏠','Inicio'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones'], ['inventario','📦','Inventario'], ['polar'], ['indicadores','📊','Indicadores'], ['gasto','💰','Gasto'], ['presu','💼','Presupuesto'], ['otif','🎯','OTIF']] },
+    // Orden de Piero (12.10.2026): Inicio, Indicadores, Compras, Importaciones y Gasto + Presupuesto en una sola pestaña.
+    tabs:[['inicio','🏠','Inicio'], ['indicadores','📊','Indicadores'], ['pendcompras','🛒','Compras'], ['polar'], ['pendlog','🚢','Importaciones'], ['gastopresu','💰','Gasto y presupuesto']] },
   almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Inventario, compras, importaciones e indicadores.',
     tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones'], ['polar'], ['indicadores','📊','Indicadores'], ['gasto','💰','Gasto'], ['presu','💼','Presupuesto'], ['otif','🎯','OTIF']] },
 };
@@ -13033,7 +13035,7 @@ function appVeGerencial(t){ return t === 'gerencia' || t === 'compras' || t === 
 // Vistas que usan el Inicio y las pantallas de Logística (Compras y Almacén son partes de ella).
 function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v === 'almacen'; }
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
-const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto vs. OC', inventario:'Inventario',
+const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto vs. OC', gastopresu:'Gasto y presupuesto', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
@@ -13495,6 +13497,7 @@ function appAnim(el, cls, ms){
 }
 function appInicio(pantalla){
   if(APP.vista === 'frioteam') pantalla = 'inventario';
+  if(APP.vista === 'compras' && (pantalla === 'gasto' || pantalla === 'presu')){ APP_GP.sub = pantalla; pantalla = 'gastopresu'; }
   if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(undefined, true); APP.entrada = false; return; }
   const tabs = ((APP_VISTAS[APP.vista] || APP_VISTAS.supervisor).tabs || []).map(function(t){ return t[0]; });
   const antes = APP.enInicio ? APP.pantalla : null, nueva = APP_PANTALLAS[pantalla] ? pantalla : 'inicio';
@@ -13528,10 +13531,16 @@ function appSaludo(){
 
 // HTML de cada pantalla guardado por su estado (período, filtros, búsqueda): volver a una pestaña es
 // instantáneo. Se vacía solo cuando cambian los datos (appMemo).
-const APP_PANT_FN = { gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
+// Gasto y Presupuesto juntos en una pestaña de la vista Compras (12.10.2026): arriba se elige cuál ver.
+const APP_GP = { sub:'gasto' };
+function appGastoPresuHtml(){
+  return `<div class="ind-chips gp-tabs"><button type="button" data-gpsub="gasto" class="${APP_GP.sub === 'gasto' ? 'on' : ''}">💰 Gasto</button><button type="button" data-gpsub="presu" class="${APP_GP.sub === 'presu' ? 'on' : ''}">💼 Presupuesto vs. OC</button></div>`
+    + APP_PANT_FN[APP_GP.sub]();
+}
+const APP_PANT_FN = { gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
   pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
-  const e = { gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
+  const e = { gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
     indicadores:[APP_F.indicadores], otif:[APP_F.otif] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0);
 }
@@ -13548,7 +13557,7 @@ function appPrecalentar(){
     q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appPantallaHtml('otif'); }, function(){ appPantallaHtml('gasto'); });
   }
   if(appEsLogistica(v)){
-    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog', function(){ return appInicioLogistica('logistica'); }); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
+    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog' + v, function(){ return appInicioLogistica(v === 'compras' ? 'compras' : 'logistica'); }); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
       function(){ appImpDatos(); }, function(){ appPantallaHtml('pendlog'); });
   }
   const pausa = window.requestIdleCallback ? function(fn){ requestIdleCallback(fn, { timeout:1500 }); } : function(fn){ setTimeout(fn, 60); };
@@ -13572,7 +13581,7 @@ function appRenderInicio(){
       : '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los datos de la plataforma…</div></div>';
     clearTimeout(appEsperaDatos);
     appEsperaDatos = setTimeout(function(){ if(APP.enInicio) appRenderInicio(); }, 1500);
-  } else if(APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog'){
+  } else if(APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     if(APP.pantalla === 'inventario') setTimeout(appInvCompletar, 0);
     return;
@@ -13581,7 +13590,7 @@ function appRenderInicio(){
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
   // Compras y Almacén: siempre el calendario del daily arriba (12.10.2026, Piero), sin los indicadores de la semana.
-  else if(appEsLogistica(v)) cuerpo = `<div id="iniCal">${appDailyHtml()}</div>` + appMemo('iniLog', function(){ return appInicioLogistica('logistica'); });
+  else if(appEsLogistica(v)) cuerpo = `<div id="iniCal">${appDailyHtml()}</div>` + appMemo('iniLog' + v, function(){ return appInicioLogistica(v === 'compras' ? 'compras' : 'logistica'); });   // Compras sin lo de inventario
   else cuerpo = appInicioSupervisor();
   const corte = (DATA && DATA.corte) ? 'Datos al ' + fmtDate(DATA.corte) : '';
   // Supervisor: solo lo que sirve (29.09.2026, Piero: "hay demasiadas cosas, simplifícalo"): buscar su
@@ -16148,6 +16157,7 @@ function appClickInicio(e){
   if(b.dataset.skufam !== undefined){ APP_PC.fam = b.dataset.skufam; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true); return; }
 
   if(b.dataset.impdf){ appImpPdf(); return; }
+  if(b.dataset.gpsub){ APP_GP.sub = b.dataset.gpsub; return appRenderInicio(); }
   if(b.dataset.plsec){ APP_PL.sec = b.dataset.plsec; APP_PL.q = ''; APP_PL.tope = 15; return appRenderInicio(); }
   if(b.dataset.plmas){ APP_PL.tope += 30; const l = document.getElementById('plLista'); if(l) l.innerHTML = appPendLogLista(); return; }
   if(b.dataset.pantalla) return appInicio(b.dataset.pantalla);
