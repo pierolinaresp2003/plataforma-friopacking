@@ -1726,6 +1726,19 @@
     .arh-vacio{font-size:16px;color:#5b6780;padding:20px 0;text-align:center;}
     .arh-deco{position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(160deg,transparent 55%,#3f86ea 55%,#1f5fd1 75%,#0b2a7a 100%);opacity:.85;pointer-events:none;}
     .arh-hoja .arh-card,.arh-hoja .arh-kpis{z-index:1;}
+    .ix{padding:16px 18px;} .ix-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;} .ix-head > b{font-size:16px;font-weight:800;color:var(--ink);} .ix-head > span{font-size:12.5px;color:var(--ink-soft);}
+    .ix-head .ind-est{margin-left:auto;font-style:normal;} .ix-info{font-style:normal;margin-left:auto;width:22px;height:22px;border-radius:50%;background:var(--surface-2);color:var(--ink-soft);font-size:13px;display:inline-flex;align-items:center;justify-content:center;cursor:help;flex-shrink:0;} .ix-head .ind-est + .ix-info{margin-left:6px;}
+    .ix-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;} .ix-kpis.cuatro{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));}
+    .ix-kpis > div{background:var(--surface-2);border-radius:12px;padding:12px 12px;min-width:0;overflow:hidden;} .ix-kpis b{display:block;font-size:clamp(17px,4.4vw,24px);white-space:nowrap;font-weight:800;color:var(--ink);line-height:1.1;} .ix-kpis span{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-top:3px;} .ix-kpis small{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;opacity:.85;}
+    .ix-kpis .ac b{color:var(--accent, #2a78d6);} .ix-kpis .ok b{color:#13865d;} .ix-kpis .late b{color:#c77a12;} .ix-kpis .warn b{color:#d33;} .ix-kpis .pr-rojo b{color:#d33;} .ix-kpis .pr-ambar b{color:#c77a12;} .ix-kpis .pr-verde b{color:#13865d;}
+    .ix-rank{margin-top:14px;} .ix-rh,.ix-r{display:grid;grid-template-columns:26px minmax(0,1fr) 46px 52px 56px 56px;gap:6px;align-items:center;} .ix-rh{font-size:10px;letter-spacing:0;font-weight:700;color:var(--ink-soft);text-transform:uppercase;padding:0 0 6px;border-bottom:1px solid var(--border);}
+    .ix-rh span:nth-child(n+3),.ix-r > span:nth-child(n+3),.ix-r > b{text-align:right;} .ix-r{padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;} .ix-r:last-child{border-bottom:0;}
+    .ix-r .t b{display:block;font-size:14px;font-weight:700;} .ix-r .t i{display:block;height:5px;border-radius:3px;background:var(--surface-2);margin-top:5px;overflow:hidden;} .ix-r .t em{display:block;height:100%;background:var(--accent, #2a78d6);border-radius:3px;} .ix-r > b{font-size:16px;font-weight:800;}
+    .ix-btn{margin-top:12px;border:0;background:var(--accent, #2a78d6);color:#fff;font-weight:700;font-size:13.5px;padding:10px 16px;border-radius:10px;cursor:pointer;} .ix-tip{margin-top:12px;font-size:12.5px;color:var(--ink-soft);} .ix-sub{font-size:12.5px;color:var(--ink-soft);margin-top:6px;}
+    .ix .pr-barra{margin-top:12px;} .ix-seg{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:14px;background:var(--surface-2);gap:2px;} .ix-seg em{display:block;height:100%;}
+    .ix-ley{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12.5px;color:var(--ink-soft);} .ix-ley i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;} .ix-ley b{color:var(--ink);}
+    .ix-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);} .ix-stats span{font-size:12.5px;color:var(--ink-soft);background:var(--surface-2);border-radius:999px;padding:5px 11px;} .ix-stats b{color:var(--ink);} .ix-stats .mal b{color:#d33;}
+
     .cpx-hoja{width:768px;min-height:1152px;box-sizing:border-box;padding:16px 14px 18px;background:linear-gradient(180deg,#e4f2fb 0%,#d9edf9 100%);color:#0d1530;font-family:Inter,"DejaVu Sans",Arial,sans-serif;}
     .cpx-card{background:#fff;border:1.5px solid #d3e6f3;border-radius:22px;padding:14px 18px;margin-bottom:12px;box-shadow:0 2px 8px rgba(11,31,77,.05);box-sizing:border-box;}
     .cpx-card h2{margin:0 0 10px;font-size:34px;font-weight:900;letter-spacing:-.02em;text-transform:uppercase;line-height:1.05;} .cpx-card h2 em{font-style:normal;font-size:20px;font-weight:800;color:#3b4a66;}
@@ -13265,6 +13278,7 @@ function appConstruir(){
   });
   document.getElementById('section-inicio').addEventListener('change', function(e){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
+    if(e.target.id === 'pcPer'){ APP_PC.persona = e.target.value; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
     if(e.target.id === 'pcEntAnio' || e.target.id === 'pcEntMes'){ if(e.target.id === 'pcEntAnio'){ APP_PC.entAnio = e.target.value; APP_PC.entMes = String(+e.target.value === appIndCorte().getUTCFullYear() ? appIndCorte().getUTCMonth() + 1 : 0); } else APP_PC.entMes = e.target.value; APP_PC.entTope = 60; return appRenderInicio(); }
     if(e.target.dataset.ardesde || e.target.dataset.arhasta){ APP_AR[e.target.dataset.ardesde ? 'desde' : 'hasta'] = e.target.value; return appRenderInicio(); }
     if(e.target.id === 'prCli' || e.target.id === 'prPry'){ APP_PR[e.target.id === 'prCli' ? 'cli' : 'pry'] = e.target.value; if(e.target.id === 'prCli') APP_PR.pry = ''; return appRenderInicio(); }
@@ -14444,20 +14458,21 @@ function appFotoComprador(st){
   const lista = appDailyRango(desde, hasta, pryFn).filter(function(x){ return x.cod !== 'CMORA'; }), mios = cod ? lista.filter(function(x){ return x.cod === cod; }) : lista;   // Camila se mide aparte (Comex)
   const sum = function(k){ return mios.reduce(function(a, x){ return a + (k === 'pts' ? x.pts : x[k].size); }, 0); };
   const pr = appFotoPresu(desde, hasta, cod, pryFn), max = Math.max.apply(null, lista.map(function(x){ return x.pts; }).concat([1]));
-  const rank = !cod && lista.length ? `<div class="foto-rank">${lista.map(function(x, i){
-    return `<div class="foto-fila"><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${escapeHtml(PD_PERSONAS[x.cod] || x.cod)}</b><small>${x.oc.size} OC · ${x.sku.size} SKU${x.ped.size ? ' · ' + x.ped.size + ' directos' : ''}</small><i><em style="width:${(x.pts / max * 100).toFixed(1)}%"></em></i></span><b class="p">${appN(x.pts)}<small>pts</small></b></div>`; }).join('')}</div>` : '';
   const pct = pr.partPc > 0 ? pr.partUsd / pr.partPc * 100 : null;
-  return `<div class="ini-card foto">
-      <div class="ini-card-tit">📸 Foto ${cod ? 'de ' + escapeHtml(PD_PERSONAS[cod] || cod) : 'de los compradores'} <small>${escapeHtml(r ? r.label : 'todo lo cargado')}</small></div>
-      <div class="m-tiles foto-kpi"><div class="pts"><span>🗓️ Puntos Daily call in</span><b>${appN(sum('pts'))}</b></div><div><span>🧾 OC emitidas</span><b>${appN(sum('oc'))}</b></div><div><span>📦 SKU hechos</span><b>${appN(sum('sku'))}</b></div></div>
+  // Diseño simple (12.10.2026, Piero: "no se entiende, hay demasiado texto y separaciones"): números grandes con
+  // etiqueta corta, el ranking como tabla y las explicaciones en el ⓘ (al pasar el mouse o tocar).
+  const rank = !cod && lista.length ? `<div class="ix-rank"><div class="ix-rh"><span></span><span>Comprador</span><span>OC</span><span>SKU</span><span>Directos</span><span>Puntos</span></div>${lista.map(function(x, i){
+    return `<div class="ix-r"><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${escapeHtml(PD_PERSONAS[x.cod] || x.cod)}</b><i><em style="width:${(x.pts / max * 100).toFixed(1)}%"></em></i></span><span>${appN(x.oc.size)}</span><span>${appN(x.sku.size)}</span><span>${appN(x.ped.size)}</span><b>${appN(x.pts)}</b></div>`; }).join('')}</div>` : '';
+  const k = function(v, t, sub, cls){ return `<div class="${cls || ''}"><b>${v}</b><span>${t}</span>${sub ? '<small>' + sub + '</small>' : ''}</div>`; };
+  return `<div class="ini-card ix">
+      <div class="ix-head"><b>📸 ${cod ? escapeHtml(PD_PERSONAS[cod] || cod) : 'Compradores'}</b><span>${escapeHtml(r ? r.label : 'todo lo cargado')}</span><i class="ix-info" title="Puntos como en el Daily: 1 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo, sumados en el período.">ⓘ</i></div>
+      <div class="ix-kpis">${k(appN(sum('pts')), 'Puntos', '', 'ac')}${k(appN(sum('oc')), 'OC emitidas')}${k(appN(sum('sku')), 'SKU hechos')}</div>
       ${rank}
-      ${cod && APP_DAILY_COMPRAS.indexOf(cod) !== -1 ? `<button type="button" class="ini-link" data-cmpimg="${escapeHtml(cod)}">🖼️ Generar el resumen de ${escapeHtml(PD_PERSONAS[cod])} en imágenes ›</button>` : '<small class="sku-nota">Elige un comprador en el filtro de arriba para generar su resumen en imágenes.</small>'}
-      <small class="sku-nota">Puntos como en el Daily: 1 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo, sumados en el período.</small></div>
-    <div class="ini-card foto-presu"><div class="ini-card-tit">💼 Presupuesto <small>solicitado vs. comprado en el período</small></div>
-      <div class="m-tiles"><div><span>📋 Solicitado</span><b>${appN(pr.sol)} SKU</b><small>${pr.solPart.size} partidas · presupuesto ${fmtUSD(pr.solPc)}</small></div>
-        <div><span>🛒 Comprado en OC</span><b>${fmtUSD(pr.comUsd)}</b><small>${appN(pr.lineas)} líneas · ${fmtUSD(pr.comSin)} sin presupuesto</small></div></div>
-      ${pr.comPart.size ? `<div class="sku-presu ${appPresuCls(pct)}"${pr.partExc ? ' data-clic="1" data-prexc="foto" style="cursor:pointer"' : ''}><div class="sku-presu-top"><span>Partidas en las que compró (${pr.comPart.size})</span><b>${pct.toFixed(0)}% usado</b></div>
-        ${appPresuBarra(pr.partUsd, pr.partPc)}<div class="sku-presu-uso">${fmtUSD(pr.partUsd)} en OC de ${fmtUSD(pr.partPc)} presupuestados (todas sus OC)</div>${pr.partExc ? '<button type="button" class="pr-ver-exc" data-prexc="foto">🔴 Ver las ' + pr.partExc + ' partida' + (pr.partExc === 1 ? '' : 's') + ' pasada' + (pr.partExc === 1 ? '' : 's') + ' ›</button>' : ''}</div>` : '<div class="ini-vacio">Sin compras en partidas con presupuesto en este período.</div>'}
+      ${cod && APP_DAILY_COMPRAS.indexOf(cod) !== -1 ? `<button type="button" class="ix-btn" data-cmpimg="${escapeHtml(cod)}">🖼️ Resumen de ${escapeHtml(PD_PERSONAS[cod])} en imágenes</button>` : '<div class="ix-tip">🖼️ Elige un comprador arriba para sacar su resumen en imágenes</div>'}</div>
+    <div class="ini-card ix">
+      <div class="ix-head"><b>💼 Presupuesto</b><span>solicitado vs. comprado</span><i class="ix-info" title="Solicitado = SKU pedidos en el período y el presupuesto costo de sus partidas. Comprado = OC emitidas en el período (cantidad × precio sin IGV, en dólares). Usado = todo lo comprado en OC en esas partidas contra su presupuesto.">ⓘ</i></div>
+      <div class="ix-kpis">${k(appN(pr.sol), 'SKU solicitados', pr.solPart.size + ' partidas · ' + fmtUSD(pr.solPc))}${k(fmtUSD(pr.comUsd), 'Comprado en OC', appN(pr.lineas) + ' líneas · ' + fmtUSD(pr.comSin) + ' sin presup.')}${pr.comPart.size ? k(pct.toFixed(0) + '%', 'Presupuesto usado', pr.comPart.size + ' partidas', 'pr-' + appPresuCls(pct)) : k('—', 'Presupuesto usado', 'sin partidas')}</div>
+      ${pr.comPart.size ? `${appPresuBarra(pr.partUsd, pr.partPc)}<div class="ix-sub">${fmtUSD(pr.partUsd)} en OC de ${fmtUSD(pr.partPc)} presupuestados</div>${pr.partExc ? '<button type="button" class="pr-ver-exc" data-prexc="foto">🔴 Ver las ' + pr.partExc + ' partida' + (pr.partExc === 1 ? '' : 's') + ' pasada' + (pr.partExc === 1 ? '' : 's') + ' ›</button>' : ''}` : ''}
     </div>`;
 }
 // ===================================================================================================
@@ -15165,7 +15180,7 @@ function appPendComprasHtml(soloLista){
   const EST = { venc:'Vencida', sem:'Esta semana', luego:'Más adelante' };
   // Entregadas: del año / mes elegido (por defecto el mes en curso); con el buscador, todas.
   const entAll = appEntregadas().filter(function(o){ return !APP_PC.persona || o.persona === APP_PC.persona; });
-  if(APP_PC.sec === 'ent') APP_PC.sec = 'venc';   // ya no es pestaña: las entregadas salen con el buscador (07.10.2026)
+  // Entregadas vuelve a ser pestaña (12.10.2026, Piero: "una pestaña que muestre las OC que se entregaron").
   const entY = +APP_PC.entAnio || c.getUTCFullYear(), entM = APP_PC.entMes === '0' ? 0 : (+APP_PC.entMes || (APP_PC.entAnio ? 0 : c.getUTCMonth() + 1));
   const entPer = entAll.filter(function(o){ return o.f && o.f.getUTCFullYear() === entY && (!entM || o.f.getUTCMonth() + 1 === entM); });
   const S = { venc:['🔴', 'Vencidas', 'vc', venc, 'Ya pasó la fecha de entrega · la más atrasada primero'], sem:['🟠', 'Esta semana', 'sm', sem, 'Entrega pactada hasta el domingo'],
@@ -15265,11 +15280,13 @@ function appPendComprasHtml(soloLista){
   };
   const lista = q ? (['venc', 'sem', 'luego', 'ped', 'ent'].map(bloque).join('') || `<div class="ini-vacio">No hay OC ni pedidos con "${escapeHtml(APP_PC.q)}".</div>`) : bloque(APP_PC.sec);
   if(soloLista) return lista;
-  return appChips('pcper', APP_PC.persona, [['', 'Todos ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size]].concat([...personas.keys()].filter(Boolean).sort().map(function(p){ return [p, nom(p)]; })))
+  // Comprador en una lista desplegable (12.10.2026, Piero: "que sea para escoger por lista, no puntitos").
+  const opP = function(v, t){ return `<option value="${escapeHtml(v)}"${v === (APP_PC.persona || '') ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
+  return `<div class="m-filtros pc-per"><label><span>🧑‍💼 Comprador</span><select class="ini-select" id="pcPer">${opP('', 'Todos · ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size)}${[...personas.keys()].filter(Boolean).sort().map(function(p){ return opP(p, (PD_PERSONAS[p] || p) + ' · ' + new Set(todas.filter(function(r){ return r.persona === p; }).map(function(r){ return r.codOrden || r.codPedido; })).size); }).join('')}</select></label></div>`
     // Buscador general arriba (07.10.2026, Piero: "un buscador ahí general para todo, así se puede buscar
     // cualquier OC"): pendientes y también las ya entregadas, cerradas o anuladas.
     + `<div class="m-buscar pc-buscar-gen"><input type="search" id="pcBusca" placeholder="🔍 Buscar cualquier OC (pendiente o entregada), pedido, req., código, producto, proveedor o cliente" value="${escapeHtml(APP_PC.q || '')}"></div>`
-    + `<div class="m-resumen m-pl-tabs imp-tabs">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}</div>`
+    + `<div class="m-resumen m-pl-tabs imp-tabs cinco">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}${tile('ent')}</div>`
     + `<div id="pcLista">${lista}</div>`;
 }
 
@@ -16577,7 +16594,7 @@ function appCmpImagenes(cod){
 const CMX_META_INGRESO = 5;   // días hábiles de referencia de la llegada al ingreso
 function appComexHtml(st){
   const E = EMB_DATA.rows || [];
-  if(!E.length) return `<div class="m-sec-tit">🌎 Comex · Camila Mora</div><div class="ini-card"><div class="ini-vacio">Carga el Excel de seguimiento de contenedores (Camila) para medir Comex.</div></div>`;
+  if(!E.length) return `<div class="ini-card"><div class="ini-vacio">Carga el Excel de seguimiento de contenedores (Camila) para medir Comex.</div></div>`;
   const r = appFRango(st), desde = r ? appIndIso(r.desde) : '1900-01-01', hasta = r ? appIndIso(r.hasta) : '2100-01-01', hoy = isoDay(appIndCorte());
   const D = appMemo('comex:' + desde + hasta, function(){
     const ing = new Map(); almMovRows().forEach(function(x){ if(x.t === 'i' && x.oc){ (ing.get(x.oc) || ing.set(x.oc, []).get(x.oc)).push(x.f); } });
@@ -16596,24 +16613,17 @@ function appComexHtml(st){
     return { n:E.length, ocs:ocs.size, est:est, vivos:vivos, conFechas:conFechas, etaVenc:etaVenc, abiertas:abiertas.size, cubiertas:cubiertas,
       tiempos:tiempos, prom:tiempos.length ? tiempos.reduce(function(a, x){ return a + x; }, 0) / tiempos.length : null, enMeta:tiempos.filter(function(t){ return t <= CMX_META_INGRESO; }).length, b:b, sinIngreso:sinIngreso.length };
   });
-  const t = function(v, tt, sub){ return `<div><span>${tt}</span><b>${v}</b>${sub ? '<small>' + sub + '</small>' : ''}</div>`; };
   const pct = function(a, b2){ return b2 ? Math.round(a / b2 * 100) + '%' : '—'; };
-  const max = Math.max.apply(null, D.b.concat([1]));
-  const bar = function(l, v){ return `<div class="ini-bar"><span>${l}</span><i><em style="width:${(v / max * 100).toFixed(1)}%"></em></i><b>${v}</b></div>`; };
   const cls = function(p){ return p == null ? '' : p >= 80 ? 'ok' : p >= 50 ? 'late' : 'warn'; }, pMeta = D.tiempos.length ? Math.round(D.enMeta / D.tiempos.length * 100) : null;
-  return `<div class="m-sec-tit">🌎 Comex · Camila Mora <small>según su Excel de seguimiento de contenedores</small></div>
-    <div class="ini-card ind-card ${cls(pMeta)}">
-      <div class="ind-top"><span class="ind-area">IMPORTACIONES</span>${pMeta != null ? `<span class="ind-est ${cls(pMeta)}">${appIndEstado(pMeta)}</span>` : ''}</div>
-      <div class="ind-nom">De la llegada al ingreso en almacén</div>
-      <div class="ind-que">Días hábiles desde la ETA del embarque hasta la primera guía de recepción de sus OC (embarques que llegaron en el período). Referencia: ${CMX_META_INGRESO} días hábiles.</div>
-      ${D.tiempos.length ? `<div class="ind-big"><div><b class="${cls(pMeta)}">${pMeta}%</b><span>dentro de ${CMX_META_INGRESO} d.h.</span><small>${D.enMeta} de ${D.tiempos.length} embarques</small></div>
-        <div><b>${D.prom.toFixed(1)}</b><span>días háb. promedio</span><small>${D.sinIngreso ? D.sinIngreso + ' llegado' + (D.sinIngreso === 1 ? '' : 's') + ' sin ingreso todavía' : 'todos con ingreso'}</small></div></div>
-        ${bar('0 a 2 d.h.', D.b[0])}${bar('3 a ' + CMX_META_INGRESO + ' d.h.', D.b[1])}${bar('6 a 10 d.h.', D.b[2])}${bar('Más de 10 d.h.', D.b[3])}` : '<div class="ini-vacio">Ningún embarque llegó en este período.</div>'}
-    </div>
-    <div class="ini-card"><div class="ini-card-tit">📦 Seguimiento al corte</div>
-      <div class="m-tiles">${t(appN(D.n), 'Embarques en su Excel', appN(D.ocs) + ' OC')}${t(appN(D.est.tr), '🚢 En tránsito')}${t(appN(D.est.zar), '🛳️ Por zarpar', 'por embarcar o booking')}${t(appN(D.est.arr), '✅ Arribados')}</div>
-      <div class="m-tiles">${t(pct(D.cubiertas, D.abiertas), 'Cobertura', D.cubiertas + ' de ' + D.abiertas + ' OC de importación abiertas')}${t(pct(D.conFechas, D.vivos), 'Con ETD y ETA', D.conFechas + ' de ' + D.vivos + ' embarques en curso')}${t(appN(D.etaVenc), '⛔ ETA vencida', 'en tránsito con la ETA pasada')}</div>
-      <div class="av-nota">Cobertura = OC de importación pendientes que ya están en su seguimiento. Las que faltan no tienen ETD/ETA en la app.</div></div>`;
+  const k = function(v, t2, sub, c2){ return `<div class="${c2 || ''}"><b>${v}</b><span>${t2}</span>${sub ? '<small>' + sub + '</small>' : ''}</div>`; };
+  const tot = D.b.reduce(function(a, x){ return a + x; }, 0), seg = [['0–2 d.h.', '#1baf7a'], ['3–' + CMX_META_INGRESO + ' d.h.', '#3ec6ac'], ['6–10 d.h.', '#f4a640'], ['+10 d.h.', '#e5484d']];
+  return `<div class="ini-card ix">
+      <div class="ix-head"><b>🌎 Comex · Camila Mora</b><span>Excel de seguimiento de contenedores</span>${pMeta != null ? `<em class="ind-est ${cls(pMeta)}">${appIndEstado(pMeta)}</em>` : ''}<i class="ix-info" title="Llegada → ingreso: días hábiles desde la ETA del embarque hasta la primera guía de recepción de sus OC, para los embarques que llegaron en el período (referencia ${CMX_META_INGRESO} d.h.). Cobertura: OC de importación pendientes que ya están en su Excel; las que faltan no tienen ETD/ETA en la app.">ⓘ</i></div>
+      <div class="ix-kpis cuatro">${k(pMeta == null ? '—' : pMeta + '%', 'Ingreso en ≤ ' + CMX_META_INGRESO + ' d.h.', D.tiempos.length ? D.enMeta + ' de ' + D.tiempos.length + ' llegados' : 'ninguno llegó en el período', cls(pMeta))}${k(D.prom == null ? '—' : D.prom.toFixed(1), 'D.h. llegada → ingreso', D.sinIngreso ? D.sinIngreso + ' llegados sin ingreso' : 'todos con ingreso')}${k(pct(D.cubiertas, D.abiertas), 'Cobertura', D.cubiertas + ' de ' + D.abiertas + ' OC abiertas')}${k(pct(D.conFechas, D.vivos), 'Con ETD y ETA', D.conFechas + ' de ' + D.vivos + ' en curso')}</div>
+      ${tot ? `<div class="ix-seg">${D.b.map(function(v, i){ return v ? `<em style="flex:${v};background:${seg[i][1]}" title="${seg[i][0]}: ${v}"></em>` : ''; }).join('')}</div>
+        <div class="ix-ley">${D.b.map(function(v, i){ return `<span><i style="background:${seg[i][1]}"></i>${seg[i][0]} <b>${v}</b></span>`; }).join('')}</div>` : ''}
+      <div class="ix-stats"><span>📦 <b>${appN(D.n)}</b> embarques · ${appN(D.ocs)} OC</span><span>🚢 <b>${appN(D.est.tr)}</b> en tránsito</span><span>🛳️ <b>${appN(D.est.zar)}</b> por zarpar</span><span>✅ <b>${appN(D.est.arr)}</b> arribados</span><span class="${D.etaVenc ? 'mal' : ''}">⛔ <b>${appN(D.etaVenc)}</b> ETA vencida</span></div>
+    </div>`;
 }
 // Foto de Almacén en Indicadores (12.10.2026, Piero: "en los indicadores de almacén solo sale lo que corresponde
 // a almacén"): lo del Daily de Almacén (Javier, Katherine y Marycarmen) sumado en el período.
