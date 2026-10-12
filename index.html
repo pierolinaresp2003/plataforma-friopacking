@@ -1086,7 +1086,7 @@
     .ini-fila .bar i{display:block;height:100%;background:var(--brand-2);border-radius:7px;}
     .ini-fila .q{flex-shrink:0;text-align:right;} .ini-fila .q b{display:block;font-size:16px;color:var(--amber-ink);} .ini-fila .q small{font-size:10.5px;color:var(--muted);}
     .mono{font-family:ui-monospace,Menlo,Consolas,monospace;}
-    .ini-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+    .ini-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;} .ini-stats > :last-child:nth-child(odd){grid-column:1/-1;}
     .ini-stats button{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;text-align:left;cursor:pointer;
       box-shadow:var(--shadow);font-family:inherit;border-left:4px solid var(--brand-ink);}
     .ini-stats button.rojo{border-left-color:var(--red);} .ini-stats button.ambar{border-left-color:var(--amber);}
@@ -4931,7 +4931,7 @@ function processSupervisores(wb, filename){
   if(hdr === -1){ SUPERVISOR_MAIL = null; return { ok:false, message:"no encontré las columnas Nombre y Correo." }; }
   const iN = findCol(rows[hdr], ["Nombre"]), iC = findCol(rows[hdr], ["Correo","Email","E_MAIL"]);
   const iA = findCol(rows[hdr], ["Acceso","Tipo","Rol"]);
-  const mapa = {}, roles = {}, rango = { frioteam:1, supervisor:1, logistica:2, gerencia:3 };
+  const mapa = {}, roles = {}, rango = { frioteam:1, supervisor:1, compras:2, almacen:2, logistica:2, gerencia:3 };
   for(let r=hdr+1; r<rows.length; r++){
     const row = rows[r]; if(!row) continue;
     const nom = s(row[iN]), correos = partirCorreos(row[iC]);
@@ -4939,7 +4939,7 @@ function processSupervisores(wb, filename){
     mapa[claveNombre(nom)] = correos[0];
     const a = sinAcentos(s(iA === -1 ? '' : row[iA]).toLowerCase());
     // Frioteam (07.10.2026, Piero): solo ve Logística → Inventario.
-    const t = /^ger/.test(a) ? 'gerencia' : (/^log/.test(a) ? 'logistica' : (/^frio/.test(a) ? 'frioteam' : 'supervisor'));
+    const t = /^ger/.test(a) ? 'gerencia' : (/^log/.test(a) ? 'logistica' : (/^frio/.test(a) ? 'frioteam' : (/^compra/.test(a) ? 'compras' : (/^almac/.test(a) ? 'almacen' : 'supervisor'))));
     const u = appUsuarioDe(correos[0]);
     if(!roles[u] || rango[t] > rango[roles[u].t]) roles[u] = { t:t, n:nom.replace(/\s+/g, ' '), c:correos[0].toLowerCase() };
   }
@@ -13019,7 +13019,15 @@ const APP_VISTAS = {
   logistica:  { nombre:'Logística',  ico:'🚚', desc:'Ingresos, salidas, kardex y qué comprar para stock.',
     // 30.09.2026 (Piero): sin "Vista" (queda en el botón de arriba); Pendientes de Compras y de Logística aparte.
     tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones']] },
+  // Compras y Almacén (12.10.2026, Piero: "la misma información que existe ahora, pero para distintas
+  // personas"): la vista Logística repartida. Compras → Compras e Importaciones; Almacén → Inventario.
+  compras:    { nombre:'Compras',    ico:'🛒', desc:'OC por llegar, pedidos sin OC e importaciones.',
+    tabs:[['inicio','🏠','Inicio'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones']] },
+  almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Stock por sede, kardex y qué reponer.',
+    tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar']] },
 };
+// Vistas que usan el Inicio y las pantallas de Logística (Compras y Almacén son partes de ella).
+function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v === 'almacen'; }
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
 const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto vs. OC', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones' };
@@ -13030,7 +13038,7 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 // Gerencia y Logística piden la clave del módulo Gerencial). Se guarda solo en ese celular: la plataforma
 // es una página estática, no hay un servidor con la lista de usuarios. Qué vistas ve cada tipo:
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
-const APP_ACCESO = { gerencia:['gerencia','logistica','supervisor'], logistica:['logistica','supervisor'], supervisor:['supervisor'], frioteam:['frioteam'] };
+const APP_ACCESO = { gerencia:['gerencia','logistica','compras','almacen','supervisor'], logistica:['logistica','compras','almacen','supervisor'], compras:['compras','supervisor'], almacen:['almacen','supervisor'], supervisor:['supervisor'], frioteam:['frioteam'] };
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
 // y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
 // solo entran los correos que están ahí. Los de Supervisor entran directo; Logística y Gerencial ponen la
@@ -13531,8 +13539,8 @@ function appPrecalentar(){
     q.push(function(){ appIndDatos(appFIndF(APP_F0.indicadores)); });
     appIndTendF(false).forEach(function(x){ q.push(function(){ appIndDatos(x.f); }); });
     q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appPantallaHtml('otif'); }, function(){ appPantallaHtml('gasto'); });
-  } else if(v === 'logistica'){
-    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog', appInicioLogistica); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
+  } else if(appEsLogistica(v)){
+    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog' + v, function(){ return appInicioLogistica(v); }); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
       function(){ appImpDatos(); }, function(){ appPantallaHtml('pendlog'); });
   }
   const pausa = window.requestIdleCallback ? function(fn){ requestIdleCallback(fn, { timeout:1500 }); } : function(fn){ setTimeout(fn, 60); };
@@ -13541,7 +13549,7 @@ function appPrecalentar(){
 function appRenderInicio(){
   const cont = document.getElementById('section-inicio');
   const v = APP.vista || 'supervisor';
-  const ph = { supervisor:'N° de requerimiento, proyecto o pregunta…', logistica:'Código, producto, OC o pregunta…', gerencia:'Pregunta por un indicador o el gasto…' }[v];
+  const ph = { supervisor:'N° de requerimiento, proyecto o pregunta…', logistica:'Código, producto, OC o pregunta…', compras:'OC, pedido, proveedor o pregunta…', almacen:'Código, producto o pregunta…', gerencia:'Pregunta por un indicador o el gasto…' }[v];
   const hay = appHayDatos();
   if(hay && SUPERVISOR_ROL && APP.usuario){
     const antes = APP.usuario.tipo; appRevisarAcceso();
@@ -13564,7 +13572,7 @@ function appRenderInicio(){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
-  else if(v === 'logistica') cuerpo = appMemo('iniLog', appInicioLogistica);
+  else if(appEsLogistica(v)) cuerpo = appMemo('iniLog' + v, function(){ return appInicioLogistica(v); });
   else cuerpo = appInicioSupervisor();
   const corte = (DATA && DATA.corte) ? 'Datos al ' + fmtDate(DATA.corte) : '';
   // Supervisor: solo lo que sirve (29.09.2026, Piero: "hay demasiadas cosas, simplifícalo"): buscar su
@@ -15908,29 +15916,30 @@ function appPendientesResumen(){
   });
   return { filas, ocs:ocs.size, venc:venc.size, peds:peds.size };
 }
-function appInicioLogistica(){
-  const pd = appPendientesResumen();
-  const rep = appPorReponer();
+function appInicioLogistica(v){
+  const verC = v !== 'almacen', verA = v !== 'compras';
+  const pd = verC ? appPendientesResumen() : {};
+  const rep = verA ? appPorReponer() : [];
   const n = (v)=> Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:0 });
   return `<div class="ini-stats">
-      <button type="button" data-pantalla="pendcompras"><b>${n(pd.ocs)}</b><span>OC por llegar</span></button>
+      ${verC ? `<button type="button" data-pantalla="pendcompras"><b>${n(pd.ocs)}</b><span>OC por llegar</span></button>
       <button type="button" data-pantalla="pendcompras" class="rojo"><b>${n(pd.venc)}</b><span>OC vencidas</span></button>
-      <button type="button" data-pantalla="pendcompras"><b>${n(pd.peds)}</b><span>Pedidos sin OC</span></button>
-      <button type="button" data-pantalla="inventario" class="ambar"><b>${n(rep.length)}</b><span>Por reponer</span></button>
+      <button type="button" data-pantalla="pendcompras"><b>${n(pd.peds)}</b><span>Pedidos sin OC</span></button>` : ''}
+      ${verA ? `<button type="button" data-pantalla="inventario" class="ambar"><b>${n(rep.length)}</b><span>Por reponer</span></button>` : ''}
     </div>
-    <div class="ini-card"><div class="ini-card-tit">📦 Buscar un producto</div>
+    ${verA ? `<div class="ini-card"><div class="ini-card-tit">📦 Buscar un producto</div>
       <form class="ini-busca" data-form="inv"><input type="search" name="q" placeholder="Código o descripción"><button type="submit">Ver</button></form></div>
     <div class="ini-card"><div class="ini-card-tit">⚠️ Reponer primero <small>(menos meses de stock)</small></div>
       ${rep.length ? rep.slice(0, 6).map(function(r){
         return `<button type="button" class="ini-fila" data-invbuscar="${escapeHtml(r.codigo)}">
           <span class="t"><b class="mono">${escapeHtml(r.codigo)}</b><small>${escapeHtml(r.descripcion || '')}</small></span>
           <span class="q"><b>${n(Math.round(r.aPedir))}</b><small>${escapeHtml(r.unidad || '')} a pedir</small></span></button>`;
-      }).join('') : '<div class="ini-vacio">Nada por reponer con los meses configurados.</div>'}</div>
-    <div class="ini-atajos">
+      }).join('') : '<div class="ini-vacio">Nada por reponer con los meses configurados.</div>'}</div>` : ''}
+    ${verC ? `<div class="ini-atajos">
       <button type="button" data-pantalla="pendlog">🚢 Estatus de importaciones</button>
       <button type="button" data-ir="certificados">📄 Certificados</button>
       <button type="button" data-url="https://melissa2026714.github.io/dashboard-friopacking/compras.html">📊 Plataforma Compras ↗</button>
-    </div>`;
+    </div>` : ''}`;
 }
 
 // ---------- Inicio: Gerencia ----------
@@ -16151,6 +16160,8 @@ function polarChips(){
   try{ rqPreparar(); const u = appResumenReqs(RQ.filas)[0]; if(u) req = u.cod.replace(/^0001-0*/, ''); }catch(err){}
   if(v === 'gerencia') return ['¿Cómo vamos esta semana?', 'Indicador más bajo', 'Gasto de este mes', 'Top proveedores'];
   if(v === 'logistica') return ['OC por llegar esta semana', '¿Qué se queda sin stock?', 'Pedidos sin OC', 'OC vencidas'];
+  if(v === 'compras') return ['OC por llegar esta semana', 'Pedidos sin OC', 'OC vencidas', 'Estatus de embarques'];
+  if(v === 'almacen') return ['¿Qué se queda sin stock?', 'Qué reponer', 'OC por llegar esta semana'];
   return ['Mis requerimientos', 'Mis requerimientos atrasados', req ? '¿Cómo va el ' + req + '?' : '¿Qué salió a obra esta semana?'];
 }
 function polarSugerencias(){
