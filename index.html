@@ -14,7 +14,7 @@
 (function(){ try{
   var cel = window.matchMedia && matchMedia('(max-width: 760px)').matches, u = null;
   try{ u = JSON.parse(localStorage.getItem('fp-usuario') || 'null'); }catch(e){}
-  var completa = !cel && localStorage.getItem('fp-pc-completa') === '1' && u && (u.tipo === 'logistica' || u.tipo === 'gerencia');
+  var completa = !cel && localStorage.getItem('fp-pc-completa') === '1' && u && /^(logistica|gerencia|compras|almacen)$/.test(u.tipo);
   if(!completa) document.documentElement.classList.add('app-modo');
   if(!cel && !completa) document.documentElement.classList.add('app-pc');
 }catch(e){ document.documentElement.classList.add('app-modo'); } })();
@@ -960,6 +960,7 @@
       background:var(--brand);filter:none;opacity:1;box-shadow:0 6px 16px rgba(10,30,100,.35);border:3px solid var(--card);}
     .app-tabbar button.polar .i img{width:100%;height:100%;display:block;}
     .app-tabbar button.polar{color:var(--brand-ink);}
+    .app-tabbar.muchas{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;} .app-tabbar.muchas::-webkit-scrollbar{display:none;}
     /* Hoja de acciones (lo que antes eran los íconos de la barra de arriba) */
     .app-sheet-fondo{position:fixed;inset:0;background:rgba(10,20,40,.45);z-index:97;align-items:flex-end;}
     .app-sheet-fondo.abierto{display:flex;}
@@ -4939,7 +4940,7 @@ function processSupervisores(wb, filename){
     mapa[claveNombre(nom)] = correos[0];
     const a = sinAcentos(s(iA === -1 ? '' : row[iA]).toLowerCase());
     // Frioteam (07.10.2026, Piero): solo ve Logística → Inventario.
-    const t = /^ger/.test(a) ? 'gerencia' : (/^log/.test(a) ? 'logistica' : (/^frio/.test(a) ? 'frioteam' : (/^compra/.test(a) ? 'compras' : (/^almac/.test(a) ? 'almacen' : 'supervisor'))));
+    const t = /^ger/.test(a) ? 'gerencia' : (/^log/.test(a) ? 'compras' : (/^frio/.test(a) ? 'frioteam' : (/^compra/.test(a) ? 'compras' : (/^almac/.test(a) ? 'almacen' : 'supervisor'))));
     const u = appUsuarioDe(correos[0]);
     if(!roles[u] || rango[t] > rango[roles[u].t]) roles[u] = { t:t, n:nom.replace(/\s+/g, ' '), c:correos[0].toLowerCase() };
   }
@@ -13016,16 +13017,18 @@ const APP_VISTAS = {
     // nada más, y con ese que se consulte todo"): entra directo a Leo. Lo que Leo muestra (un req., un
     // proyecto) se abre en Requerimientos y el botón flotante lo devuelve a Leo.
     tabs:[] },
-  logistica:  { nombre:'Logística',  ico:'🚚', desc:'Ingresos, salidas, kardex y qué comprar para stock.',
-    // 30.09.2026 (Piero): sin "Vista" (queda en el botón de arriba); Pendientes de Compras y de Logística aparte.
-    tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones']] },
-  // Compras y Almacén (12.10.2026, Piero: "la misma información que existe ahora, pero para distintas
-  // personas"): la vista Logística repartida. Compras → Compras e Importaciones; Almacén → Inventario.
-  compras:    { nombre:'Compras',    ico:'🛒', desc:'OC por llegar, pedidos sin OC e importaciones.',
-    tabs:[['inicio','🏠','Inicio'], ['polar'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones']] },
-  almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Stock por sede, kardex y qué reponer.',
-    tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['polar']] },
+  // Compras y Almacén (12.10.2026, Piero: "tanto compras como almacén ahora tengan las subvistas de gerencial
+  // y las funciones que estaban en la vista logística"; la de Supervisor es Leo, así que no se ofrece). La
+  // vista Logística se quitó: quien tenía ese acceso entra a Compras (ver appTipoNorm).
+  compras:    { nombre:'Compras',    ico:'🛒', desc:'Compras, importaciones, inventario e indicadores.',
+    tabs:[['inicio','🏠','Inicio'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones'], ['inventario','📦','Inventario'], ['polar'], ['indicadores','📊','Indicadores'], ['gasto','💰','Gasto'], ['presu','💼','Presupuesto'], ['otif','🎯','OTIF']] },
+  almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Inventario, compras, importaciones e indicadores.',
+    tabs:[['inicio','🏠','Inicio'], ['inventario','📦','Inventario'], ['pendcompras','🛒','Compras'], ['pendlog','🚢','Importaciones'], ['polar'], ['indicadores','📊','Indicadores'], ['gasto','💰','Gasto'], ['presu','💼','Presupuesto'], ['otif','🎯','OTIF']] },
 };
+// El acceso "Logística" de antes es ahora Compras.
+function appTipoNorm(t){ return t === 'logistica' ? 'compras' : t; }
+// Vistas que ven lo gerencial (con la clave de la app ya puesta).
+function appVeGerencial(t){ return t === 'gerencia' || t === 'compras' || t === 'almacen'; }
 // Vistas que usan el Inicio y las pantallas de Logística (Compras y Almacén son partes de ella).
 function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v === 'almacen'; }
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
@@ -13038,7 +13041,7 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 // Gerencia y Logística piden la clave del módulo Gerencial). Se guarda solo en ese celular: la plataforma
 // es una página estática, no hay un servidor con la lista de usuarios. Qué vistas ve cada tipo:
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
-const APP_ACCESO = { gerencia:['gerencia','logistica','compras','almacen','supervisor'], logistica:['logistica','compras','almacen','supervisor'], compras:['compras','supervisor'], almacen:['almacen','supervisor'], supervisor:['supervisor'], frioteam:['frioteam'] };
+const APP_ACCESO = { gerencia:['gerencia','compras','almacen'], logistica:['compras','almacen'], compras:['compras','almacen'], almacen:['almacen','compras'], supervisor:['supervisor'], frioteam:['frioteam'] };
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
 // y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
 // solo entran los correos que están ahí. Los de Supervisor entran directo; Logística y Gerencial ponen la
@@ -13069,7 +13072,7 @@ function appCorreoValido(correo){
 function appTipoPorCorreo(correo){
   if(!appCorreoValido(correo)) return null;
   const a = appAccesos()[appUsuarioDe(correo)];
-  return a ? a.t : null;
+  return a ? appTipoNorm(a.t) : null;
 }
 function appNombrePorCorreo(correo){
   const a = appCorreoValido(correo) && appAccesos()[appUsuarioDe(correo)];
@@ -13081,6 +13084,7 @@ try{
   // appRevisarAcceso lo vuelve a comprobar apenas llegan (si cambió su acceso en la base, cambia acá).
   const u = JSON.parse(localStorage.getItem('fp-usuario') || 'null');
   // Frioteam puede tener otro dominio: se acepta lo guardado y appRevisarAcceso lo valida cuando llega la base.
+  if(u) u.tipo = appTipoNorm(u.tipo);
   if(u && APP_ACCESO[u.tipo] && (appCorreoValido(u.correo) || (u.tipo === 'frioteam' && /^[^@\s]+@[^@\s]+$/.test(u.correo || '')))) APP.usuario = u;
 }catch(err){}
 function appRevisarAcceso(){
@@ -13094,14 +13098,14 @@ function appRevisarAcceso(){
   if(t === APP.usuario.tipo) return;
   APP.usuario.tipo = t;
   try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); }catch(err){}
-  if(t !== 'gerencia'){ gerAbierto = false; try{ sessionStorage.removeItem(GER_SESION); }catch(err){} }
+  if(!appVeGerencial(t)){ gerAbierto = false; try{ sessionStorage.removeItem(GER_SESION); }catch(err){} }
   APP.vista = t; try{ localStorage.setItem('fp-vista', t); }catch(err){}   // cambió su acceso: entra a su vista
   if(appNecesitaClave()) appBienvenida(APP.usuario.correo);                // subió a Logística/Gerencia: clave
 }
 if(APP.usuario){
   if(APP_ACCESO[APP.usuario.tipo].indexOf(APP.vista) === -1) APP.vista = APP.usuario.tipo;
   // Gerencia con la clave ya puesta (acceso guardado o en esta sesión): no se le vuelve a pedir.
-  if(APP.usuario.tipo === 'gerencia' && RQ_MOVIL.matches && !appNecesitaClave()){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(err){} }
+  if(appVeGerencial(APP.usuario.tipo) && RQ_MOVIL.matches && !appNecesitaClave()){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(err){} }
 } else APP.vista = null;
 function appVistasPermitidas(){ return APP.usuario ? APP_ACCESO[APP.usuario.tipo] : ['supervisor']; }
 
@@ -13422,7 +13426,7 @@ function appBienvenida(correoFijo){
     APP.usuario = { correo:c, nombre:appNombrePorCorreo(c) || (APP.usuario && APP.usuario.correo === c ? APP.usuario.nombre : ''), tipo:tipo, recordar:recordar,
       creado:(APP.usuario && APP.usuario.correo === c && APP.usuario.creado) || new Date().toISOString().slice(0, 10) };
     try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); if(tipo !== 'supervisor') sessionStorage.setItem(APP_SESION, '1'); }catch(er){}
-    if(tipo === 'gerencia'){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(er){} }
+    if(appVeGerencial(tipo)){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(er){} }
     pass.value = '';
     const bt = document.querySelector('#bvForm .bv-entrar'); if(bt) bt.classList.add('cargando');
     setTimeout(function(){ appElegirVista(tipo); }, 420);   // un respiro para que se vea que está entrando
@@ -13459,7 +13463,9 @@ function appPintarBarra(activa){
   // Leo ya no va en el centro de la barra (07.10.2026, Piero: "interfiere y da problemas"): es una burbuja
   // flotante a la derecha, encima de la barra (#asisFab).
   const tabs = v.tabs.filter(function(t){ return t[0] !== 'polar'; });
-  barra.style.gridTemplateColumns = 'repeat(' + Math.max(1, tabs.length) + ',1fr)';
+  // Más de 5 pestañas (Compras y Almacén tienen 8): en el celular la barra se desliza de lado.
+  barra.style.gridTemplateColumns = tabs.length > 5 && !APP_EN_PC ? 'repeat(' + tabs.length + ',minmax(78px,1fr))' : 'repeat(' + Math.max(1, tabs.length) + ',1fr)';
+  barra.classList.toggle('muchas', tabs.length > 5 && !APP_EN_PC);
   Object.keys(APP_VISTAS).forEach(function(k){ document.body.classList.toggle('vista-' + k, k === (APP.vista || 'supervisor')); });
   barra.innerHTML = (APP_EN_PC ? `<div class="app-side-logo"><img src="${appLogo()}" alt="Grupo Friopacking"></div><div class="app-side-tit">${escapeHtml(v.nombre)}</div>` : '') + tabs.map(function(t){
     if(t[0] === 'polar') return '<button type="button" class="polar" data-tab="polar"><span class="i"><img src="' + POLAR_AVATAR + '" alt=""></span>Leo</button>';
@@ -13535,12 +13541,13 @@ function appPrecalentar(){
   if(!RQ_MOVIL.matches || !appHayDatos() || appPrecalentar._firma === appFirmaDatos() + APP.vista) return;
   appPrecalentar._firma = appFirmaDatos() + APP.vista;
   const v = APP.vista, q = [];
-  if(v === 'gerencia' && gerAbierto){
+  if(appVeGerencial(v) && gerAbierto){
     q.push(function(){ appIndDatos(appFIndF(APP_F0.indicadores)); });
     appIndTendF(false).forEach(function(x){ q.push(function(){ appIndDatos(x.f); }); });
     q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appPantallaHtml('otif'); }, function(){ appPantallaHtml('gasto'); });
-  } else if(appEsLogistica(v)){
-    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog' + v, function(){ return appInicioLogistica(v); }); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
+  }
+  if(appEsLogistica(v)){
+    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog', function(){ return appInicioLogistica('logistica'); }); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
       function(){ appImpDatos(); }, function(){ appPantallaHtml('pendlog'); });
   }
   const pausa = window.requestIdleCallback ? function(fn){ requestIdleCallback(fn, { timeout:1500 }); } : function(fn){ setTimeout(fn, 60); };
@@ -13560,7 +13567,7 @@ function appRenderInicio(){
   if(!hay){
     appIntentos++;
     cuerpo = appIntentos > 12
-      ? '<div class="ini-card"><div class="ini-vacio">Todavía no hay datos publicados.' + (v === 'logistica' ? ' Cárgalos desde <b>👥 Vista → Cargar archivos</b>.' : ' Avísale al área de Logística.') + '</div></div>'
+      ? '<div class="ini-card"><div class="ini-vacio">Todavía no hay datos publicados.' + (appEsLogistica(v) || v === 'gerencia' ? ' Cárgalos desde <b>👥 Vista → Cargar archivos</b>.' : ' Avísale al área de Logística.') + '</div></div>'
       : '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los datos de la plataforma…</div></div>';
     clearTimeout(appEsperaDatos);
     appEsperaDatos = setTimeout(function(){ if(APP.enInicio) appRenderInicio(); }, 1500);
@@ -13572,7 +13579,7 @@ function appRenderInicio(){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
-  else if(appEsLogistica(v)) cuerpo = appMemo('iniLog' + v, function(){ return appInicioLogistica(v); });
+  else if(appEsLogistica(v)) cuerpo = appInicioGerencia() + appMemo('iniLog', function(){ return appInicioLogistica('logistica'); });
   else cuerpo = appInicioSupervisor();
   const corte = (DATA && DATA.corte) ? 'Datos al ' + fmtDate(DATA.corte) : '';
   // Supervisor: solo lo que sirve (29.09.2026, Piero: "hay demasiadas cosas, simplifícalo"): buscar su
@@ -16087,7 +16094,7 @@ function appSubmitInicio(e){
 
 // ---------- Hoja "Vista": cambiar de vista, tema y (solo Logística) las opciones de datos ----------
 function appAbrirSheet(){
-  const datos = APP.vista === 'logistica';
+  const datos = appEsLogistica(APP.vista);
   const pub = document.getElementById('btnPublish');
   const oscuro = document.documentElement.getAttribute('data-theme') === 'dark';
   document.getElementById('appSheetIn').innerHTML = `<div class="asa"></div>
@@ -16103,7 +16110,7 @@ function appAbrirSheet(){
       <button type="button" data-accion="btnAuto"><span>🔄</span>Guardado automático</button>` : ''}
     ${appEsInstalada() ? '' : `<h4>App</h4>
     <button type="button" data-instalar="1"><span>📲</span>Instalar la app en este equipo</button>`}
-    ${APP_EN_PC && APP.usuario && (APP.usuario.tipo === 'logistica' || APP.usuario.tipo === 'gerencia') ? `<h4>Plataforma</h4>
+    ${APP_EN_PC && APP.usuario && appVeGerencial(APP.usuario.tipo) ? `<h4>Plataforma</h4>
     <button type="button" data-completa="1"><span>🖥️</span>Ver la plataforma completa<em>módulos, filtros y reportes</em></button>` : ''}
     <h4>Usuario</h4>
     <button type="button" data-usuario="salir"><span>🚪</span>Cambiar de usuario</button>`;
@@ -16160,8 +16167,8 @@ function polarChips(){
   try{ rqPreparar(); const u = appResumenReqs(RQ.filas)[0]; if(u) req = u.cod.replace(/^0001-0*/, ''); }catch(err){}
   if(v === 'gerencia') return ['¿Cómo vamos esta semana?', 'Indicador más bajo', 'Gasto de este mes', 'Top proveedores'];
   if(v === 'logistica') return ['OC por llegar esta semana', '¿Qué se queda sin stock?', 'Pedidos sin OC', 'OC vencidas'];
-  if(v === 'compras') return ['OC por llegar esta semana', 'Pedidos sin OC', 'OC vencidas', 'Estatus de embarques'];
-  if(v === 'almacen') return ['¿Qué se queda sin stock?', 'Qué reponer', 'OC por llegar esta semana'];
+  if(v === 'compras') return ['OC por llegar esta semana', 'Pedidos sin OC', 'OC vencidas', 'Estatus de embarques', '¿Cómo vamos esta semana?'];
+  if(v === 'almacen') return ['¿Qué se queda sin stock?', 'Qué reponer', 'OC por llegar esta semana', '¿Cómo vamos esta semana?'];
   return ['Mis requerimientos', 'Mis requerimientos atrasados', req ? '¿Cómo va el ' + req + '?' : '¿Qué salió a obra esta semana?'];
 }
 function polarSugerencias(){
