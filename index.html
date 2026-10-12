@@ -1734,7 +1734,7 @@
     .ix-rank{margin-top:14px;} .ix-rh,.ix-r{display:grid;grid-template-columns:26px minmax(0,1fr) 46px 52px 56px 56px;gap:6px;align-items:center;} .ix-rh{font-size:10px;letter-spacing:0;font-weight:700;color:var(--ink-soft);text-transform:uppercase;padding:0 0 6px;border-bottom:1px solid var(--border);}
     .ix-rh span:nth-child(n+3),.ix-r > span:nth-child(n+3),.ix-r > b{text-align:right;} .ix-rank.alm .ix-rh,.ix-rank.alm .ix-r{grid-template-columns:26px minmax(0,1fr) 52px 46px 46px 52px 56px;} .ix-r{padding:9px 0;border-bottom:1px solid var(--border);font-size:13.5px;} .ix-r:last-child{border-bottom:0;}
     .ix-r .t b{display:block;font-size:14px;font-weight:700;} .ix-r .t i{display:block;height:5px;border-radius:3px;background:var(--surface-2);margin-top:5px;overflow:hidden;} .ix-r .t em{display:block;height:100%;background:var(--accent, #2a78d6);border-radius:3px;} .ix-r > b{font-size:16px;font-weight:800;}
-    .ix-btn{margin-top:12px;border:0;background:var(--accent, #2a78d6);color:#fff;font-weight:700;font-size:13.5px;padding:10px 16px;border-radius:10px;cursor:pointer;} .ix-tip{margin-top:12px;font-size:12.5px;color:var(--ink-soft);} .ix-sub{font-size:12.5px;color:var(--ink-soft);margin-top:6px;}
+    .ix-btn-blq{display:block;margin:0 0 12px;} .ix-btn{margin-top:12px;border:0;background:var(--accent, #2a78d6);color:#fff;font-weight:700;font-size:13.5px;padding:10px 16px;border-radius:10px;cursor:pointer;} .ix-tip{margin-top:12px;font-size:12.5px;color:var(--ink-soft);} .ix-sub{font-size:12.5px;color:var(--ink-soft);margin-top:6px;}
     .ix .pr-barra{margin-top:12px;} .ix-seg{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:14px;background:var(--surface-2);gap:2px;} .ix-seg em{display:block;height:100%;}
     .ix-ley{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12.5px;color:var(--ink-soft);} .ix-ley i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;} .ix-ley b{color:var(--ink);}
     .ix-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);} .ix-stats span{font-size:12.5px;color:var(--ink-soft);background:var(--surface-2);border-radius:999px;padding:5px 11px;} .ix-stats b{color:var(--ink);} .ix-stats .mal b{color:#d33;}
@@ -15897,7 +15897,7 @@ function appPendLogHtml(){
     return `<button type="button" class="${cls}${APP_PL.sec === k && !APP_PL.q ? ' sel' : ''}" data-plsec="${k}"><b>${l.length}</b><span>${APP_IMP_SEC[k][1]}</span><small>${noc} OC</small></button>`; };
   return `${S ? `<div class="m-resumen m-pl-tabs imp-tabs">${tile('tr', 'imp-tr')}${tile('em', 'imp-em')}${tile('bo', 'imp-bk')}${tile('ot', 'imp-ot')}</div>`
       : `<div class="m-resumen tres m-pl-tabs imp-tabs">${tile('tr', 'imp-tr')}${tile('em', 'imp-em')}${tile('bk', 'imp-bk')}</div>`}
-    <button type="button" class="m-aviso" data-impdf="1">🖼️ Imágenes · Estatus de embarques (Control Tower) ›</button>
+    <button type="button" class="ix-btn ix-btn-blq" data-impdf="1">🖼️ Estatus de embarques en imágenes</button>
     <div class="m-buscar"><input type="search" id="plBusca" placeholder="🔍 OC, proveedor, proyecto o producto" value="${escapeHtml(APP_PL.q)}"></div>
     <div id="plLista">${appPendLogLista()}</div>
     <div class="m-sec-nota">ETD: zarpe · ETA: llegada estimada (Seguimiento de contenedores de Camila; si no está ahí, Nisira) · toca una OC para ver su detalle.</div>`;
@@ -16200,7 +16200,7 @@ function appAlmRepCuerpo(){
   const t = function(v, s){ return `<div><span>${s}</span><b>${v}</b></div>`; };
   return `${APP_AR.sub === 'jav' ? appAlmAnaHtml() : `
     <div class="ini-card m-total"><span>${e(R.sede)} · ${e(almPerTxt(R))}</span><b>${almUSD(r.valor + d.valor)}</b><small>valor movilizado (US$) · recibido ${almUSD(r.valor)} · despachado ${almUSD(d.valor)}</small>
-      <button type="button" class="ini-link" data-arimg="1">🖼️ Generar las 5 imágenes del reporte ›</button></div>
+      <button type="button" class="ix-btn" data-arimg="1">🖼️ Reporte de recepción y despacho en imágenes</button></div>
     ${!R.hay ? '<div class="ini-card"><div class="ini-vacio">No hay movimientos en ese período.</div></div>' : `
     <div class="m-sec-tit">📥 01 · Recepción de mercadería</div>
     <div class="ini-card"><div class="m-tiles">${t(r.prov, 'Proveedores')}${t(r.oc, 'OC atendidas')}${t(r.grc, 'Guías (GRC)')}${t(almUSD(r.valor), 'Valor recibido')}</div>
@@ -16380,7 +16380,7 @@ function appAlmAnaHtml(){
     return `<tr class="${yo ? 'an-yo' : ''}"><td>${x.n ? e(yo ? PD_PERSONAS[x.cod] : almTitulo(x.n)) : '<i>Sin responsable</i>'}</td><td>${e([...x.sedes].join(', '))}</td><td class="num">${appN(x.grc.size)}</td><td class="num">${appN(x.grr.size)}</td><td class="num">${appN(x.lin)}</td></tr>`; }).join('');
   return `
     <div class="ini-card m-total"><span>${e(R.sede)} · ${e(almPerTxt(R))}</span><b>${appN(M.gS)} salidas · ${appN(M.gI)} ingresos</b><small>${appN(q.n)} requerimientos · despachado ${almSoles(M.sS)} · recibido ${almSoles(M.sI)}</small>
-      <button type="button" class="ini-link" data-anaimg="1">🖼️ Generar las 4 imágenes del análisis ›</button></div>
+      <button type="button" class="ix-btn" data-anaimg="1">🖼️ Análisis semanal en imágenes</button></div>
     ${!R.hay ? '<div class="ini-card"><div class="ini-vacio">No hay movimientos en ese período.</div></div>' : `
     <div class="m-sec-tit">📋 01 · Resumen ejecutivo</div>
     <div class="ini-card"><div class="m-tiles">${t(appN(q.n), 'Requerimientos')}${t(appN(M.gS), 'Salidas (guías)')}${t(appN(M.gI), 'Ingresos (guías)')}</div>
@@ -16916,8 +16916,6 @@ function appAbrirSheet(){
       <button type="button" data-accion="btnAuto"><span>🔄</span>Guardado automático</button>` : ''}
     ${appEsInstalada() ? '' : `<h4>App</h4>
     <button type="button" data-instalar="1"><span>📲</span>Instalar la app en este equipo</button>`}
-    ${APP_EN_PC && APP.usuario && appVeGerencial(APP.usuario.tipo) ? `<h4>Plataforma</h4>
-    <button type="button" data-completa="1"><span>🖥️</span>Ver la plataforma completa<em>módulos, filtros y reportes</em></button>` : ''}
     <h4>Usuario</h4>
     <button type="button" data-usuario="salir"><span>🚪</span>Cambiar de usuario</button>`;
   const fondo = document.getElementById('appSheet');
