@@ -1693,6 +1693,8 @@
   .asis-msg.bot.hablando{box-shadow:0 0 0 2px var(--brand-2), var(--shadow);}
   .asis-pie button{border:0;background:var(--brand-2);color:#08281f;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;}
     /* PDF "Estatus de embarques" (07.10.2026): fuera de los @media para que se vea igual en PC y celular */
+    .imp-imgs-acc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;} .imp-img{background:var(--card,#fff);border-radius:14px;padding:10px;margin-bottom:14px;box-shadow:0 2px 8px rgba(10,30,100,.08);}
+    .imp-img-t{display:flex;align-items:center;gap:10px;margin-bottom:8px;} .imp-img-t span{flex:1;color:var(--ink-soft);font-size:13px;} .imp-img img{display:block;width:100%;max-width:800px;margin:0 auto;border-radius:8px;border:1px solid #e3e8ef;}
     .ctw-caja{position:absolute;left:-12000px;top:0;width:800px;color:#0a1a5c;font-family:"DejaVu Sans",Verdana,Inter,Arial,sans-serif;}
     .ctw-hoja{position:relative;width:800px;padding-bottom:44px;background-color:#fff;background-image:linear-gradient(#eef1f6 1px, transparent 1px),linear-gradient(90deg, #eef1f6 1px, transparent 1px);background-size:40px 40px;box-sizing:border-box;}
     .ctw-cab{position:relative;height:178px;background:#eef0f7;} .ctw-tit{position:absolute;left:32px;top:18px;}
@@ -15672,8 +15674,7 @@ function appPendLogHtml(){
     return `<button type="button" class="${cls}${APP_PL.sec === k && !APP_PL.q ? ' sel' : ''}" data-plsec="${k}"><b>${l.length}</b><span>${APP_IMP_SEC[k][1]}</span><small>${noc} OC</small></button>`; };
   return `${S ? `<div class="m-resumen m-pl-tabs imp-tabs">${tile('tr', 'imp-tr')}${tile('em', 'imp-em')}${tile('bo', 'imp-bk')}${tile('ot', 'imp-ot')}</div>`
       : `<div class="m-resumen tres m-pl-tabs imp-tabs">${tile('tr', 'imp-tr')}${tile('em', 'imp-em')}${tile('bk', 'imp-bk')}</div>`}
-    <button type="button" class="m-aviso" data-dashimp="${appIndCorte().getUTCFullYear()}">📊 Dashboard de importaciones ${appIndCorte().getUTCFullYear()} ›</button>
-    <button type="button" class="m-aviso" data-impdf="1">📄 Exportar PDF · Estatus de embarques (Control Tower) ›</button>
+    <button type="button" class="m-aviso" data-impdf="1">🖼️ Imágenes · Estatus de embarques (Control Tower) ›</button>
     <div class="m-buscar"><input type="search" id="plBusca" placeholder="🔍 OC, proveedor, proyecto o producto" value="${escapeHtml(APP_PL.q)}"></div>
     <div id="plLista">${appPendLogLista()}</div>
     <div class="m-sec-nota">ETD: zarpe · ETA: llegada estimada (Seguimiento de contenedores de Camila; si no está ahí, Nisira) · toca una OC para ver su detalle.</div>`;
@@ -15795,30 +15796,46 @@ function ctwHojas(){
   });
   return hojas;
 }
+// Estatus de embarques en IMÁGENES numeradas en vez de PDF (12.10.2026, Piero: "en lugar de exportar pdf del
+// estatus de embarques, genere las imágenes correspondientes automáticamente, separadas en imágenes
+// enumeradas"). Una imagen por hoja (PNG). En la PC se descargan solas; en el panel quedan a la vista con
+// botones para compartir (WhatsApp, desde el celular) o descargarlas.
+let APP_IMP_IMGS = [];
 async function appImpPdf(){
-  if(typeof html2canvas !== 'function'){ appToast('No se pudo preparar el PDF: revisa tu conexión.'); return; }
+  if(typeof html2canvas !== 'function'){ appToast('No se pudieron preparar las imágenes: revisa tu conexión.'); return; }
   if(!(EMB_DATA.rows || []).length){ appToast('Primero carga el Seguimiento de contenedores (Excel de Camila).'); return; }
   const hojas = ctwHojas();
   if(!hojas.length){ appToast('No hay embarques en tránsito, por embarcar ni pendientes de booking.'); return; }
-  appToast('Preparando el PDF…');
+  appToast('Preparando las imágenes…');
   const caja = document.createElement('div'); caja.className = 'ctw-caja'; caja.innerHTML = hojas.join(''); document.body.appendChild(caja);
+  const corte = appIndCorte(), fc = String(corte.getUTCDate()).padStart(2, '0') + '-' + String(corte.getUTCMonth() + 1).padStart(2, '0') + '-' + corte.getUTCFullYear();
+  APP_IMP_IMGS.forEach(function(x){ URL.revokeObjectURL(x.url); }); APP_IMP_IMGS = [];
   try{
-    const JsPDF = await appCargarJsPdf();
-    const els = caja.querySelectorAll('.ctw-hoja');
-    let pdf = null;
-    for(let i = 0; i < els.length; i++){
-      if(els.length > 1) appToast('Preparando el PDF… hoja ' + (i + 1) + ' de ' + els.length);
+    const els = caja.querySelectorAll('.ctw-hoja'), n = els.length;
+    for(let i = 0; i < n; i++){
+      if(n > 1) appToast('Preparando las imágenes… ' + (i + 1) + ' de ' + n);
       const W = 800, H = Math.ceil(els[i].getBoundingClientRect().height);
       const c = await html2canvas(els[i], { backgroundColor:'#ffffff', scale:2, width:W, height:H, windowWidth:W, onclone:function(doc){ const x = doc.querySelector('.ctw-caja'); if(x) appPdfColores(x, doc.defaultView || window); } });
-      if(!pdf) pdf = new JsPDF({ unit:'px', format:[W, H], orientation:'portrait', hotfixes:['px_scaling'] });
-      else pdf.addPage([W, H], 'portrait');
-      pdf.addImage(c.toDataURL('image/jpeg', 0.9), 'JPEG', 0, 0, W, H);
+      const blob = await new Promise(function(ok){ c.toBlob(ok, 'image/png'); });
+      const sec = (els[i].querySelector('.ctw-box span') || {}).textContent || '';
+      APP_IMP_IMGS.push({ blob:blob, url:URL.createObjectURL(blob), sec:sec, nombre:'Estatus de embarques ' + fc + ' (' + (i + 1) + ' de ' + n + ').png' });
     }
-    const corte = appIndCorte();
-    pdf.save('Estatus de embarques ' + String(corte.getUTCDate()).padStart(2, '0') + '-' + String(corte.getUTCMonth() + 1).padStart(2, '0') + '-' + corte.getUTCFullYear() + '.pdf');
-    appToast('PDF listo ✔');
-  }catch(err){ console.error(err); appToast('No se pudo generar el PDF.'); }
+  }catch(err){ console.error(err); appToast('No se pudieron generar las imágenes.'); return; }
   finally{ caja.remove(); }
+  const L = APP_IMP_IMGS, n = L.length;
+  const archivos = L.map(function(x){ return new File([x.blob], x.nombre, { type:'image/png' }); });
+  const puedeCompartir = !!(navigator.canShare && navigator.canShare({ files:archivos }));
+  appListaAbrir('🖼️ Estatus de embarques', n + ' imagen' + (n === 1 ? '' : 'es') + ' · corte ' + rqFecha(corte),
+    `<div class="imp-imgs-acc">${puedeCompartir ? '<button type="button" class="ini-link" data-impimgcomp="1">📤 Compartir las ' + n + ' (WhatsApp)</button>' : ''}<button type="button" class="ini-link" data-impimgdesc="1">⬇️ Descargar las ${n}</button></div>
+    ${L.map(function(x, i){ return `<div class="imp-img"><div class="imp-img-t"><b>Imagen ${i + 1} de ${n}</b><span>${escapeHtml(x.sec)}</span><button type="button" class="ini-link" data-impimg="${i}">⬇️ Descargar</button></div><img src="${x.url}" alt="Imagen ${i + 1} de ${n}"></div>`; }).join('')}`);
+  const panel = document.getElementById('appOC'); panel.classList.add('ancho');   // en la PC, a pantalla completa
+  panel.querySelectorAll('[data-impimg]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); const x = L[+b.dataset.impimg]; descargarBlob(x.blob, x.nombre); }); });
+  const todas = function(){ L.forEach(function(x, i){ setTimeout(function(){ descargarBlob(x.blob, x.nombre); }, i * 500); }); };
+  const bd = panel.querySelector('[data-impimgdesc]'); if(bd) bd.addEventListener('click', function(ev){ ev.stopPropagation(); todas(); });
+  const bc = panel.querySelector('[data-impimgcomp]'); if(bc) bc.addEventListener('click', function(ev){ ev.stopPropagation();
+    navigator.share({ files:archivos, title:'Estatus de embarques ' + fc }).catch(function(){}); });
+  if(!RQ_MQ.matches) todas();   // en la PC se descargan solas
+  appToast(n + ' imagen' + (n === 1 ? '' : 'es') + ' lista' + (n === 1 ? '' : 's') + ' ✔');
 }
 
 // ---------- Inicio: Supervisor ----------
@@ -17098,7 +17115,7 @@ function polarEmbarques(q, p, S){
   let que = k ? APP_IMP_SEC[k][1].toLowerCase() : 'estatus de embarques';
   const porEtd = /\betd\b|zarp|embarc/.test(q), porEta = /\beta\b|llega|llegan|arrib/.test(q);
   if(p){ l = l.filter(function(y){ const f = porEtd ? y[1].etd : (porEta ? y[1].eta : (y[1].eta || y[1].etd)); return f && polarEnPeriodo(f, p); }); que += (porEtd ? ' · ETD ' : porEta ? ' · ETA ' : ' · ') + p.label; }
-  const ddmm = appDDMM, acc = `<div class="asis-acc">${polarBtn('pantalla', 'pendlog', '🚢 Ver importaciones')}${polarBtn('q', 'pdf estatus de embarques', '📄 PDF de embarques')}</div>`;
+  const ddmm = appDDMM, acc = `<div class="asis-acc">${polarBtn('pantalla', 'pendlog', '🚢 Ver importaciones')}${polarBtn('q', 'imágenes de estatus de embarques', '🖼️ Imágenes de embarques')}</div>`;
   if(!l.length) return `<p>🌎 No hay embarques: ${escapeHtml(que)}.</p>${acc}`;
   const fila = function(y){ const x = y[1], e = x.e, pa = ctwPartes(e), prov = pa.prov || (x.g ? ctwProv(x.g.prov) : '');
     return `<div class="asis-item"><div class="d"><span class="mono">${e.oc.map(function(o){ return o.replace(/^0002-0*/, ''); }).join(' · ')}</span> · ${escapeHtml(polarCorta(prov || e.ds || '', 30))}</div>
@@ -17770,7 +17787,7 @@ function polarResponder1(texto){
   const quiereProducto = (/stock|kardex|consumo|consume|rotacion|precio|costo|cuesta|movimiento|ingresos de|salidas de/.test(q) || /(a que|a quien|que|cual) proveedor|quien(es)? nos (vende|provee)|a quien le (compramos|compran)|donde (compramos|se compra)/.test(qr)) && !/requerimiento|\boc\b|\bpedido\b|proyecto|\bpry\b/.test(q);
 
   // PDF "Estatus de embarques" (Control Tower) del módulo de Importaciones (07.10.2026).
-  if(/\bpdf\b/.test(qr) && /embarque|control tower|estatus de (las )?importac/.test(qr)){ appImpPdf(); return '<p>📄 Estoy armando el PDF <b>Estatus de embarques</b> (en tránsito, por embarcar y pendiente booking). Se descarga en unos segundos.</p>'; }
+  if(/\bpdf\b|imagen|imagenes/.test(qr) && /embarque|control tower|estatus de (las )?importac/.test(qr)){ appImpPdf(); return '<p>🖼️ Estoy armando las imágenes <b>Estatus de embarques</b> (en tránsito, por embarcar y pendiente booking), numeradas. Aparecen en unos segundos.</p>'; }
   // "Dashboard de importaciones en PDF": el dashboard con su botón 📄 Exportar PDF (05.10.2026).
   if(!soloReqs && /\bpdf\b/.test(qr) && /importac|dashboard|tablero/.test(qr)) return polarDashImportacion(polarPeriodoDe(q), polarClienteImport(qr)[0] || '');
   // "PDF del req 23303": el requerimiento completo en PDF (06.10.2026).
@@ -18053,7 +18070,7 @@ function polarAyudaReportes(){
   return `<div class="cab">📑 Reportes que puedo armarte</div>
     <p>📄 <b>PDF</b> de un requerimiento completo (con semáforo, stock en Lima y lo que viene en camino): "pdf del req 23405".<br>
     📊 <b>Dashboard de importaciones</b> (y en PDF): "dashboard de importaciones 2026", "importaciones de sun fruits en pdf".<br>
-    🚢 <b>PDF Estatus de embarques</b> (Control Tower, del Excel de Camila): "pdf de embarques".<br>
+    🚢 <b>Imágenes Estatus de embarques</b> (Control Tower, del Excel de Camila, numeradas): "imágenes de embarques".<br>
     📥 <b>Excel</b>: "excel del req 23303", "excel del proyecto 36", "excel de pendientes de Melissa", "excel de reposición", "excel de indicadores".</p>
     <div class="asis-acc">${polarBtn('q', 'dashboard de importaciones ' + appIndCorte().getUTCFullYear(), '📊 Dashboard de importaciones')}${polarBtn('q', 'excel de reposición', '📥 Excel de reposición')}</div>`;
 }
