@@ -13631,10 +13631,11 @@ const APP_DAILY = { dia:'', anio:null, mes:null };
 const APP_DAILY_EQUIPO = ['PLINARES', 'MSIHUAIRO', 'CCHECA', 'JALTAMIRANO', 'JPOMEZ', 'MLUJAN', 'CMORA'];
 const APP_DAILY_COLORES = ['#3ec6ac', '#6c8cff', '#f4a640', '#e66b8a', '#8a6cf0', '#2fa7d8', '#7cbf4f'];
 // Puntos del día para ordenar a los compradores (07.10.2026, Piero: "dale una jerarquía para saber quién
-// hizo más ese día"): 1 por SKU puesto en OC, 2 por OC emitida, 1 por pedido cerrado y 1 por pedido directo.
+// hizo más ese día"): 1 por SKU puesto en OC, 2 por OC emitida y 1 por pedido directo (los pedidos cerrados no suman).
 function appDailySuma(l){ return l.reduce(function(a, m){ if(m){ a.s += m.s; a.d += m.d; } return a; }, { s:0, d:0 }); }
 function appDailyMonto(m){ return m ? [m.s ? fmtPEN(m.s) : '', m.d ? fmtUSD(m.d) : ''].filter(Boolean).join(' + ') : ''; }   // cada moneda en lo suyo, sin convertir
-function appDailyPts(x){ return x.sku.size + 2 * x.oc.size + x.cer.size + x.ped.size; }
+// Los pedidos cerrados ya no suman (12.10.2026, Piero: "es redundar en puntaje"); se siguen mostrando como dato.
+function appDailyPts(x){ return x.sku.size + 2 * x.oc.size + x.ped.size; }
 const APP_DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 function appDailyFilas(){
   return getReqRows().concat(PEDIDO_SIN_REQ_ROWS || [], (PEDIDO_SIN_REQ_PEND || []).map(function(r){ return Object.assign({ esPedidoDirecto:true }, r); }));
@@ -13768,7 +13769,7 @@ function appDailyDetHtml(dia){
       <span class="m-rk-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${det}${x.montoPEN ? ' · ' + appDailyMonto(x.monto) : ''}</small><i><em style="width:${Math.max(4, x.pts / max * 100).toFixed(0)}%;background:${APP_DAILY_COLORES[APP_DAILY_EQUIPO.indexOf(x.cod) % APP_DAILY_COLORES.length]}"></em></i></span>
       <span class="m-rk-pts"><b>${x.pts}</b><small>pts</small></span><span class="m-rk-ir">›</span></button>`; };
   return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día</div>${l.map(fila).join('')}
-    <div class="m-rk-nota">Puntos: 1 por SKU en OC, 2 por OC emitida, 1 por pedido cerrado y 1 por pedido directo. Toca a un comprador para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
+    <div class="m-rk-nota">Puntos: 1 por SKU en OC, 2 por OC emitida y 1 por pedido directo. Toca a un comprador para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
 }
 // Pantalla del comprador (07.10.2026, Piero: "en la web está muy simple… usa todo el espacio, más grande y llamativo"):
 // franja con su color, 4 indicadores grandes, 3 alertas para el daily y las listas abiertas lado a lado en la PC.
@@ -14201,7 +14202,7 @@ function appDailyRango(desde, hasta, pryFn){ return appMemo('drango:' + desde + 
     const lim = new Date(ult.fo + 'T00:00:00Z'); lim.setUTCDate(lim.getUTCDate() - 120); if(g.fp < isoDay(lim)) return;
     const x = per(ult.uc); if(x) x.cer.add(cp);
   });
-  return [...P.values()].map(function(x){ x.pts = x.sku.size + 2 * x.oc.size + x.cer.size + x.ped.size; return x; })
+  return [...P.values()].map(function(x){ x.pts = appDailyPts(x); return x; })
     .filter(function(x){ return x.pts; }).sort(function(a, b){ return b.pts - a.pts; });
 }); }
 // Presupuesto: lo solicitado (pedidos del período) y lo comprado (OC emitidas en el período), contra el
@@ -14240,7 +14241,7 @@ function appFotoComprador(st){
       <div class="ini-card-tit">📸 Foto ${cod ? 'de ' + escapeHtml(PD_PERSONAS[cod] || cod) : 'de los compradores'} <small>${escapeHtml(r ? r.label : 'todo lo cargado')}</small></div>
       <div class="m-tiles foto-kpi"><div class="pts"><span>🗓️ Puntos Daily call in</span><b>${appN(sum('pts'))}</b></div><div><span>🧾 OC emitidas</span><b>${appN(sum('oc'))}</b></div><div><span>📦 SKU hechos</span><b>${appN(sum('sku'))}</b></div><div><span>✅ Pedidos cerrados</span><b>${appN(sum('cer'))}</b></div></div>
       ${rank}
-      <small class="sku-nota">Puntos como en el Daily: 2 por OC emitida, 1 por SKU puesto en OC, 1 por pedido cerrado y 1 por pedido directo, sumados en el período.</small></div>
+      <small class="sku-nota">Puntos como en el Daily: 2 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo, sumados en el período.</small></div>
     <div class="ini-card foto-presu"><div class="ini-card-tit">💼 Presupuesto <small>solicitado vs. comprado en el período</small></div>
       <div class="m-tiles"><div><span>📋 Solicitado</span><b>${appN(pr.sol)} SKU</b><small>${pr.solPart.size} partidas · presupuesto ${fmtUSD(pr.solPc)}</small></div>
         <div><span>🛒 Comprado en OC</span><b>${fmtUSD(pr.comUsd)}</b><small>${appN(pr.lineas)} líneas · ${fmtUSD(pr.comSin)} sin presupuesto</small></div></div>
@@ -18223,11 +18224,11 @@ function polarDailyPuntos(cod, p){
     if(!x) return `<p>${escapeHtml(PD_PERSONAS[cod] || cod)} no tiene puntos del Daily en ${escapeHtml(per.label)}.</p>`;
     return `<div class="cab">🗓️ ${escapeHtml(PD_PERSONAS[cod] || cod)}</div><div class="sub">Daily call in · ${escapeHtml(per.label)}</div>
       <div class="asis-kpis"><div><b>${appN(x.pts)}</b><span>puntos</span></div><div><b>${i + 1}.º</b><span>de ${l.length}</span></div><div><b>${x.oc.size}</b><span>OC emitidas</span></div><div><b>${x.sku.size}</b><span>SKU hechos</span></div></div>
-      <p>${det(x)}.</p><p class="asis-nota">Puntos: 2 por OC emitida, 1 por SKU puesto en OC, 1 por pedido cerrado y 1 por pedido directo.</p>`; }
+      <p>${det(x)}.</p><p class="asis-nota">Puntos: 2 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo.</p>`; }
   if(!l.length) return `<p>No hay actividad de compradores en ${escapeHtml(per.label)}.</p>`;
   return `<div class="cab">🗓️ Ranking del Daily call in</div><div class="sub">${escapeHtml(per.label)} · ${appN(l.reduce(function(a, x){ return a + x.pts; }, 0))} puntos en total</div>
     ${l.map(function(x, i){ return `<div class="asis-item"><div class="d">${['🥇','🥈','🥉'][i] || (i + 1) + '.'} <b>${escapeHtml(PD_PERSONAS[x.cod] || x.cod)}</b> · ${appN(x.pts)} pts</div><div class="q">${det(x)}</div><div class="asis-avance"><i><em style="width:${(x.pts / max * 100).toFixed(0)}%"></em></i></div></div>`; }).join('')}
-    <p class="asis-nota">Puntos: 2 por OC emitida, 1 por SKU puesto en OC, 1 por pedido cerrado y 1 por pedido directo.</p>
+    <p class="asis-nota">Puntos: 2 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo.</p>
     <div class="asis-acc">${polarBtn('dailyfecha', appDailyUltimo(), '🗓️ Daily del último día')}</div>`;
 }
 function polarProducto(cod){
