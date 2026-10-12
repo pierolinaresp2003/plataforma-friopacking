@@ -16455,7 +16455,8 @@ function appCmpRep(cod, desde, hasta){
     const docs = { LIM:new Set(), TRU:new Set(), ICA:new Set() }, ocsRec = new Set(), lurin = new Map();
     almMovRows().forEach(function(x){ if(x.t !== 'i' || !x.oc || !en(x.f) || duenio.get(x.oc) !== cod) return;
       if(docs[x.s]) docs[x.s].add(x.d); ocsRec.add(x.oc);
-      if(x.s === 'LIM' && (!lurin.has(x.oc) || x.f < lurin.get(x.oc))) lurin.set(x.oc, x.f); });
+      // Indicador de entrega: solo OC nacionales recibidas en Lurín (12.10.2026, Piero: las importadas no se consideran).
+      if(x.s === 'LIM' && !(O.get(x.oc) || {}).imp && (!lurin.has(x.oc) || x.f < lurin.get(x.oc))) lurin.set(x.oc, x.f); });
     const sem = [0, 0, 0, 0], desdeEmi = []; let impL = 0;
     lurin.forEach(function(f, co){ const o = O.get(co); if(!o) return; const fr = new Date(f + 'T00:00:00Z');
       if(o.fOrden) desdeEmi.push(Math.max(0, busdayCount(o.fOrden, fr) || 0)); if(o.imp) impL++;
@@ -16547,7 +16548,7 @@ function cmpHojas(R){
       <div class="cpx-card cpx-sedes"><i class="cpx-circ">${CPX_ICO.pin(46)}</i><div class="cpx-sedes-c"><h3>Recepciones por sede</h3>
           <div class="cpx-sedes-t">${[['Lurín', 'LIM'], ['Trujillo', 'TRU'], ['Ica', 'ICA']].map(function(x){ return `<div><span>${x[0]}</span><div>${CPX_ICO.almacen(CPX_C.navy, 40)}<b>${n(R.rec.docs[x[1]].size)}</b></div></div>`; }).join('')}</div></div>
         <div class="cpx-sedes-d"><i class="cpx-circ s">${CPX_ICO.doc('#fff', 34, CPX_C.navy)}</i><div><b>${n(R.rec.nDocs)}</b><span>documentos de<br>recepción</span><b>${n(R.rec.ocs)}</b><span>OC distintas</span></div></div></div>
-      <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>Semáforo: solo Lurín, respecto a fecha comprometida.${R.rec.impL ? '<br>Promedio incluye ' + R.rec.impL + ' OC importada' + (R.rec.impL === 1 ? '' : 's') + '.' : ''}<br>Días hábiles sin fines de semana ni feriados.</p></div></div>`;
+      <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>Semáforo: solo Lurín y OC nacionales, respecto a fecha comprometida.<br>Las OC importadas no entran al indicador.<br>Días hábiles sin fines de semana ni feriados.</p></div></div>`;
   const z = R.sin, corte = R.corte.slice(8) + ' ' + MESES_CORTOS[+R.corte.slice(5, 7) - 1].toUpperCase() + ' ' + R.corte.slice(0, 4);
   const h3 = `<div class="cpx-hoja">
       <div class="cpx-card cpx-cab">${cpxLogo()}<div class="cpx-cab-t"><h1 class="m">Pedidos pendientes<br>sin orden de compra</h1><div class="cpx-cab-p">${pill}${fecha('AL ' + corte)}</div></div></div>
