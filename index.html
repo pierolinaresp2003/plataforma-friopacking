@@ -1828,8 +1828,11 @@
     .lz-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
     .lz-card{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:6px;border:0;border-radius:24px;padding:22px 20px;font:inherit;cursor:pointer;box-shadow:0 8px 24px rgba(27,58,107,.10);animation:lzEntra .5s cubic-bezier(.22,.8,.2,1) both;transition:transform .18s ease, box-shadow .18s ease;}
     .lz-card:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(27,58,107,.16);}
-    .lz-card i{font-style:normal;font-size:40px;} .lz-card b{font-size:22px;font-weight:900;color:#1b3a6b;} .lz-card span{font-size:13.5px;color:#4c5f7a;line-height:1.35;} .lz-card em{margin-top:8px;font-style:normal;font-weight:800;color:#3f6aa8;}
+    .lz-card i{font-style:normal;font-size:40px;} .lz-card b{display:block;font-size:22px;font-weight:900;color:#1b3a6b;} .lz-card span{display:block;margin-top:4px;font-size:13.5px;color:#4c5f7a;line-height:1.35;} .lz-card em{margin-top:8px;font-style:normal;font-weight:800;color:#3f6aa8;}
     .lz-compras{background:#dbe9fb;} .lz-almacen{background:#dcf3e6;} .lz-super{background:#fdebd8;} .lz-frioteam{background:#e9e3fa;}
+    @media (max-width:600px){ .lz{align-items:flex-start;padding-top:40px;} .lz-cards{gap:10px;} .lz-card{flex-direction:row;align-items:center;gap:14px;padding:16px;border-radius:20px;}
+      .lz-card i{font-size:34px;flex:0 0 auto;} .lz-card b{display:block;font-size:19px;} .lz-card span{display:block;font-size:12.5px;} .lz p{margin-bottom:16px;} }
+    .lz-card > *{pointer-events:none;}
     @keyframes lzEntra{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}} @keyframes lzFondo{from{opacity:0;}to{opacity:1;}}
 
     .ix{padding:16px 18px;} .ix-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;} .ix-head > b{font-size:16px;font-weight:800;color:var(--ink);} .ix-head > span{font-size:12.5px;color:var(--ink-soft);}
@@ -13140,6 +13143,7 @@ try{ gerAbierto = sessionStorage.getItem(GER_SESION) === '1'; }catch(err){}
 function irASeccion(seccion){
   const modActivo = MOD_DE_SECCION[seccion];
   if(!modActivo) return;
+  if(APP.enInicio || !(document.getElementById('section-' + seccion) || { classList:{ contains:function(){ return false; } } }).classList.contains('active')) appNavPush();
 
   document.querySelectorAll('.navitem').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.navmod').forEach(t=>t.classList.remove('active'));
@@ -13465,6 +13469,26 @@ function appConstruir(){
 // aplicación"). Se deja un paso de historial "de guardia": atrás cierra lo que esté abierto (menú, Leo),
 // vuelve al Inicio o a Leo, y recién en la pantalla principal pide tocar otra vez para salir.
 let appAtrasListo = false, appAtrasUltimo = 0;
+// Historial dentro de la app (13.10.2026, Piero: "el botón de retroceder debe funcionar, no solo es para salir de la
+// aplicación"): cada cambio de pantalla o sección guarda dónde se estaba y "atrás" vuelve ahí.
+const APP_NAV = []; let appNavAtras = false;
+function appNavAqui(){ const s = document.querySelector('.section.active');
+  return { v:APP.vista, p:APP.enInicio ? APP.pantalla : null, s:!APP.enInicio && s ? s.id.replace(/^section-/, '') : null }; }
+function appNavPush(){
+  if(appNavAtras || !APP.vista || !RQ_MOVIL.matches) return;
+  const a = appNavAqui(), t = APP_NAV[APP_NAV.length - 1];
+  if(!a.p && !a.s) return;
+  if(t && t.v === a.v && t.p === a.p && t.s === a.s) return;
+  APP_NAV.push(a); if(APP_NAV.length > 40) APP_NAV.shift();
+}
+function appNavVolver(){
+  const a = APP_NAV.pop(); if(!a) return false;
+  appNavAtras = true;
+  try{ if(a.v !== APP.vista){ APP.vista = a.v; try{ localStorage.setItem('fp-vista', a.v); }catch(err){} }
+    if(a.s) irASeccion(a.s); else appInicio(a.p); }
+  finally{ appNavAtras = false; }
+  return true;
+}
 function appAtrasGuardia(){ try{ history.pushState({ fpApp:1 }, ''); }catch(err){} }
 function appToast(txt){
   let t = document.getElementById('appToast');
@@ -13482,7 +13506,12 @@ function appAtras(){
   if(leo && polarDetCerrar()) return true;
   if(leo) { if(sup) return false; polarCerrar(); return true; }
   if(sup){ polarAbrir(); return true; }
-  if(!APP.enInicio || APP.pantalla !== 'inicio'){ appInicio(); return true; }
+  const lz = document.getElementById('appLanz');
+  if(lz && lz.classList.contains('abierto')){ if(lz._desdeLogo){ lz.classList.remove('abierto'); return true; } return false; }
+  if(appNavVolver()) return true;
+  const casa = APP.vista === 'super' ? 'supreq' : 'inicio';
+  if(!APP.enInicio || APP.pantalla !== casa){ appInicio(); return true; }
+  if(appVistasPermitidas().length > 1){ appLanzador(true); lz && (lz._desdeLogo = false); const l2 = document.getElementById('appLanz'); if(l2) l2._desdeLogo = false; return true; }
   return false;
 }
 function appAtrasPreparar(){
@@ -13583,13 +13612,14 @@ function appLanzador(forzar){
   if(!el){ document.body.insertAdjacentHTML('beforeend', '<div id="appLanz" class="lz"></div>'); el = document.getElementById('appLanz');
     el.addEventListener('click', function(e){ const b = e.target.closest('[data-lzv]'); if(!b) return;
       el.classList.add('fuera'); setTimeout(function(){ el.classList.remove('abierto', 'fuera'); }, 380);
-      if(b.dataset.lzv !== APP.vista) appElegirVista(b.dataset.lzv); else appInicio(); }); }
+      if(b.dataset.lzv !== APP.vista) appElegirVista(b.dataset.lzv); else appInicio();
+      APP_NAV.length = 0; }); }
   const nom = polarMiNombre(), pri = nom ? nom.split(' ')[0].charAt(0) + nom.split(' ')[0].slice(1).toLowerCase() : '';
   const ext = { compras:'OC, pendientes, importaciones, gasto y Daily', almacen:'Recepción, despacho, inventario, OTIF y Daily', super:'Trazabilidad de requerimientos y tienda de códigos', frioteam:'Stock por sede y kardex' };
   el.innerHTML = `<div class="lz-in"><img class="lz-logo" src="${appLogo()}" alt="Grupo Friopacking">
     <h1>Hola${pri ? ', ' + escapeHtml(pri) : ''} 👋</h1><p>¿A qué módulo quieres entrar?</p>
-    <div class="lz-cards">${vs.map(function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${i * 80}ms"><i>${v.ico}</i><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span><em>Entrar ›</em></button>`; }).join('')}</div></div>`;
-  el.classList.add('abierto');
+    <div class="lz-cards">${vs.map(function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${i * 80}ms"><i>${v.ico}</i><div><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span></div></button>`; }).join('')}</div></div>`;
+  el.classList.add('abierto'); el._desdeLogo = !!forzar;
 }
 document.addEventListener('click', function(e){
   if(e.target.closest('.app-top .app-logo, .app-side-logo') && APP.usuario && appVistasPermitidas().length > 1) appLanzador(true);
@@ -13715,6 +13745,7 @@ function appCerrarUsuario(){
 
 function appElegirVista(v){
   if(appVistasPermitidas().indexOf(v) === -1) return;
+  appNavPush();
   APP.vista = v;
   try{ localStorage.setItem('fp-vista', v); }catch(err){}
   const bv = document.getElementById('appBienv');
@@ -13725,7 +13756,7 @@ function appElegirVista(v){
   }
   appCerrarSheet();
   polarCerrar(true);
-  appInicio();
+  appNavAtras = true; try{ appInicio(); } finally{ appNavAtras = false; }
   polarSugerencias();
 }
 
@@ -13770,6 +13801,7 @@ function appInicio(pantalla){
   // Importaciones ahora es la 2.ª pestaña dentro de Compras (13.10.2026, Piero).
   if(APP.vista === 'compras' && pantalla === 'pendlog'){ APP_PC.sub = 'imp'; pantalla = 'pendcompras'; }
   if(APP.vista === 'super' && pantalla !== 'tienda') pantalla = 'supreq';
+  if(!(APP.enInicio && APP.pantalla === (APP_PANTALLAS[pantalla] ? pantalla : 'inicio'))) appNavPush();
   if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(undefined, true); APP.entrada = false; return; }
   const tabs = ((APP_VISTAS[APP.vista] || APP_VISTAS.supervisor).tabs || []).map(function(t){ return t[0]; });
   const antes = APP.enInicio ? APP.pantalla : null, nueva = APP_PANTALLAS[pantalla] ? pantalla : 'inicio';
