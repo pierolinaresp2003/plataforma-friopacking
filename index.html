@@ -7984,7 +7984,7 @@ function matchesProcesoFiltrosOC(r){
 // FAMILIA_BY_PRODUCTO recién termina de armarse con ese segundo archivo.
 function ordenesDirectasFiltradas(){
   return PEDIDO_SIN_REQ_ROWS
-    .filter(r=> r.codOrden)
+    .filter(r=> r.codOrden && !psrRepetida(r))
     .map(r=> (r.idProducto && FAMILIA_BY_PRODUCTO[r.idProducto] && FAMILIA_BY_PRODUCTO[r.idProducto]!==r.familia)
       ? Object.assign({}, r, { familia: FAMILIA_BY_PRODUCTO[r.idProducto] }) : r)
     .filter(matchesProcesoFiltrosOC);
@@ -12690,6 +12690,12 @@ function pdPedidoAbierto(r){
 // Sin Katherine ni Javier (30.09.2026, Piero): ya no generan OC.
 const PD_NO_COMPRADORES = { KALBUJAR:1, JCENTENO:1, MCONDORI:1 };
 function pdEsComprador(p){ return !!(p && PD_PERSONAS[p] && !PD_NO_COMPRADORES[p]); }
+// Una línea de PedidoSinReq cuyo mismo pedido + producto YA está en Reporte Maestro (nació de un
+// requerimiento) es la misma línea repetida, no un pedido directo: se ignora (13.10.2026, Piero —
+// pedido 0001-0016605: 4 líneas por requerimiento y PedidoSinReq repetía 3 de ellas).
+function psrRepetida(r){ const k = appMemo('psrRM', function(){ const m = new Set();
+    getReqRows().forEach(function(x){ if(x.codPedido && x.idProducto) m.add(String(x.codPedido).trim() + '|' + String(x.idProducto).trim()); }); return m; });
+  return !!(r.codPedido && k.has(String(r.codPedido).trim() + '|' + String(r.idProducto || '').trim())); }
 function pdFilas(){ return appMemo('pdFilas', pdFilasCalc).slice(); }
 function pdFilasCalc(){
   const out = [];
@@ -12705,7 +12711,7 @@ function pdFilasCalc(){
   // Familia de los pedidos directos (no la traen): la del mismo código en el Reporte Maestro o PedidoSinReq.
   const famDe = new Map();
   getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(x){ if(x.idProducto && x.familia && x.familia !== 'Sin familia' && !famDe.has(x.idProducto)) famDe.set(x.idProducto, x.familia); });
-  PEDIDO_SIN_REQ_PEND.forEach(function(r){
+  PEDIDO_SIN_REQ_PEND.forEach(function(r){ if(psrRepetida(r)) return;
     const base = Object.assign({ req:'', proyecto:'Pedido directo (sin requerimiento)', idProyecto:'', directo:true, familia: famDe.get(r.idProducto) || 'Sin familia' }, r);
     if(pdOcPendiente(r)) out.push(Object.assign(base, { tipo:'oc', persona: pdPersona(r.usuarioCompras) }));
     // En un pedido directo el ResponsablePedido es quien lo pidió (almacén, oficina…), no un comprador:
@@ -15262,7 +15268,7 @@ function appEntregadas(){ return appMemo('entregadas', function(){
     M.set(r.codOrden, o);
   };
   getReqRows().forEach(function(r){ add(r, r.cantOrden, r.cantRecep); });
-  (PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ add(r, r.cantidadOrden, r.cantRecepcion); });
+  (PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(!psrRepetida(r)) add(r, r.cantidadOrden, r.cantRecepcion); });
   const presu = appOCPresuMapa();
   return [...M.values()].filter(function(o){ return o.anul || ((!o.pend || ocFinalizada(o.oc)) && (o.fr || ocFinalizada(o.oc))); }).map(function(o){
     o.persona = pdPersona(o.uc); o.fin = ocFinalizada(o.oc);
