@@ -13159,7 +13159,7 @@ const APP_VISTAS = {
   // vista Logística se quitó: quien tenía ese acceso entra a Compras (ver appTipoNorm).
   compras:    { nombre:'Compras',    ico:'🛒', desc:'Compras, importaciones, indicadores, gasto y presupuesto.',
     // Orden de Piero (12.10.2026): Inicio, Indicadores, Compras, Importaciones y Gasto + Presupuesto en una sola pestaña.
-    tabs:[['inicio','🏠','Inicio'], ['indicadores','📊','Indicadores'], ['pendcompras','🛒','Compras'], ['polar'], ['pendlog','🚢','Importaciones'], ['gastopresu','💰','Gasto y presupuesto'], ['certificados','📄','Certificados']] },
+    tabs:[['inicio','🏠','Inicio'], ['indicadores','📊','Indicadores'], ['pendcompras','🛒','Compras'], ['polar'], ['gastopresu','💰','Gasto y presupuesto'], ['certificados','📄','Certificados']] },
   almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Inventario, indicadores y OTIF.',
     // Mismo orden que Compras, sin Compras, Importaciones, Gasto ni Presupuesto (12.10.2026, Piero).
     tabs:[['inicio','🏠','Inicio'], ['indicadores','📊','Indicadores'], ['almrep','📑','Reportes'], ['polar'], ['inventario','📦','Inventario'], ['otif','🎯','OTIF']] },
@@ -13642,6 +13642,8 @@ function appAnim(el, cls, ms){
 function appInicio(pantalla){
   if(APP.vista === 'frioteam') pantalla = 'inventario';
   if(APP.vista === 'compras' && (pantalla === 'gasto' || pantalla === 'presu')){ APP_GP.sub = pantalla; pantalla = 'gastopresu'; }
+  // Importaciones ahora es la 2.ª pestaña dentro de Compras (13.10.2026, Piero).
+  if(APP.vista === 'compras' && pantalla === 'pendlog'){ APP_PC.sub = 'imp'; pantalla = 'pendcompras'; }
   if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(undefined, true); APP.entrada = false; return; }
   const tabs = ((APP_VISTAS[APP.vista] || APP_VISTAS.supervisor).tabs || []).map(function(t){ return t[0]; });
   const antes = APP.enInicio ? APP.pantalla : null, nueva = APP_PANTALLAS[pantalla] ? pantalla : 'inicio';
@@ -13681,10 +13683,10 @@ function appGastoPresuHtml(){
   return `<div class="ind-chips gp-tabs"><button type="button" data-gpsub="gasto" class="${APP_GP.sub === 'gasto' ? 'on' : ''}">💰 Gasto</button><button type="button" data-gpsub="presu" class="${APP_GP.sub === 'presu' ? 'on' : ''}">💼 Presupuesto vs. OC</button></div>`
     + APP_PANT_FN[APP_GP.sub]();
 }
-const APP_PANT_FN = { almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appPendComprasHtml(); },
+const APP_PANT_FN = { almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return `<div class="ind-chips gp-tabs"><button type="button" data-pcsub="nac" class="${APP_PC.sub !== 'imp' ? 'on' : ''}">🛒 Compras</button><button type="button" data-pcsub="imp" class="${APP_PC.sub === 'imp' ? 'on' : ''}">🚢 Importaciones</button></div>` + (APP_PC.sub === 'imp' ? appPendLogHtml() : appPendComprasHtml()); },
   pendlog:function(){ return appPendLogHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
-  const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC], pendlog:[APP_PL],
+  const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC, APP_PL], pendlog:[APP_PL],
     indicadores:[APP_F.indicadores], otif:[APP_F.otif] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (APP.vista || '');
 }
@@ -15262,7 +15264,7 @@ function appOCCerrar(){
 }
 
 // ---------- Pendientes de Compras (Logística) ----------
-const APP_PC = { persona:'', sec:'venc', tope:20, q:'', fam:'', entAnio:'', entMes:'', entTope:60 };
+const APP_PC = { sub:'nac', persona:'', sec:'venc', tope:20, q:'', fam:'', entAnio:'', entMes:'', entTope:60 };
 // ---------- OC entregadas (07.10.2026, Piero: "falta un buscador para todas las OC que ya se entregaron") ----------
 // Una OC entregada = ninguna de sus líneas sigue pendiente (regla de Pendientes: estado de Nisira + lo
 // recibido + OC Finalizadas.xlsx) y no está anulada. Fecha de entrega = la última recepción en Lurín.
@@ -15304,7 +15306,9 @@ function appPendComprasHtml(soloLista){
   const hoy = new Date(), c = appIndCorte(), finSem = isoWeekStart(c); finSem.setUTCDate(finSem.getUTCDate() + 6);
   const todas = pdFilas();
   const personas = new Map(); todas.forEach(function(r){ personas.set(r.persona, (personas.get(r.persona) || 0) + 1); });
-  const filas = APP_PC.persona ? todas.filter(function(r){ return r.persona === APP_PC.persona; }) : todas;
+  // El buscador busca en todo, aunque haya un comprador elegido (13.10.2026, Piero).
+  const per = APP_PC.q ? '' : APP_PC.persona;
+  const filas = per ? todas.filter(function(r){ return r.persona === per; }) : todas;
   const ocs = new Map(), peds = new Map();
   filas.forEach(function(r){
     const pry = /^pedido directo/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : (r.proyecto || '');
@@ -15321,7 +15325,7 @@ function appPendComprasHtml(soloLista){
   const prysTxt = function(x){ const l = [...x.prys].map(appImpNombre); return l.length ? polarCorta(l.slice(0, 2).join(' · '), 40) + (l.length > 2 ? ' +' + (l.length - 2) : '') : ''; };
   const EST = { venc:'Vencida', luego:'Más adelante' };
   // Entregadas: del año / mes elegido (por defecto el mes en curso); con el buscador, todas.
-  const entAll = appEntregadas().filter(function(o){ return !APP_PC.persona || o.persona === APP_PC.persona; });
+  const entAll = appEntregadas().filter(function(o){ return !per || o.persona === per; });
   // Entregadas vuelve a ser pestaña (12.10.2026, Piero: "una pestaña que muestre las OC que se entregaron").
   const entY = +APP_PC.entAnio || c.getUTCFullYear(), entM = APP_PC.entMes === '0' ? 0 : (+APP_PC.entMes || (APP_PC.entAnio ? 0 : c.getUTCMonth() + 1));
   const entPer = entAll.filter(function(o){ return o.f && o.f.getUTCFullYear() === entY && (!entM || o.f.getUTCMonth() + 1 === entM); });
@@ -15424,7 +15428,7 @@ function appPendComprasHtml(soloLista){
   if(soloLista) return lista;
   // Comprador en una lista desplegable (12.10.2026, Piero: "que sea para escoger por lista, no puntitos").
   const opP = function(v, t){ return `<option value="${escapeHtml(v)}"${v === (APP_PC.persona || '') ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
-  return `<div class="m-filtros pc-per"><label><span>🧑‍💼 Comprador</span><select class="ini-select" id="pcPer">${opP('', 'Todos · ' + new Set(todas.map(function(r){ return r.codOrden || r.codPedido; })).size)}${[...personas.keys()].filter(Boolean).sort().map(function(p){ return opP(p, (PD_PERSONAS[p] || p) + ' · ' + new Set(todas.filter(function(r){ return r.persona === p; }).map(function(r){ return r.codOrden || r.codPedido; })).size); }).join('')}</select></label></div>`
+  return `<div class="m-filtros pc-per"><label><span>🧑‍💼 Comprador</span><select class="ini-select" id="pcPer">${opP('', 'Todos')}${[...personas.keys()].filter(Boolean).sort().map(function(p){ return opP(p, nom(p)); }).join('')}</select></label></div>`
     // Buscador general arriba (07.10.2026, Piero: "un buscador ahí general para todo, así se puede buscar
     // cualquier OC"): pendientes y también las ya entregadas, cerradas o anuladas.
     + `<div class="m-buscar pc-buscar-gen"><input type="search" id="pcBusca" placeholder="🔍 Buscar cualquier OC (pendiente o entregada), pedido, req., código, producto, proveedor o cliente" value="${escapeHtml(APP_PC.q || '')}"></div>`
@@ -17039,6 +17043,7 @@ function appClickInicio(e){
 
   if(b.dataset.impdf){ appImpPdf(); return; }
   if(b.dataset.gpsub){ APP_GP.sub = b.dataset.gpsub; return appRenderInicio(); }
+  if(b.dataset.pcsub){ APP_PC.sub = b.dataset.pcsub; return appRenderInicio(); }
   if(b.dataset.arper){ APP_AR.per = b.dataset.arper; if(b.dataset.arper === 'custom' && !APP_AR.desde){ const p = almPeriodo(); APP_AR.desde = p.desde; APP_AR.hasta = p.hasta; } return appRenderInicio(); }
   if(b.dataset.arsuc){ APP_AR.suc = b.dataset.arsuc; return appRenderInicio(); }
   if(b.dataset.arimg){ appAlmImagenes(); return; }
@@ -17333,6 +17338,7 @@ function polarAccion(e){
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
   if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.oc) return appOCAbrir(b.dataset.oc);
+  if(b.dataset.cmpimg) return appCmpImagenes(b.dataset.cmpimg);
   // 07.10.2026: presupuesto, partidas pasadas, ficha del SKU y Daily desde Leo.
   if(b.dataset.presu){ const pp = b.dataset.presu.split('|'); return appPresuProyecto(pp[0], pp[1] || ''); }
   if(b.dataset.presuexc !== undefined){ APP_PR.todos = b.dataset.presuexc === 'todos'; APP_PR.cli = ''; APP_PR.pry = ''; APP_PR.q = ''; return appPresuExcedidas('presu'); }
@@ -17999,6 +18005,43 @@ function polarCuandoLlegaProducto(pal, per){
 // "¿En qué OC está el cemento Thorgen?", "OC de Upgrade Industrial": busca en TODAS las OC (abiertas,
 // atendidas y finalizadas) por producto o proveedor, para ubicar el número de OC (01.10.2026, Piero: "si
 // no sé el número de la OC voy a buscar el nombre del producto o el proveedor").
+// Ronda 4 de la hoja de Leo (13.10.2026).
+// "pry cerrado" / "pry no cerrado": proyectos por estado (columna Estado de la hoja Proyectos).
+function polarProyectosEstado(cerrado){
+  const T = pryTodos(), ids = Object.keys(T).filter(function(id){ return /^PR/.test(id); });
+  const l = ids.filter(function(id){ return /cerrad/i.test(T[id].e || '') === cerrado; }).sort(function(a, b){ return String(T[b].f || '').localeCompare(String(T[a].f || '')) || b.localeCompare(a); });
+  if(!l.length) return `<p>No hay proyectos ${cerrado ? 'cerrados' : 'abiertos'} en los datos cargados.</p>`;
+  const fila = function(id){ const x = T[id], f = cerrado && x.fc ? x.fc : x.f;
+    return `<div class="asis-item"><div class="d"><span class="mono">${escapeHtml(id)}</span> · ${escapeHtml(polarCorta(x.n || '', 40))}</div>
+      <div class="q">${escapeHtml(polarCorta(appImpNombre(x.cl || ''), 34))}${x.dep ? ' · ' + escapeHtml(x.dep) : ''}${f ? ' · ' + (cerrado && x.fc ? 'cerrado ' : 'desde ') + rqFecha(fromIsoDay(String(f).slice(0, 10))) : ''} ${polarBtn('q', id, 'ver')}</div></div>`; };
+  return `<div class="cab">🏗️ Proyectos ${cerrado ? 'cerrados' : 'no cerrados (abiertos)'}</div><div class="sub">${l.length} de ${ids.length} proyectos · el más reciente primero</div>
+    ${l.slice(0, 8).map(fila).join('')}${polarMas(l, 8, fila, 'proyectos')}
+    <div class="asis-acc">${polarBtn('q', cerrado ? 'proyectos no cerrados' : 'proyectos cerrados', cerrado ? '🏗️ Ver los no cerrados' : '🔒 Ver los cerrados')}</div>`;
+}
+// "12824": si no es requerimiento, pedido ni OC, puede ser una guía de almacén (GRC de recepción / GRR de salida).
+function polarGuia(num){
+  const fin = '-' + String(num).replace(/^0+/, '').padStart(7, '0'), L = almMovRows().filter(function(m){ return m.d && String(m.d).slice(-fin.length) === fin; });
+  if(!L.length) return null;
+  const nom = (ALMACEN_DATA && ALMACEN_DATA.almMov && ALMACEN_DATA.almMov.nom) || {}, corto = function(c){ return String(c || '').replace(/^000\d-0*/, ''); };
+  return [...new Set(L.map(function(m){ return m.d; }))].slice(0, 3).map(function(d){
+    const l = L.filter(function(m){ return m.d === d; }), m = l[0], ing = m.t === 'i', tot = l.reduce(function(s, x){ return s + (x.q || 0) * (x.u || 0); }, 0);
+    return `<div class="cab">${ing ? '📥 Guía de recepción' : '📤 Guía de salida'} ${escapeHtml(d)}</div><div class="sub">${escapeHtml(ALM_SEDES[m.s] || m.s || '')} · ${rqFecha(fromIsoDay(m.f))}${m.m ? ' · ' + escapeHtml(polarCorta(m.m, 40)) : ''}</div>
+      <p>${ing ? (m.oc ? 'OC <b class="mono">' + escapeHtml(corto(m.oc)) + '</b> · ' : '') + escapeHtml(m.pv || '') : (m.rq ? 'Req <b class="mono">' + escapeHtml(corto(m.rq)) + '</b> · ' : '') + escapeHtml(m.cl || '') + (m.py ? ' · ' + escapeHtml(m.py) : '')}</p>
+      <p>${l.length} ítem${l.length === 1 ? '' : 's'} · ${almSoles(tot)}${m.r ? ' · ' + escapeHtml(polarCorta(m.r, 30)) : ''}</p>
+      ${l.slice(0, 5).map(function(x){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(nom[x.c] || x.c, 50))}</div><div class="q"><span class="mono">${escapeHtml(x.c)}</span> · ${appN(x.q)}</div></div>`; }).join('')}
+      <div class="asis-acc">${ing && m.oc ? polarBtn('q', 'OC ' + m.oc, '🧾 Ver la OC') : !ing && m.rq ? polarBtn('q', 'requerimiento ' + m.rq, '📋 Ver el requerimiento') : ''}</div>`;
+  }).join('');
+}
+// "req botiquín": requerimientos que piden ese producto.
+function polarReqsPorProducto(pal, q, p){
+  pal = (pal || []).filter(function(w){ return w.length >= 3; });
+  if(!pal.length) return null;
+  rqPreparar();
+  const filas = RQ.filas.filter(function(r){ const d = polarNorm((r.producto || '') + ' ' + (r.idProducto || '')); return pal.every(function(w){ return polarContiene(d, w); }); });
+  if(!filas.length) return null;
+  POLAR.nuevoRef = 'requerimientos de ' + pal.join(' '); POLAR.nuevoRefTxt = 'requerimientos con "' + pal.join(' ') + '"';
+  return polarSobreFilas(filas, q, 'Requerimientos con "' + pal.join(' ') + '"', p);
+}
 function polarBuscarOCs(o){
   o = o || {};
   const pal = (o.pal || []).filter(function(w){ return !/^(oc|ocs|orden|ordenes|compra|compras|esta|estan|esa|ese|que|cual|del|las|los|numero|proveedor|producto|item|items|busca|buscar)$/.test(w); });
@@ -18017,7 +18060,7 @@ function polarBuscarOCs(o){
       if(pal.every(function(w){ return polarContiene(d, w); })){ x.ok = true; x.prods.add(r.producto || r.idProducto || ''); } }
     ocs.set(r.codOrden, x);
   });
-  const l = [...ocs.values()].filter(function(x){ return x.ok; }).sort(function(a,b){ return (b.f || 0) - (a.f || 0); });
+  const l = [...ocs.values()].filter(function(x){ return x.ok && (!o.abiertas || (x.abierta && !ocFinalizada(x.oc))); }).sort(function(a,b){ return (b.f || 0) - (a.f || 0); });
   if(!l.length) return null;
   const corto = function(c){ return c.replace(/^000\d-0*/, ''); };
   const est = function(x){ return ocFinalizada(x.oc) ? '<span class="asis-est ok">finalizada</span>' : !x.abierta ? '<span class="asis-est ok">atendida</span>'
@@ -18028,7 +18071,7 @@ function polarBuscarOCs(o){
   const que = [pal.length ? '"' + pal.join(' ') + '"' : '', o.provs && o.provs.length === 1 ? o.provs[0] : ''].filter(Boolean).join(' · ');
   const nAb = l.filter(function(x){ return x.abierta && !ocFinalizada(x.oc); }).length;
   const cab = l.length === 1 ? `<p>Es la <b>OC ${escapeHtml(corto(l[0].oc))}</b> de ${escapeHtml(l[0].prov.replace(/\.$/, ''))}.</p>` : `<p><b>${l.length}</b> OC${nAb ? ` · <b>${nAb}</b> pendientes` : ''} · ${l.length - nAb} atendidas.</p>`;
-  return `<div class="cab">🔎 OC con ${escapeHtml(que)}</div><div class="sub">${o.p ? 'emitidas ' + escapeHtml(o.p.label) : 'todas: pendientes y atendidas'}</div>${cab}
+  return `<div class="cab">🔎 OC con ${escapeHtml(que)}</div><div class="sub">${o.abiertas ? 'solo pendientes (por llegar)' : o.p ? 'emitidas ' + escapeHtml(o.p.label) : 'todas: pendientes y atendidas'}</div>${cab}
     ${l.slice(0, 6).map(fila).join('')}${polarMas(l, 6, fila, 'OC')}`;
 }
 // "¿Qué hay en camino sin requerimiento?": compras e importaciones en tránsito o por llegar que no
@@ -18195,6 +18238,11 @@ function polarOCsAgrupadas(campo, persona, origen){
     ${campo === 'proyecto' ? '<p class="asis-nota">Una OC con ítems de varios proyectos cuenta en cada uno.</p>' : ''}`;
 }
 function polarIntenciones(q, qr, p){
+  // "oc camisas pendientes" (13.10.2026, hoja de Leo): las OC pendientes de ese producto, no todas las OC por llegar.
+  if(/\boc\b|\bocs\b|ordenes/.test(qr) && /pendient|abiert|por llegar|faltan/.test(qr) && !polarPersonaEn(q, true) && !polarProveedoresEn(qr).length){
+    const palO = polarPalabrasProducto(qr).filter(function(w){ return !/^(oc|ocs|orden|ordenes|compra|compras|pendiente|pendientes|abierta|abiertas|llegar|faltan|falta|por|de|del|con|las|los|que|hay|todas|vencidas?|nacional(es)?|importad[ao]s?|importaciones?)$/.test(w); });
+    if(palO.length){ const bo = polarBuscarOCs({ pal:palO, abiertas:true }); if(bo) return bo; }
+  }
   // Stock en camino no comprometido (sin REQ relacionado).
   if(/no comprometid|sin comprometer|libre|sin req|sin requerimiento|sin dueno|pedidos? directos?|disponible/.test(qr) && /camino|transito|por llegar|llega|proxim|importac|pedidos? directos?|\boc\b|compras?/.test(qr) && !/excel|requerimientos? pendientes/.test(qr))
     return polarCaminoLibre(polarPalabrasProducto(qr).filter(function(w){ return !/^(stock|camino|transito|llegar|llega|llegan|proximo|proximos|proximas|comprometido|comprometidos|comprometida|comprometidas|comprometer|libre|libres|disponible|disponibles|requerimiento|requerimientos|req|pedido|pedidos|directo|directos|importacion|importaciones|compra|compras|nacional|nacionales|material|materiales|producto|productos|viene|vienen|hay|tenemos|que|cuales|reporte|sin|dueno|esta|estan|oc|ocs|ningun|ninguno|relacionado)$/.test(w); }), /importa/.test(qr) ? 'importado' : (/nacional/.test(qr) ? 'nacional' : null), /transito/.test(qr));
@@ -18244,6 +18292,8 @@ function polarIntenciones(q, qr, p){
   if(/^(las |los )?(salidas|ingresos|entradas)\b/.test(q) && p) return polarMovimientosAlmacen(p, /salida/.test(q) ? 'out' : 'in');
   // Proveedor nombrado: sus OC abiertas, su correo o lo que se le compró.
   if(provs.length >= 1 && provs.length <= 4){
+    if(/requerimiento|\breqs?\b/.test(q)){ rqPreparar(); const fl = RQ.filas.filter(function(r){ return provs.indexOf(r.proveedor) !== -1; });
+      if(fl.length) return polarSobreFilas(fl, 'requerimientos', 'Requerimientos con OC a ' + (provs.length === 1 ? appImpNombre(provs[0]) : provs.length + ' proveedores'), p); }
     if(/correo|mail|contacto|telefono|ruc|datos/.test(q)) return provs.length === 1 ? polarProveedor(provs[0], 'correo')
       : `<p>Hay ${provs.length} proveedores con ese nombre. ¿De cuál?</p><div class="asis-acc">${provs.map(function(n){ return polarBtn('q', 'correo de ' + n, escapeHtml(polarCorta(n, 34))); }).join('')}</div>`;
     if(/vencid|atras/.test(q)) return polarOCsLista({ provs:provs, venc:true, persona:per });
@@ -18331,7 +18381,10 @@ function polarProveedoresEn(q){
   const hits = [];
   nombres.forEach(function(n){
     const w = polarNorm(n).replace(/[^a-z0-9 ]+/g, ' ').replace(ruido, ' ').split(' ').filter(function(x){ return /^[a-z]{4,}$/.test(x); });   // "DANFOSS. S.A": sin puntos
-    const k = pal.filter(function(p){ return w.indexOf(p) !== -1; }).length;
+    let k = pal.filter(function(p){ return w.indexOf(p) !== -1; }).length;
+    // Siglas con puntos: "Estanterías JRM" = ESTANTERIAS METALICAS J.R.M. S.A.C (13.10.2026, hoja de Leo).
+    if(k){ const sig = (polarNorm(n).match(/\b(?:[a-z]\.){2,}[a-z]?\.?/g) || []).map(function(x){ return x.replace(/\./g, ''); }).filter(function(x){ return x.length >= 3 && !/^(sac|srl|eirl)$/.test(x); });
+      if(sig.some(function(x){ return new RegExp('\\b' + x + '\\b').test(q); })) k++; }
     if(k && k >= Math.min(2, w.length)) hits.push([n, k]);
   });
   return hits.sort(function(a,b){ return b[1] - a[1]; }).filter(function(h, i, arr){ return h[1] === arr[0][1]; }).map(function(h){ return h[0]; });
@@ -18800,9 +18853,32 @@ function polarResponder1(texto){
   }
   // Daily call in: puntos y ranking de compradores en un período (07.10.2026).
   if(/\bdaily\b|puntos|ranking/.test(qr) && /\bdaily\b|puntos|ranking|compradores?/.test(qr) && !/excel/.test(qr)) return polarDailyPuntos(polarPersonaEn(q, true), p);
-  if(!soloReqs && /\bbooking\b|\betd\b|\beta\b|embarc|embarque|zarp/.test(q) && !/cuanto tarda|demora|promedio|\boc\s*\d/.test(q)) return polarImportaciones(q, p);
+  if(!soloReqs && /\bbooking\b|\betd\b|\beta\b|embarc|embarque|zarp/.test(q) && !/cuanto tarda|demora|promedio|\boc\s*\d/.test(q)){
+    // "¿Qué embarques están relacionados con el proyecto Agroberries?" (13.10.2026, hoja de Leo): las importaciones de ese cliente.
+    let clE = polarClienteImport(POLAR.textoTal || qr);
+    if(clE.length !== 1){ const ws = (POLAR.textoTal || qr).split(' ').filter(function(w){ return w.length >= 5 && !/^(hola+|dime|embarqu|embarc|estan|esten|relacionad|proyecto|poryecto|cliente|cuales|muestrame|tienen|tiene|transito|booking|zarp|estatus|status|seguimiento|contenedor|llegan|llegar|todos|todas|pendiente)/.test(w); });
+      clE = [...new Set([].concat.apply([], ws.map(function(w){ return polarClienteImport(w); })))]; }
+    if(clE.length === 1) return polarDashImportacion(p, clE[0]);
+    return polarImportaciones(q, p);
+  }
+  // "pry cerrado", "pry no cerrado", "proyectos abiertos" (13.10.2026, hoja de Leo).
+  if(/^(los |las |que |cuales )?(pry|prys|proyectos?)\s+(que )?(estan |esten |siguen )?(no cerrad[oa]s?|cerrad[oa]s?|abiert[oa]s?|activ[oa]s?|vigentes?|en curso|sin cerrar)$/.test(qr))
+    return polarProyectosEstado(/cerrad/.test(qr) && !/no cerrad|sin cerrar/.test(qr));
+  // "reporte de ccheca" (13.10.2026, hoja de Leo): lo pendiente del comprador y su resumen en imágenes.
+  const mRep = qr.match(/^(el |un )?(reporte|resumen|informe)( semanal)? (de |del )?(.+)$/);
+  if(mRep && !soloReqs){ const perR = polarPersonaEn(q, true);
+    if(!perR && /^compras?$/.test(mRep[5])) return polarResponder1('pendientes de compras');
+    if(!perR && /^(logistica|almacen)$/.test(mRep[5])) return polarResponder1('pendientes de logistica');
+    if(perR && pdEsComprador(perR)) return `<div class="asis-acc">${polarBtn('cmpimg', perR, '🖼️ Resumen de ' + escapeHtml((PD_PERSONAS[perR] || perR).split(' ')[0]) + ' en imágenes')}</div>` + polarPendientesPersona(perR, polarFiltrosDe(q)); }
+  // "pedido" / "oc" / "req" a secas: se pide el número.
+  if(/^(el |la |un |una )?(pedido|pedidos|oc|orden de compra|req|requerimiento)$/.test(qr)){
+    const k = /pedido/.test(qr) ? 'pedido' : /req/.test(qr) ? 'requerimiento' : 'OC';
+    return `<p>¿Qué ${k}? Escribe el número, por ejemplo <b>${k === 'pedido' ? 'pedido 16605' : k === 'OC' ? 'OC 12130' : '23652'}</b>.</p><div class="asis-acc">${k === 'pedido' ? polarBtn('q', 'pedidos sin oc', '⚪ Pedidos sin OC') : k === 'OC' ? polarBtn('q', 'oc vencidas', '🔴 OC vencidas') : polarBtn('q', 'requerimientos pendientes', '📋 Requerimientos pendientes')}</div>`;
+  }
   let prod = T.match(/\b\d{12}\b/), codNota = '';
-  if(!prod){ const m9 = T.match(/\b\d{9,11}\b/); const cp = m9 ? polarCodigoParecido(m9[0]) : null; if(cp){ prod = [cp]; codNota = cp === m9[0].padStart(12, '0') ? '' : `<p class="asis-nota">Usé el código <b class="mono">${escapeHtml(cp)}</b> (el más parecido a ${escapeHtml(m9[0])}).</p>`; } }
+  if(!prod){ const m9 = T.match(/\b\d{9,11}\b/); const cp = m9 ? polarCodigoParecido(m9[0]) : null;
+    if(m9 && !cp && T.replace(/\D/g, '').length === m9[0].length && !soloReqs){ POLAR.resultado = 'no encontró'; return `<p>No encontré el código <b class="mono">${escapeHtml(m9[0].padStart(12, '0'))}</b> en el Reporte Almacén ni uno parecido.</p><p>Revisa los dígitos (los códigos tienen 12) o busca por la descripción, por ejemplo "stock de válvula mariposa 6".</p>`; }
+    if(cp){ prod = [cp]; codNota = cp === m9[0].padStart(12, '0') ? '' : `<p class="asis-nota">Usé el código <b class="mono">${escapeHtml(cp)}</b> (el más parecido a ${escapeHtml(m9[0])}).</p>`; } }
   if(prod && /(que|cuales|cuantos) (proyectos?|requerimientos?|req|clientes?|obras?)|quien(es)? (lo )?(pide|piden|pidio|pidieron|solicita|solicitan|solicito|usa|usan)|(solicitan|solicitaron|piden|pidieron) (este|el|ese)/.test(qr)) return codNota + polarQuienPide(prod[0]);
   if(prod){ if(soloReqs) return fueraDeAlcance;
     if(/precio|costo/.test(q)){ const rp = polarComprasDeProducto([prod[0]], 'precio'); if(rp) return codNota + rp;
@@ -18850,9 +18926,12 @@ function polarResponder1(texto){
       : esOC ? [polarOC.bind(null, cod1), polarOC.bind(null, cod2), polarReq.bind(null, cod1), polarPedido.bind(null, cod1)]
       : esPed ? [polarPedido.bind(null, cod1), polarReq.bind(null, cod1), polarOC.bind(null, cod1)]
       : [polarReq.bind(null, cod1), polarOC.bind(null, cod1), polarPedido.bind(null, cod1), polarOC.bind(null, cod2)];
+    if(/\b(guia|grc|grr)\b/.test(qr) && !soloReqs) orden.unshift(polarGuia.bind(null, num));
     for(const fn of orden){ const r = fn(); if(r) return r; }
+    // No es requerimiento, pedido ni OC: ¿es una guía de almacén? (13.10.2026, hoja de Leo: "12824" era la GRC 0002-0012824).
+    if(!soloReqs){ const g = polarGuia(num); if(g) return `<p class="asis-nota">No hay requerimiento, pedido ni OC ${escapeHtml(num)}; es una guía de almacén:</p>` + g; }
     POLAR.resultado = 'no encontró';
-    return `<p>No encontré el ${esOC ? 'OC' : (esPed ? 'pedido' : 'requerimiento')} <b class="mono">${escapeHtml(num)}</b> en los datos cargados.</p><p>Revisa el número o prueba con el código completo, por ejemplo <span class="mono">0001-0023303</span>.</p>`;
+    return `<p>No encontré <b class="mono">${escapeHtml(num)}</b> como ${esOC ? 'OC' : (esPed ? 'pedido' : 'requerimiento')}${soloReqs ? '' : ' ni como ' + [esOC ? 'requerimiento' : 'OC', esPed ? 'requerimiento' : 'pedido', 'guía de almacén'].join(', ').replace(/, ([^,]*)$/, ' ni $1')} en los datos cargados${DATA && DATA.corte ? ' (datos al ' + fmtDate(DATA.corte) + ')' : ''}.</p><p>Si es reciente, puede que todavía no esté en lo publicado. Revisa el número o prueba con el código completo, por ejemplo <span class="mono">0001-0023303</span>.</p>`;
   }
 
   const mReqDe = qr.match(/\b(?:req|reqs|requerimientos?)\s+(pendientes|abiertos|por atender|atrasados|vencidos|sin atender)\s+(?:de|del)\s+(.+)$/);
@@ -18886,8 +18965,18 @@ function polarResponder1(texto){
     const nomX = !sol && /requerimientos? (de|del|pedidos por) /.test(qr) ? polarNombresEnPregunta(qr) : [];   // tal cual, sin corregir
     if(nomX.length){
       const pn = polarProyectoPorNombre(nomX); if(pn) return pn;
+      const rpX = polarReqsPorProducto(nomX, q, p); if(rpX) return rpX;   // "requerimientos de botiquín"
       POLAR.resultado = 'no encontró';
       return `<p>No encontré a nadie llamado "<b>${escapeHtml(nomX.join(' '))}</b>" que haya pedido requerimientos, ni un proyecto con ese nombre.</p><p>Prueba con el nombre y apellido tal como figura en Nisira, o con el N° de requerimiento.</p>`;
+    }
+    // "req botiquín" (13.10.2026, hoja de Leo: "esperaba ver requerimientos de botiquín").
+    if(!sol && /^(todos |todas )?(los |las )?(req|reqs|requerimientos?)\s+(con |de |del )?[a-z]/.test(qr)){
+      const palR = polarPalabrasProducto(qr.replace(/^(todos |todas )?(los |las )?(req|reqs|requerimientos?)\s+(con |de |del )?/, '')).filter(function(w){ return !/^(pendientes?|abiertos?|atrasados?|vencidos?|todos?|hoy|semana|mes|ano|este|esta)$/.test(w); });
+      const rr = palR.length ? polarReqsPorProducto(palR, q, p) : null; if(rr) return rr;
+      // "todos los req de Estanterías JRM": requerimientos con OC a ese proveedor.
+      const pvR = polarProveedoresEn(qr);
+      if(pvR.length >= 1 && pvR.length <= 4){ rqPreparar(); const fl = RQ.filas.filter(function(r){ return pvR.indexOf(r.proveedor) !== -1; });
+        if(fl.length) return polarSobreFilas(fl, 'requerimientos', 'Requerimientos con OC a ' + (pvR.length === 1 ? appImpNombre(pvR[0]) : pvR.length + ' proveedores'), p); }
     }
     if(sol){ rqPreparar(); POLAR.nuevoRef = 'requerimientos de ' + polarNorm(sol); POLAR.nuevoRefTxt = 'requerimientos de ' + sol.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }); return polarSobreFilas(RQ.filas.filter(function(r){ return r.responsable === sol; }), q, 'Requerimientos de ' + sol.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); }), p); }
   }
