@@ -945,7 +945,7 @@
     .app-top{display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:60;
       background:var(--brand);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
       box-shadow:0 2px 10px rgba(10,30,100,.25);}
-    .app-top .app-logo{height:26px;width:auto;flex-shrink:0;}
+    .app-top .app-logo{height:26px;width:auto;flex-shrink:0;cursor:pointer;}
     .app-top .app-tit{flex:1;min-width:0;line-height:1.2;}
     .app-top .app-tit b{display:block;font-size:15.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .app-top .app-tit span{display:block;font-size:11px;opacity:.7;font-weight:600;letter-spacing:.02em;}
@@ -13489,7 +13489,7 @@ const APP_PC_CSS = `
   body.app-pc .app-tabbar{top:0;bottom:0;left:0;right:auto;width:232px;transform:none;border-radius:0;display:flex;flex-direction:column;
     align-items:stretch;justify-content:flex-start;gap:2px;background:linear-gradient(180deg,#0b2170 0%,#081a58 100%);border-top:0;
     box-shadow:4px 0 18px rgba(10,30,100,.16);padding:0 14px 20px;overflow-y:auto;}
-  body.app-pc .app-side-logo{display:flex;align-items:center;height:64px;margin:0 -14px 14px;padding:0 22px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;}
+  body.app-pc .app-side-logo{cursor:pointer;display:flex;align-items:center;height:64px;margin:0 -14px 14px;padding:0 22px;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;}
   body.app-pc .app-side-logo img{height:30px;width:auto;}
   body.app-pc .app-side-tit{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);padding:6px 14px 8px;}
   body.app-pc .app-tabbar button{cursor:pointer;flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;font-size:14px;font-weight:700;
@@ -13566,6 +13566,9 @@ function appLanzador(forzar){
     <div class="lz-cards">${vs.map(function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${i * 80}ms"><i>${v.ico}</i><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span><em>Entrar ›</em></button>`; }).join('')}</div></div>`;
   el.classList.add('abierto');
 }
+document.addEventListener('click', function(e){
+  if(e.target.closest('.app-top .app-logo, .app-side-logo') && APP.usuario && appVistasPermitidas().length > 1) appLanzador(true);
+});
 function appArrancar(){
   appPcActivar();
   if(APP.usuario && APP.vista && appVistasPermitidas().indexOf(APP.vista) === -1){ APP.vista = appVistaInicial(appTipoNorm(APP.usuario.tipo)); try{ localStorage.setItem('fp-vista', APP.vista); }catch(err){} }
@@ -17346,7 +17349,7 @@ function appAbrirSheet(){
   const oscuro = document.documentElement.getAttribute('data-theme') === 'dark';
   document.getElementById('appSheetIn').innerHTML = `<div class="asa"></div>
     ${APP.usuario ? `<div class="app-sheet-usr"><b>${escapeHtml(APP.usuario.nombre || APP.usuario.correo || '')}</b><span>${escapeHtml(APP.usuario.correo || '')} · Usuario ${escapeHtml(APP_VISTAS[APP.usuario.tipo].nombre)}</span></div>` : ''}
-    ${appVistasPermitidas().length > 1 ? '<h4>Cambiar de vista</h4><button type="button" data-lanz="1"><span>🧭</span>Pantalla de módulos</button>' : ''}
+    ${appVistasPermitidas().length > 1 ? '<h4>Cambiar de vista</h4>' : ''}
     ${Object.entries(APP_VISTAS).filter(([k])=> appVistasPermitidas().length > 1 && appVistasPermitidas().indexOf(k) !== -1).map(([k,v])=>`<button type="button" data-vista="${k}" class="${k === APP.vista ? 'on' : ''}"><span>${v.ico}</span>${v.nombre}${k === APP.vista ? ' <em>✓</em>' : ''}</button>`).join('')}
     <h4>Apariencia</h4>
     <button type="button" data-accion="btnTheme"><span>${oscuro ? '☀️' : '🌙'}</span>${oscuro ? 'Modo claro' : 'Modo oscuro'}</button>
@@ -17366,7 +17369,6 @@ function appAbrirSheet(){
     if(e.target === fondo) return appCerrarSheet();
     const b = e.target.closest('button'); if(!b || b.disabled) return;
     if(b.dataset.vista) return appElegirVista(b.dataset.vista);
-    if(b.dataset.lanz){ appCerrarSheet(); return appLanzador(true); }
     if(b.dataset.usuario) return appCerrarUsuario();
     if(b.dataset.instalar) return appInstalar();
     if(b.dataset.completa){ try{ localStorage.setItem('fp-pc-completa', '1'); }catch(err){} location.reload(); return; }
