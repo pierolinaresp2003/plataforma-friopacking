@@ -592,6 +592,14 @@
   .rqm-sit small.volver{color:var(--muted);font-style:italic;margin-top:5px;}
   .rqm-falta{margin-top:8px;font-size:13px;background:rgba(255,255,255,.14);border-radius:8px;padding:6px 10px;display:inline-block;}
   button.rqm-falta{border:0;color:#fff;font-family:inherit;font-weight:700;cursor:pointer;}
+  .rqm[data-fil] .rqm-card,.rqm[data-fil] .rqm-tip{display:none;} .rqm[data-fil] .rqm-listos{display:none;}
+  .rqm[data-fil="rev"] .rqm-card[data-paso="rev"],.rqm[data-fil="com"] .rqm-card[data-paso="com"],.rqm[data-fil="oc"] .rqm-card[data-paso="oc"],.rqm[data-fil="alm"] .rqm-card[data-paso="alm"],.rqm[data-fil="obra"] .rqm-card[data-paso="obra"]{display:block;}
+  .rqm[data-fil="obra"] #rqListos{display:block;} .rqm[data-fil="obra"] #rqListos > summary{display:none;}
+  button.rqm-st{border:0;background:none;color:inherit;font:inherit;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .rqm-st.sel i{outline:3px solid #fff;outline-offset:2px;} .rqm-st.sel small{opacity:1;text-decoration:underline;}
+  .rqm-filtro:empty{display:none;} .rqm-filtro{margin-top:10px;font-size:12.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;} .rqm-filtro button{margin-left:auto;border:0;border-radius:999px;background:#fff;color:#0d2a78;font:inherit;font-weight:800;font-size:12px;padding:5px 12px;cursor:pointer;}
+  .rqm-arch{margin-top:8px;font-size:12px;opacity:.85;}
+  .rqm-listos.arch summary{color:var(--muted);}
   .rqm-exp{display:flex;gap:6px;} .rqm-ico{width:36px;height:36px;border:0;border-radius:10px;background:rgba(255,255,255,.16);padding:5px;cursor:pointer;-webkit-tap-highlight-color:transparent;} .rqm-ico svg{display:block;width:100%;height:100%;} .rqm-ico:active{transform:scale(.94);}
   .rqm-info{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,.6fr);gap:6px;margin-top:10px;}
   .rqm-info > div{background:rgba(255,255,255,.12);border-radius:10px;padding:7px 9px;min-width:0;} .rqm-info span{display:block;font-size:10.5px;font-weight:700;opacity:.78;text-transform:uppercase;letter-spacing:.03em;} .rqm-info b{display:block;font-size:13px;font-weight:800;margin-top:2px;overflow-wrap:anywhere;}
@@ -625,6 +633,7 @@
   .rqm-sit b{display:block;font-size:13px;color:var(--ink);}
   .rqm-sit small{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;line-height:1.4;}
   .rqm-sit small.dir{color:var(--green);font-weight:700;}
+  .rqm-sit small.stk{margin-top:6px;color:#0f6b46;background:#d6f3e3;border-radius:8px;padding:5px 8px;font-weight:600;} .rqm-sit small.stk b{display:inline;font-size:inherit;color:inherit;font-weight:900;} .rqm-sit.constock{border-left-color:#2f9a5c;}
   .rqm-sit.ok{border-left-color:var(--green);} .rqm-sit.recibido,.rqm-sit.camino{border-left-color:var(--seg-a);}
   .rqm-sit.espera{border-left-color:var(--amber);} .rqm-sit.fuera{border-left-color:var(--red);}
   .rqm-cants{margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
@@ -1003,6 +1012,9 @@
     .app-top .app-vista{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:20px;
       padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap;}
     .app-top .app-vista span{opacity:.7;font-size:10px;margin-left:2px;}
+    .app-top .app-tema{flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.13);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .2s ease,background .2s ease;}
+    .app-top .app-tema:active{transform:scale(.9) rotate(-20deg);} .app-top .app-tema svg{width:20px;height:20px;}
+    body:not(.app-pc) .app-top .app-vista{display:none;}
     .app-sheet button.on{color:var(--brand-ink);font-weight:800;} .app-sheet button em{margin-left:auto;font-style:normal;color:var(--brand-2-dark);}
     .app-sheet button:disabled{opacity:.45;}
     /* Bienvenida: la primera vez se elige la vista */
@@ -1541,6 +1553,8 @@
   @keyframes appHojaSube{from{transform:translateY(100%);}to{transform:none;}}
   @keyframes appHojaBaja{from{transform:none;}to{transform:translateY(100%);}}
   @keyframes appFondoSale{from{opacity:1;}to{opacity:0;}}
+  ::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal;}
+  html.tema-suave, html.tema-suave *{transition:background-color .35s ease,color .35s ease,border-color .35s ease,fill .35s ease !important;}
   @media (max-width:760px){
     /* La animación mueve la pantalla 34 px de costado: sin recorte el documento se ensanchaba un instante,
        el celular reacomodaba el zoom y la barra de abajo "se movía". */
@@ -1827,9 +1841,25 @@
     .td-hero p{margin:-4px 0 10px;font-size:13.5px;color:#4c5f7a;} .td-hero .m-buscar{margin:0;}
     .sup-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;} .sup-kpis div{background:#ffffffb3;border-radius:14px;padding:10px 12px;} .sup-kpis b{display:block;font-size:22px;font-weight:900;color:#1b3a6b;} .sup-kpis span{font-size:11.5px;font-weight:700;color:#4c5f7a;}
     .sup-chips{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px;} .sup-chips button{border:1px solid #d6e2f2;background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;font-weight:700;color:#1b3a6b;cursor:pointer;} .sup-chips button.on{background:#c3d8f6;border-color:#b9d0f0;}
-    .sup-card{position:relative;background:var(--card,#fff);border:1px solid #dfe8f4;border-radius:18px;padding:14px 40px 14px 16px;margin-bottom:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:box-shadow .15s ease,transform .15s ease;}
+    .sup-card{position:relative;background:var(--card,#fff);border:1px solid #dfe8f4;border-radius:18px;padding:14px 16px;margin-bottom:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:box-shadow .15s ease,transform .15s ease;}
     .sup-card:hover{box-shadow:0 6px 18px rgba(27,58,107,.12);} .sup-card:active{transform:scale(.99);}
-    .sup-ir{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;background:#dde8f8;color:#1b3a6b;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;line-height:1;padding-bottom:3px;box-sizing:border-box;}
+    /* Filtros que se escriben con sugerencias (13.10.2026) */
+    .sup-fil{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px;margin:4px 0 10px;}
+    .sup-ac{position:relative;display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #d3e0f2;border-radius:14px;padding:0 6px 0 12px;min-height:46px;}
+    .sup-ac:focus-within{border-color:#5b97de;box-shadow:0 0 0 3px rgba(91,151,222,.18);} .sup-ac.lleno{background:#eaf2fd;border-color:#b7d1f3;}
+    .sup-ac > i{font-style:normal;font-size:17px;} .sup-ac input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:600;color:#14295a;outline:none;padding:12px 0;}
+    .sup-ac input::placeholder{color:#8a9bb5;font-weight:500;}
+    .sup-x{flex:0 0 auto;width:30px;height:30px;border:0;border-radius:50%;background:#d4e3fa;color:#1b3a6b;font-size:18px;font-weight:800;line-height:1;cursor:pointer;}
+    .sup-sug{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:#fff;border:1px solid #dbe5f3;border-radius:14px;box-shadow:0 14px 30px rgba(20,40,90,.18);padding:6px;max-height:300px;overflow-y:auto;}
+    .sup-sug.ver{display:block;} .sup-sug button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;border:0;background:none;text-align:left;font:inherit;font-size:13.5px;font-weight:600;color:#14295a;padding:10px 10px;border-radius:10px;cursor:pointer;}
+    .sup-sug button:hover,.sup-sug button:active{background:#eef4fd;} .sup-sug button b{flex:0 0 auto;font-size:12px;color:#3f6aa8;background:#e6eefb;border-radius:999px;padding:1px 8px;} .sup-sug-vacio{padding:10px;font-size:13px;color:#7a8aa3;}
+    /* Resumen: % atendido de lo filtrado */
+    .sup-res{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0d2a78,#1a4fb4);color:#fff;border-radius:20px;padding:14px 16px;margin-bottom:10px;}
+    .sup-ring{--p:0;flex:0 0 auto;width:84px;height:84px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;background:conic-gradient(#5fd3a0 calc(var(--p) * 1%), rgba(255,255,255,.18) 0);}
+    .sup-ring::before{content:"";position:absolute;inset:9px;border-radius:50%;background:#123d98;} .sup-ring b,.sup-ring small{position:relative;} .sup-ring b{font-size:21px;font-weight:900;line-height:1;} .sup-ring small{font-size:10px;opacity:.85;margin-top:2px;}
+    .sup-res{flex-wrap:wrap;} .sup-res-pasos{flex:1 1 100%;margin-top:4px;} .sup-res .rqm-filtro{flex:1 1 100%;margin-top:2px;}
+    .sup-res-t{flex:1;min-width:0;} .sup-res-t > b{display:block;font-size:16px;font-weight:900;line-height:1.2;} .sup-res-t > small{display:block;font-size:12px;opacity:.8;margin-top:2px;}
+    .sup-res-n{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;} .sup-res-n span{font-size:11.5px;background:rgba(255,255,255,.14);border-radius:999px;padding:3px 9px;} .sup-res-n b{font-weight:900;}
     .sup-top{display:flex;justify-content:space-between;gap:8px;} .sup-num{font-weight:900;color:#1b3a6b;font-size:15px;} .sup-f{font-size:12.5px;color:var(--ink-soft);}
     .sup-py{font-weight:700;font-size:14px;margin-top:4px;color:var(--ink);} .sup-py small{font-size:11.5px;color:#5b7aa6;font-weight:700;} .sup-resp{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
     .sup-bar{display:flex;align-items:center;gap:10px;margin:10px 0 8px;} .sup-bar i{flex:1;height:9px;border-radius:6px;background:#eef2f8;overflow:hidden;} .sup-bar em{display:block;height:100%;background:#4fb886;border-radius:6px;} .sup-bar span{font-size:12.5px;color:#4c5f7a;}
@@ -1852,21 +1882,61 @@
     .td-add{display:flex;align-items:center;gap:6px;flex:0 0 auto;} .td-add button{border:0;background:#cddff8;color:#1b3a6b;border-radius:10px;min-width:32px;height:32px;font:inherit;font-weight:800;cursor:pointer;} .td-add .td-mas{padding:0 12px;background:#c4ecd4;color:#2f7a55;}
     .td-carro{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;border:0;background:#b7d1f3;color:#1b3a6b;border-radius:999px;padding:12px 22px;font:inherit;font-weight:800;font-size:15px;box-shadow:0 8px 22px rgba(27,58,107,.22);cursor:pointer;}
     .td-carro b{background:#fff;border-radius:999px;padding:0 9px;margin-left:6px;} .td-acc{flex-wrap:wrap;}
+    /* Modo oscuro de lo nuevo (13.10.2026, Piero: "el modo oscuro debe estar bien optimizado") */
+    html[data-theme="dark"] .dci-ban,html[data-theme="dark"] .dci-hero.eq{background:linear-gradient(90deg,rgba(13,20,33,.55),rgba(13,20,33,.2)),linear-gradient(#3a4252,#3a4252),var(--marmol) left center/1600px 520px no-repeat,#1b2230;background-blend-mode:normal,multiply,normal,normal;border-color:#2c3648;}
+    html[data-theme="dark"] .dci-ban-t h2 span{color:#eef3fb;} html[data-theme="dark"] .dci-ban-t h2 span + span{color:#4fd8bd;} html[data-theme="dark"] .dci-ban-t small{color:#e2b866;} html[data-theme="dark"] .dci-ban-t small b{color:#cfe0ff;}
+    html[data-theme="dark"] .dci-ban-area{background:#0f2a66;} html[data-theme="dark"] .dci-ban-ico span{color:#c9d7ee;} html[data-theme="dark"] .dci-ban-lema{color:#cfe0ff;} html[data-theme="dark"] .dci-ban-lema b{color:#4fd8bd;}
+    html[data-theme="dark"] .dci-hero.eq .dci-hero-t h2{color:#eef3fb;} html[data-theme="dark"] .dci-hero.eq .dci-hero-t small{color:#e2b866;} html[data-theme="dark"] .dci-hero-t p{color:var(--ink-soft);}
+    html[data-theme="dark"] .dci-chip{background:rgba(255,255,255,.08);border-color:#33405a;color:#dbe6fb;}
+    html[data-theme="dark"] .dci-k.tot{background:rgba(91,151,222,.2);} html[data-theme="dark"] .dci-k.pen{background:rgba(111,182,255,.14);} html[data-theme="dark"] .dci-k.pro{background:rgba(240,173,62,.18);} html[data-theme="dark"] .dci-k.fin{background:rgba(63,209,92,.16);} html[data-theme="dark"] .dci-k.av{background:rgba(144,133,233,.2);}
+    html[data-theme="dark"] .dci-k b{color:#eef3fb;} html[data-theme="dark"] .dci-k span{color:#b4c2d6;} html[data-theme="dark"] .dci-k em{background:rgba(255,255,255,.1);}
+    html[data-theme="dark"] .dci-pys{background:rgba(255,255,255,.04);} html[data-theme="dark"] .dci-col.pen{background:rgba(111,182,255,.08);} html[data-theme="dark"] .dci-col.pro{background:rgba(240,173,62,.09);} html[data-theme="dark"] .dci-col.fin{background:rgba(63,209,92,.08);}
+    html[data-theme="dark"] .dci-colh,html[data-theme="dark"] .dci-form summary,html[data-theme="dark"] .dci-eqn b,html[data-theme="dark"] .dci-eqx,html[data-theme="dark"] .dci-py1 b{color:var(--ink);} html[data-theme="dark"] .dci-row,html[data-theme="dark"] .dci-py1,html[data-theme="dark"] .dci-card,html[data-theme="dark"] .dci-eqp{background:var(--card);border-color:var(--border);}
+    html[data-theme="dark"] .dci-py1 span{background:#24324a;color:var(--ink);} html[data-theme="dark"] .dci-eqn em{background:#2a3547;} html[data-theme="dark"] .dci-rt small{color:#8fb3e0;}
+    html[data-theme="dark"] .dci-mv.pen{background:rgba(111,182,255,.18);} html[data-theme="dark"] .dci-mv.pro{background:rgba(240,173,62,.2);} html[data-theme="dark"] .dci-mv.fin{background:rgba(63,209,92,.18);} html[data-theme="dark"] .dci-mv.del{background:rgba(255,255,255,.06);}
+    html[data-theme="dark"] .dci-blq{background:rgba(240,102,95,.14);color:#f6a19c;}
+    html[data-theme="dark"] .dci-fila input,html[data-theme="dark"] .dci-fila select{background:var(--input-bg);color:var(--ink);border-color:var(--border);} html[data-theme="dark"] .dci-fila label > span{color:#8fb3e0;}
+    html[data-theme="dark"] .sup-ac{background:var(--card);border-color:var(--border);} html[data-theme="dark"] .sup-ac.lleno{background:rgba(111,182,255,.12);border-color:rgba(111,182,255,.35);} html[data-theme="dark"] .sup-ac input{color:var(--ink);} html[data-theme="dark"] .sup-ac input::placeholder{color:#7c8ba0;}
+    html[data-theme="dark"] .sup-x{background:#24324a;color:var(--ink);} html[data-theme="dark"] .sup-sug{background:#1a2436;border-color:var(--border);box-shadow:0 14px 30px rgba(0,0,0,.45);} html[data-theme="dark"] .sup-sug button{color:var(--ink);} html[data-theme="dark"] .sup-sug button:hover,html[data-theme="dark"] .sup-sug button:active{background:rgba(255,255,255,.06);} html[data-theme="dark"] .sup-sug button b{background:rgba(111,182,255,.18);color:#9cc8ff;}
+    html[data-theme="dark"] .sup-res{background:linear-gradient(135deg,#13265e,#1c3f8c);} html[data-theme="dark"] .sup-ring::before{background:#172f6e;}
+    html[data-theme="dark"] .sup-card{border-color:var(--border);} html[data-theme="dark"] .sup-num{color:#9cc8ff;} html[data-theme="dark"] .sup-py{color:var(--ink);} html[data-theme="dark"] .sup-py small{color:#8fb3e0;} html[data-theme="dark"] .sup-bar i{background:#2a3547;} html[data-theme="dark"] .sup-bar span{color:var(--ink-soft);}
+    html[data-theme="dark"] .sup-p{background:#1f2937;} html[data-theme="dark"] .sup-p b{color:var(--ink);} html[data-theme="dark"] .sup-p small{color:var(--ink-soft);}
+    html[data-theme="dark"] .sup-p.rev.si{background:rgba(111,182,255,.2);} html[data-theme="dark"] .sup-p.com.si{background:rgba(240,140,90,.2);} html[data-theme="dark"] .sup-p.oc.si{background:rgba(240,173,62,.2);} html[data-theme="dark"] .sup-p.alm.si{background:rgba(57,135,229,.22);} html[data-theme="dark"] .sup-p.obra.si{background:rgba(63,209,92,.2);}
+    html[data-theme="dark"] .td-hero{background:linear-gradient(120deg,#16284a,#123a3a);} html[data-theme="dark"] .td-hero small{color:#8fb3e0;} html[data-theme="dark"] .td-hero h2{color:var(--ink);} html[data-theme="dark"] .td-hero p,html[data-theme="dark"] .td-res{color:var(--ink-soft);} html[data-theme="dark"] .td-res .lnk{color:#9cc8ff;}
+    html[data-theme="dark"] .td-fams button{background:var(--card);border-color:var(--border);} html[data-theme="dark"] .td-fams button span{color:var(--ink);} html[data-theme="dark"] .td-fams button b{background:rgba(63,209,92,.16);color:#7fe0a6;}
+    html[data-theme="dark"] .td-card{border-color:var(--border);} html[data-theme="dark"] .td-ico{background:#1f2937;}
+    html[data-theme="dark"] .td-st.ok{background:rgba(63,209,92,.16);color:#7fe0a6;} html[data-theme="dark"] .td-st.otra{background:rgba(240,173,62,.18);color:#f3c46d;} html[data-theme="dark"] .td-st.cam{background:rgba(111,182,255,.16);color:#9cc8ff;} html[data-theme="dark"] .td-st.sin{background:rgba(240,102,95,.16);color:#f6a19c;}
+    html[data-theme="dark"] .td-add button,html[data-theme="dark"] .td-carro{background:rgba(111,182,255,.2);color:#d6e7ff;} html[data-theme="dark"] .td-carro b{background:#0e1520;}
+    html[data-theme="dark"] .ix-btn{background:rgba(111,182,255,.18);color:#d6e7ff;}
+    html[data-theme="dark"] .rqm-sit small.stk{background:rgba(63,209,92,.14);color:#86e3ad;}
+    html[data-theme="dark"] .app-top .app-tema{background:rgba(255,255,255,.08);}
     /* Pantalla de módulos al iniciar (13.10.2026) */
-    .lz{position:fixed;inset:0;z-index:300;background:linear-gradient(150deg,#e2ecfb 0%,#e8f6f0 55%,#f1ebfb 100%);display:none;align-items:center;justify-content:center;padding:24px 16px;overflow-y:auto;}
-    .lz.abierto{display:flex;animation:lzFondo .35s ease;} .lz.fuera{animation:appFondoSale .38s ease-in forwards;}
-    .lz-in{width:100%;max-width:880px;text-align:center;} .lz-logo{height:56px;border-radius:12px;background:#0a1e64;padding:6px 10px;margin-bottom:14px;}
-    .lz h1{margin:0;font-size:clamp(26px,6vw,38px);font-weight:900;color:#1b3a6b;} .lz p{margin:6px 0 22px;font-size:15px;color:#4c5f7a;}
-    .lz-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
-    .lz-card{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:6px;border:0;border-radius:24px;padding:22px 20px;font:inherit;cursor:pointer;box-shadow:0 8px 24px rgba(27,58,107,.10);animation:lzEntra .5s cubic-bezier(.22,.8,.2,1) both;transition:transform .18s ease, box-shadow .18s ease;}
-    .lz-card:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(27,58,107,.16);}
-    .lz-card i{font-style:normal;font-size:40px;} .lz-card b{display:block;font-size:22px;font-weight:900;color:#1b3a6b;} .lz-card span{display:block;margin-top:4px;font-size:13.5px;color:#4c5f7a;line-height:1.35;} .lz-card em{margin-top:8px;font-style:normal;font-weight:800;color:#3f6aa8;}
-    .lz-compras{background:#c5daf7;} .lz-almacen{background:#c4ecd4;} .lz-super{background:#fbd6ae;} .lz-frioteam{background:#d9cff5;}
-    @media (max-width:600px){ .lz{align-items:flex-start;padding-top:40px;} .lz-cards{gap:10px;} .lz-card{flex-direction:row;align-items:center;gap:14px;padding:16px;border-radius:20px;}
-      .lz-card i{font-size:34px;flex:0 0 auto;} .lz-card b{display:block;font-size:19px;} .lz-card span{display:block;font-size:12.5px;} .lz p{margin-bottom:16px;} }
+    /* Pantalla de módulos (13.10.2026, Piero: "mejora totalmente la pestaña de inicio... que sea llamativa y profesional") */
+    .lz{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:28px 18px;overflow-y:auto;color:#fff;
+      background:radial-gradient(circle at 88% 6%,rgba(45,200,185,.42) 0,rgba(45,200,185,0) 38%),radial-gradient(circle at 6% 96%,rgba(90,150,255,.38) 0,rgba(90,150,255,0) 42%),linear-gradient(160deg,#061649 0%,#0a2470 52%,#0b3c7c 100%);}
+    .lz.abierto{display:flex;animation:lzFondo .25s ease;} .lz.fuera{animation:appFondoSale .18s ease-in forwards;pointer-events:none;}
+    .lz-copo{position:absolute;right:-70px;top:-60px;width:300px;height:300px;opacity:.09;pointer-events:none;} .lz-copo.b{right:auto;left:-90px;top:auto;bottom:-90px;width:260px;height:260px;opacity:.06;}
+    .lz-in{position:relative;width:100%;max-width:980px;}
+    .lz-head{display:flex;align-items:center;justify-content:space-between;gap:12px;} .lz-logo{height:40px;display:block;}
+    .lz-fecha{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:#b9cdf2;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:6px 12px;}
+    .lz-hola{margin:34px 0 22px;} .lz-hola small{display:block;font-size:15px;font-weight:600;color:#9fe3d8;} .lz-hola h1{margin:2px 0 6px;font-size:clamp(34px,8vw,52px);line-height:1;font-weight:900;letter-spacing:-.02em;color:#fff;}
+    .lz-hola p{margin:0;font-size:14.5px;color:#c6d5f2;}
+    .lz-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
+    .lz-card{position:relative;display:flex;align-items:center;gap:16px;text-align:left;border:0;border-radius:22px;padding:18px 16px 18px 18px;font:inherit;cursor:pointer;color:#14295a;background:#fff;
+      box-shadow:0 14px 34px rgba(3,12,48,.35);overflow:hidden;animation:lzEntra .45s cubic-bezier(.22,.8,.2,1) both;transition:transform .15s ease,box-shadow .15s ease;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;outline:none;}
+    .lz-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--lz-a);}
+    .lz-card:hover{transform:translateY(-3px);box-shadow:0 20px 40px rgba(3,12,48,.45);} .lz-card:focus{outline:none;} .lz-card.pulsado{transform:scale(.97);}
     .lz-card > *{pointer-events:none;}
-    .lz-card{-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;outline:none;} .lz-card:focus{outline:none;}
-    .lz-card.pulsado{transform:scale(.97);filter:brightness(.96);} .lz.fuera{animation-duration:.2s;}
+    .lz-ic{flex:0 0 auto;width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:var(--lz-g);box-shadow:0 8px 16px var(--lz-s);} .lz-ic svg{width:30px;height:30px;}
+    .lz-tx{flex:1;min-width:0;} .lz-tx b{display:block;font-size:19px;font-weight:900;color:#0f2557;} .lz-tx span{display:block;margin-top:3px;font-size:12.8px;color:#5a6b86;line-height:1.35;}
+    .lz-go{flex:0 0 auto;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eef3fb;} .lz-go svg{width:16px;height:16px;}
+    .lz-compras{--lz-a:#2f6fe0;--lz-g:linear-gradient(135deg,#4f8ef7,#1d4ed8);--lz-s:rgba(37,99,235,.35);}
+    .lz-almacen{--lz-a:#13a394;--lz-g:linear-gradient(135deg,#2cc7b4,#0f766e);--lz-s:rgba(15,118,110,.35);}
+    .lz-super{--lz-a:#e8922b;--lz-g:linear-gradient(135deg,#f7b347,#d9761a);--lz-s:rgba(217,118,26,.35);}
+    .lz-frioteam{--lz-a:#7c5ce0;--lz-g:linear-gradient(135deg,#9b82f2,#5b3fd1);--lz-s:rgba(91,63,209,.35);}
+    .lz-pie{margin-top:26px;text-align:center;font-size:12px;color:#8ea7d6;letter-spacing:.03em;display:flex;flex-direction:column;align-items:center;gap:12px;}
+    .lz-usr{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#dbe6fb;border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;}
+    @media (max-width:600px){ .lz{align-items:flex-start;padding-top:22px;} .lz-hola{margin:26px 0 18px;} .lz-cards{gap:12px;} .lz-card{padding:15px 14px 15px 16px;gap:14px;} .lz-ic{width:50px;height:50px;border-radius:14px;} .lz-ic svg{width:27px;height:27px;} .lz-tx b{font-size:18px;} }
     @keyframes lzEntra{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}} @keyframes lzFondo{from{opacity:0;}to{opacity:1;}}
 
     .ix{padding:16px 18px;} .ix-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;} .ix-head > b{font-size:16px;font-weight:800;color:var(--ink);} .ix-head > span{font-size:12.5px;color:var(--ink-soft);}
@@ -11827,8 +11897,11 @@ function rqSituacion(r){
   }
   if(e === 'Pedido pendiente')
     return { ico:'🛒', cls:'espera', titulo:'En Compras, todavía sin OC', detalle:'Pedido ' + r.codPedido + (r.fPedido ? ' desde el ' + rqFecha(r.fPedido) + ' (' + rqHace(r.fPedido) + ')' : '') };
-  if(e === 'En Revisión')
-    return { ico:'📝', cls:'espera', titulo:'En revisión de almacén', detalle:(r.fReq ? 'Pedido el ' + rqFecha(r.fReq) + ' (' + rqHace(r.fReq) + '), todavía sin atender' : '') };
+  if(e === 'En Revisión'){
+    // Si el almacén tiene stock del código, se dice (13.10.2026, Piero: "en revisión sí, pero indicar que almacén sí cuenta con stock").
+    const lm = rqLimaLibre(r), st = lm && lm.libre > 0 ? { q:lm.libre, um:lm.um, alc:lm.libre >= lm.falta - 0.001 } : null;
+    return { ico:'📝', cls:st ? 'espera constock' : 'espera', titulo:'En revisión de almacén', detalle:(r.fReq ? 'Pedido el ' + rqFecha(r.fReq) + ' (' + rqHace(r.fReq) + '), todavía sin atender' : ''), stock:st };
+  }
   if(e === 'Archivado') return { ico:'🗄️', cls:'fuera', titulo:'Archivado', detalle:'Se anuló o se cerró sin atender' };
   return { ico:'•', cls:'', titulo:e || '—', detalle:'' };
 }
@@ -11877,9 +11950,10 @@ function rqPasoDetalle(r, j){
   return { ico:'🏗️', cls:'ok', titulo:'Recibido en obra' + (r.fObra ? ' el ' + rqFecha(r.fObra) : ''), lineas: lin('Cantidad recibida: ' + n(r.cantObra) + um, r.docObra ? 'Guía: ' + r.docObra : '') };
 }
 function rqSitHtml(r, j){
+  const n2 = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(j == null){
     const sit = rqSituacion(r);
-    return `<span class="ic">${sit.ico}</span><div><b>${escapeHtml(sit.titulo)}</b>${sit.detalle ? `<small>${escapeHtml(sit.detalle)}</small>` : ''}
+    return `<span class="ic">${sit.ico}</span><div><b>${escapeHtml(sit.titulo)}</b>${sit.detalle ? `<small>${escapeHtml(sit.detalle)}</small>` : ''}${sit.stock ? `<small class="stk">🏬 Almacén sí cuenta con stock: <b>${n2(sit.stock.q)} ${escapeHtml(sit.stock.um)}</b> en Lima${sit.stock.alc ? ' · alcanza para lo pedido' : ' · alcanza para una parte'}</small>` : ''}
       ${r.partido ? '<small class="dir">Una parte salió del stock y el resto está en pedido (ver abajo).</small>' : (r.via === 'Directo' ? '<small class="dir">Atendido del stock del almacén: no pasó por Compras.</small>' : '')}</div>`;
   }
   const d = rqPasoDetalle(r, j);
@@ -11912,7 +11986,8 @@ function rqVistaTarjetas(cont, filas){
   // Primero lo que falta; lo que ya llegó a obra queda plegado abajo (29.09.2026, Piero). Desde el
   // 30.09.2026 en todas las vistas del celular, no solo Supervisor ("igual debe agruparse").
   const soloFalta = true;
-  const listos = soloFalta ? todo.filter(rqItemListo) : [];
+  const listos = soloFalta ? todo.filter(function(r){ return rqItemListo(r) && r.estadoCalc !== 'Archivado'; }) : [];
+  const archivados = soloFalta ? todo.filter(function(r){ return r.estadoCalc === 'Archivado'; }) : [];
   const orden = soloFalta ? todo.filter(function(r){ return !rqItemListo(r); }) : todo;
   // En el celular las tarjetas pesan: de 30 en 30 (cada "ver más" suma otras 30).
   // Todo a la vista, sin "Ver 30 más" (05.10.2026, Piero: "siempre mostrar todo completo... para todo el app").
@@ -11929,9 +12004,10 @@ function rqVistaTarjetas(cont, filas){
   const faltaTxt = soloFalta ? `<div class="rqm-falta">${orden.length ? '⏳ Faltan <b>' + orden.length + '</b> de ' + todo.length + ' ítems' : '✅ Todo ya llegó a obra'}</div>` : '';
   // Cabecera de UN requerimiento (13.10.2026, Piero): exportar con íconos, quién pidió ordenado y el avance
   // en gráfico (pasos), en lugar del texto "Faltan X de Y ítems".
-  const pasoN = { rev:0, com:0, oc:0, alm:0, obra:0 }; if(unSoloReq) todo.forEach(function(r){ pasoN[supPaso(r)]++; });
+  const pasoN = { rev:0, com:0, oc:0, alm:0, obra:0, arch:0 }; if(unSoloReq) todo.forEach(function(r){ pasoN[supPaso(r)]++; });
   const pasoI = function(r){ return SUP_PASOS.findIndex(function(p){ return p[0] === supPaso(r); }); };
-  const pctObra = todo.length ? Math.round(pasoN.obra / todo.length * 100) : 0;
+  const activos = todo.filter(function(r){ return r.estadoCalc !== 'Archivado'; });
+  const pctObra = activos.length ? Math.round(pasoN.obra / activos.length * 100) : 0;
   const cab = unSoloReq ? `<div class="rqm-cab">
       <div class="rqm-cab-top"><span class="rqm-num">${escapeHtml(r0.codRequerimiento)}</span><span class="rqm-exp">
         <button type="button" class="rqm-ico pdf" data-reqpdf="${escapeHtml(r0.codRequerimiento)}" title="Exportar a PDF" aria-label="Exportar a PDF"><svg viewBox="0 0 24 24"><path d="M6 2h8l5 5v15H6z" fill="#fff"/><path d="M14 2v5h5" fill="#dbe4f3"/><rect x="3" y="12" width="14" height="7" rx="1.5" fill="#e04b4b"/><text x="10" y="17.6" font-size="5.6" font-weight="900" text-anchor="middle" fill="#fff" font-family="Arial">PDF</text></svg></button>
@@ -11939,8 +12015,10 @@ function rqVistaTarjetas(cont, filas){
       <div class="rqm-pry">${pryCelda(r0.proyecto, r0.idProyecto)}</div>
       <div class="rqm-info"><div><span>👷 Pidió · Supervisor</span><b>${rqTxt(r0.responsable)}</b></div><div><span>📅 Fecha</span><b>${rqFecha(r0.fReq)}</b></div><div><span>📦 Ítems</span><b>${todo.length}</b></div></div>
       <div class="rqm-prog"><div class="rqm-prog-top"><b>${pctObra}%</b><span>en obra</span><i><em style="width:${pctObra}%"></em></i></div>
-        <div class="rqm-steps">${SUP_PASOS.map(function(p, k){ const llego = todo.filter(function(r){ return pasoI(r) >= k; }).length;
-          return `<div class="rqm-st ${llego === todo.length ? 'ok' : (pasoN[p[0]] ? 'act' : '')}"><i>${p[1]}</i><small>${p[2]}</small><b>${pasoN[p[0]]}</b></div>`; }).join('')}</div></div>
+        <div class="rqm-steps">${SUP_PASOS.map(function(p, k){ const llego = activos.filter(function(r){ return pasoI(r) >= k; }).length;
+          const est = p[0] === 'obra' ? (pasoN.obra ? 'ok' : '') : pasoN[p[0]] ? 'act' : (activos.length && llego === activos.length ? 'ok' : '');
+          return `<button type="button" class="rqm-st ${est}" data-rqpaso="${p[0]}" title="Ver solo los ítems en ${p[2]}"><i>${p[1]}</i><small>${p[2]}</small><b>${pasoN[p[0]]}</b></button>`; }).join('')}</div>
+        ${pasoN.arch ? `<div class="rqm-arch">🗄️ ${pasoN.arch} ítem${pasoN.arch === 1 ? '' : 's'} archivado${pasoN.arch === 1 ? '' : 's'}</div>` : ''}<div class="rqm-filtro" id="rqmFiltro"></div></div>
       ${cruce.length ? `<div class="rqm-falta">📦 <b>${cruce.length}</b> ítem${cruce.length === 1 ? '' : 's'} con stock en camino sin REQ (ver en la tarjeta)</div>` : ''}
     </div>` : (soloFalta && pryUnico ? `<div class="rqm-cab">
       <div class="rqm-cab-top"><span class="rqm-num">${escapeHtml(r0.idProyecto || '')}</span><span class="rqm-fecha">${reqs.length} req.</span></div>
@@ -11948,7 +12026,7 @@ function rqVistaTarjetas(cont, filas){
     </div>` : '');
 
   const listosVer = listos;
-  RQ.tarjetas = ver.concat(listosVer);
+  RQ.tarjetas = ver.concat(listosVer, archivados);
   const tarjeta = function(r, iTarjeta){
     const refRecep = r.cantPedido != null ? r.cantPedido : r.cantOrden;
     const docs = [
@@ -11956,7 +12034,7 @@ function rqVistaTarjetas(cont, filas){
       r.docSalida ? 'Salida ' + escapeHtml(r.docSalida) + (r.fSalida ? ' · ' + rqFecha(r.fSalida) : '') + (r.cantSalida != null ? ' · ' + n(r.cantSalida) + ' ' + escapeHtml(r.unidad || '') : '') + escapeHtml(rqDesde(r)) : '',
       r.docObra ? 'Obra ' + escapeHtml(r.docObra) + (r.fObra ? ' · ' + rqFecha(r.fObra) : '') : '',
     ].filter(Boolean);
-    return `<div class="rqm-card" data-i="${iTarjeta}">
+    return `<div class="rqm-card" data-i="${iTarjeta}" data-paso="${supPaso(r)}">
       ${unSoloReq ? '' : `<div class="rqm-req"><span class="rqm-num">${escapeHtml(r.codRequerimiento)}</span> · ${rqFecha(r.fReq)} · ${rqTxt(r.proyecto)}</div>`}
       <div class="rqm-top">
         <button type="button" class="cod rq-cod" data-rqstock="${escapeHtml(r.idProducto)}" data-rqreq="${escapeHtml(r.codRequerimiento)}">${escapeHtml(r.idProducto)}</button>
@@ -11980,7 +12058,8 @@ function rqVistaTarjetas(cont, filas){
 
   // Lo que ya se envió: plegado, con la misma tarjeta y los mismos círculos de arriba (29.09.2026, Piero).
   // Las tarjetas se arman recién al abrirlo, para que buscar no se ponga lento.
-  const listosHtml = listos.length ? `<details class="rqm-listos" id="rqListos"><summary>✅ Ya se envió a obra · ${listos.length} ítem${listos.length === 1 ? '' : 's'}</summary><div></div></details>` : '';
+  const listosHtml = (listos.length ? `<details class="rqm-listos" id="rqListos"><summary>✅ Ya se envió a obra · ${listos.length} ítem${listos.length === 1 ? '' : 's'}</summary><div></div></details>` : '')
+    + (archivados.length ? `<details class="rqm-listos arch" id="rqArch"><summary>🗄️ Archivados · ${archivados.length} ítem${archivados.length === 1 ? '' : 's'}</summary><div>${archivados.map(function(r, k){ return tarjeta(r, ver.length + listosVer.length + k); }).join('')}</div></details>` : '');
   const nada = soloFalta && !orden.length ? '<div class="rqm-tip">✅ No falta nada: todo lo pedido ya llegó a obra.</div>' : '';
   cont.innerHTML = `<div class="rqm">${cab}${orden.length ? '' : nada}${tarjetas}${listosHtml}</div>` + rqMasHtml(ver.length, orden.length, soloFalta ? 'ítems por llegar' : 'ítems', 30);
   rqEngancharMas();
@@ -12078,8 +12157,21 @@ function rqVistaItem(cont, filas){
   rqEngancharMas();
 }
 
+// Filtro por paso en el detalle de un requerimiento (13.10.2026, Piero: "al darle click a Revisión, Compras, Con OC,
+// Almacén o En obra que se filtre abajo lo que corresponde"). Otro toque en el mismo paso muestra todo.
+function rqFiltrarPaso(b){
+  const rqm = b.closest('.rqm'); if(!rqm) return;
+  const k = rqm.dataset.fil === b.dataset.rqpaso ? '' : b.dataset.rqpaso;
+  if(k) rqm.dataset.fil = k; else delete rqm.dataset.fil;
+  rqm.querySelectorAll('[data-rqpaso]').forEach(function(x){ x.classList.toggle('sel', x.dataset.rqpaso === k); });
+  const det = document.getElementById('rqListos'); if(det && k === 'obra' && !det.open){ det.open = true; det.dispatchEvent(new Event('toggle')); }
+  const p = SUP_PASOS.find(function(x){ return x[0] === k; }), n = k ? rqm.querySelectorAll('.rqm-card[data-paso="' + k + '"]').length : 0;
+  const f = document.getElementById('rqmFiltro');
+  if(f) f.innerHTML = k ? `Mostrando <b>${p[2]}</b>${k === 'obra' ? '' : ' · ' + n + ' ítem' + (n === 1 ? '' : 's')} <button type="button" data-rqpaso="${k}">✕ Ver todos</button>` : '';
+  if(k && f) f.scrollIntoView({ block:'nearest', behavior:'smooth' });
+}
 function rqMasHtml(mostradas, total, que, paso){
-  if(mostradas >= total) return total ? `<div class="rq-mas" style="color:var(--muted);font-size:12.5px;">${total.toLocaleString('es-PE', { maximumFractionDigits:2 })} ${que} · todo a la vista</div>` : '';
+  if(mostradas >= total) return '';   // sin "N ítems · todo a la vista" (13.10.2026, Piero)
   return `<div class="rq-mas"><button class="btn secondary" type="button" id="rqMas">Ver ${Math.min(paso || RQ_PASO, total-mostradas)} más · ${mostradas.toLocaleString('es-PE', { maximumFractionDigits:2 })} de ${total.toLocaleString('es-PE', { maximumFractionDigits:2 })} ${que}</button></div>`;
 }
 function rqEngancharMas(){
@@ -12478,7 +12570,9 @@ document.addEventListener('click', function(e){
   const b = e.target.closest ? e.target.closest('[data-rqstock]') : null;
   if(b){ rqAbrirStock(b); return; }
   const rp = e.target.closest ? e.target.closest('[data-reqpdf]') : null;
-  if(rp){ if(appReqPdf(rp.dataset.reqpdf)) appPanelPdf(); return; }
+  if(rp){ rqPdfNativo(rp.dataset.reqpdf); return; }
+  const rps = e.target.closest ? e.target.closest('[data-rqpaso]') : null;
+  if(rps){ rqFiltrarPaso(rps); return; }
   const rx = e.target.closest ? e.target.closest('[data-reqxls]') : null;
   if(rx){ const f = RQ.filas.filter(function(r){ return r.codRequerimiento === rx.dataset.reqxls; }); if(f.length) XLSX.writeFile(rqHojaComoVa(f, rqLibroExcel(f)), 'Requerimiento ' + rx.dataset.reqxls + ' - Grupo Friopacking.xlsx'); return; }
   const t = e.target.closest ? e.target.closest('[data-transito]') : null;
@@ -13393,6 +13487,30 @@ if(APP.usuario){
 function appVistasPermitidas(){ return APP.usuario ? APP_ACCESO[APP.usuario.tipo] : ['supervisor']; }
 
 function appLogo(){ const l = document.querySelector('.sidebar-brand .logo-lockup'); return l ? l.src : ''; }
+// Modo claro / oscuro desde el botón de arriba (13.10.2026, Piero: "quita el desplegable de arriba a la derecha en el
+// celular; ahí solo la opción de modo oscuro o claro con el ícono... con un cambio cómodo"): el tema nuevo entra con
+// un círculo que se abre desde el botón (o con un fundido suave si el navegador no lo soporta).
+function appTemaIcono(){
+  const b = document.getElementById('appTemaBtn'); if(!b) return;
+  const osc = document.documentElement.getAttribute('data-theme') === 'dark';
+  b.innerHTML = osc ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a.6.6 0 0 0-.8-.7A9.6 9.6 0 1 0 21.2 15.4a.6.6 0 0 0-.7-.8z"/></svg>';
+  b.setAttribute('aria-label', osc ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'); b.title = osc ? 'Modo claro' : 'Modo oscuro';
+  const m = document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', osc ? '#0b1322' : '#0a1e64');
+}
+function appTemaCambiar(btn){
+  const root = document.documentElement, osc = root.getAttribute('data-theme') !== 'dark';
+  const aplicar = function(){ if(osc) root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+    try{ localStorage.setItem('fp-theme', osc ? 'dark' : 'light'); }catch(err){}
+    appTemaIcono(); if(typeof applyThemeLabel === 'function') try{ applyThemeLabel(); }catch(err){} };
+  const quieto = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(document.startViewTransition && !quieto){
+    const r = btn ? btn.getBoundingClientRect() : { left:innerWidth - 30, top:30, width:0, height:0 };
+    const x = r.left + r.width / 2, y = r.top + r.height / 2, rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const vt = document.startViewTransition(aplicar);
+    vt.ready.then(function(){ root.animate({ clipPath:['circle(0px at ' + x + 'px ' + y + 'px)', 'circle(' + rad + 'px at ' + x + 'px ' + y + 'px)'] }, { duration:520, easing:'cubic-bezier(.4,0,.2,1)', pseudoElement:'::view-transition-new(root)' }); }).catch(function(){});
+  } else { root.classList.add('tema-suave'); aplicar(); setTimeout(function(){ root.classList.remove('tema-suave'); }, 450); }
+}
 function appAntesDe(html){ document.body.insertAdjacentHTML('beforeend', html); }
 
 function appConstruir(){
@@ -13400,6 +13518,7 @@ function appConstruir(){
   document.querySelector('.main').insertAdjacentHTML('afterbegin',
     `<header class="app-top"><img class="app-logo" src="${logo}" alt="Friopacking">
        <div class="app-tit"><b id="appTit">Inicio</b><span id="appSubTit"></span></div>
+       <button type="button" class="app-tema" id="appTemaBtn" aria-label="Cambiar a modo oscuro"></button>
        <button type="button" class="app-vista" id="appVistaBtn"></button></header>`);
   document.querySelector('.content').insertAdjacentHTML('afterbegin', '<div id="section-inicio" class="section"></div>');
   appAntesDe(`<nav class="app-tabbar" id="appTabbar"></nav>
@@ -13422,6 +13541,8 @@ function appConstruir(){
     </div>`);
 
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
+  document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(this); });
+  appTemaIcono();
   document.getElementById('appSheet').addEventListener('click', function(e){ if(e.target === this) appCerrarSheet(); });
   document.getElementById('appTabbar').addEventListener('click', function(e){
     const b = e.target.closest('button[data-tab]'); if(!b) return;
@@ -13442,15 +13563,26 @@ function appConstruir(){
   });
   document.getElementById('section-inicio').addEventListener('click', appClickInicio);
   document.getElementById('section-inicio').addEventListener('submit', appSubmitInicio);
+  // Filtros de Supervisor: al tocar, salen las opciones; Enter elige la primera; tocar afuera las cierra.
+  document.getElementById('section-inicio').addEventListener('focusin', function(e){
+    const m = /^supQ-(cli|pry)$/.exec(e.target.id || ''); if(!m) return;
+    e.target.select(); const box = document.getElementById('supSug-' + m[1]); if(box){ box.innerHTML = supSugerencias(m[1], e.target.closest('.sup-ac').classList.contains('lleno') ? '' : e.target.value); box.classList.add('ver'); }
+  });
+  document.getElementById('section-inicio').addEventListener('keydown', function(e){
+    const m = /^supQ-(cli|pry)$/.exec(e.target.id || ''); if(!m || e.key !== 'Enter') return;
+    e.preventDefault(); const b = document.querySelector('#supSug-' + m[1] + ' [data-supsel]'); if(b) b.click();
+  });
+  document.addEventListener('click', function(e){ if(!e.target.closest('.sup-ac')) document.querySelectorAll('.sup-sug.ver').forEach(function(x){ x.classList.remove('ver'); }); });
   let appBuscaEspera = null;
   document.getElementById('section-inicio').addEventListener('input', function(e){
     const id = e.target.id, v = e.target.value;
     if(id === 'prBusca'){ clearTimeout(appBuscaEspera); appBuscaEspera = setTimeout(function(){ APP_PR.q = v; const l = document.getElementById('prLista'); if(l) l.innerHTML = appPresuLista(); }, 250); return; }
+    if(id === 'supQ-cli' || id === 'supQ-pry'){ const tipo = id.slice(5), box = document.getElementById('supSug-' + tipo); if(box){ box.innerHTML = supSugerencias(tipo, v); box.classList.add('ver'); } return; }
     if(id === 'supBusca' || id === 'tdBusca'){
       clearTimeout(appBuscaEspera);
       appBuscaEspera = setTimeout(function(){
         const t = document.createElement('div');
-        if(id === 'supBusca'){ APP_SUP.q = v; APP_SUP.tope = 30; t.innerHTML = appSupReqHtml(); ['#supLista', '.sup-chips', '.sup-kpis'].forEach(function(sel){ const a = document.querySelector('#section-inicio ' + sel), b = t.querySelector(sel); if(a && b) a.innerHTML = b.innerHTML; }); }
+        if(id === 'supBusca'){ APP_SUP.q = v; t.innerHTML = appSupReqHtml(); ['#supLista'].forEach(function(sel){ const a = document.querySelector('#section-inicio ' + sel), b = t.querySelector(sel); if(a && b) a.innerHTML = b.innerHTML; }); }
         else { APP_TIENDA.q = v; if(v) APP_TIENDA.fam = ''; t.innerHTML = appTiendaHtml(); const a = document.getElementById('tdLista'), b = t.querySelector('#tdLista'); if(a && b) a.innerHTML = b.innerHTML; }
       }, 250);
       return;
@@ -13469,7 +13601,6 @@ function appConstruir(){
   });
   document.getElementById('section-inicio').addEventListener('change', function(e){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
-    if(e.target.id === 'supCli' || e.target.id === 'supPry'){ if(e.target.id === 'supCli'){ APP_SUP.cli = e.target.value; APP_SUP.pry = ''; } else APP_SUP.pry = e.target.value; APP_SUP.tope = 30; return appRenderInicio(); }
     if(e.target.id === 'pcPer'){ APP_PC.persona = e.target.value; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
     if(e.target.id === 'pcEntAnio' || e.target.id === 'pcEntMes'){ if(e.target.id === 'pcEntAnio'){ APP_PC.entAnio = e.target.value; APP_PC.entMes = String(+e.target.value === appIndCorte().getUTCFullYear() ? appIndCorte().getUTCMonth() + 1 : 0); } else APP_PC.entMes = e.target.value; APP_PC.entTope = 60; return appRenderInicio(); }
     if(e.target.id === 'dciFotoIn') return appDciFoto(e.target.files && e.target.files[0]);
@@ -13657,22 +13788,30 @@ function appLanzador(forzar){
   if(vs.length < 2 && !forzar) return;
   let el = document.getElementById('appLanz');
   if(!el){ document.body.insertAdjacentHTML('beforeend', '<div id="appLanz" class="lz"></div>'); el = document.getElementById('appLanz');
-    // Entrar fluido (13.10.2026, Piero): se marca el toque al instante, el módulo se arma detrás del lanzador
-    // y recién ahí el lanzador se va. En el historial queda el lanzador, así "atrás" vuelve a esta pantalla.
-    el.addEventListener('click', function(e){ const b = e.target.closest('[data-lzv]'); if(!b || el._yendo) return;
-      el._yendo = true; b.classList.add('pulsado');
+    // Entrar al instante (13.10.2026, Piero): el lanzador se desvanece en el acto y el módulo se arma a la vez. En el historial queda el lanzador, así "atrás" vuelve a esta pantalla.
+    el.addEventListener('click', function(e){ if(e.target.closest('[data-lzusr]')){ el.classList.remove('abierto'); return appCerrarUsuario(); }
+      const b = e.target.closest('[data-lzv]'); if(!b || el._yendo) return;
+      el._yendo = true; b.classList.add('pulsado'); el.classList.add('fuera');
       const v = b.dataset.lzv, desdeLogo = el._desdeLogo;
-      setTimeout(function(){
-        if(desdeLogo) appNavPush(); else APP_NAV.length = 0;   // al arrancar no hay a dónde volver
-        appNavAtras = true; try{ if(v !== APP.vista) appElegirVista(v); else appInicio(); } finally{ appNavAtras = false; }
-        APP_NAV.push({ lz:1 });
-        requestAnimationFrame(function(){ el.classList.add('fuera'); setTimeout(function(){ el.classList.remove('abierto', 'fuera'); b.classList.remove('pulsado'); el._yendo = false; }, 200); });
-      }, 20); }); }
-  const nom = polarMiNombre(), pri = nom ? nom.split(' ')[0].charAt(0) + nom.split(' ')[0].slice(1).toLowerCase() : '';
+      if(desdeLogo) appNavPush(); else APP_NAV.length = 0;   // al arrancar no hay a dónde volver
+      appNavAtras = true; try{ if(v !== APP.vista) appElegirVista(v); else appInicio(); } finally{ appNavAtras = false; }
+      APP_NAV.push({ lz:1 });
+      setTimeout(function(){ el.classList.remove('abierto', 'fuera'); b.classList.remove('pulsado'); el._yendo = false; }, 180); }); }
   const ext = { compras:'OC, pendientes, importaciones, gasto y Daily', almacen:'Recepción, despacho, inventario, OTIF y Daily', super:'Trazabilidad de requerimientos y tienda de códigos', frioteam:'Stock por sede y kardex' };
-  el.innerHTML = `<div class="lz-in"><img class="lz-logo" src="${appLogo()}" alt="Grupo Friopacking">
-    <h1>Hola${pri ? ', ' + escapeHtml(pri) : ''} 👋</h1><p>¿A qué módulo quieres entrar?</p>
-    <div class="lz-cards">${vs.map(function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${i * 80}ms"><i>${v.ico}</i><div><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span></div></button>`; }).join('')}</div></div>`;
+  const sv = function(d){ return `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`; };
+  const ico = { compras:sv('<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.2l1.6-7.3H6.2"/>'),
+    almacen:sv('<path d="M3 9.5 12 4l9 5.5V20H3z"/><path d="M7 20v-6h10v6M7 17h10"/>'),
+    super:sv('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 12.5l2.2 2.2 4.8-4.8"/>'),
+    frioteam:sv('<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5"/>') };
+  const copo = '<svg viewBox="0 0 100 100" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M50 4v92M10 27l80 46M10 73l80-46M40 12l10 10 10-10M40 88l10-10 10 10M14 40l14 2-4-14M86 60l-14-2 4 14M14 60l14-2-4 14M86 40l-14 2 4-14"/></svg>';
+  const go = '<svg viewBox="0 0 24 24" fill="none" stroke="#2a4c8f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
+  const fecha0 = new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long' }), fecha = fecha0.charAt(0).toUpperCase() + fecha0.slice(1);
+  const sal = appSaludo().split(', ');
+  el.innerHTML = `<div class="lz-copo">${copo}</div><div class="lz-copo b">${copo}</div><div class="lz-in">
+    <div class="lz-head"><img class="lz-logo" src="${appLogo()}" alt="Grupo Friopacking"><span class="lz-fecha">${escapeHtml(fecha)}</span></div>
+    <div class="lz-hola"><small>${sal[0]}${sal[1] ? ',' : ''}</small><h1>${sal[1] || 'Bienvenido'}</h1><p>Plataforma de Logística · elige el módulo</p></div>
+    <div class="lz-cards">${vs.map(function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${60 + i * 70}ms"><span class="lz-ic">${ico[k] || ''}</span><span class="lz-tx"><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span></span><span class="lz-go">${go}</span></button>`; }).join('')}</div>
+    <div class="lz-pie"><button type="button" class="lz-usr" data-lzusr="1">🚪 Cambiar de usuario</button><span>❄ Grupo Friopacking · Logística y cadena de frío</span></div></div>`;
   el.classList.add('abierto'); el._desdeLogo = !!forzar;
 }
 document.addEventListener('click', function(e){
@@ -14665,9 +14804,10 @@ function appDciFoto(file){
 // ---------- Módulo Supervisor (13.10.2026, Piero) ----------
 // "Supervisor es un nuevo módulo que va a indicar literalmente el estado de los requerimientos (la
 // trazabilidad)" + una "tienda virtual" de códigos: escriben lo que necesitan y ven lo disponible.
-const APP_SUP = { q:'', f:'pend', tope:30, cli:'', pry:'' };
+const APP_SUP = { q:'', cli:'', pry:'', paso:'' };
 const SUP_PASOS = [['rev', '📝', 'Revisión'], ['com', '🛒', 'Compras'], ['oc', '🧾', 'Con OC'], ['alm', '🏬', 'Almacén'], ['obra', '🏗️', 'En obra']];
 function supPaso(r){
+  if(r.estadoCalc === 'Archivado') return 'arch';   // archivado no es "en obra" (13.10.2026, Piero)
   if(rqItemListo(r)) return 'obra';
   const e = r.estadoCalc;
   if(e === 'En Revisión') return 'rev';
@@ -14677,50 +14817,86 @@ function supPaso(r){
   return 'obra';
 }
 function supEsSupervisor(){ return !!(APP.usuario && APP.usuario.tipo === 'supervisor'); }
-function appSupReqHtml(){
+// Requerimientos del Supervisor (13.10.2026, Piero): sin título ni chips Pendientes/Completos/Todos; filtros de
+// cliente y proyecto que se escriben y sugieren opciones; arriba el % atendido de lo filtrado; todos los req.
+// (sin "ver más": las tarjetas se agregan por tandas para que la pantalla no se trabe).
+function supGrupos(){
   rqPreparar();
-  const e = escapeHtml, sup = supEsSupervisor(), base = sup ? (polarMisFilas() || []) : RQ.filas;
-  if(!RQ.filas.length) return '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los requerimientos…</div></div>';
+  const sup = supEsSupervisor(), base = sup ? (polarMisFilas() || []) : RQ.filas;
+  const c = APP_SUP._g;
+  if(c && c.base === base && c.n === base.length) return c;
   const M = new Map();
   base.forEach(function(r){ const k = r.codRequerimiento; if(!k) return;
-    const g = M.get(k) || { cod:k, py:r.proyecto || '', id:r.idProyecto || '', resp:r.responsable || '', f:r.fReq, items:[], n:{ rev:0, com:0, oc:0, alm:0, obra:0 }, txt:'' };
+    const g = M.get(k) || { cod:k, py:r.proyecto || '', id:r.idProyecto || '', resp:r.responsable || '', f:r.fReq, items:[], n:{ rev:0, com:0, oc:0, alm:0, obra:0, arch:0 }, txt:'' };
     g.items.push(r); g.n[supPaso(r)]++; g.txt += ' ' + (r.producto || '') + ' ' + (r.idProducto || ''); M.set(k, g); });
-  let l = [...M.values()];
-  // Filtros de cliente y proyecto (13.10.2026, Piero). El proyecto depende del cliente elegido.
-  l.forEach(function(g){ g.cli = appImpNombre(g.py || '') || '—'; });
-  const clis = {}; l.forEach(function(g){ clis[g.cli] = (clis[g.cli] || 0) + 1; });
-  if(APP_SUP.cli && !clis[APP_SUP.cli]) APP_SUP.cli = '';
+  const l = [...M.values()];
+  l.forEach(function(g){ g.cli = appImpNombre(g.py || '') || '—'; g.pryN = /^SIN PROYECTO/i.test(g.id) ? 'Sin proyecto (almacén)' : (pryNombre(g.id) || '');
+    g.tot = g.items.length - g.n.arch; g.ok = g.n.obra; g.pct = g.tot ? dciN2(g.ok / g.tot * 100) : 0; g.txt = polarNorm(g.cod + ' ' + g.py + ' ' + g.id + ' ' + g.resp + g.txt); });
+  l.sort(function(a, b){ return (b.f || 0) - (a.f || 0); });
+  APP_SUP._g = { base:base, n:base.length, l:l, sup:sup };
+  return APP_SUP._g;
+}
+function supFiltrados(sinQ){
+  const G = supGrupos(); let l = G.l;
   if(APP_SUP.cli) l = l.filter(function(g){ return g.cli === APP_SUP.cli; });
-  const prys = {}; l.forEach(function(g){ if(g.id) prys[g.id] = (prys[g.id] || 0) + 1; });
-  if(APP_SUP.pry && !prys[APP_SUP.pry]) APP_SUP.pry = '';
   if(APP_SUP.pry) l = l.filter(function(g){ return g.id === APP_SUP.pry; });
-  const opS = function(v, t, sel){ return `<option value="${e(v)}"${v === sel ? ' selected' : ''}>${e(t)}</option>`; };
-  const filtrosS = `<div class="m-filtros sup-filtros"><label><span>🏢 Cliente</span><select class="ini-select" id="supCli">${opS('', 'Todos los clientes', APP_SUP.cli)}${Object.keys(clis).sort().map(function(c){ return opS(c, polarCorta(c, 40) + ' (' + clis[c] + ')', APP_SUP.cli); }).join('')}</select></label>
-    <label><span>🏗️ Proyecto</span><select class="ini-select" id="supPry">${opS('', 'Todos los proyectos', APP_SUP.pry)}${Object.keys(prys).sort().reverse().map(function(id){ const n = /^SIN PROYECTO/i.test(id) ? 'Sin proyecto (almacén)' : id + (pryNombre(id) ? ' · ' + polarCorta(pryNombre(id), 34) : ''); return opS(id, n + ' (' + prys[id] + ')', APP_SUP.pry); }).join('')}</select></label></div>`;
-  l.forEach(function(g){ g.tot = g.items.length; g.ok = g.n.obra; g.pct = g.tot ? dciN2(g.ok / g.tot * 100) : 0; g.txt = polarNorm(g.cod + ' ' + g.py + ' ' + g.id + ' ' + g.resp + g.txt); });
-  const q = polarNorm(APP_SUP.q || '').trim();
+  const q = sinQ ? '' : polarNorm(APP_SUP.q || '').trim();
   if(q) l = l.filter(function(g){ return q.split(' ').every(function(w){ return g.txt.indexOf(w) !== -1; }); });
-  const pend = l.filter(function(g){ return g.ok < g.tot; }), comp = l.filter(function(g){ return g.ok >= g.tot; });
-  const ver = (APP_SUP.f === 'pend' ? pend : APP_SUP.f === 'comp' ? comp : l).sort(function(a, b){ return (b.f || 0) - (a.f || 0); });
-  const itemsPend = pend.reduce(function(s, g){ return s + g.tot - g.ok; }, 0), itemsTot = l.reduce(function(s, g){ return s + g.tot; }, 0);
-  const pctTot = itemsTot ? dciN2((itemsTot - itemsPend) / itemsTot * 100) : 0;
-  const chip = function(k, t, n){ return `<button type="button" data-supf="${k}" class="${APP_SUP.f === k ? 'on' : ''}">${t} <b>${n}</b></button>`; };
-  const card = function(g){
-    const r0 = g.items[0], nPend = g.tot - g.ok;
-    return `<div class="sup-card" data-clic="1" data-req="${e(g.cod)}" title="Ver el detalle del requerimiento"><span class="sup-ir" aria-hidden="true">›</span><div class="sup-top"><span class="sup-num">Req. ${e(g.cod.replace(/^000\d-0*/, ''))}</span><span class="sup-f">${rqFecha(g.f)}</span></div>
+  return l;
+}
+function supConPaso(l){ return APP_SUP.paso ? l.filter(function(g){ return g.n[APP_SUP.paso] > 0; }) : l; }
+// Sugerencias mientras se escribe el cliente o el proyecto.
+function supSugerencias(tipo, txt){
+  const e = escapeHtml, q = polarNorm(txt || '').trim(), ws = q ? q.split(' ').filter(Boolean) : [];
+  const G = supGrupos(), cuenta = new Map();
+  (tipo === 'pry' && APP_SUP.cli ? G.l.filter(function(g){ return g.cli === APP_SUP.cli; }) : G.l).forEach(function(g){
+    const k = tipo === 'cli' ? g.cli : g.id; if(!k) return;
+    const x = cuenta.get(k) || { k:k, t:tipo === 'cli' ? k : k + (g.pryN ? ' · ' + g.pryN : ''), n:0 }; x.n++; cuenta.set(k, x); });
+  let l = [...cuenta.values()];
+  if(ws.length) l = l.filter(function(x){ const t = polarNorm(x.t); return ws.every(function(w){ return t.indexOf(w) !== -1; }); });
+  l.sort(function(a, b){ return tipo === 'pry' ? b.k.localeCompare(a.k) : a.k.localeCompare(b.k); });
+  return l.slice(0, 8).map(function(x){ return `<button type="button" data-supsel="${tipo}|${e(x.k)}"><span>${e(polarCorta(x.t, 60))}</span><b>${x.n}</b></button>`; }).join('') || '<div class="sup-sug-vacio">Sin coincidencias</div>';
+}
+function supCard(g){
+  const e = escapeHtml, sup = supEsSupervisor(), nPend = g.tot - g.ok;
+  return `<div class="sup-card" data-clic="1" data-req="${e(g.cod)}" title="Ver el detalle del requerimiento"><div class="sup-top"><span class="sup-num">Req. ${e(g.cod.replace(/^000\d-0*/, ''))}</span><span class="sup-f">${rqFecha(g.f)}</span></div>
       <div class="sup-py">${e(polarCorta(appImpNombre(g.py || '—'), 48))}${g.id && !/^SIN PROYECTO/i.test(g.id) ? ` <small>${e(g.id)}</small>` : ''}</div>
       ${sup ? '' : `<div class="sup-resp">👷 ${e(polarCorta(g.resp, 40))}</div>`}
-      <div class="sup-bar"><i><em style="width:${g.pct}%"></em></i><span>${nPend ? `<b>${g.ok}/${g.tot}</b> ítems en obra` : '<b>✅ Todo en obra</b>'}</span></div>
+      <div class="sup-bar"><i><em style="width:${g.pct}%"></em></i><span>${!g.tot ? '<b>🗄️ Archivado</b>' : nPend ? `<b>${g.ok}/${g.tot}</b> ítems en obra` : '<b>✅ Todo en obra</b>'}${g.tot && g.n.arch ? ` · 🗄️ ${g.n.arch} archivado${g.n.arch === 1 ? '' : 's'}` : ''}</span></div>
       <div class="sup-pasos">${SUP_PASOS.map(function(p){ return `<button type="button" class="sup-p ${p[0]}${g.n[p[0]] ? ' si' : ''}" data-req="${e(g.cod)}" title="Ver la trazabilidad completa"><i>${p[1]}</i><b>${g.n[p[0]]}</b><small>${p[2]}</small></button>`; }).join('')}</div>
     </div>`;
-  };
+}
+// Resumen de lo filtrado: anillo con el % atendido.
+function supResumenHtml(l){
+  const e = escapeHtml, itemsTot = l.reduce(function(s, g){ return s + g.tot; }, 0), itemsOk = l.reduce(function(s, g){ return s + g.ok; }, 0);
+  const pend = l.filter(function(g){ return g.ok < g.tot; }).length, pct = itemsTot ? Math.round(itemsOk / itemsTot * 100) : 0;
+  const tit = APP_SUP.pry ? (/^SIN PROYECTO/i.test(APP_SUP.pry) ? 'Sin proyecto (almacén)' : APP_SUP.pry) : (APP_SUP.cli || (supEsSupervisor() ? 'Mis requerimientos' : 'Todos los clientes'));
+  const sub = APP_SUP.pry ? (pryNombre(APP_SUP.pry) || APP_SUP.cli || '') : (APP_SUP.cli ? 'Todos sus proyectos' : 'Todos los proyectos');
+  return `<div class="sup-res"><div class="sup-ring" style="--p:${pct}"><b>${pct}%</b><small>atendido</small></div>
+    <div class="sup-res-t"><b>${e(polarCorta(tit, 44))}</b><small>${e(polarCorta(sub, 52))}</small>
+      <div class="sup-res-n"><span><b>${l.length}</b> req.</span><span><b>${pend}</b> con pendientes</span><span><b>${itemsTot - itemsOk}</b> ítems por llegar</span></div></div>
+    <div class="rqm-steps sup-res-pasos">${SUP_PASOS.map(function(p){ const n = l.reduce(function(a, g){ return a + g.n[p[0]]; }, 0);
+      return `<button type="button" class="rqm-st ${p[0] === 'obra' ? (n ? 'ok' : '') : (n ? 'act' : '')}${APP_SUP.paso === p[0] ? ' sel' : ''}" data-suppaso="${p[0]}" title="Ver los req. con ítems en ${p[2]}"><i>${p[1]}</i><small>${p[2]}</small><b>${n}</b></button>`; }).join('')}</div>
+    ${APP_SUP.paso ? `<div class="rqm-filtro">Req. con ítems en <b>${(SUP_PASOS.find(function(p){ return p[0] === APP_SUP.paso; }) || [])[2]}</b> <button type="button" data-suppaso="${APP_SUP.paso}">✕ Ver todos</button></div>` : ''}</div>`;
+}
+function appSupReqHtml(){
+  const e = escapeHtml;
+  if(!RQ.filas.length){ rqPreparar(); if(!RQ.filas.length) return '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los requerimientos…</div></div>'; }
+  const G = supGrupos();
+  if(APP_SUP.cli && !G.l.some(function(g){ return g.cli === APP_SUP.cli; })) APP_SUP.cli = '';
+  if(APP_SUP.pry && !G.l.some(function(g){ return g.id === APP_SUP.pry && (!APP_SUP.cli || g.cli === APP_SUP.cli); })) APP_SUP.pry = '';
+  const l0 = supFiltrados(), sinQ = APP_SUP.q ? supFiltrados(true) : l0, l = supConPaso(l0);
+  const pryTxt = APP_SUP.pry ? APP_SUP.pry + (pryNombre(APP_SUP.pry) ? ' · ' + pryNombre(APP_SUP.pry) : '') : '';
+  const ac = function(tipo, ico, ph, val){ return `<div class="sup-ac${val ? ' lleno' : ''}" data-ac="${tipo}"><i>${ico}</i><input type="text" id="supQ-${tipo}" placeholder="${ph}" value="${e(val)}" autocomplete="off" enterkeyhint="search">${val ? `<button type="button" class="sup-x" data-supx="${tipo}" aria-label="Quitar">×</button>` : ''}<div class="sup-sug" id="supSug-${tipo}"></div></div>`; };
+  const n0 = 24;
+  APP_SUP._gen = (APP_SUP._gen || 0) + 1; const gen = APP_SUP._gen, resto = l.slice(n0);
+  if(resto.length) setTimeout(function tanda(){ const c = document.getElementById('supLista'); if(!c || gen !== APP_SUP._gen || !resto.length) return;
+    c.insertAdjacentHTML('beforeend', resto.splice(0, 40).map(supCard).join('')); if(resto.length) setTimeout(tanda, 30); }, 60);
   return `<div class="sup">
-    <div class="sup-hero"><small>${sup ? 'MIS REQUERIMIENTOS' : 'REQUERIMIENTOS'}</small><h2>${sup ? '¿Cómo va lo que pediste?' : 'Trazabilidad de requerimientos'}</h2>
-      <div class="sup-kpis"><div><b>${pend.length}</b><span>Req. con pendientes</span></div><div><b>${itemsPend}</b><span>Ítems por llegar a obra</span></div><div><b>${pctTot}%</b><span>Atendido</span></div></div></div>
-    ${filtrosS}<div class="m-buscar"><input type="search" id="supBusca" placeholder="🔍 N° de req., proyecto, cliente o producto" value="${e(APP_SUP.q)}"></div>
-    <div class="sup-chips">${chip('pend', '⏳ Pendientes', pend.length)}${chip('comp', '✅ Completos', comp.length)}${chip('todos', 'Todos', l.length)}</div>
-    <div id="supLista">${ver.slice(0, APP_SUP.tope).map(card).join('') || `<div class="ini-card"><div class="ini-vacio">${sup && !base.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}
-    ${ver.length > APP_SUP.tope ? `<button type="button" class="ix-btn sup-mas" data-supmas="1">Ver ${Math.min(30, ver.length - APP_SUP.tope)} más de ${ver.length - APP_SUP.tope}</button>` : ''}</div></div>`;
+    <div class="sup-fil">${ac('cli', '🏢', 'Escribe el cliente', APP_SUP.cli)}${ac('pry', '🏗️', 'Escribe el PRY o proyecto', pryTxt)}</div>
+    ${supResumenHtml(sinQ)}
+    <div class="m-buscar"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}"></div>
+    <div id="supLista">${l.slice(0, n0).map(supCard).join('') || `<div class="ini-card"><div class="ini-vacio">${supEsSupervisor() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
 }
 // Tienda de códigos: lo que necesitan → opciones con stock (primero lo disponible en Lurín).
 const APP_TIENDA = { q:'', fam:'', cart:{} };
@@ -16262,6 +16438,107 @@ async function appPanelPdf(){
   }catch(err){ appToast('No se pudo generar el PDF. Inténtalo de nuevo.'); }
 }
 
+// PDF de un requerimiento dibujado directo con jsPDF (13.10.2026, Piero: "al exportar en PDF haz bien el diseño en
+// el celular"). Ya no es una foto de la pantalla: sale igual en el celular y en la PC, con texto nítido.
+async function rqPdfNativo(cod){
+  rqPreparar();
+  const items = RQ.filas.filter(function(r){ return r.codRequerimiento === cod; });
+  if(!items.length){ appToast('No encontré el requerimiento ' + cod + '.'); return; }
+  appToast('Preparando el PDF…');
+  let JsPDF; try{ JsPDF = await appCargarJsPdf(); }catch(err){ appToast('No se pudo preparar el PDF: revisa tu conexión.'); return; }
+  try{
+  const pdf = new JsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
+  const W = 210, M = 12, CW = W - 2 * M, BOT = 280;
+  const NAVY = [10, 30, 100], TEAL = [26, 140, 134], GOLD = [210, 166, 74], INK = [28, 39, 51], SOFT = [100, 114, 130], LINEA = [221, 229, 240];
+  const T = function(v){ return String(v == null ? '' : v).replace(/[^\x20-\x7E -ÿ]/g, '').replace(/\s+/g, ' ').trim(); };
+  const col = function(c, f){ pdf[f || 'setTextColor'].apply(pdf, c); };
+  const fuente = function(t, sz, c){ pdf.setFont('helvetica', t); pdf.setFontSize(sz); col(c || INK); };
+  const r0 = items[0], nRq = cod.replace(/^000\d-0*/, ''), hoy = rqFecha(new Date()), corte = rqFecha(appIndCorte());
+  const logo = appLogo();
+  // Cabecera grande (pág. 1) y chica (las demás)
+  const cab = function(grande){
+    const h = grande ? 30 : 15;
+    col(NAVY, 'setFillColor'); pdf.rect(0, 0, W, h, 'F');
+    col(TEAL, 'setFillColor'); pdf.rect(0, h, W * .35, 1.4, 'F'); col(GOLD, 'setFillColor'); pdf.rect(W * .35, h, W * .3, 1.4, 'F'); col(TEAL, 'setFillColor'); pdf.rect(W * .65, h, W * .35, 1.4, 'F');
+    if(logo){ try{ pdf.addImage(logo, 'PNG', M, grande ? 8.5 : 3.5, grande ? 40 : 25, grande ? 12.8 : 8); }catch(err){} }
+    if(grande){
+      fuente('bold', 8, [159, 227, 216]); pdf.text('REQUERIMIENTO', W - M, 10.5, { align:'right' });
+      fuente('bold', 19, [255, 255, 255]); pdf.text(cod, W - M, 19, { align:'right' });
+      fuente('normal', 8, [185, 205, 242]); pdf.text('Datos al ' + corte + '  ·  generado el ' + hoy, W - M, 25.5, { align:'right' });
+    } else { fuente('bold', 10, [255, 255, 255]); pdf.text('Requerimiento ' + cod, W - M, 9.5, { align:'right' }); }
+    return h + 9;
+  };
+  let y = cab(true);
+  const salto = function(alto){ if(y + alto > BOT){ pdf.addPage(); y = cab(false); return true; } return false; };
+  // Proyecto y cliente
+  const pn = pdf.splitTextToSize(T(pryNombre(r0.idProyecto) || r0.idProyecto || 'Sin proyecto'), CW);
+  fuente('bold', 15, NAVY); pdf.text(pn, M, y + 2); y += pn.length * 6.2;
+  fuente('normal', 10, SOFT); pdf.text(T(r0.proyecto) + (r0.idProyecto ? '   ·   ' + T(r0.idProyecto) : ''), M, y + 1); y += 5;
+  const pl = T(pryLinea(r0.idProyecto)); if(pl){ fuente('normal', 8.5, SOFT); const l = pdf.splitTextToSize(pl, CW); pdf.text(l, M, y + 1); y += l.length * 4; }
+  y += 3;
+  // Datos: quién pidió, fecha, ítems
+  const caja = function(x, w, h, et, val){ col([238, 243, 251], 'setFillColor'); pdf.roundedRect(x, y, w, h, 2.5, 2.5, 'F');
+    fuente('bold', 7, SOFT); pdf.text(et, x + 4, y + 5.5); fuente('bold', 10.5, NAVY); pdf.text(pdf.splitTextToSize(T(val) || '—', w - 8).slice(0, 2), x + 4, y + 11); };
+  const g = 3, w1 = CW * .5, w2 = CW * .3 - g, w3 = CW - w1 - w2 - 2 * g;
+  caja(M, w1, 17, 'PIDIÓ · SUPERVISOR', r0.responsable); caja(M + w1 + g, w2, 17, 'FECHA DEL REQUERIMIENTO', rqFecha(r0.fReq)); caja(M + w1 + w2 + 2 * g, w3, 17, 'ÍTEMS', items.length);
+  y += 17 + 3;
+  if(T(r0.obs)){ const l = pdf.splitTextToSize(T(r0.obs), CW - 8); const h = 9 + l.length * 4.2; col([238, 243, 251], 'setFillColor'); pdf.roundedRect(M, y, CW, h, 2.5, 2.5, 'F');
+    fuente('bold', 7, SOFT); pdf.text('OBSERVACIÓN', M + 4, y + 5.5); fuente('italic', 9, INK); pdf.text(l, M + 4, y + 10); y += h + 3; }
+  // Avance: % en obra + 5 pasos
+  const pasoN = { rev:0, com:0, oc:0, alm:0, obra:0, arch:0 }; items.forEach(function(r){ pasoN[supPaso(r)]++; });
+  const pasoI = function(r){ return SUP_PASOS.findIndex(function(p){ return p[0] === supPaso(r); }); };
+  const activos = items.filter(function(r){ return r.estadoCalc !== 'Archivado'; });
+  const pct = activos.length ? Math.round(pasoN.obra / activos.length * 100) : 0;
+  y += 2; col(LINEA, 'setDrawColor'); pdf.setLineWidth(.3); pdf.roundedRect(M, y, CW, 40, 3, 3, 'S');
+  fuente('bold', 7.5, SOFT); pdf.text('AVANCE DEL REQUERIMIENTO', M + 5, y + 7);
+  fuente('bold', 22, TEAL); pdf.text(pct + '%', M + 5, y + 17); fuente('normal', 8.5, SOFT); pdf.text('en obra · ' + pasoN.obra + ' de ' + activos.length + ' ítems' + (pasoN.arch ? ' · ' + pasoN.arch + ' archivado' + (pasoN.arch === 1 ? '' : 's') : ''), M + 5, y + 22);
+  const bx = M + 62, bw = CW - 67; col([232, 238, 247], 'setFillColor'); pdf.roundedRect(bx, y + 12, bw, 4, 2, 2, 'F'); if(pct){ col([79, 184, 134], 'setFillColor'); pdf.roundedRect(bx, y + 12, Math.max(4, bw * pct / 100), 4, 2, 2, 'F'); }
+  const sy = y + 30, paso = CW / 5;
+  SUP_PASOS.forEach(function(p, k){
+    const llego = activos.filter(function(r){ return pasoI(r) >= k; }).length, est = p[0] === 'obra' ? (pasoN.obra ? 'ok' : '') : pasoN[p[0]] ? 'act' : (activos.length && llego === activos.length ? 'ok' : '');
+    const cx = M + paso * k + paso / 2;
+    if(k){ col(est ? [95, 211, 160] : [214, 222, 234], 'setDrawColor'); pdf.setLineWidth(1); pdf.line(cx - paso + 4.5, sy, cx - 4.5, sy); }
+    col(est === 'ok' ? [63, 174, 120] : est === 'act' ? [242, 182, 50] : [214, 222, 234], 'setFillColor'); pdf.circle(cx, sy, 4, 'F');
+    fuente('bold', 8.5, est ? [255, 255, 255] : SOFT); pdf.text(String(pasoN[p[0]]), cx, sy + 1.1, { align:'center' });
+    fuente(est === 'act' ? 'bold' : 'normal', 7.5, est ? NAVY : SOFT); pdf.text(p[2], cx, sy + 8.5, { align:'center' });
+  });
+  y += 40 + 7;
+  // Ítems: primero lo pendiente, luego lo atendido
+  const pills = { espera:[[255, 236, 190], [140, 88, 8]], camino:[[214, 228, 250], [30, 70, 160]], recibido:[[222, 234, 250], [30, 70, 160]], tarde:[[250, 215, 215], [170, 40, 40]], ok:[[205, 238, 219], [20, 110, 70]], '':[[232, 236, 242], [80, 90, 105]] };
+  const bloque = function(tit, colr, l){
+    if(!l.length) return;
+    salto(16); fuente('bold', 11, colr); pdf.text(tit + ' (' + l.length + ')', M, y + 4); col(colr, 'setDrawColor'); pdf.setLineWidth(.6); pdf.line(M, y + 6, M + CW, y + 6); y += 10;
+    l.forEach(function(r, i){
+      const sc = polarSitCorta(r), pc = pills[sc[0]] || pills[''];
+      const nom = pdf.splitTextToSize(T(r.producto || '—'), CW - 62), cv = pdf.splitTextToSize('Cómo va: ' + T(rqComoVa(r)), CW - 14);
+      const lm = r.estadoCalc === 'En Revisión' ? rqLimaLibre(r) : null, stk = lm && lm.libre > 0 ? 'Almacén sí cuenta con stock: ' + polarNum(lm.libre) + ' ' + T(lm.um) + ' en Lima' + (lm.libre >= lm.falta - 0.001 ? ' (alcanza para lo pedido)' : ' (alcanza para una parte)') : '';
+      const h = 4 + nom.length * 4.3 + 5 + cv.length * 4 + (stk ? 6.5 : 0) + 3;
+      salto(h);
+      if(i % 2 === 0){ col([248, 250, 253], 'setFillColor'); pdf.rect(M, y - 1, CW, h, 'F'); }
+      fuente('bold', 9, TEAL); pdf.text(String(i + 1), M + 2, y + 4);
+      fuente('bold', 9.5, INK); pdf.text(nom, M + 9, y + 4);
+      let yy = y + 4 + nom.length * 4.3;
+      fuente('normal', 8, SOFT); pdf.text('Código ' + T(r.idProducto || '—') + '   ·   Pidió ' + polarNum(r.cantidad) + ' ' + T(r.unidad), M + 9, yy); yy += 5;
+      fuente('normal', 8.5, INK); pdf.text(cv, M + 9, yy); yy += cv.length * 4;
+      if(stk){ col([214, 243, 227], 'setFillColor'); pdf.roundedRect(M + 9, yy - 2.6, pdf.getTextWidth(stk) * 8 / 8.5 + 6, 5.4, 1.5, 1.5, 'F'); fuente('bold', 8, [15, 107, 70]); pdf.text(stk, M + 12, yy + 1.2); }
+      // Estado como etiqueta a la derecha
+      const et = T(sc[2]).slice(0, 34); fuente('bold', 7.5, pc[1]); const tw = Math.min(50, pdf.getTextWidth(et) + 6);
+      col(pc[0], 'setFillColor'); pdf.roundedRect(M + CW - tw - 1, y + .3, tw, 5.6, 2.8, 2.8, 'F'); pdf.text(et, M + CW - tw / 2 - 1, y + 4, { align:'center' });
+      y += h; col(LINEA, 'setDrawColor'); pdf.setLineWidth(.2); pdf.line(M, y - 1, M + CW, y - 1);
+    });
+    y += 5;
+  };
+  bloque('Pendientes', [190, 120, 10], items.filter(function(r){ return !rqItemListo(r); }));
+  bloque('Atendidos', [30, 130, 80], items.filter(function(r){ return rqItemListo(r) && r.estadoCalc !== 'Archivado'; }));
+  bloque('Archivados', [110, 120, 135], items.filter(function(r){ return r.estadoCalc === 'Archivado'; }));
+  // Pie de página
+  const np = pdf.internal.getNumberOfPages();
+  for(let i = 1; i <= np; i++){ pdf.setPage(i); col(LINEA, 'setDrawColor'); pdf.setLineWidth(.3); pdf.line(M, 287, W - M, 287);
+    fuente('normal', 7.5, SOFT); pdf.text('Grupo Friopacking  ·  Requerimiento ' + cod + '  ·  generado el ' + hoy, M, 291.5); pdf.text('Página ' + i + ' de ' + np, W - M, 291.5, { align:'right' }); }
+  pdf.save('Requerimiento ' + nRq + ' - Grupo Friopacking.pdf');
+  }catch(err){ appToast('No se pudo generar el PDF. Inténtalo de nuevo.'); }
+}
+
 // ---------- PDF de un requerimiento (06.10.2026, Piero: "cuando se consulte por un req, la opción de
 // exportarlo como pdf ... debe ser del total del requerimiento"). Panel con TODOS los ítems (pendientes y
 // atendidos), sin precios, y se exporta con appPanelPdf.
@@ -16354,7 +16631,7 @@ function appReqPdf(cod){
   const dato = function(t, st){ return t ? appFilaHtml('', 'rq-pdf', t, st) : ''; };
   const sec = function(tit, cls, l){ return l.length ? `<details class="m-sec ${cls}" open><summary><span>${tit}</span><b>${l.length}</b></summary>${l.map(fila).join('')}</details>` : ''; };
   appListaAbrir('📄 Requerimiento ' + escapeHtml(cod.replace(/^0001-0*/, '')), escapeHtml(cod) + ' · datos al ' + rqFecha(appIndCorte()), `
-    <button type="button" class="ini-link" data-ocpdf="1">📄 Exportar a PDF</button>
+    <button type="button" class="ini-link" data-reqpdf="${escapeHtml(cod)}">📄 Exportar a PDF</button>
     <div class="ini-card m-total"><span>Avance del requerimiento</span><b>${pct}%</b><small>${listos.length} de ${items.length} ítems atendidos</small>
       <div class="m-tiles"><div><span>Ítems</span><b>${items.length}</b></div><div><span>Atendidos</span><b>${listos.length}</b></div><div><span>Pendientes</span><b>${pend.length}</b></div></div>
       <div class="asis-estados">${appChipsEstado(est)}</div>
@@ -17527,8 +17804,9 @@ function appClickInicio(e){
   if(b.dataset.impdf){ appImpPdf(); return; }
   if(b.dataset.gpsub){ APP_GP.sub = b.dataset.gpsub; return appRenderInicio(); }
   if(b.dataset.pcsub){ APP_PC.sub = b.dataset.pcsub; return appRenderInicio(); }
-  if(b.dataset.supf){ APP_SUP.f = b.dataset.supf; APP_SUP.tope = 30; return appRenderInicio(); }
-  if(b.dataset.supmas){ APP_SUP.tope += 30; const y = window.scrollY; appRenderInicio(); return window.scrollTo(0, y); }
+  if(b.dataset.supsel){ const p = b.dataset.supsel.split('|'); if(p[0] === 'cli'){ APP_SUP.cli = p[1]; APP_SUP.pry = ''; } else { APP_SUP.pry = p[1]; const g = supGrupos().l.find(function(x){ return x.id === p[1]; }); if(g && !APP_SUP.cli) APP_SUP.cli = g.cli; } return appRenderInicio(); }
+  if(b.dataset.suppaso){ APP_SUP.paso = APP_SUP.paso === b.dataset.suppaso ? '' : b.dataset.suppaso; return appRenderInicio(); }
+  if(b.dataset.supx){ if(b.dataset.supx === 'cli'){ APP_SUP.cli = ''; APP_SUP.pry = ''; } else APP_SUP.pry = ''; return appRenderInicio(); }
   if(b.dataset.tdfam != null){ APP_TIENDA.fam = b.dataset.tdfam; APP_TIENDA.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.tdq){ tdCantidad(b.dataset.tdq); return appTiendaPintar(); }
   if(b.dataset.tdcarro) return appTiendaCarro();
