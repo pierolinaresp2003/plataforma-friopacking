@@ -2287,7 +2287,7 @@
       <div class="crt-resumen" id="crtResumen" hidden></div>
       <div class="crt-msg" id="crtMsg" hidden></div>
       <div id="crtVista"></div>
-      <input type="file" id="crtArchivo" accept="application/pdf,image/*" hidden>
+      <input type="file" id="crtArchivo" accept="application/pdf,image/*" multiple hidden>
 
       <div class="crt-accion" id="crtAccion" hidden>
         <span class="n" id="crtAccionN"></span>
@@ -11063,7 +11063,7 @@ function crtPedirArchivo(claves, tipo){
   const inp = document.getElementById('crtArchivo');
   inp.value = ''; inp.click();
 }
-async function crtRecibirArchivo(file){
+async function crtRecibirArchivo(file, lote){
   if(!CRT.pendiente || !file) return;
   const { claves, tipo } = CRT.pendiente;
   CRT.pendiente = null;
@@ -11084,6 +11084,7 @@ async function crtRecibirArchivo(file){
   });
   CRT.subidas.set(huella, reg);
   if(!tocados.length) return;
+  if(lote) crtMensaje('Subiendo ' + lote + ': <b>' + escapeHtml(reg.nombre) + '</b>…');
 
   // Guardado real en Drive. Si no hay URL configurada, queda solo en pantalla.
   const res = await crtGuardarEnDrive(file, tipo, tocados);
@@ -11105,6 +11106,7 @@ async function crtRecibirArchivo(file){
       (yaEstaba.length > 4 ? ' y ' + (yaEstaba.length-4) + ' más' : '') + ': no se guarda otra copia.'
     : '';
 
+  if(lote) return { ok:!!(res && res.ok), nombre:reg.nombre, error:res && !res.ok ? (res.sinConexion ? 'sin conexión a Drive' : (res.error || 'error de red')) : '', tocados:tocados };
   if(tocados.length > 1){
     CRT.sel.clear();
     crtMensaje('<b>' + escapeHtml(reg.nombre) + '</b> quedó como ' + crtNombreDoc(tipo) + ' de ' +
@@ -12998,9 +13000,21 @@ document.getElementById('crtLimpiar').addEventListener('click', ()=>{
     CRT.pry=''; CRT.abiertos.clear(); crtRefrescarPry(); crtDibujar(); inp.focus();
   });
 })();
-document.getElementById('crtArchivo').addEventListener('change', (e)=>{
-  const f = e.target.files && e.target.files[0];
-  if(f) crtRecibirArchivo(f);
+// Varios archivos a la vez para el mismo certificado o ficha (13.10.2026, Piero): se suben uno tras otro
+// a los mismos productos y al final queda un solo resumen.
+document.getElementById('crtArchivo').addEventListener('change', async (e)=>{
+  const fs = [...(e.target.files || [])], pend = CRT.pendiente;
+  if(!fs.length || !pend) return;
+  if(fs.length === 1) return crtRecibirArchivo(fs[0]);
+  const R = [];
+  for(let i = 0; i < fs.length; i++){ CRT.pendiente = { claves:pend.claves, tipo:pend.tipo }; R.push(await crtRecibirArchivo(fs[i], (i + 1) + ' de ' + fs.length)); }
+  const ok = R.filter(function(r){ return r && r.ok; }), mal = R.filter(function(r){ return r && !r.ok; });
+  const tocados = [...new Set([].concat.apply([], R.map(function(r){ return r ? r.tocados : []; })))];
+  const html = '<b>' + R.filter(Boolean).length + ' archivos</b> quedaron como ' + crtNombreDoc(pend.tipo) + ' de ' + (tocados.length === 1 ? 'este producto' : tocados.length + ' productos') + ': ' +
+    R.filter(Boolean).map(function(r){ return escapeHtml(r.nombre); }).join(', ') + '.' + (ok.length ? ' ' + ok.length + ' guardado' + (ok.length === 1 ? '' : 's') + ' en Drive.' : '') +
+    (mal.length ? ' <b>No se guardaron en Drive:</b> ' + mal.map(function(r){ return escapeHtml(r.nombre) + ' (' + escapeHtml(r.error) + ')'; }).join(', ') + '.' : '');
+  if(tocados.length > 1){ CRT.sel.clear(); crtMensaje(html); } else { crtMensaje(''); if(tocados[0]) tocados[0].nota = { html:html }; }
+  crtDibujar();
 });
 document.getElementById('crtSubirCert').addEventListener('click', ()=> crtPedirArchivo([...CRT.sel], 'cert'));
 document.getElementById('crtSubirFicha').addEventListener('click', ()=> crtPedirArchivo([...CRT.sel], 'ficha'));
@@ -15298,20 +15312,21 @@ function appPendComprasHtml(soloLista){
       o.n++; if(pry) o.prys.add(pry); ocs.set(r.codOrden, o); }
     else { const p = peds.get(r.codPedido) || { ped:r.codPedido, f:r.fPedido, persona:r.persona, prys:new Set(), n:0 }; p.n++; if(pry) p.prys.add(pry); peds.set(r.codPedido, p); }
   });
-  const venc = [], sem = [], luego = [];
-  [...ocs.values()].forEach(function(o){ const d = o.f ? busdayCount(o.f, hoy) : 0; o.d = d; if(o.f && d > 0 && !ocEnTransito(o.oc)) venc.push(o); else if(o.f && polarDia(o.f) <= finSem) sem.push(o); else luego.push(o); });
-  venc.sort(function(a,b){ return b.d - a.d; }); sem.sort(function(a,b){ return a.f - b.f; }); luego.sort(function(a,b){ return (a.f || 9e15) - (b.f || 9e15); });
+  // Sin "Esta semana" (13.10.2026, Piero): todo lo que no está vencido va en "Más adelante".
+  const venc = [], luego = [];
+  [...ocs.values()].forEach(function(o){ const d = o.f ? busdayCount(o.f, hoy) : 0; o.d = d; if(o.f && d > 0 && !ocEnTransito(o.oc)) venc.push(o); else luego.push(o); });
+  venc.sort(function(a,b){ return b.d - a.d; }); luego.sort(function(a,b){ return (a.f || 9e15) - (b.f || 9e15); });
   const pl = [...peds.values()].sort(function(a,b){ return (a.f || 0) - (b.f || 0); });
   const nom = function(p){ return (PD_PERSONAS[p] || p || '—').split(' ')[0]; };
   const prysTxt = function(x){ const l = [...x.prys].map(appImpNombre); return l.length ? polarCorta(l.slice(0, 2).join(' · '), 40) + (l.length > 2 ? ' +' + (l.length - 2) : '') : ''; };
-  const EST = { venc:'Vencida', sem:'Esta semana', luego:'Más adelante' };
+  const EST = { venc:'Vencida', luego:'Más adelante' };
   // Entregadas: del año / mes elegido (por defecto el mes en curso); con el buscador, todas.
   const entAll = appEntregadas().filter(function(o){ return !APP_PC.persona || o.persona === APP_PC.persona; });
   // Entregadas vuelve a ser pestaña (12.10.2026, Piero: "una pestaña que muestre las OC que se entregaron").
   const entY = +APP_PC.entAnio || c.getUTCFullYear(), entM = APP_PC.entMes === '0' ? 0 : (+APP_PC.entMes || (APP_PC.entAnio ? 0 : c.getUTCMonth() + 1));
   const entPer = entAll.filter(function(o){ return o.f && o.f.getUTCFullYear() === entY && (!entM || o.f.getUTCMonth() + 1 === entM); });
-  const S = { venc:['🔴', 'Vencidas', 'vc', venc, 'Ya pasó la fecha de entrega · la más atrasada primero'], sem:['🟠', 'Esta semana', 'sm', sem, 'Entrega pactada hasta el domingo'],
-    luego:['🔵', 'Más adelante', 'lu', luego, 'Entrega después de esta semana'], ped:['⚪', 'Pedidos sin OC', 'pd', pl, 'Compras todavía no emite la orden · el más antiguo primero'],
+  const S = { venc:['🔴', 'Vencidas', 'vc', venc, 'Ya pasó la fecha de entrega · la más atrasada primero'],
+    luego:['🔵', 'Más adelante', 'lu', luego, 'Todavía no vence · la entrega más próxima primero'], ped:['⚪', 'Pedidos sin OC', 'pd', pl, 'Compras todavía no emite la orden · el más antiguo primero'],
     ent:['✅', 'Entregadas', 'en', entPer, 'Ya llegaron a Lurín o se cerraron · la más reciente primero · toca una para ver su detalle y presupuesto'] };
   if(!S[APP_PC.sec]) APP_PC.sec = 'venc';
   const cardOC = function(o, i, k){
@@ -15405,7 +15420,7 @@ function appPendComprasHtml(soloLista){
         : '<div class="imp-linea">' + l.slice(0, tope).map(function(o, i){ return cardOC(o, i, k); }).join('') + '</div>')
       + (l.length > tope ? `<button type="button" class="ini-link" data-pcmas="1">Ver más (${appN(l.length - tope)} restantes) ›</button>` : '');
   };
-  const lista = q ? (['venc', 'sem', 'luego', 'ped', 'ent'].map(bloque).join('') || `<div class="ini-vacio">No hay OC ni pedidos con "${escapeHtml(APP_PC.q)}".</div>`) : bloque(APP_PC.sec);
+  const lista = q ? (['venc', 'luego', 'ent', 'ped'].map(bloque).join('') || `<div class="ini-vacio">No hay OC ni pedidos con "${escapeHtml(APP_PC.q)}".</div>`) : bloque(APP_PC.sec);
   if(soloLista) return lista;
   // Comprador en una lista desplegable (12.10.2026, Piero: "que sea para escoger por lista, no puntitos").
   const opP = function(v, t){ return `<option value="${escapeHtml(v)}"${v === (APP_PC.persona || '') ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
@@ -15413,7 +15428,7 @@ function appPendComprasHtml(soloLista){
     // Buscador general arriba (07.10.2026, Piero: "un buscador ahí general para todo, así se puede buscar
     // cualquier OC"): pendientes y también las ya entregadas, cerradas o anuladas.
     + `<div class="m-buscar pc-buscar-gen"><input type="search" id="pcBusca" placeholder="🔍 Buscar cualquier OC (pendiente o entregada), pedido, req., código, producto, proveedor o cliente" value="${escapeHtml(APP_PC.q || '')}"></div>`
-    + `<div class="m-resumen m-pl-tabs imp-tabs cinco">${tile('venc')}${tile('sem')}${tile('luego')}${tile('ped')}${tile('ent')}</div>`
+    + `<div class="m-resumen m-pl-tabs imp-tabs">${tile('venc')}${tile('luego')}${tile('ent')}${tile('ped')}</div>`
     + `<div id="pcLista">${lista}</div>`;
 }
 
