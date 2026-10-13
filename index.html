@@ -1801,7 +1801,7 @@
     .sup-top{display:flex;justify-content:space-between;gap:8px;} .sup-num{font-weight:900;color:#1b3a6b;font-size:15px;} .sup-f{font-size:12.5px;color:var(--ink-soft);}
     .sup-py{font-weight:700;font-size:14px;margin-top:4px;color:var(--ink);} .sup-py small{font-size:11.5px;color:#5b7aa6;font-weight:700;} .sup-resp{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
     .sup-bar{display:flex;align-items:center;gap:10px;margin:10px 0 8px;} .sup-bar i{flex:1;height:9px;border-radius:6px;background:#eef2f8;overflow:hidden;} .sup-bar em{display:block;height:100%;background:#7cc9a3;border-radius:6px;} .sup-bar span{font-size:12.5px;color:#4c5f7a;}
-    .sup-pasos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;} .sup-p{text-align:center;border-radius:12px;padding:7px 2px;background:#f4f6fa;opacity:.55;} .sup-p.si{opacity:1;}
+    .sup-pasos{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;} .sup-p{text-align:center;border-radius:12px;padding:7px 2px;background:#f4f6fa;opacity:.55;border:0;font:inherit;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;} .sup-p:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(27,58,107,.12);opacity:1;} .sup-p.si{opacity:1;}
     .sup-p i{display:block;font-style:normal;font-size:16px;} .sup-p b{display:block;font-size:15px;font-weight:900;color:#1b3a6b;} .sup-p small{display:block;font-size:10.5px;font-weight:700;color:#4c5f7a;}
     .sup-p.rev.si{background:#e8eefc;} .sup-p.com.si{background:#fde9de;} .sup-p.oc.si{background:#fff3cf;} .sup-p.alm.si{background:#e5f0fb;} .sup-p.obra.si{background:#dcf3e6;}
     #supLista{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:0 12px;align-items:start;} #supLista > .ini-card,#supLista > .sup-mas{grid-column:1 / -1;} .sup-det{margin-top:10px;} .sup-det summary{cursor:pointer;font-size:13px;font-weight:800;color:#3f6aa8;} .sup-mas{display:block;margin:6px auto 0;}
@@ -13419,6 +13419,7 @@ function appConstruir(){
   });
   document.getElementById('section-inicio').addEventListener('change', function(e){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
+    if(e.target.id === 'supCli' || e.target.id === 'supPry'){ if(e.target.id === 'supCli'){ APP_SUP.cli = e.target.value; APP_SUP.pry = ''; } else APP_SUP.pry = e.target.value; APP_SUP.tope = 30; return appRenderInicio(); }
     if(e.target.id === 'pcPer'){ APP_PC.persona = e.target.value; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
     if(e.target.id === 'pcEntAnio' || e.target.id === 'pcEntMes'){ if(e.target.id === 'pcEntAnio'){ APP_PC.entAnio = e.target.value; APP_PC.entMes = String(+e.target.value === appIndCorte().getUTCFullYear() ? appIndCorte().getUTCMonth() + 1 : 0); } else APP_PC.entMes = e.target.value; APP_PC.entTope = 60; return appRenderInicio(); }
     if(e.target.id === 'dciFotoIn') return appDciFoto(e.target.files && e.target.files[0]);
@@ -14500,7 +14501,7 @@ function appDciFoto(file){
 // ---------- Módulo Supervisor (13.10.2026, Piero) ----------
 // "Supervisor es un nuevo módulo que va a indicar literalmente el estado de los requerimientos (la
 // trazabilidad)" + una "tienda virtual" de códigos: escriben lo que necesitan y ven lo disponible.
-const APP_SUP = { q:'', f:'pend', tope:30 };
+const APP_SUP = { q:'', f:'pend', tope:30, cli:'', pry:'' };
 const SUP_PASOS = [['rev', '📝', 'Revisión'], ['com', '🛒', 'Compras'], ['oc', '🧾', 'Con OC'], ['alm', '🏬', 'Almacén'], ['obra', '🏗️', 'En obra']];
 function supPaso(r){
   if(rqItemListo(r)) return 'obra';
@@ -14521,6 +14522,17 @@ function appSupReqHtml(){
     const g = M.get(k) || { cod:k, py:r.proyecto || '', id:r.idProyecto || '', resp:r.responsable || '', f:r.fReq, items:[], n:{ rev:0, com:0, oc:0, alm:0, obra:0 }, txt:'' };
     g.items.push(r); g.n[supPaso(r)]++; g.txt += ' ' + (r.producto || '') + ' ' + (r.idProducto || ''); M.set(k, g); });
   let l = [...M.values()];
+  // Filtros de cliente y proyecto (13.10.2026, Piero). El proyecto depende del cliente elegido.
+  l.forEach(function(g){ g.cli = appImpNombre(g.py || '') || '—'; });
+  const clis = {}; l.forEach(function(g){ clis[g.cli] = (clis[g.cli] || 0) + 1; });
+  if(APP_SUP.cli && !clis[APP_SUP.cli]) APP_SUP.cli = '';
+  if(APP_SUP.cli) l = l.filter(function(g){ return g.cli === APP_SUP.cli; });
+  const prys = {}; l.forEach(function(g){ if(g.id) prys[g.id] = (prys[g.id] || 0) + 1; });
+  if(APP_SUP.pry && !prys[APP_SUP.pry]) APP_SUP.pry = '';
+  if(APP_SUP.pry) l = l.filter(function(g){ return g.id === APP_SUP.pry; });
+  const opS = function(v, t, sel){ return `<option value="${e(v)}"${v === sel ? ' selected' : ''}>${e(t)}</option>`; };
+  const filtrosS = `<div class="m-filtros sup-filtros"><label><span>🏢 Cliente</span><select class="ini-select" id="supCli">${opS('', 'Todos los clientes', APP_SUP.cli)}${Object.keys(clis).sort().map(function(c){ return opS(c, polarCorta(c, 40) + ' (' + clis[c] + ')', APP_SUP.cli); }).join('')}</select></label>
+    <label><span>🏗️ Proyecto</span><select class="ini-select" id="supPry">${opS('', 'Todos los proyectos', APP_SUP.pry)}${Object.keys(prys).sort().reverse().map(function(id){ const n = /^SIN PROYECTO/i.test(id) ? 'Sin proyecto (almacén)' : id + (pryNombre(id) ? ' · ' + polarCorta(pryNombre(id), 34) : ''); return opS(id, n + ' (' + prys[id] + ')', APP_SUP.pry); }).join('')}</select></label></div>`;
   l.forEach(function(g){ g.tot = g.items.length; g.ok = g.n.obra; g.pct = g.tot ? dciN2(g.ok / g.tot * 100) : 0; g.txt = polarNorm(g.cod + ' ' + g.py + ' ' + g.id + ' ' + g.resp + g.txt); });
   const q = polarNorm(APP_SUP.q || '').trim();
   if(q) l = l.filter(function(g){ return q.split(' ').every(function(w){ return g.txt.indexOf(w) !== -1; }); });
@@ -14536,14 +14548,14 @@ function appSupReqHtml(){
       <div class="sup-py">${e(polarCorta(appImpNombre(g.py || '—'), 48))}${g.id && !/^SIN PROYECTO/i.test(g.id) ? ` <small>${e(g.id)}</small>` : ''}</div>
       ${sup ? '' : `<div class="sup-resp">👷 ${e(polarCorta(g.resp, 40))}</div>`}
       <div class="sup-bar"><i><em style="width:${g.pct}%"></em></i><span>${nPend ? `<b>${g.ok}/${g.tot}</b> ítems en obra` : '<b>✅ Todo en obra</b>'}</span></div>
-      <div class="sup-pasos">${SUP_PASOS.map(function(p){ return `<span class="sup-p ${p[0]}${g.n[p[0]] ? ' si' : ''}"><i>${p[1]}</i><b>${g.n[p[0]]}</b><small>${p[2]}</small></span>`; }).join('')}</div>
+      <div class="sup-pasos">${SUP_PASOS.map(function(p){ return `<button type="button" class="sup-p ${p[0]}${g.n[p[0]] ? ' si' : ''}" data-req="${e(g.cod)}" title="Ver la trazabilidad completa"><i>${p[1]}</i><b>${g.n[p[0]]}</b><small>${p[2]}</small></button>`; }).join('')}</div>
       <details class="sup-det"><summary>Ver ítems</summary>${items.map(function(r){ return polarItemCorto(r); }).join('')}
         <div class="asis-acc"><button type="button" data-req="${e(g.cod)}">🔎 Trazabilidad completa</button></div></details></div>`;
   };
   return `<div class="sup">
     <div class="sup-hero"><small>${sup ? 'MIS REQUERIMIENTOS' : 'REQUERIMIENTOS'}</small><h2>${sup ? '¿Cómo va lo que pediste?' : 'Trazabilidad de requerimientos'}</h2>
       <div class="sup-kpis"><div><b>${pend.length}</b><span>Req. con pendientes</span></div><div><b>${itemsPend}</b><span>Ítems por llegar a obra</span></div><div><b>${pctTot}%</b><span>Atendido</span></div></div></div>
-    <div class="m-buscar"><input type="search" id="supBusca" placeholder="🔍 N° de req., proyecto, cliente o producto" value="${e(APP_SUP.q)}"></div>
+    ${filtrosS}<div class="m-buscar"><input type="search" id="supBusca" placeholder="🔍 N° de req., proyecto, cliente o producto" value="${e(APP_SUP.q)}"></div>
     <div class="sup-chips">${chip('pend', '⏳ Pendientes', pend.length)}${chip('comp', '✅ Completos', comp.length)}${chip('todos', 'Todos', l.length)}</div>
     <div id="supLista">${ver.slice(0, APP_SUP.tope).map(card).join('') || `<div class="ini-card"><div class="ini-vacio">${sup && !base.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}
     ${ver.length > APP_SUP.tope ? `<button type="button" class="ix-btn sup-mas" data-supmas="1">Ver ${Math.min(30, ver.length - APP_SUP.tope)} más de ${ver.length - APP_SUP.tope}</button>` : ''}</div></div>`;
