@@ -25,6 +25,11 @@
  * en qué trabajará, bloqueos, prioridad y los comentarios del equipo. Cada uno solo registra y edita lo suyo
  * (mismo control por correo); comentar puede cualquiera. La plataforma lo lee con doGet?accion=dci.
  *
+ * Desde el 13.10.2026 (v7): cada tarea del Daily call in tiene PROYECTO / FRENTE y ESTADO (Pendiente / En proceso /
+ * Finalizada, con la fecha en que se finalizó). Cambia el estado el dueño de la tarea o PLINARES (administrador).
+ * También guarda la FOTO de cada colaborador (pestaña "Daily fotos", imagen chica en texto). Las columnas nuevas se
+ * agregan solas al final de la hoja; no se pierde nada de lo ya registrado.
+ *
  * ACTUALIZAR (si ya estaba instalado): pega este archivo encima del anterior → Guardar →
  *   Implementar → Administrar implementaciones → ✏️ editar → Versión: Nueva versión → Implementar.
  *   Así la URL /exec sigue siendo la misma y no hay que tocar el index.html.
@@ -146,7 +151,10 @@ function tareaGuardar(d) {
 }
 // ---------- Daily Call In (12.10.2026, v6) ----------
 const HOJA_DCI = 'Daily call in';
-const COLS_DCI = ['ID', 'Día', 'Código', 'Colaborador', 'Área', '¿Qué avancé?', '¿En qué trabajaré?', 'Bloqueos', 'Prioridad', 'Comentarios', 'Registró', 'Creada', 'Actualizada'];
+const COLS_DCI = ['ID', 'Día', 'Código', 'Colaborador', 'Área', '¿Qué avancé?', '¿En qué trabajaré?', 'Bloqueos', 'Prioridad', 'Comentarios', 'Registró', 'Creada', 'Actualizada', 'Proyecto / frente', 'Estado', 'Finalizada'];
+const ESTADOS_DCI = ['Pendiente', 'En proceso', 'Finalizada'];
+const DCI_ADMIN = ['PLINARES'];
+const HOJA_FOTOS = 'Daily fotos';
 const PRIORIDADES = ['Alta', 'Media', 'Baja'];
 function hojaDci() {
   const libro = SpreadsheetApp.getActiveSpreadsheet();
@@ -159,6 +167,17 @@ function hojaDci() {
     h.getRange('B:B').setNumberFormat('@');
     h.setColumnWidth(6, 380); h.setColumnWidth(7, 380); h.setColumnWidth(8, 260); h.setColumnWidth(10, 320);
   }
+  // v7: columnas nuevas al final (hojas creadas con la v6).
+  if (h.getLastColumn() < COLS_DCI.length || !h.getRange(1, COLS_DCI.length).getValue()) {
+    h.getRange(1, 1, 1, COLS_DCI.length).setValues([COLS_DCI]).setFontWeight('bold').setBackground('#0a1e64').setFontColor('#ffffff');
+    h.setColumnWidth(14, 220);
+  }
+  return h;
+}
+function hojaFotos() {
+  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  let h = libro.getSheetByName(HOJA_FOTOS);
+  if (!h) { h = libro.insertSheet(HOJA_FOTOS); h.appendRow(['Código', 'Foto', 'Actualizada']); h.setFrozenRows(1); }
   return h;
 }
 function dciLeer() {
@@ -167,12 +186,15 @@ function dciLeer() {
   const lim = new Date(); lim.setDate(lim.getDate() - 120);
   const desde = Utilities.formatDate(lim, 'America/Lima', 'yyyy-MM-dd');
   const filas = h.getRange(2, 1, n - 1, COLS_DCI.length).getValues();
-  const dci = filas.filter(function (f) { return f[0] && diaTxt(f[1]) >= desde; }).map(function (f) {
+  const dci = filas.filter(function (f) { return f[0] && (diaTxt(f[1]) >= desde || String(f[14] || 'Pendiente') !== 'Finalizada'); }).map(function (f) {
     let com = []; try { com = JSON.parse(f[9] || '[]'); } catch (err) {}
     return { id: String(f[0]), dia: diaTxt(f[1]), cod: String(f[2]), nombre: String(f[3] || ''), area: String(f[4] || ''), av: String(f[5] || ''), tr: String(f[6] || ''),
-      bl: String(f[7] || ''), pr: String(f[8] || 'Media'), com: com, por: String(f[10] || ''), creada: String(f[11] || ''), act: String(f[12] || '') };
+      bl: String(f[7] || ''), pr: String(f[8] || 'Media'), com: com, por: String(f[10] || ''), creada: String(f[11] || ''), act: String(f[12] || ''),
+      py: String(f[13] || ''), es: ESTADOS_DCI.indexOf(String(f[14])) !== -1 ? String(f[14]) : 'Pendiente', ff: String(f[15] || '') };
   });
-  return salida({ ok: true, dci: dci });
+  const fotos = {}, hf = hojaFotos(), nf = hf.getLastRow();
+  if (nf >= 2) hf.getRange(2, 1, nf - 1, 2).getValues().forEach(function (f) { if (f[0] && f[1]) fotos[String(f[0])] = String(f[1]); });
+  return salida({ ok: true, dci: dci, fotos: fotos });
 }
 function dciGuardar(d) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
@@ -185,9 +207,16 @@ function dciGuardar(d) {
       const cod = txt(d.cod, 20), dia = txt(d.dia, 10), av = txt(d.av, 1000), tr = txt(d.tr, 1000);
       if (!cod || (!av && !tr) || !/^\d{4}-\d{2}-\d{2}$/.test(dia)) return salida({ ok: false, error: 'faltan datos' });
       if (cod !== yo) return salida({ ok: false, error: 'solo puedes registrar tu propio daily' });
-      const id = Utilities.getUuid().slice(0, 8), t = ahora();
-      h.appendRow([id, dia, cod, txt(d.nombre, 80), txt(d.area, 30), av, tr, txt(d.bl, 600), pr, '[]', quien, t, '']);
-      return salida({ ok: true, dci: { id: id, dia: dia, cod: cod, nombre: txt(d.nombre, 80), area: txt(d.area, 30), av: av, tr: tr, bl: txt(d.bl, 600), pr: pr, com: [], por: quien, creada: t, act: '' } });
+      const id = Utilities.getUuid().slice(0, 8), t = ahora(), py = txt(d.py, 80);
+      h.appendRow([id, dia, cod, txt(d.nombre, 80), txt(d.area, 30), av, tr, txt(d.bl, 600), pr, '[]', quien, t, '', py, 'Pendiente', '']);
+      return salida({ ok: true, dci: { id: id, dia: dia, cod: cod, nombre: txt(d.nombre, 80), area: txt(d.area, 30), av: av, tr: tr, bl: txt(d.bl, 600), pr: pr, com: [], por: quien, creada: t, act: '', py: py, es: 'Pendiente', ff: '' } });
+    }
+    if (d.accion === 'foto') {
+      const foto = String(d.foto || '');
+      if (!/^data:image\/(jpeg|png|webp);base64,/.test(foto) || foto.length > 48000) return salida({ ok: false, error: 'foto no válida' });
+      const hf = hojaFotos(), c = hf.getRange('A:A').createTextFinder(yo).matchEntireCell(true).findNext();
+      if (c) hf.getRange(c.getRow(), 2, 1, 2).setValues([[foto, ahora()]]); else hf.appendRow([yo, foto, ahora()]);
+      return salida({ ok: true });
     }
     const id = txt(d.id, 20); if (!id) return salida({ ok: false, error: 'sin id' });
     const celda = h.getRange('A:A').createTextFinder(id).matchEntireCell(true).findNext();
@@ -200,9 +229,17 @@ function dciGuardar(d) {
       h.getRange(fila, 10).setValue(JSON.stringify(com));
       return salida({ ok: true, com: c });
     }
+    if (d.accion === 'estado') {
+      if (String(h.getRange(fila, 3).getValue()) !== yo && DCI_ADMIN.indexOf(yo) === -1) return salida({ ok: false, error: 'solo el dueño puede cambiar el estado' });
+      const es = ESTADOS_DCI.indexOf(d.es) !== -1 ? d.es : 'Pendiente', t = ahora();
+      h.getRange(fila, 15, 1, 2).setValues([[es, es === 'Finalizada' ? t : '']]);
+      h.getRange(fila, 13).setValue(t);
+      return salida({ ok: true, ff: es === 'Finalizada' ? t : '' });
+    }
     if (String(h.getRange(fila, 3).getValue()) !== yo) return salida({ ok: false, error: 'solo el dueño puede cambiar esto' });
     if (d.accion === 'borrar') { h.deleteRow(fila); return salida({ ok: true }); }
     h.getRange(fila, 6, 1, 4).setValues([[txt(d.av, 1000), txt(d.tr, 1000), txt(d.bl, 600), pr]]);
+    if (d.py != null) h.getRange(fila, 14).setValue(txt(d.py, 80));
     h.getRange(fila, 13).setValue(ahora());
     return salida({ ok: true });
   } finally { lock.releaseLock(); }
