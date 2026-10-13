@@ -1553,8 +1553,7 @@
   @keyframes appHojaSube{from{transform:translateY(100%);}to{transform:none;}}
   @keyframes appHojaBaja{from{transform:none;}to{transform:translateY(100%);}}
   @keyframes appFondoSale{from{opacity:1;}to{opacity:0;}}
-  ::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal;}
-  html.tema-suave, html.tema-suave *{transition:background-color .35s ease,color .35s ease,border-color .35s ease,fill .35s ease !important;}
+  #temaVelo{position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:0;will-change:opacity;} #temaVelo.entra{opacity:1;transition:opacity .15s ease-out;} #temaVelo.sale{opacity:0;transition:opacity .28s ease-in;}
   @media (max-width:760px){
     /* La animación mueve la pantalla 34 px de costado: sin recorte el documento se ensanchaba un instante,
        el celular reacomodaba el zoom y la barra de abajo "se movía". */
@@ -1842,6 +1841,7 @@
     .sup-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;} .sup-kpis div{background:#ffffffb3;border-radius:14px;padding:10px 12px;} .sup-kpis b{display:block;font-size:22px;font-weight:900;color:#1b3a6b;} .sup-kpis span{font-size:11.5px;font-weight:700;color:#4c5f7a;}
     .sup-chips{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px;} .sup-chips button{border:1px solid #d6e2f2;background:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:13px;font-weight:700;color:#1b3a6b;cursor:pointer;} .sup-chips button.on{background:#c3d8f6;border-color:#b9d0f0;}
     .sup-card{position:relative;background:var(--card,#fff);border:1px solid #dfe8f4;border-radius:18px;padding:14px 16px;margin-bottom:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:box-shadow .15s ease,transform .15s ease;}
+    .sup-card,.td-card{content-visibility:auto;contain-intrinsic-size:auto 190px;} .rqm-card{content-visibility:auto;contain-intrinsic-size:auto 330px;}
     .sup-card:hover{box-shadow:0 6px 18px rgba(27,58,107,.12);} .sup-card:active{transform:scale(.99);}
     /* Filtros que se escriben con sugerencias (13.10.2026) */
     .sup-fil{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px;margin:4px 0 10px;}
@@ -1879,9 +1879,8 @@
     .td-d{flex:1;min-width:0;} .td-d b{display:block;font-size:13.5px;line-height:1.3;color:var(--ink);} .td-d small{display:block;font-size:11.5px;color:var(--ink-soft);}
     .td-st{display:inline-block;margin-top:4px;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;}
     .td-st.ok{background:#c4ecd4;color:#2f7a55;} .td-st.otra{background:#ffe8a6;color:#8a6a12;} .td-st.cam{background:#e3eefb;color:#2f5f95;} .td-st.sin{background:#fbe6e7;color:#9a4a50;}
-    .td-add{display:flex;align-items:center;gap:6px;flex:0 0 auto;} .td-add button{border:0;background:#cddff8;color:#1b3a6b;border-radius:10px;min-width:32px;height:32px;font:inherit;font-weight:800;cursor:pointer;} .td-add .td-mas{padding:0 12px;background:#c4ecd4;color:#2f7a55;}
-    .td-carro{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;border:0;background:#b7d1f3;color:#1b3a6b;border-radius:999px;padding:12px 22px;font:inherit;font-weight:800;font-size:15px;box-shadow:0 8px 22px rgba(27,58,107,.22);cursor:pointer;}
-    .td-carro b{background:#fff;border-radius:999px;padding:0 9px;margin-left:6px;} .td-acc{flex-wrap:wrap;}
+    .td-otras{margin-top:3px;} .td-dif{margin-top:6px;font-size:12px;line-height:1.4;color:#7a4b0c;background:#fff1d1;border-radius:8px;padding:5px 8px;}
+    .td-aviso{font-size:13px;color:#4c5f7a;background:#e8f0fb;border-radius:12px;padding:10px 12px;margin:4px 0 10px;line-height:1.4;}
     /* Modo oscuro de lo nuevo (13.10.2026, Piero: "el modo oscuro debe estar bien optimizado") */
     html[data-theme="dark"] .dci-ban,html[data-theme="dark"] .dci-hero.eq{background:linear-gradient(90deg,rgba(13,20,33,.55),rgba(13,20,33,.2)),linear-gradient(#3a4252,#3a4252),var(--marmol) left center/1600px 520px no-repeat,#1b2230;background-blend-mode:normal,multiply,normal,normal;border-color:#2c3648;}
     html[data-theme="dark"] .dci-ban-t h2 span{color:#eef3fb;} html[data-theme="dark"] .dci-ban-t h2 span + span{color:#4fd8bd;} html[data-theme="dark"] .dci-ban-t small{color:#e2b866;} html[data-theme="dark"] .dci-ban-t small b{color:#cfe0ff;}
@@ -1906,7 +1905,7 @@
     html[data-theme="dark"] .td-fams button{background:var(--card);border-color:var(--border);} html[data-theme="dark"] .td-fams button span{color:var(--ink);} html[data-theme="dark"] .td-fams button b{background:rgba(63,209,92,.16);color:#7fe0a6;}
     html[data-theme="dark"] .td-card{border-color:var(--border);} html[data-theme="dark"] .td-ico{background:#1f2937;}
     html[data-theme="dark"] .td-st.ok{background:rgba(63,209,92,.16);color:#7fe0a6;} html[data-theme="dark"] .td-st.otra{background:rgba(240,173,62,.18);color:#f3c46d;} html[data-theme="dark"] .td-st.cam{background:rgba(111,182,255,.16);color:#9cc8ff;} html[data-theme="dark"] .td-st.sin{background:rgba(240,102,95,.16);color:#f6a19c;}
-    html[data-theme="dark"] .td-add button,html[data-theme="dark"] .td-carro{background:rgba(111,182,255,.2);color:#d6e7ff;} html[data-theme="dark"] .td-carro b{background:#0e1520;}
+    html[data-theme="dark"] .td-dif{background:rgba(240,173,62,.14);color:#f3c46d;} html[data-theme="dark"] .td-aviso{background:rgba(111,182,255,.1);color:var(--ink-soft);}
     html[data-theme="dark"] .ix-btn{background:rgba(111,182,255,.18);color:#d6e7ff;}
     html[data-theme="dark"] .rqm-sit small.stk{background:rgba(63,209,92,.14);color:#86e3ad;}
     html[data-theme="dark"] .app-top .app-tema{background:rgba(255,255,255,.08);}
@@ -13395,10 +13394,10 @@ const APP_VISTAS = {
   almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Inventario, indicadores y OTIF.',
     // Mismo orden que Compras, sin Compras, Importaciones, Gasto ni Presupuesto (12.10.2026, Piero).
     tabs:[['inicio','🏠','Inicio'], ['indicadores','📊','Indicadores'], ['almrep','📑','Almacén'], ['daily','🗓️','Daily'], ['polar'], ['inventario','📦','Inventario'], ['otif','🎯','OTIF']] },
-  // Supervisor (13.10.2026, Piero): trazabilidad de requerimientos y tienda de códigos. Reemplaza a la vista
+  // Supervisor (13.10.2026, Piero): trazabilidad de requerimientos y consulta de stock por producto. Reemplaza a la vista
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
-  super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y tienda de códigos.',
-    tabs:[['supreq','📋','Requerimientos'], ['polar'], ['tienda','🛍️','Tienda']] },
+  super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
+    tabs:[['supreq','📋','Requerimientos'], ['polar'], ['tienda','🔎','Producto']] },
 };
 // El acceso "Logística" de antes es ahora Compras.
 function appTipoNorm(t){ return t === 'logistica' ? 'compras' : t; }
@@ -13408,7 +13407,7 @@ function appVeGerencial(t){ return t === 'gerencia' || t === 'compras' || t === 
 function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v === 'almacen'; }
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
 const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto vs. OC', gastopresu:'Gasto y presupuesto', almrep:'Almacén', inventario:'Inventario',
-  pendcompras:'Pendientes de Compras', pendlog:'Importaciones', daily:'Daily Call In', supreq:'Requerimientos', tienda:'Tienda de códigos' };
+  pendcompras:'Pendientes de Compras', pendlog:'Importaciones', daily:'Daily Call In', supreq:'Requerimientos', tienda:'Consulta de producto' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
 // Usuario del celular (29.09.2026, Piero: "al abrir la aplicación, previo a todo, una interfaz de Grupo
@@ -13498,18 +13497,20 @@ function appTemaIcono(){
   b.setAttribute('aria-label', osc ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'); b.title = osc ? 'Modo claro' : 'Modo oscuro';
   const m = document.querySelector('meta[name="theme-color"]'); if(m) m.setAttribute('content', osc ? '#0b1322' : '#0a1e64');
 }
-function appTemaCambiar(btn){
+// Cambio de tema sin trabas (13.10.2026, Piero: "al cambiar se está lagueando mucho"): un velo del color del tema
+// nuevo se funde (solo opacidad, la mueve la tarjeta gráfica), el tema cambia debajo y el velo se va.
+function appTemaCambiar(){
+  if(appTemaCambiar.en) return; appTemaCambiar.en = true;
   const root = document.documentElement, osc = root.getAttribute('data-theme') !== 'dark';
-  const aplicar = function(){ if(osc) root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+  let v = document.getElementById('temaVelo');
+  if(!v){ v = document.createElement('div'); v.id = 'temaVelo'; document.body.appendChild(v); }
+  v.style.background = osc ? '#0e1520' : '#eff4fb'; v.className = ''; void v.offsetWidth; v.className = 'entra';
+  setTimeout(function(){
+    if(osc) root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
     try{ localStorage.setItem('fp-theme', osc ? 'dark' : 'light'); }catch(err){}
-    appTemaIcono(); if(typeof applyThemeLabel === 'function') try{ applyThemeLabel(); }catch(err){} };
-  const quieto = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(document.startViewTransition && !quieto){
-    const r = btn ? btn.getBoundingClientRect() : { left:innerWidth - 30, top:30, width:0, height:0 };
-    const x = r.left + r.width / 2, y = r.top + r.height / 2, rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-    const vt = document.startViewTransition(aplicar);
-    vt.ready.then(function(){ root.animate({ clipPath:['circle(0px at ' + x + 'px ' + y + 'px)', 'circle(' + rad + 'px at ' + x + 'px ' + y + 'px)'] }, { duration:520, easing:'cubic-bezier(.4,0,.2,1)', pseudoElement:'::view-transition-new(root)' }); }).catch(function(){});
-  } else { root.classList.add('tema-suave'); aplicar(); setTimeout(function(){ root.classList.remove('tema-suave'); }, 450); }
+    appTemaIcono(); if(typeof applyThemeLabel === 'function') try{ applyThemeLabel(); }catch(err){}
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){ v.className = 'sale'; setTimeout(function(){ v.className = ''; appTemaCambiar.en = false; }, 280); }); });
+  }, 150);
 }
 function appAntesDe(html){ document.body.insertAdjacentHTML('beforeend', html); }
 
@@ -13541,7 +13542,7 @@ function appConstruir(){
     </div>`);
 
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
-  document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(this); });
+  document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(); });
   appTemaIcono();
   document.getElementById('appSheet').addEventListener('click', function(e){ if(e.target === this) appCerrarSheet(); });
   document.getElementById('appTabbar').addEventListener('click', function(e){
@@ -13797,7 +13798,7 @@ function appLanzador(forzar){
       appNavAtras = true; try{ if(v !== APP.vista) appElegirVista(v); else appInicio(); } finally{ appNavAtras = false; }
       APP_NAV.push({ lz:1 });
       setTimeout(function(){ el.classList.remove('abierto', 'fuera'); b.classList.remove('pulsado'); el._yendo = false; }, 180); }); }
-  const ext = { compras:'OC, pendientes, importaciones, gasto y Daily', almacen:'Recepción, despacho, inventario, OTIF y Daily', super:'Trazabilidad de requerimientos y tienda de códigos', frioteam:'Stock por sede y kardex' };
+  const ext = { compras:'OC, pendientes, importaciones, gasto y Daily', almacen:'Recepción, despacho, inventario, OTIF y Daily', super:'Trazabilidad de requerimientos y consulta de stock por producto', frioteam:'Stock por sede y kardex' };
   const sv = function(d){ return `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`; };
   const ico = { compras:sv('<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.6a1.6 1.6 0 0 0 1.6-1.2l1.6-7.3H6.2"/>'),
     almacen:sv('<path d="M3 9.5 12 4l9 5.5V20H3z"/><path d="M7 20v-6h10v6M7 17h10"/>'),
@@ -14898,64 +14899,153 @@ function appSupReqHtml(){
     <div class="m-buscar"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}"></div>
     <div id="supLista">${l.slice(0, n0).map(supCard).join('') || `<div class="ini-card"><div class="ini-vacio">${supEsSupervisor() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
 }
-// Tienda de códigos: lo que necesitan → opciones con stock (primero lo disponible en Lurín).
-const APP_TIENDA = { q:'', fam:'', cart:{} };
-try{ const t = JSON.parse(localStorage.getItem('fp-tienda') || 'null'); if(t && t.cart) APP_TIENDA.cart = t.cart; }catch(err){}
-function tdGuardar(){ try{ localStorage.setItem('fp-tienda', JSON.stringify({ cart:APP_TIENDA.cart })); }catch(err){} }
-function tdItems(){ return appMemo('tienda', function(){ return appInvIndice().items.filter(function(x){ return x.r && x.r.codigo && x.r.descripcion; }).map(function(x){ const r = x.r;
-  return { c:r.codigo, d:r.descripcion, u:r.unidad || 'UND', fam:x.fam, l:r.lima || 0, t:r.trujillo || 0, i:r.ica || 0, cam:r.transito || 0, n:polarNorm(r.codigo + ' ' + r.descripcion) }; }); }); }
+// Consulta de producto (13.10.2026, Piero: "no es una tienda, es para que el supervisor consulte lo que se tiene en
+// stock en base a sus descripciones... no necesariamente va a ser igual lo que escriban y lo que se recomiende; analiza
+// qué se puede ofrecer como reemplazo o como literal lo que necesiten"). Se entiende la descripción con sinónimos,
+// medidas y errores de tipeo; se separa "lo que buscas" de "podría reemplazarlo" y se explica la diferencia.
+const APP_TIENDA = { q:'', fam:'' };
+const TD_STOP = new Set('de del la el los las para con sin por en y o a al tipo marca modelo und unid unidad c p s n x mm mm2 cm mts mt m v vac vdc kw hp w kv lb lbs psi bar hz ph ml lt kg gr'.split(' '));
+const TD_SIN = (function(){ const g = [
+  ['tubo', 'tuberia', 'caneria', 'cano', 'tub'], ['cable', 'conductor', 'cab'], ['valvula', 'valv', 'llave de paso'], ['termomagnetico', 'termomagnetica', 'breaker', 'interruptor termomagnetico', 'llave termica', 'itm'],
+  ['interruptor', 'switch'], ['luminaria', 'lampara', 'foco', 'luz', 'fluorescente'], ['reflector', 'proyector'], ['reduccion', 'reductor', 'bushing', 'reducc'], ['tee', 'te'], ['codo', 'curva'],
+  ['union', 'acople', 'acoplamiento', 'empalme'], ['niple', 'nipple'], ['tapon', 'tapa'], ['perno', 'tornillo', 'esparrago'], ['arandela', 'volanda'], ['tuerca', 'tuer'],
+  ['galvanizado', 'galv', 'gal'], ['inoxidable', 'inox', 'ss'], ['cobre', 'cu'], ['aluminio', 'alum', 'al'], ['manguera', 'flexible'], ['sensor', 'sonda', 'transmisor'], ['controlador', 'control'],
+  ['contactor', 'contac'], ['rele', 'relay', 'relevador'], ['tablero', 'gabinete', 'caja electrica'], ['canaleta', 'canal'], ['conduit', 'emt', 'tubo conduit'], ['prensaestopa', 'prensa estopa', 'prensacable'],
+  ['silicona', 'silicon'], ['sellador', 'sellante'], ['bola', 'esfera'], ['check', 'retencion', 'antirretorno'], ['cinta', 'tape'], ['guante', 'guantes'], ['casco', 'cascos'], ['bota', 'botas', 'zapato'], ['pintura', 'esmalte'], ['abrazadera', 'grapa', 'clamp'],
+  ['manometro', 'manom'], ['termometro', 'termom'], ['ventilador', 'extractor'], ['puerta', 'portón', 'porton'], ['aislamiento', 'aislante', 'armaflex', 'elastomerico', 'elastomerica'], ['soldadura', 'electrodo', 'varilla'],
+  ['broca', 'mecha'], ['disco', 'disco de corte'], ['enchufe', 'tomacorriente', 'toma'], ['clavija', 'plug'], ['interruptor diferencial', 'diferencial'], ['bandeja', 'bandeja portacable'], ['terminal', 'terminales', 'puntera'] ];
+  const m = new Map(); g.forEach(function(x){ x.forEach(function(w){ if(w.indexOf(' ') === -1) m.set(w, x[0]); }); }); return m; })();
+// Texto → fichas normalizadas: palabras (con sinónimo y singular) y medidas (1/2, 1-1/2, 3x1.5 → 3 · 1.5, 25mm, 220v).
+function tdFichas(t){
+  let x = sinAcentos(String(t || '')).toLowerCase()
+    .replace(/[”“″]|''|´´/g, '"').replace(/(\d)\s*(pulgadas|pulgada|pulg|plg)\b/g, '$1"').replace(/(\d),(\d)/g, '$1.$2')
+    .replace(/mm²|mm\^?2\b/g, 'mm2').replace(/(\d)\s*[-.\s]\s*(\d\/\d)/g, '$1-$2').replace(/ø|diam\.?|diametro/g, ' ');
+  x = x.replace(/(\d)\s*x\s*(\d)/g, '$1 $2').replace(/(\d)\s*(mm2|mm|cm|mts|mt|m|metros|")(?![a-z0-9])/g, '$1 ')
+    .replace(/(\d)\s+(a|w|v|vac|vdc|kw|hp|ka|kv|psi|bar|hz|lm|amp|watts?)\b/g, '$1$2').replace(/(\d)(vac|vdc)\b/g, '$1v').replace(/(\d)(amp)\b/g, '$1a').replace(/(\d)watts?\b/g, '$1w');
+  const out = [];
+  x.split(/[^a-z0-9.\/\-"]+/).forEach(function(w){
+    w = w.replace(/^[.\-]+|[.\-]+$/g, '').replace(/"/g, ''); if(!w) return;
+    if(/\d/.test(w)){ out.push({ t:w.replace(/^0+(?=\d)/, ''), n:1 }); return; }
+    if(w.length < 2 || TD_STOP.has(w)) return;
+    let c = TD_SIN.get(w) || w;
+    if(c === w && c.length > 4){ const sg = c.replace(/(es|s)$/, ''); c = TD_SIN.get(sg) || (c.endsWith('es') && sg.length > 3 ? sg : c.replace(/s$/, '')); }
+    out.push({ t:c, n:0 });
+  });
+  return out;
+}
+const TD_TIPO = new Set(['bola', 'check', 'compuerta', 'mariposa', 'globo', 'solenoide', 'aguja', 'alivio', 'expansion', 'macho', 'hembra']);
+const TD_MAT = new Set(['pvc', 'cpvc', 'cobre', 'inoxidable', 'galvanizado', 'acero', 'bronce', 'laton', 'hdpe', 'aluminio', 'fierro', 'polipropileno', 'ppr', 'nitrilo', 'cuero', 'latex', 'nylon']);
+const TD_MED = /^\d[\d.\/-]*[a-z]{0,3}$/;   // medida (1/2, 1.5, 20a, 220v), no un código de modelo
+function tdValor(m){   // '1-1/2' → 1.5 · '7/8' → 0.875 · '20a' → 20
+  const t = String(m).replace(/[a-z]+$/, ''), p = t.split('-'); let v = 0;
+  p.forEach(function(x){ const f = x.split('/'); v += f.length === 2 ? (+f[0] / +f[1]) : +x; }); return isFinite(v) && v > 0 ? v : null;
+}
+function tdLev1(a, b){   // ¿a y b difieren en una letra como máximo? (errores de tipeo)
+  if(Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, d = 0;
+  while(i < a.length && j < b.length){ if(a[i] === b[j]){ i++; j++; continue; } if(++d > 1) return false; if(a.length > b.length) i++; else if(b.length > a.length) j++; else { i++; j++; } }
+  return d + (a.length - i) + (b.length - j) <= 1;
+}
+function tdItems(){ return appMemo('tienda', function(){
+  const voc = new Map();
+  const l = appInvIndice().items.filter(function(x){ return x.r && x.r.codigo && x.r.descripcion; }).map(function(x){ const r = x.r, f = tdFichas(r.descripcion);
+    const it = { c:r.codigo, d:r.descripcion, u:r.unidad || 'UND', fam:x.fam, l:r.lima || 0, t:r.trujillo || 0, i:r.ica || 0, cam:r.transito || 0,
+      w:new Set(f.filter(function(y){ return !y.n; }).map(function(y){ return y.t; })), m:f.filter(function(y){ return y.n; }).map(function(y){ return y.t; }), cod:polarNorm(r.codigo) };
+    it.h = (f.find(function(y){ return !y.n; }) || {}).t || '';
+    it.w.forEach(function(w){ voc.set(w, (voc.get(w) || 0) + 1); }); return it; });
+  l.voc = voc; return l; }); }
+// Qué palabras del catálogo valen por una palabra escrita (igual, sinónimo, empieza igual o un error de tipeo).
+function tdParecidas(w, voc){
+  const r = new Set([w]);
+  voc.forEach(function(n, v){ if(v === w) return;
+    if(w.length >= 3 && v.startsWith(w)) r.add(v); else if(v.length >= 4 && w.startsWith(v)) r.add(v); else if(w.length >= 5 && tdLev1(w, v)) r.add(v); });
+  return r;
+}
+function tdBuscar(q){
+  const all = tdItems(), f = tdFichas(q), pal = f.filter(function(x){ return !x.n; }).map(function(x){ return x.t; }), med = f.filter(function(x){ return x.n; }).map(function(x){ return x.t; });
+  const qn = polarNorm(q).replace(/\s+/g, '');
+  if(!pal.length && !med.length) return { exactos:[], reemp:[] };
+  const par = pal.map(function(w){ return tdParecidas(w, all.voc); });
+  const qTipo = pal.filter(function(w){ return TD_TIPO.has(w); }), qMat = pal.filter(function(w){ return TD_MAT.has(w); });
+  // La palabra principal (qué es: codo, cable, válvula…) es la primera; las demás describen (tipo, material).
+  const exactos = [], cand = [];
+  all.forEach(function(x){
+    if(qn.length >= 6 && x.cod.indexOf(qn) !== -1){ exactos.push({ x:x, s:100, cab:1, dif:[] }); return; }
+    const okP = par.map(function(P){ for(const w of x.w) if(P.has(w)) return true; return false; });
+    if(pal.length && !okP[0]) return;
+    const okM = med.map(function(m){ return x.m.indexOf(m) !== -1; });
+    const nP = okP.filter(Boolean).length, nM = okM.filter(Boolean).length;
+    const cab = pal.length && par[0].has(x.h) ? 1 : 0;   // el producto ES eso (su descripción empieza así)
+    let s = nP * 3 + nM * 4 + cab * 5 - Math.max(0, x.m.filter(function(m){ return TD_MED.test(m); }).length - med.length) * .15;
+    // Medida que no calza: suma si el producto tiene una de la misma clase (W con W, A con A, pulgadas con pulgadas) y cercana.
+    med.forEach(function(m, k){ if(okM[k]) return; const u = (m.match(/[a-z]+$/) || [''])[0], v = tdValor(m); if(!v) return;
+      let best = -1; x.m.forEach(function(y){ if(!TD_MED.test(y) || (y.match(/[a-z]+$/) || [''])[0] !== u) return; const w = tdValor(y); if(w) best = Math.max(best, 1.5 - Math.min(1.5, Math.abs(Math.log(w / v)))); });
+      if(best >= 0) s += 2 + best; });
+    if(nP === pal.length && nM === med.length) return exactos.push({ x:x, s:s, cab:cab, dif:[] });
+    // Otro tipo (p. ej. check en vez de bola) no reemplaza.
+    if(qTipo.length && qTipo.some(function(t, k){ return !x.w.has(t); }) && [...x.w].some(function(w){ return TD_TIPO.has(w) && qTipo.indexOf(w) === -1; })) return;
+    cand.push({ x:x, s:s, cab:cab, okP:okP, okM:okM, nP:nP, nM:nM });
+  });
+  const stk = function(x){ return x.l > 0 ? 3 : (x.t + x.i > 0 ? 2 : x.cam > 0 ? 1 : 0); };
+  exactos.sort(function(a, b){ return b.cab - a.cab || stk(b.x) - stk(a.x) || b.s - a.s || b.x.l - a.x.l; });
+  // Reemplazo: es lo mismo (palabra principal) y comparte al menos la mitad de lo demás; si lo exacto no tiene stock
+  // en Lurín, basta con que sea lo mismo. Solo sirve lo que hay (en alguna sede o en camino). Se explica la diferencia.
+  const hayEx = exactos.some(function(y){ y.x.l > 0; return y.x.l > 0; });
+  const resto = Math.max(0, pal.length - 1) + med.length;
+  const reemp = cand.filter(function(y){ if(!stk(y.x)) return false; const comp = y.nP - (pal.length ? 1 : 0) + y.nM;
+      return !resto || comp / resto >= .5 || (!hayEx && y.cab); })
+    .map(function(y){ const x = y.x, dif = [];
+      // Por cada medida que no calza se muestra la del producto de la misma clase (20w ↔ 14.7w, 1/2 ↔ 3/4).
+      const faltaM = med.filter(function(m, k){ return !y.okM[k]; });
+      const suyas = []; faltaM.forEach(function(m){ const u = (m.match(/[a-z]+$/) || [''])[0], fr = /\//.test(m);
+        x.m.forEach(function(v){ if(TD_MED.test(v) && med.indexOf(v) === -1 && suyas.indexOf(v) === -1 && (v.match(/[a-z]+$/) || [''])[0] === u && (!u ? /\//.test(v) === fr : true)) suyas.push(v); }); });
+      if(faltaM.length) dif.push('Medida: pediste ' + faltaM.join(' · ') + (suyas.length ? ' · este es ' + suyas.slice(0, 3).join(' · ') : ''));
+      pal.forEach(function(w, k){ if(y.okP[k]) return;
+        const otro = TD_MAT.has(w) ? [...x.w].find(function(v){ return TD_MAT.has(v); }) : (TD_TIPO.has(w) ? [...x.w].find(function(v){ return TD_TIPO.has(v); }) : '');
+        dif.push(otro ? (TD_MAT.has(w) ? 'Material' : 'Tipo') + ': pediste ' + w + ' · este es ' + otro : 'No dice: ' + w); });
+      return { x:x, s:y.s, cab:y.cab, dif:dif }; })
+    .sort(function(a, b){ return b.cab - a.cab || b.s - a.s || stk(b.x) - stk(a.x) || b.x.l - a.x.l; });
+  return { exactos:exactos, reemp:reemp };
+}
 function tdStock(x){
   if(x.l > 0) return ['ok', '✅ Disponible', appN(x.l, 2) + ' ' + x.u + ' en Lurín'];
   if(x.t + x.i > 0) return ['otra', '🟡 En otra sede', [x.t ? 'Trujillo ' + appN(x.t, 2) : '', x.i ? 'Ica ' + appN(x.i, 2) : ''].filter(Boolean).join(' · ') + ' ' + x.u];
   if(x.cam > 0) return ['cam', '🚚 En camino', appN(x.cam, 2) + ' ' + x.u];
   return ['sin', '⛔ Sin stock', 'Se pide por requerimiento'];
 }
-function tdCard(x){
-  const e = escapeHtml, s = tdStock(x), q = APP_TIENDA.cart[x.c] || 0;
+function tdCard(y){
+  const e = escapeHtml, x = y.x || y, s = tdStock(x), dif = y.dif || [];
+  const otras = [x.l > 0 && (x.t || x.i) ? (x.t ? 'Trujillo ' + appN(x.t, 2) : '') + (x.t && x.i ? ' · ' : '') + (x.i ? 'Ica ' + appN(x.i, 2) : '') : '', x.cam > 0 && s[0] !== 'cam' ? '🚚 ' + appN(x.cam, 2) + ' en camino' : ''].filter(Boolean).join(' · ');
   return `<div class="td-card ${s[0]}"><div class="td-ico">${iconForFamilia(sinAcentos(x.fam))}</div>
-    <div class="td-d"><b>${e(polarCorta(x.d, 70))}</b><small class="mono">${e(x.c)}</small><span class="td-st ${s[0]}">${s[1]} · ${e(s[2])}</span></div>
-    <div class="td-add">${q ? `<button type="button" data-tdq="${e(x.c)}|-1">−</button><b>${q}</b><button type="button" data-tdq="${e(x.c)}|1">+</button>` : `<button type="button" class="td-mas" data-tdq="${e(x.c)}|1">＋ Agregar</button>`}</div></div>`;
+    <div class="td-d"><b>${e(x.d)}</b><small class="mono">Código ${e(x.c)} · ${e(x.u)}</small><span class="td-st ${s[0]}">${s[1]} · ${e(s[2])}</span>${otras ? `<small class="td-otras">${e(otras)}</small>` : ''}
+      ${dif.length ? `<div class="td-dif">🔁 ${dif.map(e).join('<br>')}</div>` : ''}</div></div>`;
 }
 function appTiendaHtml(){
   const e = escapeHtml, all = tdItems();
   if(!all.length) return '<div class="ini-card"><div class="ini-vacio">⏳ Cargando el catálogo del almacén…</div></div>';
-  const q = polarNorm(APP_TIENDA.q || '').trim(), ws = q ? q.split(' ').filter(Boolean) : [];
-  let l = ws.length ? all.filter(function(x){ return ws.every(function(w){ return x.n.indexOf(w) !== -1; }); }) : (APP_TIENDA.fam ? all.filter(function(x){ return x.fam === APP_TIENDA.fam; }) : []);
-  const rk = { ok:0, otra:1, cam:2, sin:3 };
-  l = l.sort(function(a, b){ return rk[tdStock(a)[0]] - rk[tdStock(b)[0]] || (b.l - a.l); });
-  const nCart = Object.keys(APP_TIENDA.cart).length;
+  const q = String(APP_TIENDA.q || '').trim();
+  const R = q ? tdBuscar(q) : null;
+  const famL = !q && APP_TIENDA.fam ? all.filter(function(x){ return x.fam === APP_TIENDA.fam && x.l > 0; }).sort(function(a, b){ return b.l - a.l; }) : [];
   const fams = {}; all.forEach(function(x){ if(x.l > 0) fams[x.fam] = (fams[x.fam] || 0) + 1; });
   const famChips = Object.keys(fams).sort(function(a, b){ return fams[b] - fams[a]; }).slice(0, 16)
     .map(function(f){ return `<button type="button" data-tdfam="${e(f)}" class="${APP_TIENDA.fam === f ? 'on' : ''}">${iconForFamilia(sinAcentos(f))}<span>${e(polarCorta(f, 26))}</span><b>${fams[f]}</b></button>`; }).join('');
-  const disp = l.filter(function(x){ return x.l > 0; }).length;
+  let cuerpo;
+  if(R){
+    const ex = R.exactos, re = R.reemp, dispEx = ex.filter(function(y){ return y.x.l > 0; }).length;
+    const titEx = ex.length ? `<div class="td-sec">✅ Lo que buscas · ${appN(ex.length)} código${ex.length === 1 ? '' : 's'}${dispEx ? ' · ' + dispEx + ' con stock en Lurín' : ''}</div>` : '';
+    const msg = !ex.length && re.length ? '<div class="td-aviso">No encontré exactamente eso, pero hay productos parecidos con stock que podrían reemplazarlo:</div>'
+      : ex.length && !dispEx && re.length ? '<div class="td-aviso">Lo que buscas no tiene stock en Lurín. Estos parecidos sí hay y podrían reemplazarlo:</div>' : '';
+    cuerpo = (ex.length || re.length) ? `${titEx}${ex.slice(0, 30).map(tdCard).join('')}${ex.length > 30 ? `<div class="td-res">Mostrando 30 de ${appN(ex.length)}: agrega la medida o el material para afinar.</div>` : ''}
+      ${re.length ? `${msg || ''}<div class="td-sec">🔁 Podría reemplazarlo · con stock</div>${re.slice(0, 20).map(tdCard).join('')}` : ''}`
+      : '<div class="td-aviso">No encontré ese producto ni algo parecido con stock. Prueba describiéndolo con otras palabras (qué es, material, medida) o pídelo por requerimiento.</div>';
+  } else if(APP_TIENDA.fam){
+    cuerpo = `<div class="td-res"><b>${appN(famL.length)}</b> con stock en Lurín · <button type="button" class="lnk" data-tdfam="">‹ Todas las familias</button></div>${famL.slice(0, 40).map(tdCard).join('')}`;
+  } else cuerpo = `<div class="td-sec">Familias con stock en Lurín</div><div class="td-fams">${famChips}</div>`;
   return `<div class="td">
-    <div class="td-hero"><small>TIENDA DE CÓDIGOS</small><h2>¿Qué necesitas?</h2><p>Escribe el producto y te muestro las opciones que hay en el almacén.</p>
-      <div class="m-buscar"><input type="search" id="tdBusca" placeholder="🔍 Ej. cable 3x1.5, guardamotor, válvula 2&quot;" value="${e(APP_TIENDA.q)}"></div></div>
-    <div id="tdLista">${ws.length || APP_TIENDA.fam ? `<div class="td-res">${l.length ? `<b>${appN(l.length)}</b> opciones · <b>${disp}</b> con stock en Lurín` : 'No encontré ese producto. Prueba con otra palabra o pídelo por requerimiento.'}${APP_TIENDA.fam && !ws.length ? ` · <button type="button" class="lnk" data-tdfam="">‹ Todas las familias</button>` : ''}</div>
-      ${l.slice(0, 40).map(tdCard).join('')}${l.length > 40 ? `<div class="td-res">Mostrando 40 de ${appN(l.length)}: escribe algo más para afinar.</div>` : ''}`
-      : `<div class="td-sec">Familias con stock en Lurín</div><div class="td-fams">${famChips}</div>`}</div>
-    ${nCart ? `<button type="button" class="td-carro" data-tdcarro="1">🛒 Mi lista <b>${nCart}</b></button>` : ''}</div>`;
+    <div class="td-hero"><small>CONSULTA DE STOCK</small><h2>¿Qué producto buscas?</h2><p>Escríbelo como lo conoces: te digo si está en el almacén o qué podría reemplazarlo.</p>
+      <div class="m-buscar"><input type="search" id="tdBusca" placeholder="🔍 Ej. codo galvanizado 1/2" value="${e(APP_TIENDA.q)}"></div></div>
+    <div id="tdLista">${cuerpo}</div></div>`;
 }
-function tdListaTexto(){
-  const all = tdItems(), by = {}; all.forEach(function(x){ by[x.c] = x; });
-  return '*Lista de materiales*\n' + Object.keys(APP_TIENDA.cart).map(function(c, i){ const x = by[c] || { d:c, u:'' }; return (i + 1) + ') ' + x.d + ' – ' + APP_TIENDA.cart[c] + ' ' + x.u + '\n   Cód. ' + c; }).join('\n');
-}
-function appTiendaCarro(){
-  const e = escapeHtml, all = tdItems(), by = {}; all.forEach(function(x){ by[x.c] = x; });
-  const cs = Object.keys(APP_TIENDA.cart);
-  appListaAbrir('🛒 Mi lista', cs.length + ' producto' + (cs.length === 1 ? '' : 's'),
-    (cs.length ? cs.map(function(c){ const x = by[c]; return x ? tdCard(x) : ''; }).join('') : '<div class="ini-vacio">Tu lista está vacía.</div>')
-    + (cs.length ? `<div class="asis-acc td-acc"><button type="button" data-tdcopiar="1">📋 Copiar lista</button><button type="button" data-tdwa="1">💬 Enviar por WhatsApp</button><button type="button" data-tdvaciar="1">🗑️ Vaciar</button></div>` : ''));
-  const p = document.getElementById('appOC');
-  p.onclick = function(ev){ const b = ev.target.closest('button'); if(!b) return;
-    if(b.dataset.tdq){ ev.stopPropagation(); tdCantidad(b.dataset.tdq); return appTiendaCarro(); }
-    if(b.dataset.tdcopiar){ ev.stopPropagation(); return navigator.clipboard.writeText(tdListaTexto()).then(function(){ appToast('📋 Lista copiada'); }); }
-    if(b.dataset.tdwa){ ev.stopPropagation(); return window.open('https://wa.me/?text=' + encodeURIComponent(tdListaTexto()), '_blank'); }
-    if(b.dataset.tdvaciar){ ev.stopPropagation(); APP_TIENDA.cart = {}; tdGuardar(); appTiendaPintar(); return appTiendaCarro(); } };
-}
-function tdCantidad(v){ const p = v.split('|'), c = p[0], n = Math.max(0, (APP_TIENDA.cart[c] || 0) + Number(p[1]));
-  if(n) APP_TIENDA.cart[c] = n; else delete APP_TIENDA.cart[c]; tdGuardar(); }
-function appTiendaPintar(){ const t = document.querySelector('#section-inicio .td'); if(!t) return; const y = window.scrollY; t.outerHTML = appTiendaHtml(); window.scrollTo(0, y); }
 
 function appOtifHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
@@ -17808,8 +17898,6 @@ function appClickInicio(e){
   if(b.dataset.suppaso){ APP_SUP.paso = APP_SUP.paso === b.dataset.suppaso ? '' : b.dataset.suppaso; return appRenderInicio(); }
   if(b.dataset.supx){ if(b.dataset.supx === 'cli'){ APP_SUP.cli = ''; APP_SUP.pry = ''; } else APP_SUP.pry = ''; return appRenderInicio(); }
   if(b.dataset.tdfam != null){ APP_TIENDA.fam = b.dataset.tdfam; APP_TIENDA.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
-  if(b.dataset.tdq){ tdCantidad(b.dataset.tdq); return appTiendaPintar(); }
-  if(b.dataset.tdcarro) return appTiendaCarro();
   if(b.dataset.arper){ APP_AR.per = b.dataset.arper; if(b.dataset.arper === 'custom' && !APP_AR.desde){ const p = almPeriodo(); APP_AR.desde = p.desde; APP_AR.hasta = p.hasta; } return appRenderInicio(); }
   if(b.dataset.arsuc){ APP_AR.suc = b.dataset.arsuc; return appRenderInicio(); }
   if(b.dataset.arimg){ appAlmImagenes(); return; }
