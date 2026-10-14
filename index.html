@@ -12095,8 +12095,9 @@ function rqPasoDetalle(r, j){
   if(j === 0) return { ico:'📝', cls:'ok', titulo:'Requerimiento ' + r.codRequerimiento,
     lineas: lin(r.fReq ? 'Pedido el ' + rqFecha(r.fReq) + (r.responsable ? ' por ' + r.responsable : '') : '', 'Cantidad pedida: ' + n(r.cantidad) + um,
       r.estadoCalc === 'En Revisión' ? 'En revisión de almacén ' + rqHace(r.fReq) : '',
-      // Quién lo pasó de requerimiento a pedido de compra (14.10.2026, Piero).
-      r.codPedido && r.responsablePedido ? 'Lo pasó a pedido de compra: ' + (PD_PERSONAS[pdPersona(r.responsablePedido)] || r.responsablePedido) + (r.fPedido ? ' el ' + rqFecha(r.fPedido) : '') : '') };
+      // Quién lo pasó de requerimiento a pedido de compra (14.10.2026, Piero): el responsable del Indicador 1 (Almacén,
+      // Javier; o quien figure en PedidoSinReq para los directos). ResponsablePedido del Reporte Maestro es el comprador.
+      r.codPedido ? 'Lo pasó a pedido de compra: ' + (function(c){ return PD_PERSONAS[pdPersona(c)] || c; })(responsableD1For(r.codPedido)) + (r.fPedido ? ' el ' + rqFecha(r.fPedido) : '') : '') };
   if(j === 1){
     if(directo) return { ico:'🛒', cls:'', titulo:'No pasó por Compras', lineas:['Se atendió directo del stock del almacén.'] };
     if(!r.codPedido) return { ico:'🛒', cls:'espera', titulo:'Todavía no pasa a Compras', lineas:['El almacén aún está revisando si sale de stock o se compra.'] };
