@@ -1919,6 +1919,9 @@
     .sup-card,.td-card{content-visibility:auto;contain-intrinsic-size:auto 190px;} .rqm-card{content-visibility:auto;contain-intrinsic-size:auto 330px;}
     .sup-card:hover{box-shadow:0 6px 18px rgba(27,58,107,.12);} .sup-card:active{transform:scale(.99);}
     /* Filtros que se escriben con sugerencias (13.10.2026) */
+    .sup-mios{display:flex;gap:4px;padding:4px;margin:4px 0 8px;background:var(--card);border:1px solid var(--border);border-radius:14px;}
+    .sup-mios button{flex:1;border:0;background:none;border-radius:10px;padding:9px 8px;font:inherit;font-size:13px;font-weight:800;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .sup-mios button.on{background:var(--brand);color:#fff;}
     .sup-fil{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px;margin:4px 0 10px;}
     .sup-ac{position:relative;display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #d3e0f2;border-radius:14px;padding:0 6px 0 12px;min-height:46px;}
     .sup-ac:focus-within{border-color:#5b97de;box-shadow:0 0 0 3px rgba(91,151,222,.18);} .sup-ac.lleno{background:#eaf2fd;border-color:#b7d1f3;}
@@ -14983,7 +14986,7 @@ function appDciFoto(file){
 // ---------- Módulo Supervisor (13.10.2026, Piero) ----------
 // "Supervisor es un nuevo módulo que va a indicar literalmente el estado de los requerimientos (la
 // trazabilidad)" + una "tienda virtual" de códigos: escriben lo que necesitan y ven lo disponible.
-const APP_SUP = { q:'', cli:'', pry:'', paso:'' };
+const APP_SUP = { q:'', cli:'', pry:'', paso:'', mios:false };
 // Los mismos 6 pasos que la tarjeta de cada ítem (14.10.2026, Piero: "arriba sale amarillo Compras y abajo verde; debe
 // seguir la misma lógica"): un ítem cuenta en el paso que le FALTA (el amarillo de su tarjeta).
 const SUP_PASOS = [['rev', '📝', 'Req.'], ['com', '🛒', 'Compras'], ['oc', '🧾', 'OC'], ['alm', '🏬', 'Almacén'], ['sal', '🚚', 'Salida'], ['obra', '🏗️', 'Obra']];
@@ -15012,12 +15015,15 @@ function supPasoEstado(items, k){
   return idx.every(function(x){ return x > k; }) ? 'ok' : '';
 }
 function supEsSupervisor(){ return !!(APP.usuario && APP.usuario.tipo === 'supervisor'); }
+// El supervisor ve los req. de todos y con un toque solo los suyos (14.10.2026, Piero: "que los supervisores puedan
+// consultar los de todos y que además tengan una opción simple para que vean sus requerimientos").
+function supSoloMios(){ return supEsSupervisor() && APP_SUP.mios; }
 // Requerimientos del Supervisor (13.10.2026, Piero): sin título ni chips Pendientes/Completos/Todos; filtros de
 // cliente y proyecto que se escriben y sugieren opciones; arriba el % atendido de lo filtrado; todos los req.
 // (sin "ver más": las tarjetas se agregan por tandas para que la pantalla no se trabe).
 function supGrupos(){
   rqPreparar();
-  const sup = supEsSupervisor(), base = sup ? (polarMisFilas() || []) : RQ.filas;
+  const sup = supSoloMios(), base = sup ? (polarMisFilas() || []) : RQ.filas;
   const c = APP_SUP._g;
   if(c && c.base === base && c.n === base.length) return c;
   const M = new Map();
@@ -15053,7 +15059,7 @@ function supSugerencias(tipo, txt){
   return l.slice(0, 8).map(function(x){ return `<button type="button" data-supsel="${tipo}|${e(x.k)}"><span>${e(polarCorta(x.t, 60))}</span><b>${x.n}</b></button>`; }).join('') || '<div class="sup-sug-vacio">Sin coincidencias</div>';
 }
 function supCard(g){
-  const e = escapeHtml, sup = supEsSupervisor(), nPend = g.tot - g.ok;
+  const e = escapeHtml, sup = supSoloMios(), nPend = g.tot - g.ok;
   return `<div class="sup-card" data-clic="1" data-req="${e(g.cod)}" title="Ver el detalle del requerimiento"><div class="sup-top"><span class="sup-num">Req. ${e(g.cod.replace(/^000\d-0*/, ''))}</span><span class="sup-f">${rqFecha(g.f)}</span></div>
       <div class="sup-py">${e(polarCorta(appImpNombre(g.py || '—'), 48))}${g.id && !/^SIN PROYECTO/i.test(g.id) ? ` <small>${e(g.id)}</small>` : ''}</div>
       ${sup ? '' : `<div class="sup-resp">👷 ${e(polarCorta(g.resp, 40))}</div>`}
@@ -15065,7 +15071,7 @@ function supCard(g){
 function supResumenHtml(l){
   const e = escapeHtml, itemsTot = l.reduce(function(s, g){ return s + g.tot; }, 0), itemsOk = l.reduce(function(s, g){ return s + g.ok; }, 0);
   const pend = l.filter(function(g){ return g.ok < g.tot; }).length, pct = itemsTot ? Math.round(itemsOk / itemsTot * 100) : 0;
-  const tit = APP_SUP.pry ? (/^SIN PROYECTO/i.test(APP_SUP.pry) ? 'Sin proyecto (almacén)' : APP_SUP.pry) : (APP_SUP.cli || (supEsSupervisor() ? 'Mis requerimientos' : 'Todos los clientes'));
+  const tit = APP_SUP.pry ? (/^SIN PROYECTO/i.test(APP_SUP.pry) ? 'Sin proyecto (almacén)' : APP_SUP.pry) : (APP_SUP.cli || (supSoloMios() ? 'Mis requerimientos' : 'Todos los clientes'));
   const sub = APP_SUP.pry ? (pryNombre(APP_SUP.pry) || APP_SUP.cli || '') : (APP_SUP.cli ? 'Todos sus proyectos' : 'Todos los proyectos');
   return `<div class="sup-res"><div class="sup-ring" style="--p:${pct}"><b>${pct}%</b><small>atendido</small></div>
     <div class="sup-res-t"><b>${e(polarCorta(tit, 44))}</b><small>${e(polarCorta(sub, 52))}</small>
@@ -15088,10 +15094,11 @@ function appSupReqHtml(){
   if(resto.length) setTimeout(function tanda(){ const c = document.getElementById('supLista'); if(!c || gen !== APP_SUP._gen || !resto.length) return;
     c.insertAdjacentHTML('beforeend', resto.splice(0, 40).map(supCard).join('')); if(resto.length) setTimeout(tanda, 30); }, 60);
   return `<div class="sup">
+    ${supEsSupervisor() ? `<div class="sup-mios"><button type="button" data-supmios="0" class="${APP_SUP.mios ? '' : 'on'}">👥 Todos</button><button type="button" data-supmios="1" class="${APP_SUP.mios ? 'on' : ''}">👷 Mis requerimientos</button></div>` : ''}
     <div class="sup-fil">${ac('cli', '🏢', 'Escribe el cliente', APP_SUP.cli)}${ac('pry', '🏗️', 'Escribe el PRY o proyecto', pryTxt)}</div>
     ${supResumenHtml(sinQ)}
     <div class="m-buscar"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}"></div>
-    <div id="supLista">${l.slice(0, n0).map(supCard).join('') || `<div class="ini-card"><div class="ini-vacio">${supEsSupervisor() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
+    <div id="supLista">${l.slice(0, n0).map(supCard).join('') || `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
 }
 // Consulta de producto (13.10.2026, Piero: "no es una tienda, es para que el supervisor consulte lo que se tiene en
 // stock en base a sus descripciones... no necesariamente va a ser igual lo que escriban y lo que se recomiende; analiza
@@ -18171,6 +18178,7 @@ function appClickInicio(e){
   if(b.dataset.gpsub){ APP_GP.sub = b.dataset.gpsub; return appRenderInicio(); }
   if(b.dataset.pcsub){ APP_PC.sub = b.dataset.pcsub; return appRenderInicio(); }
   if(b.dataset.supsel){ const p = b.dataset.supsel.split('|'); if(p[0] === 'cli'){ APP_SUP.cli = p[1]; APP_SUP.pry = ''; } else { APP_SUP.pry = p[1]; const g = supGrupos().l.find(function(x){ return x.id === p[1]; }); if(g && !APP_SUP.cli) APP_SUP.cli = g.cli; } return appRenderInicio(); }
+  if(b.dataset.supmios){ APP_SUP.mios = b.dataset.supmios === '1'; APP_SUP.cli = ''; APP_SUP.pry = ''; APP_SUP.paso = ''; return appRenderInicio(); }
   if(b.dataset.suppaso){ APP_SUP.paso = APP_SUP.paso === b.dataset.suppaso ? '' : b.dataset.suppaso; return appRenderInicio(); }
   if(b.dataset.supx){ if(b.dataset.supx === 'cli'){ APP_SUP.cli = ''; APP_SUP.pry = ''; } else APP_SUP.pry = ''; return appRenderInicio(); }
   if(b.dataset.tdfam != null){ APP_TIENDA.fam = b.dataset.tdfam; APP_TIENDA.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
