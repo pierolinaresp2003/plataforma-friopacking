@@ -15285,6 +15285,21 @@ function supResumenHtml(l){
       return `<button type="button" class="rqm-st ${p[0] === 'obra' ? (n ? 'ok' : '') : (n ? 'act' : '')}${APP_SUP.paso === p[0] ? ' sel' : ''}" data-suppaso="${p[0]}" title="Ver los req. con ítems en ${p[2]}"><i>${p[1]}</i><small>${p[2]}</small><b>${n}</b></button>`; }).join('')}</div>
     ${APP_SUP.paso ? `<div class="rqm-filtro">Req. con ítems en <b>${(SUP_PASOS.find(function(p){ return p[0] === APP_SUP.paso; }) || [])[2]}</b> <button type="button" data-suppaso="${APP_SUP.paso}">✕ Ver todos</button></div>` : ''}</div>`;
 }
+function appSupMas(){
+  const c = document.getElementById('supLista'), m = document.getElementById('supMas'); if(!c || !m) return;
+  const l = supConPaso(supFiltrados()), n = c.querySelectorAll('.sup-card').length;
+  if(n < l.length) m.insertAdjacentHTML('beforebegin', l.slice(n, n + 30).map(supCard).join(''));
+  if(n + 30 >= l.length){ m.remove(); return; }
+  // Si el final sigue a la vista (pantalla grande), se agrega otra tanda en el siguiente cuadro.
+  requestAnimationFrame(function(){ const r = m.getBoundingClientRect(); if(m.isConnected && r.top < window.innerHeight + 900) appSupMas(); });
+}
+function appSupObservar(){
+  if(appSupObservar._ok) return; const sec = document.getElementById('section-inicio'); if(!sec || !window.IntersectionObserver) return; appSupObservar._ok = true;
+  const io = new IntersectionObserver(function(en){ if(en.some(function(x){ return x.isIntersecting; })) appSupMas(); }, { rootMargin:'0px 0px 900px 0px' });
+  let visto = null;
+  const mirar = function(){ const m = document.getElementById('supMas'); if(m && m !== visto){ if(visto) io.unobserve(visto); visto = m; io.observe(m); } };
+  new MutationObserver(mirar).observe(sec, { childList:true, subtree:true }); setTimeout(mirar, 0);
+}
 function appSupReqHtml(){
   const e = escapeHtml;
   if(!RQ.filas.length){ rqPreparar(); if(!RQ.filas.length) return '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los requerimientos…</div></div>'; }
@@ -15295,15 +15310,15 @@ function appSupReqHtml(){
   const pryTxt = APP_SUP.pry ? APP_SUP.pry + (pryNombre(APP_SUP.pry) ? ' · ' + pryNombre(APP_SUP.pry) : '') : '';
   const ac = function(tipo, ico, ph, val){ return `<div class="sup-ac${val ? ' lleno' : ''}" data-ac="${tipo}"><i>${ico}</i><input type="text" id="supQ-${tipo}" placeholder="${ph}" value="${e(val)}" autocomplete="off" enterkeyhint="search">${val ? `<button type="button" class="sup-x" data-supx="${tipo}" aria-label="Quitar">×</button>` : ''}<div class="sup-sug" id="supSug-${tipo}"></div></div>`; };
   const n0 = 24;
-  APP_SUP._gen = (APP_SUP._gen || 0) + 1; const gen = APP_SUP._gen, resto = l.slice(n0);
-  if(resto.length) setTimeout(function tanda(){ const c = document.getElementById('supLista'); if(!c || gen !== APP_SUP._gen || !resto.length) return;
-    c.insertAdjacentHTML('beforeend', resto.splice(0, 40).map(supCard).join('')); if(resto.length) setTimeout(tanda, 30); }, 60);
+  // Las demás tarjetas se agregan al acercarse al final de la lista (14.10.2026, Piero: "al retroceder desde Supervisor demora
+  // un montón"): antes se metían las 3,000+ tarjetas en segundo plano y la pantalla quedaba pesadísima para todo lo demás.
+  appSupObservar();
   return `<div class="sup">
     ${supEsSupervisor() ? `<div class="sup-mios"><button type="button" data-supmios="0" class="${APP_SUP.mios ? '' : 'on'}">👥 Todos</button><button type="button" data-supmios="1" class="${APP_SUP.mios ? 'on' : ''}">👷 Mis requerimientos</button></div>` : ''}
     <div class="sup-fil">${ac('cli', '🏢', 'Escribe el cliente', APP_SUP.cli)}${ac('pry', '🏗️', 'Escribe el PRY o proyecto', pryTxt)}</div>
     ${supResumenHtml(sinQ)}
     <div class="m-buscar"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}"></div>
-    <div id="supLista">${l.slice(0, n0).map(supCard).join('') || `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
+    <div id="supLista">${l.slice(0, n0).map(supCard).join('')}${l.length > n0 ? '<div class="sup-mas" id="supMas"></div>' : ''}${l.length ? '' : `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
 }
 // Consulta de producto (13.10.2026, Piero: "no es una tienda, es para que el supervisor consulte lo que se tiene en
 // stock en base a sus descripciones... no necesariamente va a ser igual lo que escriban y lo que se recomiende; analiza
