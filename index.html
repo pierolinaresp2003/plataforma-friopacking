@@ -647,6 +647,19 @@
   .rqm-cants b .rq-q{font-size:15px;}
   .rqm-cants b small{font-size:10px;font-weight:700;letter-spacing:0;text-transform:none;}
   .rqm-cants em{display:block;font-style:normal;font-size:9.5px;color:var(--muted);}
+  /* Cobertura de la línea (14.10.2026): Lima por orden de llegada + en camino sin REQ, en una barra. */
+  .rq-cob{display:block;width:100%;text-align:left;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:11px;background:var(--card);color:var(--ink);font:inherit;cursor:pointer;}
+  .rq-cob-top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);}
+  .rq-cob-top b{color:var(--ink);} .rq-cob-top em{font-style:normal;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#e7f6ec;color:#17733f;white-space:nowrap;}
+  .rq-cob.camino .rq-cob-top em{background:#e6f0fc;color:#1d5fa8;} .rq-cob.parcial .rq-cob-top em{background:#fff1d6;color:#9a5a00;} .rq-cob.nada .rq-cob-top em{background:#fde7e7;color:#b42323;}
+  .rq-cob-bar{display:flex;gap:2px;height:8px;margin:7px 0 6px;border-radius:999px;background:#f3dede;overflow:hidden;}
+  .rq-cob-bar i{display:block;height:100%;} .rq-cob-bar i.l{background:#2f9a5c;} .rq-cob-bar i.c{background:#3b82d6;}
+  .rq-cob-k{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--ink-soft);} .rq-cob-k b{color:var(--ink);font-weight:900;}
+  .rq-cob-k .l b{color:#17733f;} .rq-cob-k .c b{color:#1d5fa8;} .rq-cob-k .f b{color:#b42323;}
+  .rq-cob-oc{margin-top:5px;font-size:11px;color:var(--ink-soft);line-height:1.35;} .rq-cob-oc b{color:#1d5fa8;font-weight:900;} .rq-cob-oc .asis-est{font-size:10px;padding:1px 6px;}
+  .rq-cob small{display:block;margin-top:5px;font-size:10.5px;color:var(--muted);}
+  .rq-pop .res-tag.ll{color:#17733f;} .rq-pop .res-fila b small{display:block;font-size:9.5px;font-weight:700;color:#1d5fa8;text-align:right;}
+  .rq-pop .res.cam .res-tit b{color:#1d5fa8;}
   .rqm-partes{margin-top:8px;display:grid;gap:5px;}
   .rqm-partes > div{display:flex;gap:8px;align-items:flex-start;background:#eef7f0;border-radius:9px;padding:7px 9px;font-size:12px;line-height:1.35;color:var(--ink);}
   .rqm-partes > div.ped{background:#fff6e6;}
@@ -1970,6 +1983,13 @@
     html[data-theme="dark"] .td-dif{background:rgba(240,173,62,.14);color:#f3c46d;} html[data-theme="dark"] .td-aviso{background:rgba(111,182,255,.1);color:var(--ink-soft);}
     html[data-theme="dark"] .ix-btn{background:rgba(111,182,255,.18);color:#d6e7ff;}
     html[data-theme="dark"] .rqm-sit small.stk{background:rgba(63,209,92,.14);color:#86e3ad;}
+    html[data-theme="dark"] .rq-cob{background:rgba(255,255,255,.03);}
+    html[data-theme="dark"] .rq-cob-top em{background:rgba(63,209,92,.16);color:#86e3ad;}
+    html[data-theme="dark"] .rq-cob.camino .rq-cob-top em{background:rgba(96,165,250,.16);color:#9cc8ff;}
+    html[data-theme="dark"] .rq-cob.parcial .rq-cob-top em{background:rgba(245,166,35,.16);color:#f5c26b;}
+    html[data-theme="dark"] .rq-cob.nada .rq-cob-top em{background:rgba(239,68,68,.16);color:#ff9a9a;}
+    html[data-theme="dark"] .rq-cob-bar{background:rgba(239,68,68,.22);} html[data-theme="dark"] .rq-cob-bar i.l{background:#3fbf73;} html[data-theme="dark"] .rq-cob-bar i.c{background:#5b9ef0;}
+    html[data-theme="dark"] .rq-cob-k .l b{color:#86e3ad;} html[data-theme="dark"] .rq-cob-k .c b, html[data-theme="dark"] .rq-cob-oc b, html[data-theme="dark"] .rq-pop .res.cam .res-tit b, html[data-theme="dark"] .rq-pop .res-fila b small{color:#9cc8ff;} html[data-theme="dark"] .rq-cob-k .f b{color:#ff9a9a;}
     html[data-theme="dark"] .app-top .app-tema{background:rgba(255,255,255,.08);}
     /* Pantalla de módulos al iniciar (13.10.2026) */
     /* Pantalla de módulos (14.10.2026): marca a la izquierda, módulos a la derecha; en el celular, una arriba de la otra. */
@@ -12026,7 +12046,7 @@ function rqSitHtml(r, j){
   const n2 = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(j == null){
     const sit = rqSituacion(r);
-    return `<span class="ic">${sit.ico}</span><div><b>${escapeHtml(sit.titulo)}</b>${sit.detalle ? `<small>${escapeHtml(sit.detalle)}</small>` : ''}${sit.stock ? `<small class="stk">🏬 Almacén sí cuenta con stock: <b>${n2(sit.stock.q)} ${escapeHtml(sit.stock.um)}</b> en Lima${sit.stock.alc ? ' · alcanza para lo pedido' : ' · alcanza para una parte'}</small>` : ''}
+    return `<span class="ic">${sit.ico}</span><div><b>${escapeHtml(sit.titulo)}</b>${sit.detalle ? `<small>${escapeHtml(sit.detalle)}</small>` : ''}
       ${r.partido ? '<small class="dir">Una parte salió del stock y el resto está en pedido (ver abajo).</small>' : (r.via === 'Directo' ? '<small class="dir">Atendido del stock del almacén: no pasó por Compras.</small>' : '')}</div>`;
   }
   const d = rqPasoDetalle(r, j);
@@ -12116,6 +12136,7 @@ function rqVistaTarjetas(cont, filas){
       <div class="rqm-desc">${rqTxt(r.producto)}</div>
       ${rqPasosHtml(r)}
       <div class="rqm-sit ${rqClaseSit(r)}">${rqSitHtml(r)}</div>
+      ${rqCobHtml(r)}
       <div class="rqm-cants">
         <div><span>Pidió</span><b>${n(r.cantidad)}</b><em>${rqTxt(r.unidad)}</em></div>
         <div><span>Llegó</span><b>${rqCant(r.cantRecep, refRecep)}</b></div>
@@ -12123,7 +12144,6 @@ function rqVistaTarjetas(cont, filas){
         <div><span>En obra</span><b>${rqCant(r.cantObra, r.cantSalida)}</b></div>
       </div>
       ${rqPartesHtml(r)}
-      ${rqLibreHtml(cruceDe.get(r))}
       ${docs.length ? `<div class="rqm-docs">${docs.join('<br>')}</div>` : ''}
     </div>`;
   };
@@ -12419,15 +12439,12 @@ function caminoLibreDe(codigo){
 }
 // Ítems pendientes de un requerimiento que podrían atenderse con stock en camino sin REQ.
 function rqCruceLibre(filas){
+  // Ya repartido por orden de llegada (rqFifo): cada ítem ve solo lo que le toca de cada OC.
   const out = [];
   (filas || []).forEach(function(r){
-    if(rqItemListo(r) || /^(Archivado|Recibido en Almac)/.test(r.estadoCalc || '')) return;
-    const falta = Math.round(((r.cantidad || 0) - (r.cantSalida || 0)) * 100) / 100;
-    if(!(falta > 0)) return;
-    const l = caminoLibreDe(r.idProducto);
-    if(!l.length) return;
-    const tot = Math.round(l.reduce(function(a, y){ return a + y.q; }, 0) * 100) / 100;
-    out.push({ r:r, falta:falta, libres:l, total:tot, cubre: tot >= falta - 0.001 });
+    const x = rqFifoDe(r); if(!x || !x.cam.length) return;
+    const falta = Math.round((x.falta - x.asig) * 100) / 100;
+    out.push({ r:r, falta:falta, libres:x.cam.map(function(c){ return Object.assign({}, c.y, { q:c.q, qOc:c.y.q }); }), total:x.camQ, cubre:x.camQ >= falta - 0.001 });
   });
   return out;
 }
@@ -12544,27 +12561,73 @@ function almOtrosLista(){
   return almOtrosLista._l;
 }
 
-// Reservas de un código: material que YA LLEGÓ al almacén para un requerimiento y todavía no tiene
-// salida. Está físicamente en el stock, pero ya tiene dueño (25.09.2026, Piero: "figuran 210 mts en
-// stock de ese cable porque ya le dieron ingreso, pero en realidad ese stock se va a ir por ese mismo
-// requerimiento"). Se mira RQ.filas, que ya tiene la salida repartida ítem por ítem.
-// No cuentan como reserva:
-//  - "En Revisión": 466 de esas líneas tienen más de 60 días sin que nadie las cierre; sumarlas
-//    inflaría la reserva de casi cualquier código con demanda vieja.
-//  - "Pedido pendiente" / "cuenta con OC": ese material todavía no llegó, no está en el stock.
-function rqReservasDe(codigo){
-  const porReq = new Map();
-  (RQ.filas || []).forEach(function(r){
-    if(r.idProducto !== codigo || r.estadoCalc !== 'Recibido en Almacén') return;
-    const q = (r.cantRecep || 0) - (r.cantSalida || 0);
-    if(!(q > 0)) return;
-    const y = porReq.get(r.codRequerimiento) || { req:r.codRequerimiento, proyecto:r.proyecto, q:0, fReq:r.fReq || null };
-    y.q += q;
-    porReq.set(r.codRequerimiento, y);
+// Reservas por orden de llegada (14.10.2026, Piero: "las reservas solo se consideran correctas si son del mes
+// pasado que estén pendientes; si hay alguna muy antigua no cuenta" y "varios requerimientos pueden pedir el mismo
+// producto, así que debes descontar ... por orden de llegada").
+//  - Válida = línea pendiente con fecha de req desde el 1 del mes pasado. Las más antiguas no reservan: solo ven
+//    lo que sobra al final.
+//  - Primero se descuenta lo que ya llegó para un req (Recibido en Almacén, es suyo físicamente); después las líneas
+//    En Revisión / Pedido pendiente, de la más antigua a la más nueva, toman el stock de Lima del MISMO código.
+//  - Lo que les falta toma lo que viene en camino sin REQ (pedidos directos), por fecha de llegada.
+//  - Las líneas con OC propia no toman nada: su material ya viene en camino.
+function rqResCorte(){ const c = appIndCorte(); return new Date(Date.UTC(c.getUTCFullYear(), c.getUTCMonth() - 1, 1)); }
+function rqLimaDe(cod){ const p = rqStockDe(cod); if(!p) return null; return (p.miembros || []).filter(function(m){ return m.codigo === cod; })[0] || p; }
+function rqFifo(){
+  const filas = RQ.filas || [];
+  return appMemo('rqFifo' + filas.length, function(){
+    const corte = rqResCorte(), r2 = function(v){ return Math.round(v * 100) / 100; };
+    const lima = new Map(), cam = new Map(), por = new Map(), res = new Map();
+    const poolLima = function(cod){ if(!lima.has(cod)){ const p = rqLimaDe(cod); lima.set(cod, { tot:p ? (p.lima || 0) : 0, resto:p ? (p.lima || 0) : 0, um:p ? (p.unidad || '') : '', hay:!!p }); } return lima.get(cod); };
+    const poolCam = function(cod){ return caminoLibreDe(cod).map(function(y){ const k = y.oc + '|' + y.cod; if(!cam.has(k)) cam.set(k, { y:y, resto:y.q }); return cam.get(k); }); };
+    const fecha = function(r){ return r.fReq ? +r.fReq : 9e15; };
+    const ord = function(a, b){ return fecha(a) - fecha(b) || String(a.codRequerimiento).localeCompare(String(b.codRequerimiento)); };
+    const valida = function(r){ return !r.fReq || r.fReq >= corte; };
+    const anota = function(cod, x){ const l = res.get(cod) || []; l.push(x); res.set(cod, l); };
+    // 1) Lo que ya llegó para un req y no tiene salida.
+    filas.filter(function(r){ return r.estadoCalc === 'Recibido en Almacén' && valida(r) && (r.cantRecep || 0) - (r.cantSalida || 0) > 0; }).sort(ord).forEach(function(r){
+      const L = poolLima(r.idProducto), q = r2(Math.min(L.resto, (r.cantRecep || 0) - (r.cantSalida || 0)));
+      if(q > 0){ L.resto = r2(L.resto - q); anota(r.idProducto, { r:r, q:q, llego:true }); }
+    });
+    // 2) Pendientes por orden de llegada: primero Lima y luego lo que viene en camino sin REQ.
+    const pend = filas.filter(function(r){ return (r.estadoCalc === 'En Revisión' || r.estadoCalc === 'Pedido pendiente') && !rqItemListo(r) && (r.cantidad || 0) - (r.cantSalida || 0) > 0; });
+    const toma = function(r, consume){
+      const L = poolLima(r.idProducto), falta = r2((r.cantidad || 0) - (r.cantSalida || 0));
+      const x = { r:r, falta:falta, lima:L.tot, hay:L.hay, um:L.um || r.unidad || '', antes:r2(L.tot - L.resto), disp:Math.max(0, L.resto), asig:0, cam:[], camQ:0, vieja:!consume };
+      x.asig = r2(Math.min(L.resto, falta)); if(consume) L.resto = r2(L.resto - x.asig);
+      let q = r2(falta - x.asig);
+      poolCam(r.idProducto).sort(function(a, b){ return (a.y.lleg.eta || 9e15) - (b.y.lleg.eta || 9e15); }).forEach(function(c){
+        if(!(q > 0) || !(c.resto > 0)) return; const t = r2(Math.min(c.resto, q));
+        x.cam.push({ y:c.y, q:t }); x.camQ = r2(x.camQ + t); q = r2(q - t); if(consume) c.resto = r2(c.resto - t); });
+      x.sinCubrir = Math.max(0, q);
+      if(consume && x.asig > 0) anota(r.idProducto, { r:r, q:x.asig });
+      por.set(r, x);
+    };
+    pend.filter(valida).sort(ord).forEach(function(r){ toma(r, true); });
+    pend.filter(function(r){ return !valida(r); }).sort(ord).forEach(function(r){ toma(r, false); });
+    return { por:por, res:res, cam:cam, corte:corte, viejas:pend.filter(function(r){ return !valida(r); }) };
   });
-  return Array.from(porReq.values())
-    .map(function(y){ y.q = Math.round(y.q * 100) / 100; return y; })
-    .sort(function(a,b){ return b.q - a.q; });
+}
+function rqFifoDe(r){ return rqFifo().por.get(r) || null; }
+// Reservas válidas de un código (lo que ya se descontó del stock de Lima), en orden de llegada.
+function rqReservasDe(codigo){
+  return (rqFifo().res.get(codigo) || []).map(function(y){ return { req:y.r.codRequerimiento, proyecto:y.r.proyecto, q:y.q, fReq:y.r.fReq || null, llego:!!y.llego }; });
+}
+// Bloque visual de cobertura de una línea pendiente: barra Lima / en camino / falta y la OC que llega.
+function rqCobHtml(r){
+  const x = rqFifoDe(r); if(!x || !(x.asig > 0 || x.cam.length || x.antes > 0)) return '';
+  const n = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
+  const pc = function(v){ return x.falta > 0 ? Math.max(0, Math.min(100, v / x.falta * 100)).toFixed(1) : 0; };
+  const ok = x.sinCubrir <= 0.001, um = escapeHtml(x.um);
+  const est = ok ? (x.cam.length ? ['camino', '✅ Cubierto'] : ['ok', '✅ Hay stock']) : (x.asig > 0 || x.camQ > 0 ? ['parcial', '◐ Parcial'] : ['nada', '✕ Sin stock libre']);
+  const ocs = x.cam.slice(0, 2).map(function(c){ const eta = String(c.y.lleg.etaTxt || '').replace(/\s*\(.*\)\s*$/, '');
+    return `<div class="rq-cob-oc"><b>${n(c.q)}</b> ${escapeHtml(rqOcCorta(c.y.oc))} · ${escapeHtml(polarCorta(appImpNombre(c.y.prov || ''), 22))} · ${escapeHtml(eta)} <span class="asis-est ${c.y.lleg.est[0]}">${escapeHtml(c.y.lleg.est[1])}</span></div>`; }).join('');
+  return `<button type="button" class="rq-cob ${est[0]}" data-rqstock="${escapeHtml(r.idProducto)}" data-rqreq="${escapeHtml(r.codRequerimiento)}">
+    <div class="rq-cob-top"><span>Faltan <b>${n(x.falta)} ${um}</b></span><em>${est[1]}</em></div>
+    <div class="rq-cob-bar"><i class="l" style="width:${pc(x.asig)}%"></i><i class="c" style="width:${pc(x.camQ)}%"></i></div>
+    <div class="rq-cob-k">${x.asig > 0 || !x.camQ ? `<span class="l">🏬 Lima <b>${n(x.asig)}</b></span>` : ''}${x.camQ > 0 ? `<span class="c">🚢 En camino <b>${n(x.camQ)}</b></span>` : ''}${x.sinCubrir > 0 ? `<span class="f">Sin cubrir <b>${n(x.sinCubrir)}</b></span>` : ''}</div>
+    ${ocs}${x.cam.length > 2 ? `<div class="rq-cob-oc">+${x.cam.length - 2} OC más</div>` : ''}
+    ${x.antes > 0 && !x.vieja ? `<small>${n(x.antes)} de ${n(x.lima)} en Lima ya son de reqs anteriores</small>` : ''}${x.vieja ? '<small>Req. antiguo: no reserva, solo ve lo que sobra</small>' : ''}
+  </button>`;
 }
 
 function rqCerrarPop(){
@@ -12595,22 +12658,29 @@ function rqAbrirStock(btn){
     const sede = (etq, v)=> `<div class="sede${(v||0) ? '' : ' cero'}"><b>${etq}</b><i>${num(v)}</i></div>`;
     // Solo Lima: es donde llega lo que se compra y de donde sale a obra. Trujillo e Ica se muestran
     // como referencia pero no entran al descuento (25.09.2026, pedido de Piero).
-    const res = rqReservasDe(cod);
+    const res = rqReservasDe(cod), F = rqFifo();
     const reservado = Math.round(res.reduce(function(a,x){ return a + x.q; }, 0) * 100) / 100;
     const libre = Math.round(((yo.lima || 0) - reservado) * 100) / 100;
-    // Sin "En tránsito" (25.09.2026, Piero): lo que viene en camino casi siempre es la OC de un
-    // requerimiento, o sea material que ya tiene dueño; mostrarlo al lado del stock se leía como
-    // stock libre por llegar. El tránsito completo sigue en Análisis de Inventario.
-    const TOPE = 4;
+    const fc = function(d){ return d ? d.toLocaleDateString('es-PE', { day:'2-digit', month:'short' }).replace('.', '') : ''; };
     const reqActual = btn.dataset.rqreq || '';
-    const listaRes = res.slice(0, TOPE).map(function(x){
+    // Cola de reservas (orden de llegada). Se ven las 4 primeras y siempre la de este req.
+    const TOPE = 4, iEste = res.findIndex(function(x){ return x.req === reqActual; });
+    const verRes = res.filter(function(x, i){ return i < TOPE || i === iEste; });
+    const listaRes = verRes.map(function(x){
       const esEste = x.req === reqActual;
       return `<div class="res-fila${esEste ? ' este' : ''}">
-        <div><span class="res-req">${escapeHtml(x.req)}</span>${x.fReq ? '<span class="res-fecha">' + x.fReq.toLocaleDateString('es-PE', { day:'2-digit', month:'short', year:'2-digit' }).replace('.', '') + '</span>' : ''}${esEste ? '<span class="res-tag">este req</span>' : ''}
-          <span class="res-pry">${escapeHtml(String(x.proyecto || '').slice(0, 30))}</span></div>
+        <div><span class="res-req">${escapeHtml(String(x.req).replace(/^0001-0*/, ''))}</span><span class="res-fecha">${fc(x.fReq)}</span>${esEste ? '<span class="res-tag">este req</span>' : (x.llego ? '<span class="res-tag ll">ya llegó</span>' : '')}
+          <span class="res-pry">${escapeHtml(polarCorta(x.proyecto || '', 30))}</span></div>
         <b>${num(x.q)}</b>
       </div>`;
     }).join('');
+    const viejas = F.viejas.filter(function(r){ return r.idProducto === cod; }).length;
+    // En camino sin REQ (pedidos directos): cuánto trae cada OC y cuánto queda libre después de la cola.
+    const cam = caminoLibreDe(cod).map(function(y){ const c = F.cam.get(y.oc + '|' + y.cod); return { y:y, libre:c ? c.resto : y.q }; });
+    const listaCam = cam.slice(0, 4).map(function(c){ const eta = String(c.y.lleg.etaTxt || '').replace(/\s*\(.*\)\s*$/, '');
+      return `<div class="res-fila"><div><span class="res-req">${escapeHtml(rqOcCorta(c.y.oc))}</span><span class="res-fecha">${escapeHtml(eta)}</span>
+        <span class="res-pry">${escapeHtml(polarCorta(appImpNombre(c.y.prov || ''), 30))} · ${escapeHtml(c.y.lleg.est[1])}</span></div>
+        <b>${num(c.y.q)}${c.libre < c.y.q - 0.001 ? `<small>libre ${num(c.libre)}</small>` : ''}</b></div>`; }).join('');
     pop.innerHTML = `<button class="cerrar" type="button" aria-label="Cerrar">&times;</button>
       <h5>${escapeHtml(cod)}</h5>
       <div class="desc">${escapeHtml(yo.descripcion || p.descripcion || '')}${p.unidad ? ' · <b>' + escapeHtml(p.unidad) + '</b>' : ''}</div>
@@ -12618,15 +12688,17 @@ function rqAbrirStock(btn){
       ${p.sinRop ? '<div class="desc aviso" style="font-size:11.5px;">Sin punto de reorden: no entra en la reposición ni tiene kardex.</div>' : ''}
       ${(!p.miembros && p.nCodigos > 1) ? `<div class="alt"><div class="aviso" style="font-size:11.5px;">Este link se publicó antes del desglose por código: lo de arriba suma ${p.nCodigos} códigos. Vuelve a publicar con ☁.</div></div>` : ''}
       <div class="res">
-        <div class="res-tit"><span>Reservado</span><b>${reservado ? '−' + num(reservado) : '0'}</b></div>
-        <div class="res-sub">Llegó para un requerimiento y aún no tiene salida</div>
+        <div class="res-tit"><span>Reservado en Lima</span><b>${reservado ? '−' + num(reservado) : '0'}</b></div>
+        <div class="res-sub">Reqs pendientes desde el ${fc(F.corte)}, por orden de llegada</div>
         ${listaRes}
-        ${res.length > TOPE ? `<div class="res-mas">y ${res.length - TOPE} requerimiento${res.length - TOPE === 1 ? '' : 's'} más</div>` : ''}
+        ${res.length > verRes.length ? `<div class="res-mas">y ${res.length - verRes.length} req. más</div>` : ''}
+        ${viejas ? `<div class="res-mas">${viejas} req. antiguo${viejas === 1 ? '' : 's'} sin atender no reserva${viejas === 1 ? '' : 'n'}</div>` : ''}
       </div>
       <div class="libre${libre > 0 ? '' : ' cero'}">
         <span>Disponible real en Lima</span><b>${num(Math.max(0, libre))}</b>
       </div>
-      ${libre < 0 ? `<div class="res-aviso">Lo reservado supera el stock de Lima en <b>${num(-libre)}</b>: algún requerimiento figura como recibido sin salida, pero el material ya no está. Conviene revisarlo con Almacén.</div>` : ''}`;
+      ${cam.length ? `<div class="res cam"><div class="res-tit"><span>🚢 En camino sin REQ</span><b>${num(cam.reduce(function(a, c){ return a + c.y.q; }, 0))}</b></div>
+        <div class="res-sub">Pedidos directos; se reparten a los reqs por orden de llegada</div>${listaCam}${cam.length > 4 ? `<div class="res-mas">y ${cam.length - 4} OC más</div>` : ''}</div>` : ''}`;
   }
   document.body.appendChild(pop);
   // Se ancla debajo del código y se corrige si se sale de la pantalla.
@@ -16783,7 +16855,8 @@ async function rqPdfNativo(cod){
     l.forEach(function(r, i){
       const sc = polarSitCorta(r), pc = pills[sc[0]] || pills[''];
       const nom = pdf.splitTextToSize(T(r.producto || '—'), CW - 62), cv = pdf.splitTextToSize('Cómo va: ' + T(rqComoVa(r)), CW - 14);
-      const lm = r.estadoCalc === 'En Revisión' ? rqLimaLibre(r) : null, stk = lm && lm.libre > 0 ? 'Almacén sí cuenta con stock: ' + polarNum(lm.libre) + ' ' + T(lm.um) + ' en Lima' + (lm.libre >= lm.falta - 0.001 ? ' (alcanza para lo pedido)' : ' (alcanza para una parte)') : '';
+      // Cobertura por orden de llegada (14.10.2026): Lima + en camino sin REQ, en una línea corta.
+      const fx = rqFifoDe(r), stk = fx && (fx.asig > 0 || fx.camQ > 0) ? 'Lima ' + polarNum(fx.asig) + ' · En camino ' + polarNum(fx.camQ) + (fx.cam[0] ? ' (' + rqOcCorta(fx.cam[0].y.oc) + ', ETA ' + T(String(fx.cam[0].y.lleg.etaTxt || '').replace(/\s*\(.*\)\s*$/, '')) + ')' : '') + ' · ' + (fx.sinCubrir > 0.001 ? 'faltan ' + polarNum(fx.sinCubrir) + ' ' + T(fx.um) : 'cubre lo que falta') : '';
       const h = 4 + nom.length * 4.3 + 5 + cv.length * 4 + (stk ? 6.5 : 0) + 3;
       salto(h);
       if(i % 2 === 0){ col([248, 250, 253], 'setFillColor'); pdf.rect(M, y - 1, CW, h, 'F'); }
@@ -16817,11 +16890,9 @@ async function rqPdfNativo(cod){
 // Stock libre en Lima para una línea pendiente: lo que hay en Lima menos lo reservado para OTROS requerimientos
 // (lo reservado para este mismo sí le sirve). Lo recibido en almacén para este req ya es suyo: no aplica.
 function rqLimaLibre(r){
-  if(rqItemListo(r) || r.estadoCalc === 'Recibido en Almacén') return null;
-  const p = rqStockDe(r.idProducto); if(!p) return null;
-  const otros = rqReservasDe(r.idProducto).filter(function(y){ return y.req !== r.codRequerimiento; }).reduce(function(a, y){ return a + y.q; }, 0);
-  const falta = Math.round(((r.cantidad || 0) - (r.cantSalida || 0)) * 100) / 100;
-  return { lima:p.lima || 0, reservado:Math.round(otros * 100) / 100, libre:Math.max(0, Math.round(((p.lima || 0) - otros) * 100) / 100), falta:falta, um:p.unidad || r.unidad || '' };
+  // Por orden de llegada (rqFifo): "libre" = lo que queda en Lima después de los reqs anteriores.
+  const x = rqFifoDe(r); if(!x || !x.hay) return null;
+  return { lima:x.lima, reservado:x.antes, libre:x.disp, falta:x.falta, um:x.um };
 }
 // Semáforo de una línea pendiente (06.10.2026, Piero): verde = el stock libre en Lima alcanza; amarillo = viene
 // en camino sin REQ (o Lima cubre solo una parte); rojo = en revisión y sin stock en Lima ni en camino.
@@ -16889,13 +16960,14 @@ function appReqPdf(cod){
   const lmDe = new Map(pend.map(function(r){ return [r, rqLimaLibre(r)]; }));
   const semDe = new Map(pend.map(function(r){ return [r, rqSemaforo(r, crDe.get(r), lmDe.get(r))]; }));
   const nSem = function(k){ return pend.filter(function(r){ return semDe.get(r) === k; }).length; };
+  // Corto, por orden de llegada (14.10.2026, Piero: "siento que hay mucho texto, deja lo relevante").
   const lima = function(lm){ if(!lm || !(lm.falta > 0)) return '';
-    if(lm.libre > 0) return `<div class="rqp-cam lima">🏬 En Lima hay <b>${polarNum(lm.libre)} ${escapeHtml(lm.um)}</b> disponibles${lm.reservado > 0 ? ' (sin contar ' + polarNum(lm.reservado) + ' reservadas para otros requerimientos)' : ''}. <b>${lm.libre >= lm.falta - 0.001 ? 'Alcanza para lo que falta.' : 'Cubre solo una parte.'}</b></div>`;
-    if(lm.lima > 0) return `<div class="rqp-cam nada">🏬 En Lima hay ${polarNum(lm.lima)} ${escapeHtml(lm.um)}, pero están reservadas para otros requerimientos.</div>`;
+    if(lm.libre > 0) return `<div class="rqp-cam lima">🏬 Lima: <b>${polarNum(Math.min(lm.libre, lm.falta))} ${escapeHtml(lm.um)}</b> para este req${lm.reservado > 0 ? ' · ' + polarNum(lm.reservado) + ' ya son de reqs anteriores' : ''}. <b>${lm.libre >= lm.falta - 0.001 ? 'Alcanza.' : 'Cubre una parte.'}</b></div>`;
+    if(lm.lima > 0) return `<div class="rqp-cam nada">🏬 Lima tiene ${polarNum(lm.lima)} ${escapeHtml(lm.um)}, pero ya son de reqs anteriores.</div>`;
     return ''; };
   const camino = function(c){ if(!c) return ''; const y = c.libres[0], ok = c.total >= c.falta - 0.001;
     const eta = String(y.lleg.etaTxt || '').replace(/\s*\(.*\)\s*$/, '');
-    return `<div class="rqp-cam camino">📦 Se puede atender con <b>${polarNum(c.total)} ${escapeHtml(y.um)}</b> que vienen en camino sin REQ: ${escapeHtml(ocC(y.oc))} de ${escapeHtml(prov(y.prov))}${c.libres.length > 1 ? ' y ' + (c.libres.length - 1) + ' OC más' : ''} · ${escapeHtml(y.lleg.est[1])} · ETA ${escapeHtml(eta)}. ${ok ? '<b>Alcanza para lo que falta.</b>' : '<b>Cubre solo una parte.</b>'}</div>`; };
+    return `<div class="rqp-cam camino">🚢 En camino sin REQ: <b>${polarNum(c.total)} ${escapeHtml(y.um)}</b> · ${escapeHtml(ocC(y.oc))}${c.libres.length > 1 ? ' +' + (c.libres.length - 1) : ''} · ${escapeHtml(prov(y.prov))} · ETA ${escapeHtml(eta)}. <b>${ok ? 'Alcanza.' : 'Cubre una parte.'}</b></div>`; };
   const fila = function(r, i){ const s = polarSitCorta(r);
     return `<div class="rqp-it ${semDe.get(r) || ''}"><div class="rqp-top"><div class="rqp-nom"><span class="rqp-n">${i + 1}</span>${escapeHtml(r.producto || '—')}</div><span class="asis-est ${s[0]}">${s[1]} ${escapeHtml(r.partido && !(r.cantRecep > 0 || r.fRecep) ? 'Atendido en parte' : ((APP_ESTADOS.find(function(e){ return e[0] === r.estadoCalc; }) || [])[1] || r.estadoCalc || '—'))}</span></div>
       <div class="rqp-meta">Código ${escapeHtml(r.idProducto || '—')} · pidió ${polarNum(r.cantidad)} ${escapeHtml(r.unidad || '')}${(function(){ if(rqItemListo(r)) return ''; const c = rqCompradorDe(r); return c ? '<br>🛒 ' + c[0] + ': <b>' + escapeHtml(c[1]) + '</b>' : ''; })()}</div>
