@@ -1012,6 +1012,7 @@
     .app-top .app-vista{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:20px;
       padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap;}
     .app-top .app-vista span{opacity:.7;font-size:10px;margin-left:2px;}
+    .app-lado{display:none;flex-shrink:0;width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:#fff;align-items:center;justify-content:center;cursor:pointer;padding:0;} .app-lado svg{width:20px;height:20px;} .app-lado:hover{background:rgba(255,255,255,.18);}
     .app-top .app-tema{flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.13);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .2s ease,background .2s ease;}
     .app-top .app-tema:active{transform:scale(.9) rotate(-20deg);} .app-top .app-tema svg{width:20px;height:20px;}
     body:not(.app-pc) .app-top .app-vista{display:none;}
@@ -13542,7 +13543,7 @@ function appAntesDe(html){ document.body.insertAdjacentHTML('beforeend', html); 
 function appConstruir(){
   const logo = appLogo();
   document.querySelector('.main').insertAdjacentHTML('afterbegin',
-    `<header class="app-top"><img class="app-logo" src="${logo}" alt="Friopacking">
+    `<header class="app-top"><button type="button" class="app-lado" id="appLadoBtn" aria-label="Ocultar o mostrar el menú" title="Ocultar / mostrar el menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><img class="app-logo" src="${logo}" alt="Friopacking">
        <div class="app-tit"><b id="appTit">Inicio</b><span id="appSubTit"></span></div>
        <button type="button" class="app-tema" id="appTemaBtn" aria-label="Cambiar a modo oscuro"></button>
        <button type="button" class="app-vista" id="appVistaBtn"></button></header>`);
@@ -13568,6 +13569,8 @@ function appConstruir(){
 
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
   document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(); });
+  try{ if(localStorage.getItem('fp-lado') === 'off') document.body.classList.add('lado-off'); }catch(err){}
+  document.getElementById('appLadoBtn').addEventListener('click', function(){ const off = document.body.classList.toggle('lado-off'); try{ localStorage.setItem('fp-lado', off ? 'off' : ''); }catch(err){} });
   appTemaIcono();
   document.getElementById('appSheet').addEventListener('click', function(e){ if(e.target === this) appCerrarSheet(); });
   document.getElementById('appTabbar').addEventListener('click', function(e){
@@ -13785,7 +13788,16 @@ const APP_PC_CSS = `
   body.app-pc .app-toast{bottom:40px;}
   body.app-pc .m-fila:hover, body.app-pc .m-prod-cab:hover, body.app-pc .ind-fila:hover, body.app-pc .m-fam:hover{background:var(--surface-2);}
   body.app-pc .m-cal-dias button{aspect-ratio:auto;height:44px;font-size:14px;} body.app-pc .m-cal-dias button:hover{filter:brightness(.95);}
-  body.app-pc .app-oc{inset:0 0 0 auto;width:min(760px, 100%);box-shadow:-20px 0 60px rgba(10,20,40,.25);}
+  /* Detalle a página completa (14.10.2026, Piero: "todo se abre a la mitad; que se abra en toda la página y se pueda
+     retroceder con la flecha"): ocupa todo a la derecha del menú, con el contenido centrado. */
+  body.app-pc .app-oc{inset:0 0 0 232px;width:auto;box-shadow:none;} body.app-pc .app-oc .oc-cuerpo{max-width:1180px;margin:0 auto;padding:22px 32px 40px;box-sizing:border-box;}
+  body.app-pc .app-oc .oc-cab{padding-left:max(24px, calc((100% - 1180px) / 2 + 16px));padding-right:max(24px, calc((100% - 1180px) / 2 + 16px));}
+  body.app-pc.lado-off .app-oc{left:0;} body.app-pc.vista-supervisor .app-oc{left:0;}
+  /* Menú lateral que se puede ocultar (14.10.2026, Piero: "que se pueda ocultar en la versión web para que no estorbe"). */
+  body.app-pc{transition:padding-left .25s ease;} body.app-pc .app-tabbar{transition:transform .25s ease;}
+  body.app-pc .app-top .app-lado{display:flex;}
+  body.app-pc.lado-off{padding-left:0;} body.app-pc.lado-off .app-tabbar{transform:translateX(-100%);box-shadow:none;}
+  body.app-pc.lado-off .app-top .app-logo{display:block;height:30px;cursor:pointer;}
   body.app-pc .app-oc.ancho{inset:0;width:100%;box-shadow:none;} body.app-pc .app-oc.ancho .oc-cuerpo{max-width:1280px;padding:22px 32px 40px;}
   body.app-pc .m-pp-hero{padding:26px 32px;} body.app-pc .m-pp-av{width:84px;height:84px;font-size:30px;} body.app-pc .m-pp-nom b{font-size:30px;} body.app-pc .m-pp-monto b{font-size:42px;}
   body.app-pc .m-pp-kpis{grid-template-columns:repeat(3,1fr);gap:14px;} body.app-pc .m-pp-kpis > :last-child{grid-column:auto;} body.app-pc .m-pp-kpi{padding:18px 20px;} body.app-pc .m-pp-kpi b{font-size:40px;}
