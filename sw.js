@@ -2,7 +2,7 @@
 // Primero la red, para que siempre se vea lo último publicado (index.html y data.json.gz); si no hay
 // señal, se abre la última copia guardada en el celular. Solo archivos de este mismo sitio: lo que va a
 // GitHub (Guardar y compartir) y a Google no pasa por aquí.
-const CACHE = 'friopacking-v3';
+const CACHE = 'friopacking-v4';
 self.addEventListener('install', function(e){
   self.skipWaiting();
   // La primera vez se guarda la página misma, para que abra aunque luego no haya señal.
@@ -16,7 +16,10 @@ self.addEventListener('fetch', function(e){
   if(req.method !== 'GET' || url.origin !== self.location.origin) return;
   // Se guarda sin el "?_=hora" con que se pide data.json.gz: una sola copia por archivo, no una por visita.
   const clave = url.origin + url.pathname;
-  e.respondWith(fetch(req).then(function(res){
+  // La página y los datos se piden siempre revalidando con el servidor (14.10.2026): sin esto el navegador podía
+  // mostrar hasta 10 min la versión anterior aunque ya estuviera publicada la nueva.
+  const fresco = req.mode === 'navigate' || /\.(html|json|gz|webmanifest)$/.test(url.pathname) || url.pathname.endsWith('/');
+  e.respondWith(fetch(fresco ? new Request(req, { cache:'no-cache' }) : req).then(function(res){
     if(res && res.ok){ const copia = res.clone(); caches.open(CACHE).then(function(c){ return c.put(clave, copia); }); }
     return res;
   }).catch(function(){
