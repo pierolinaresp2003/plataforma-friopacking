@@ -647,6 +647,7 @@
   .rqm-paso.ok i{background:var(--green-bg);border-color:var(--green);filter:none;opacity:1;}
   .rqm-paso.act i{background:var(--amber-bg);border-color:var(--amber);filter:none;opacity:1;box-shadow:0 0 0 4px rgba(226,150,10,.18);}
   .rqm-paso.salto i{border-style:dashed;opacity:.35;}
+  .rqm-paso .rqm-paso-est{font-size:9px;font-weight:700;color:var(--amber-ink);white-space:nowrap;margin-top:-2px;}
   .rqm-paso span{font-size:9.5px;font-weight:800;color:var(--muted);letter-spacing:.02em;white-space:nowrap;}
   .rqm-paso.ok span{color:var(--green);} .rqm-paso.act span{color:var(--amber-ink);} .rqm-paso.salto span{font-weight:600;opacity:.7;}
   .rqm-sit{margin-top:10px;display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border-radius:10px;padding:9px 11px;border-left:4px solid var(--border);}
@@ -12148,16 +12149,17 @@ function rqPasosHtml(r){
   const directo = r.via === 'Directo' && !r.partido;
   // En revisión todavía está en el almacén decidiendo si sale de stock o se compra: el paso vivo es el
   // requerimiento, no Compras.
-  let actual = r.estadoCalc === 'En Revisión';
+  // El amarillo marca DÓNDE está ahora (el último paso cumplido) y debajo dice qué espera: con OC y sin llegar, se pinta OC
+  // "en camino", no Almacén (14.10.2026, Piero).
+  const pos = r.estadoCalc === 'Archivado' ? -1 : rqPasoEn(r);
   return '<div class="rqm-pasos">' + RQ_PASOS.map(function(p, j){
     const salto = directo && (j === 1 || j === 2);
     let ok = p.ok(r);
     if((directo || r.partido) && j === 3) ok = ok || !!r.fSalida;   // salió del stock: el almacén ya lo tenía
     if(r.estadoCalc === 'Archivado') ok = ok && j === 0;
     let cls = salto ? 'salto' : (ok ? 'ok' : '');
-    if(j === 0 && r.estadoCalc === 'En Revisión') cls = 'act';
-    if(!salto && !ok && !actual && r.estadoCalc !== 'Archivado'){ cls = 'act'; actual = true; }
-    return `<button type="button" class="rqm-paso ${cls}" data-paso="${j}" aria-label="Ver el detalle de ${RQ_PASOS_ICO[j][1]}"><i>${RQ_PASOS_ICO[j][0]}</i><span>${salto ? 'No aplica' : RQ_PASOS_ICO[j][1]}</span></button>`;
+    if(!salto && j === pos) cls = 'act';
+    return `<button type="button" class="rqm-paso ${cls}" data-paso="${j}" aria-label="Ver el detalle de ${RQ_PASOS_ICO[j][1]}"><i>${RQ_PASOS_ICO[j][0]}</i><span>${salto ? 'No aplica' : RQ_PASOS_ICO[j][1]}</span>${!salto && j === pos ? '<small class="rqm-paso-est">' + RQ_PASO_EST[j] + '</small>' : ''}</button>`;
   }).join('') + '</div>';
 }
 
@@ -15096,15 +15098,26 @@ function rqPasoAct(r){
   }
   return 6;
 }
+// Dónde ESTÁ el ítem (14.10.2026, Piero: "se pinta Almacén cuando el producto aún no llega; visualmente confunde"):
+// el último paso que ya cumplió, no el siguiente que espera. Con OC y sin llegar está en OC (en camino); en revisión,
+// en el Req.; listo en obra = 6.
+function rqPasoEn(r){
+  if(rqItemListo(r)) return 6;
+  if(r.estadoCalc === 'En Revisión') return 0;
+  const directo = r.via === 'Directo' && !r.partido; let k = rqPasoAct(r) - 1;
+  while(k > 0 && directo && (k === 1 || k === 2)) k--;
+  return Math.max(0, Math.min(5, k));
+}
+const RQ_PASO_EST = ['en revisión', 'sin OC aún', 'en camino', 'por despachar', 'en camino a obra', 'por confirmar'];
 function supPaso(r){
   if(r.estadoCalc === 'Archivado') return 'arch';
   if(rqItemListo(r)) return 'obra';
-  const k = rqPasoAct(r); return k >= 6 ? 'obra' : SUP_PASOS[k][0];
+  const k = rqPasoEn(r); return k >= 6 ? 'obra' : SUP_PASOS[k][0];
 }
 // Estado de cada paso para un grupo de ítems: verde si todos ya lo pasaron, amarillo si hay ítems esperando ahí.
 function supPasoEstado(items, k){
   const act = items.filter(function(r){ return r.estadoCalc !== 'Archivado'; }); if(!act.length) return '';
-  const idx = act.map(function(r){ return rqItemListo(r) ? 6 : rqPasoAct(r); });
+  const idx = act.map(function(r){ return rqPasoEn(r); });
   if(idx.some(function(x){ return x === k; })) return 'act';
   return idx.every(function(x){ return x > k; }) ? 'ok' : '';
 }
