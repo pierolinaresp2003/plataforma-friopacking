@@ -15329,7 +15329,9 @@ function appIndicadoresHtml(){
   const barra = appFBarra('indicadores', alm ? { pry:1 } : { persona:1, pry:1, compradores:1 }), foto = alm ? appFotoAlmacen(st) : appFotoComprador(st);
   const datos0 = appIndDatos(per.f), datos = Array.isArray(datos0) ? datos0.filter(deCompra) : datos0;
   if(!Array.isArray(datos) || (st.persona && !datos.length)) return barra + foto + '<div class="ini-card"><div class="ini-vacio">No hay tiempos con esos filtros.</div></div>';
-  const TR = appTramos(st), tend = TR.l.map(function(x){ return { etq:x.etq, datos:appIndDatos(Object.assign({}, x.f, st.persona ? { persona:st.persona } : {}, st.pry ? { pry:st.pry } : {})) }; });
+  // Siempre por mes desde enero (14.10.2026, Piero: "estaba bien que siempre salga el progreso mensual, si no se pierde
+  // la línea de tiempo"); sí respeta la persona y el cliente / proyecto elegidos.
+  const tend = appIndTendF(false).map(function(x){ return { etq:x.etq, datos:appIndDatos(Object.assign({}, x.f, st.persona ? { persona:st.persona } : {}, st.pry ? { pry:st.pry } : {})) }; });
   tend.forEach(function(t){ t.datos = Array.isArray(t.datos) ? t.datos.filter(deCompra) : []; });
   const cuenta = { ok:0, late:0, warn:0 };
   datos.forEach(function(d){ const c = appIndClase(d.st.cumplePct); if(cuenta[c] != null) cuenta[c]++; });
@@ -15351,7 +15353,7 @@ function appIndicadoresHtml(){
         ${pct != null ? `<div class="ind-barra"><i class="ok" style="width:${pct.toFixed(1)}%"></i><i class="warn" style="width:${(100 - pct).toFixed(1)}%"></i></div>
         <div class="ind-ley"><span><i class="ok"></i>A tiempo ${st.cumpleN}</span><span><i class="warn"></i>Fuera de meta ${st.noCumpleN}</span></div>` : ''}`
         : '<div class="ini-vacio">No hay casos terminados en este período.</div>'}
-      <div class="ind-sub">% a tiempo · por ${TR.tipo} · ${escapeHtml(per.largo)}</div>
+      <div class="ind-sub">% a tiempo · por mes desde enero ${appIndCorte().getUTCFullYear()}</div>
       <div class="ind-tend" style="grid-template-columns:repeat(${tend.length},1fr)">${barras}</div>
       ${st.n ? '<div class="ind-ver">Ver los ' + st.n + ' casos ›</div>' : ''}
     </div>`;
