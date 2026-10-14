@@ -1546,21 +1546,22 @@
      Una sola curva para todo (entra rápido y frena suave), duraciones de 0.3–0.5 s y cada capa con su
      salida animada: nada aparece ni desaparece de golpe encima de otra pantalla. */
   @keyframes appFundido{from{opacity:0;}to{opacity:1;}}
-  @keyframes appPasoDer{from{opacity:0;transform:translateX(34px);}to{opacity:1;transform:none;}}
-  @keyframes appPasoIzq{from{opacity:0;transform:translateX(-34px);}to{opacity:1;transform:none;}}
+  @keyframes appPasoDer{from{opacity:.4;transform:translateX(16px);}to{opacity:1;transform:none;}}
+  @keyframes appPasoIzq{from{opacity:.4;transform:translateX(-16px);}to{opacity:1;transform:none;}}
   @keyframes appSubeSuave{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
   @keyframes appEntraDer{from{transform:translateX(100%);}to{transform:none;}}
   @keyframes appSaleDer{from{transform:none;}to{transform:translateX(100%);}}
   @keyframes appHojaSube{from{transform:translateY(100%);}to{transform:none;}}
   @keyframes appHojaBaja{from{transform:none;}to{transform:translateY(100%);}}
   @keyframes appFondoSale{from{opacity:1;}to{opacity:0;}}
-  #temaVelo{position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:0;will-change:opacity;} #temaVelo.entra{opacity:1;transition:opacity .15s ease-out;} #temaVelo.sale{opacity:0;transition:opacity .28s ease-in;}
+  html.sin-trans, html.sin-trans *{transition:none !important;}
+  .app-tema.gira svg{animation:appTemaGira .35s cubic-bezier(.22,.8,.2,1);} @keyframes appTemaGira{from{transform:rotate(-90deg) scale(.6);}to{transform:none;}}
   @media (max-width:760px){
     /* La animación mueve la pantalla 34 px de costado: sin recorte el documento se ensanchaba un instante,
        el celular reacomodaba el zoom y la barra de abajo "se movía". */
     body{overflow-x:hidden;} .main, .content{overflow-x:clip;}
-    #section-inicio.tr-der{animation:appPasoDer .42s cubic-bezier(.22,.8,.2,1);}
-    #section-inicio.tr-izq{animation:appPasoIzq .42s cubic-bezier(.22,.8,.2,1);}
+    #section-inicio.tr-der{animation:appPasoDer .24s cubic-bezier(.22,.8,.2,1);}
+    #section-inicio.tr-izq{animation:appPasoIzq .24s cubic-bezier(.22,.8,.2,1);}
     .section.tr-sube{animation:appSubeSuave .45s cubic-bezier(.22,.8,.2,1);}
     /* Primera entrada al inicio: las tarjetas llegan una tras otra. */
     #section-inicio.tr-entrada > *{animation:appSubeSuave .6s cubic-bezier(.22,.8,.2,1) both;}
@@ -1819,6 +1820,9 @@
     .dci-n{flex:0 0 26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:900;color:#fff;background:#5f9ade;}
     .dci-col.pro .dci-n{background:#e0aa2c;} .dci-col.fin .dci-n{background:#4fb886;}
     .dci-rt{flex:1;min-width:0;} .dci-rt small{display:block;font-size:11.5px;font-weight:800;color:#5b7aa6;text-transform:uppercase;} .dci-rt b{display:block;font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;margin-top:2px;}
+    .dci-edit .dci-rt label{display:block;margin-bottom:8px;} .dci-edit .dci-rt label > span{display:block;font-size:11.5px;font-weight:800;color:#4c6c9c;margin-bottom:3px;}
+    .dci-edit input{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font:inherit;font-size:13.5px;background:var(--input-bg,#fff);color:var(--ink);}
+    .dci-edit-acc{display:flex;gap:8px;align-items:center;} .dci-edit-acc .ix-btn{margin-top:0;} .dci-mv.edit{background:#e8eefc;} html[data-theme="dark"] .dci-mv.edit{background:rgba(111,182,255,.16);}
     .dci-com{display:block;font-size:12px;color:var(--ink-soft);background:var(--surface-2);border-radius:8px;padding:3px 8px;margin-top:5px;}
     .dci-blq{display:block;font-size:12px;color:#b4545a;background:#fde9ea;border-radius:8px;padding:3px 8px;margin-top:5px;} .dci-rf{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:4px;}
     .dci-ra{display:flex;flex-direction:column;gap:4px;} .dci-mv{border:0;border-radius:9px;width:32px;height:28px;cursor:pointer;font-size:14px;}
@@ -1951,32 +1955,44 @@
     html[data-theme="dark"] .rqm-sit small.stk{background:rgba(63,209,92,.14);color:#86e3ad;}
     html[data-theme="dark"] .app-top .app-tema{background:rgba(255,255,255,.08);}
     /* Pantalla de módulos al iniciar (13.10.2026) */
-    /* Pantalla de módulos (13.10.2026, Piero: "mejora totalmente la pestaña de inicio... que sea llamativa y profesional") */
-    .lz{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:28px 18px;overflow-y:auto;color:#fff;
-      background:radial-gradient(circle at 88% 6%,rgba(45,200,185,.42) 0,rgba(45,200,185,0) 38%),radial-gradient(circle at 6% 96%,rgba(90,150,255,.38) 0,rgba(90,150,255,0) 42%),linear-gradient(160deg,#061649 0%,#0a2470 52%,#0b3c7c 100%);}
-    .lz.abierto{display:flex;animation:lzFondo .25s ease;} .lz.fuera{animation:appFondoSale .18s ease-in forwards;pointer-events:none;}
-    .lz-copo{position:absolute;right:-70px;top:-60px;width:300px;height:300px;opacity:.09;pointer-events:none;} .lz-copo.b{right:auto;left:-90px;top:auto;bottom:-90px;width:260px;height:260px;opacity:.06;}
-    .lz-in{position:relative;width:100%;max-width:980px;}
-    .lz-head{display:flex;align-items:center;justify-content:space-between;gap:12px;} .lz-logo{height:40px;display:block;}
-    .lz-fecha{font-size:12.5px;font-weight:700;letter-spacing:.04em;color:#b9cdf2;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:999px;padding:6px 12px;}
-    .lz-hola{margin:34px 0 22px;} .lz-hola small{display:block;font-size:15px;font-weight:600;color:#9fe3d8;} .lz-hola h1{margin:2px 0 6px;font-size:clamp(34px,8vw,52px);line-height:1;font-weight:900;letter-spacing:-.02em;color:#fff;}
-    .lz-hola p{margin:0;font-size:14.5px;color:#c6d5f2;}
-    .lz-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
-    .lz-card{position:relative;display:flex;align-items:center;gap:16px;text-align:left;border:0;border-radius:22px;padding:18px 16px 18px 18px;font:inherit;cursor:pointer;color:#14295a;background:#fff;
-      box-shadow:0 14px 34px rgba(3,12,48,.35);overflow:hidden;animation:lzEntra .45s cubic-bezier(.22,.8,.2,1) both;transition:transform .15s ease,box-shadow .15s ease;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;outline:none;}
-    .lz-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--lz-a);}
-    .lz-card:hover{transform:translateY(-3px);box-shadow:0 20px 40px rgba(3,12,48,.45);} .lz-card:focus{outline:none;} .lz-card.pulsado{transform:scale(.97);}
+    /* Pantalla de módulos (14.10.2026): marca a la izquierda, módulos a la derecha; en el celular, una arriba de la otra. */
+    .lz{position:fixed;inset:0;z-index:300;display:none;overflow-y:auto;background:#f3f6fb;color:#14295a;}
+    .lz.abierto{display:block;animation:lzFondo .22s ease;} .lz.fuera{animation:appFondoSale .18s ease-in forwards;pointer-events:none;}
+    .lz-in{display:grid;grid-template-columns:minmax(380px,42%) 1fr;min-height:100%;}
+    .lz-brand{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;gap:28px;padding:44px 48px;color:#fff;
+      background:radial-gradient(circle at 100% 0%,rgba(62,198,172,.30) 0,rgba(62,198,172,0) 45%),linear-gradient(165deg,#0a1e64 0%,#0b2a7a 60%,#0d3a86 100%);}
+    .lz-marca{position:absolute;right:-90px;bottom:-90px;width:380px;height:380px;opacity:.07;pointer-events:none;} .lz-marca svg{width:100%;height:100%;}
+    .lz-brand-top,.lz-hola,.lz-brand-pie{position:relative;z-index:1;}
+    .lz-casco{position:absolute;right:36px;bottom:30px;width:min(240px,34%);height:auto;filter:drop-shadow(0 18px 30px rgba(0,0,0,.35));pointer-events:none;}
+    .lz-logo{display:block;height:64px;width:auto;}
+    .lz-fecha{display:inline-block;font-size:13px;font-weight:700;color:#bfe9e1;letter-spacing:.02em;margin-bottom:18px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);}
+    .lz-hola small{display:block;font-size:20px;font-weight:600;color:#cdd9f2;} .lz-hola h1{margin:2px 0 12px;font-size:clamp(44px,5.4vw,72px);line-height:1;font-weight:900;letter-spacing:-.025em;color:#fff;}
+    .lz-hola p{margin:0;font-size:16px;color:#aec3ea;max-width:420px;line-height:1.5;}
+    .lz-brand-pie b{display:block;font-size:14px;font-weight:800;color:#fff;} .lz-brand-pie span{font-size:12.5px;color:#9fb4dd;}
+    .lz-main{display:flex;align-items:center;justify-content:center;padding:44px 40px;}
+    .lz-main-in{width:100%;max-width:620px;}
+    .lz-main h2{margin:0;font-size:26px;font-weight:900;color:#0f2557;letter-spacing:-.01em;} .lz-sub{margin:6px 0 22px;font-size:14px;color:#5e6f88;}
+    .lz-cards{display:flex;flex-direction:column;gap:12px;}
+    .lz-card{position:relative;display:flex;align-items:center;gap:18px;width:100%;text-align:left;border:1px solid #e2e8f2;border-radius:18px;padding:18px 18px 18px 20px;font:inherit;cursor:pointer;color:#14295a;background:#fff;
+      box-shadow:0 1px 2px rgba(15,37,87,.05);animation:lzEntra .4s cubic-bezier(.22,.8,.2,1) both;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;outline:none;}
+    .lz-card:hover{transform:translateX(4px);border-color:var(--lz-a);box-shadow:0 10px 26px rgba(15,37,87,.10);} .lz-card:focus-visible{border-color:var(--lz-a);} .lz-card.pulsado{transform:scale(.98);}
     .lz-card > *{pointer-events:none;}
-    .lz-ic{flex:0 0 auto;width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:var(--lz-g);box-shadow:0 8px 16px var(--lz-s);} .lz-ic svg{width:30px;height:30px;}
-    .lz-tx{flex:1;min-width:0;} .lz-tx b{display:block;font-size:19px;font-weight:900;color:#0f2557;} .lz-tx span{display:block;margin-top:3px;font-size:12.8px;color:#5a6b86;line-height:1.35;}
-    .lz-go{flex:0 0 auto;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eef3fb;} .lz-go svg{width:16px;height:16px;}
-    .lz-compras{--lz-a:#2f6fe0;--lz-g:linear-gradient(135deg,#4f8ef7,#1d4ed8);--lz-s:rgba(37,99,235,.35);}
-    .lz-almacen{--lz-a:#13a394;--lz-g:linear-gradient(135deg,#2cc7b4,#0f766e);--lz-s:rgba(15,118,110,.35);}
-    .lz-super{--lz-a:#e8922b;--lz-g:linear-gradient(135deg,#f7b347,#d9761a);--lz-s:rgba(217,118,26,.35);}
-    .lz-frioteam{--lz-a:#7c5ce0;--lz-g:linear-gradient(135deg,#9b82f2,#5b3fd1);--lz-s:rgba(91,63,209,.35);}
-    .lz-pie{margin-top:26px;text-align:center;font-size:12px;color:#8ea7d6;letter-spacing:.03em;display:flex;flex-direction:column;align-items:center;gap:12px;}
-    .lz-usr{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#dbe6fb;border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;}
-    @media (max-width:600px){ .lz{align-items:flex-start;padding-top:22px;} .lz-hola{margin:26px 0 18px;} .lz-cards{gap:12px;} .lz-card{padding:15px 14px 15px 16px;gap:14px;} .lz-ic{width:50px;height:50px;border-radius:14px;} .lz-ic svg{width:27px;height:27px;} .lz-tx b{font-size:18px;} }
+    .lz-ic{flex:0 0 auto;width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:var(--lz-g);box-shadow:0 6px 14px var(--lz-s);} .lz-ic svg{width:28px;height:28px;}
+    .lz-tx{flex:1;min-width:0;} .lz-tx b{display:block;font-size:18px;font-weight:900;color:#0f2557;} .lz-tx span{display:block;margin-top:3px;font-size:13px;color:#5e6f88;line-height:1.4;}
+    .lz-go{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#f0f4fa;transition:background .15s ease;} .lz-go svg{width:16px;height:16px;}
+    .lz-card:hover .lz-go{background:var(--lz-a);} .lz-card:hover .lz-go svg{stroke:#fff;}
+    .lz-compras{--lz-a:#2f6fe0;--lz-g:linear-gradient(135deg,#4f8ef7,#1d4ed8);--lz-s:rgba(37,99,235,.28);}
+    .lz-almacen{--lz-a:#13a394;--lz-g:linear-gradient(135deg,#2cc7b4,#0f766e);--lz-s:rgba(15,118,110,.28);}
+    .lz-super{--lz-a:#e8922b;--lz-g:linear-gradient(135deg,#f7b347,#d9761a);--lz-s:rgba(217,118,26,.28);}
+    .lz-frioteam{--lz-a:#7c5ce0;--lz-g:linear-gradient(135deg,#9b82f2,#5b3fd1);--lz-s:rgba(91,63,209,.28);}
+    .lz-usr-fila{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:24px;padding-top:18px;border-top:1px solid #e2e8f2;font-size:13px;color:#5e6f88;}
+    .lz-usr{border:1px solid #d5deeb;background:#fff;color:#14295a;border-radius:999px;padding:8px 16px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;} .lz-usr:hover{border-color:#9db4dc;}
+    html[data-theme="dark"] .lz{background:#0e1520;color:var(--ink);} html[data-theme="dark"] .lz-main h2,html[data-theme="dark"] .lz-tx b{color:var(--ink);} html[data-theme="dark"] .lz-sub,html[data-theme="dark"] .lz-tx span,html[data-theme="dark"] .lz-usr-fila{color:var(--ink-soft);}
+    html[data-theme="dark"] .lz-card{background:#161f2e;border-color:#2a3547;color:var(--ink);} html[data-theme="dark"] .lz-go{background:#1f2937;} html[data-theme="dark"] .lz-usr-fila{border-color:#2a3547;} html[data-theme="dark"] .lz-usr{background:#161f2e;border-color:#2a3547;color:var(--ink);}
+    @media (max-width:860px){ .lz-in{display:block;} .lz-casco{width:96px;right:14px;bottom:16px;} .lz-brand{padding:26px 22px 30px;gap:22px;border-radius:0 0 28px 28px;} .lz-brand-pie{display:none;} .lz-logo{height:46px;}
+      .lz-fecha{margin-bottom:12px;font-size:12px;} .lz-hola small{font-size:16px;} .lz-hola h1{font-size:44px;margin-bottom:8px;} .lz-hola p{font-size:14px;} .lz-marca{width:240px;height:240px;right:-70px;bottom:-80px;}
+      .lz-main{display:block;padding:22px 16px 30px;} .lz-main h2{font-size:20px;} .lz-sub{margin-bottom:16px;font-size:13px;}
+      .lz-card{padding:15px 14px 15px 16px;gap:14px;} .lz-ic{width:48px;height:48px;border-radius:13px;} .lz-ic svg{width:25px;height:25px;} .lz-tx b{font-size:17px;} .lz-tx span{font-size:12.5px;} }
     @keyframes lzEntra{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}} @keyframes lzFondo{from{opacity:0;}to{opacity:1;}}
 
     .ix{padding:16px 18px;} .ix-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;} .ix-head > b{font-size:16px;font-weight:800;color:var(--ink);} .ix-head > span{font-size:12.5px;color:var(--ink-soft);}
@@ -13541,18 +13557,16 @@ function appTemaIcono(){
 }
 // Cambio de tema sin trabas (13.10.2026, Piero: "al cambiar se está lagueando mucho"): un velo del color del tema
 // nuevo se funde (solo opacidad, la mueve la tarjeta gráfica), el tema cambia debajo y el velo se va.
+// Cambio de tema directo (14.10.2026, Piero: "no debe poner toda la pestaña así antes de cambiar, solo optimizado"):
+// se cambian las variables de color de una vez, sin transiciones en cadena; el ícono gira para confirmar.
 function appTemaCambiar(){
-  if(appTemaCambiar.en) return; appTemaCambiar.en = true;
   const root = document.documentElement, osc = root.getAttribute('data-theme') !== 'dark';
-  let v = document.getElementById('temaVelo');
-  if(!v){ v = document.createElement('div'); v.id = 'temaVelo'; document.body.appendChild(v); }
-  v.style.background = osc ? '#0e1520' : '#eff4fb'; v.className = ''; void v.offsetWidth; v.className = 'entra';
-  setTimeout(function(){
-    if(osc) root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
-    try{ localStorage.setItem('fp-theme', osc ? 'dark' : 'light'); }catch(err){}
-    appTemaIcono(); if(typeof applyThemeLabel === 'function') try{ applyThemeLabel(); }catch(err){}
-    requestAnimationFrame(function(){ requestAnimationFrame(function(){ v.className = 'sale'; setTimeout(function(){ v.className = ''; appTemaCambiar.en = false; }, 280); }); });
-  }, 150);
+  root.classList.add('sin-trans');
+  if(osc) root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+  try{ localStorage.setItem('fp-theme', osc ? 'dark' : 'light'); }catch(err){}
+  appTemaIcono(); if(typeof applyThemeLabel === 'function') try{ applyThemeLabel(); }catch(err){}
+  const b = document.getElementById('appTemaBtn'); if(b){ b.classList.remove('gira'); void b.offsetWidth; b.classList.add('gira'); }
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){ root.classList.remove('sin-trans'); }); });
 }
 function appAntesDe(html){ document.body.insertAdjacentHTML('beforeend', html); }
 
@@ -13586,7 +13600,7 @@ function appConstruir(){
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
   document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(); });
   try{ if(localStorage.getItem('fp-lado') === 'off') document.body.classList.add('lado-off'); }catch(err){}
-  document.getElementById('appLadoBtn').addEventListener('click', function(){ const off = document.body.classList.toggle('lado-off'); try{ localStorage.setItem('fp-lado', off ? 'off' : ''); }catch(err){} });
+  document.getElementById('appLadoBtn').dataset.lado = '1';   // el clic lo atiende el manejador general [data-lado]
   appTemaIcono();
   document.getElementById('appSheet').addEventListener('click', function(e){ if(e.target === this) appCerrarSheet(); });
   document.getElementById('appTabbar').addEventListener('click', function(e){
@@ -13811,7 +13825,11 @@ const APP_PC_CSS = `
   body.app-pc.lado-off .app-oc{left:0;} body.app-pc.vista-supervisor .app-oc{left:0;}
   /* Menú lateral que se puede ocultar (14.10.2026, Piero: "que se pueda ocultar en la versión web para que no estorbe"). */
   body.app-pc{transition:padding-left .25s ease;} body.app-pc .app-tabbar{transition:transform .25s ease;}
-  body.app-pc .app-top .app-lado{display:flex;}
+  body.app-pc.lado-off .app-top .app-lado{display:flex;}
+  body.app-pc .app-side-logo{gap:12px;padding-left:16px;} body.app-pc .app-side-logo img{cursor:pointer;}
+  body.app-pc .app-tabbar .app-lado-in{padding:0;gap:0;font-size:0;} body.app-pc .app-tabbar .app-lado-in svg{width:18px;height:18px;flex:0 0 auto;}
+  body.app-pc .app-lado-in{display:flex;flex:0 0 auto;width:36px;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;align-items:center;justify-content:center;cursor:pointer;padding:0;margin:0 !important;}
+  body.app-pc .app-lado-in svg{width:18px;height:18px;} body.app-pc .app-lado-in:hover{background:rgba(255,255,255,.16);}
   body.app-pc.lado-off{padding-left:0;} body.app-pc.lado-off .app-tabbar{transform:translateX(-100%);box-shadow:none;}
   body.app-pc.lado-off .app-top .app-logo{display:block;height:30px;cursor:pointer;}
   body.app-pc .app-oc.ancho{inset:0;width:100%;box-shadow:none;} body.app-pc .app-oc.ancho .oc-cuerpo{max-width:1280px;padding:22px 32px 40px;}
@@ -13861,15 +13879,24 @@ function appLanzador(forzar){
   const go = '<svg viewBox="0 0 24 24" fill="none" stroke="#2a4c8f" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
   const fecha0 = new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long' }), fecha = fecha0.charAt(0).toUpperCase() + fecha0.slice(1);
   const sal = appSaludo().split(', ');
-  el.innerHTML = `<div class="lz-copo">${copo}</div><div class="lz-copo b">${copo}</div><div class="lz-in">
-    <div class="lz-head"><img class="lz-logo" src="${appLogo()}" alt="Grupo Friopacking"><span class="lz-fecha">${escapeHtml(fecha)}</span></div>
-    <div class="lz-hola"><small>${sal[0]}${sal[1] ? ',' : ''}</small><h1>${sal[1] || 'Bienvenido'}</h1><p>Plataforma de Logística · elige el módulo</p></div>
-    <div class="lz-cards">${vs.map(function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${60 + i * 70}ms"><span class="lz-ic">${ico[k] || ''}</span><span class="lz-tx"><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span></span><span class="lz-go">${go}</span></button>`; }).join('')}</div>
-    <div class="lz-pie"><button type="button" class="lz-usr" data-lzusr="1">🚪 Cambiar de usuario</button><span>❄ Grupo Friopacking · Logística y cadena de frío</span></div></div>`;
+  // Pantalla de módulos en dos partes (14.10.2026, Piero: "más fresca, natural y profesional; el logo es muy pequeño y en
+  // la web quedan espacios sin usar"): a la izquierda la marca (logo grande, saludo, fecha) y a la derecha los módulos.
+  const correo = APP.usuario && APP.usuario.correo ? APP.usuario.correo : '';
+  el.innerHTML = `<div class="lz-in">
+    <aside class="lz-brand"><div class="lz-marca">${copo}</div><img class="lz-casco" src="${dciEspartano()}" alt="">
+      <div class="lz-brand-top"><img class="lz-logo" src="${appLogo()}" alt="Grupo Friopacking"></div>
+      <div class="lz-hola"><span class="lz-fecha">${escapeHtml(fecha)}</span><small>${sal[0]}${sal[1] ? ',' : ''}</small><h1>${sal[1] || 'Bienvenido'}</h1><p>Plataforma de Logística y Compras</p></div>
+      <div class="lz-brand-pie"><b>Grupo Friopacking</b><span>Logística · Cadena de frío · Perú</span></div></aside>
+    <main class="lz-main"><div class="lz-main-in">
+      <h2>¿A qué módulo quieres entrar?</h2><p class="lz-sub">Puedes volver aquí cuando quieras tocando el logo.</p>
+      <div class="lz-cards">${vs.map(function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${80 + i * 60}ms"><span class="lz-ic">${ico[k] || ''}</span><span class="lz-tx"><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span></span><span class="lz-go">${go}</span></button>`; }).join('')}</div>
+      <div class="lz-usr-fila">${correo ? `<span>👤 ${escapeHtml(correo)}</span>` : ''}<button type="button" class="lz-usr" data-lzusr="1">Cambiar de usuario</button></div>
+    </div></main></div>`;
   el.classList.add('abierto'); el._desdeLogo = !!forzar;
 }
 document.addEventListener('click', function(e){
-  if(e.target.closest('.app-top .app-logo, .app-side-logo') && APP.usuario && appVistasPermitidas().length > 1) appLanzador(true);
+  if(e.target.closest('[data-lado]')){ const off = document.body.classList.toggle('lado-off'); try{ localStorage.setItem('fp-lado', off ? 'off' : ''); }catch(err){} return; }
+  if(e.target.closest('.app-top .app-logo, .app-side-logo img') && APP.usuario && appVistasPermitidas().length > 1) appLanzador(true);
 });
 function appArrancar(){
   appPcActivar();
@@ -14017,7 +14044,7 @@ function appPintarBarra(activa){
   barra.style.gridTemplateColumns = tabs.length > 6 && !APP_EN_PC ? 'repeat(' + tabs.length + ',minmax(78px,1fr))' : 'repeat(' + Math.max(1, tabs.length) + ',minmax(0,1fr))';
   barra.classList.toggle('muchas', tabs.length > 6 && !APP_EN_PC); barra.classList.toggle('seis', tabs.length === 6 && !APP_EN_PC);
   Object.keys(APP_VISTAS).forEach(function(k){ document.body.classList.toggle('vista-' + k, k === (APP.vista || 'supervisor')); });
-  barra.innerHTML = (APP_EN_PC ? `<div class="app-side-logo"><img src="${appLogo()}" alt="Grupo Friopacking"></div><div class="app-side-tit">${escapeHtml(v.nombre)}</div>` : '') + tabs.map(function(t){
+  barra.innerHTML = (APP_EN_PC ? `<div class="app-side-logo"><button type="button" class="app-lado-in" data-lado="1" aria-label="Ocultar el menú" title="Ocultar el menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><img src="${appLogo()}" alt="Grupo Friopacking"></div><div class="app-side-tit">${escapeHtml(v.nombre)}</div>` : '') + tabs.map(function(t){
     if(t[0] === 'polar') return '<button type="button" class="polar" data-tab="polar"><span class="i"><img src="' + POLAR_AVATAR + '" alt=""></span>Leo</button>';
     return `<button type="button" data-tab="${t[0]}" class="${t[0] === activa ? 'on' : ''}"><span class="i">${t[1]}</span>${t[2]}</button>`;
   }).join('');
@@ -14066,8 +14093,10 @@ function appInicio(pantalla){
   if(RQ_MOVIL.matches){
     const sec = document.getElementById('section-inicio');
     if(APP.entrada){ APP.entrada = false; appAnim(sec, 'tr-entrada', 1400); appAnim(document.querySelector('.app-top'), 'tr-entrada', 900); appAnim(document.getElementById('appTabbar'), 'tr-entrada', 1000); }
-    else if(antes !== nueva) appAnim(sec, antes && tabs.indexOf(nueva) < tabs.indexOf(antes) ? 'tr-izq' : 'tr-der', 600);
+    else if(antes !== nueva) appAnim(sec, antes && tabs.indexOf(nueva) < tabs.indexOf(antes) ? 'tr-izq' : 'tr-der', 300);
   }
+  // Se adelanta el cálculo de las otras pestañas en las pausas (antes solo corría desde el Inicio, que Compras ya no tiene).
+  clearTimeout(appPrecalentar._t); appPrecalentar._t = setTimeout(appPrecalentar, 500);
 }
 
 // Si el link publicado todavía está bajando los datos, el inicio se vuelve a pintar solo cuando llegan.
@@ -14103,15 +14132,22 @@ function appPrecalentar(){
   if(!RQ_MOVIL.matches || !appHayDatos() || appPrecalentar._firma === appFirmaDatos() + APP.vista) return;
   appPrecalentar._firma = appFirmaDatos() + APP.vista;
   const v = APP.vista, q = [];
+  // Primero lo de las pestañas de esta vista (14.10.2026: el primer toque de cada pestaña también debe ser fluido).
+  if(appEsLogistica(v)){
+    q.push(function(){ if(dciEsAdmin()) appDailyHtml(); }, function(){ pdFilas(); });
+    if(v === 'compras') q.push(function(){ appPantallaHtml('pendcompras'); }, function(){ appPantallaHtml('gastopresu'); });
+    else q.push(function(){ appPantallaHtml('almrep'); }, function(){ appInvIndice(); }, function(){ appPantallaHtml('inventario'); });
+  }
   if(appVeGerencial(v) && gerAbierto){
-    q.push(function(){ appIndDatos(appFIndF(APP_F0.indicadores)); });
+    q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appIndDatos(appFIndF(APP_F0.indicadores)); });
     appIndTendF(false).forEach(function(x){ q.push(function(){ appIndDatos(x.f); }); });
-    q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appPantallaHtml('otif'); }, function(){ appPantallaHtml('gasto'); });
+    q.push(function(){ appPantallaHtml('otif'); });
   }
   if(appEsLogistica(v)){
-    q.push(function(){ appInvIndice(); }, function(){ pdFilas(); }, function(){ appMemo('iniLog' + v, function(){ return appInicioLogistica(v); }); }, function(){ appPantallaHtml('inventario'); }, function(){ appPantallaHtml('pendcompras'); },
-      function(){ appImpDatos(); }, function(){ appPantallaHtml('pendlog'); });
+    q.push(function(){ appInvIndice(); }, function(){ appMemo('iniLog' + v, function(){ return appInicioLogistica(v); }); }, function(){ appImpDatos(); }, function(){ appPantallaHtml('pendlog'); });
+    if(v === 'compras') q.push(function(){ appPantallaHtml('inventario'); }); else q.push(function(){ appPantallaHtml('pendcompras'); });
   }
+  if(v === 'super') q.push(function(){ supGrupos(); }, function(){ tdItems(); }, function(){ appPantallaHtml('supreq'); });
   const pausa = window.requestIdleCallback ? function(fn){ requestIdleCallback(fn, { timeout:1500 }); } : function(fn){ setTimeout(fn, 60); };
   (function sig(){ const fn = q.shift(); if(!fn) return; pausa(function(){ try{ fn(); }catch(err){} sig(); }); })();
 }
@@ -14710,19 +14746,26 @@ function appDailyModHtml(){
   // Vista de equipo (admin sin colaborador elegido): una fila por persona con su avance.
   if(!cod){
     const gente = equipo.map(function(p){ const l = vis.filter(function(x){ return x.cod === p; }); return { p:p, c:dciCuenta(l) }; }).sort(function(a, b){ return b.c.tot - a.c.tot || (PD_PERSONAS[a.p] || '').localeCompare(PD_PERSONAS[b.p] || ''); });
+    requestAnimationFrame(function(){ setTimeout(function(){ const c = document.getElementById('iniCal'); if(c && c.querySelector('.ini-vacio')) appRefrescarCal(); }, 20); });
     return `<div class="dci" data-dci="1">${aviso}
       <div class="dci-hero eq"><div class="dci-hero-t"><small>DAILY CALL IN · ESPARTANOS</small><h2>Equipo ${e(APP_DCI.fArea || 'Compras y Almacén')}</h2><p>Toca a una persona para ver su tablero.</p></div><div class="dci-hero-esp"><img src="${dciEspartano()}" alt=""></div></div>
       ${filtros}${kpis}
       <div class="dci-eq">${gente.map(function(g){ return `<button type="button" class="dci-eqp" data-dcipersona="${e(g.p)}">${dciFoto(g.p, 'dci-av')}<span class="dci-eqn"><b>${e(PD_PERSONAS[g.p] || g.p)}</b><small>${e(dciArea(g.p))} · ⏳ ${g.c.pen} · 🔄 ${g.c.pro} · ✅ ${g.c.fin}</small><em><u style="width:${g.c.pct}%"></u></em></span><span class="dci-eqx">${g.c.fin}/${g.c.tot}</span></button>`; }).join('')}</div>
-      <div class="dci-sec">Actividad en Nisira (OC, SKU y pedidos por día)</div><div id="iniCal">${appDailyHtml()}</div></div>`;
+      <div class="dci-sec">Actividad en Nisira (OC, SKU y pedidos por día)</div><div id="iniCal"><div class="ini-vacio">⏳ Armando la actividad…</div></div></div>`;
   }
   const nom = PD_PERSONAS[cod] || cod, mio = cod === yo0;
   const pys = {}; vis.forEach(function(x){ const k = x.py || 'Sin proyecto'; pys[k] = (pys[k] || 0) + 1; });
   const fila = function(x, i){ const ed = dciPuedeEditar(x), tarea = x.tr || x.av || '—';
     return `<div class="dci-row${x.guardando ? ' guardando' : ''}"><span class="dci-n">${i + 1}</span><div class="dci-rt">${x.py || x.pr === 'Alta' ? `<small>${e(x.py || '')}${x.pr === 'Alta' ? (x.py ? ' · ' : '') + '🔴 Alta' : ''}</small>` : ''}<b>${e(tarea)}</b>${x.bl ? `<span class="dci-blq">⛔ ${e(x.bl)}</span>` : ''}${(x.com || []).map(function(c){ return `<span class="dci-com">💬 ${e(c.tx || '')}</span>`; }).join('')}<span class="dci-rf">📅 ${e(dciFecha(x))}${x.es === 'Finalizada' && x.ff ? ' · ✅ ' + e(String(x.ff).slice(8, 10) + '/' + String(x.ff).slice(5, 7)) : ''}</span></div>
-      ${ed ? `<div class="dci-ra">${DCI_EST.filter(function(s){ return s[0] !== x.es; }).map(function(s){ return `<button type="button" class="dci-mv ${s[3]}" data-dcies="${e(x.id)}|${s[0]}" title="Pasar a ${s[2]}">${s[1]}</button>`; }).join('')}${x.cod === tareaMiCod() ? `<button type="button" class="dci-mv del" data-dciborrar="${e(x.id)}" title="Eliminar">🗑️</button>` : ''}</div>` : ''}</div>`; };
+      ${ed ? `<div class="dci-ra">${DCI_EST.filter(function(s){ return s[0] !== x.es; }).map(function(s){ return `<button type="button" class="dci-mv ${s[3]}" data-dcies="${e(x.id)}|${s[0]}" title="Pasar a ${s[2]}">${s[1]}</button>`; }).join('')}${x.cod === tareaMiCod() ? `<button type="button" class="dci-mv edit" data-dcieditar="${e(x.id)}" title="Editar">✏️</button><button type="button" class="dci-mv del" data-dciborrar="${e(x.id)}" title="Eliminar">🗑️</button>` : ''}</div>` : ''}</div>`; };
+  // Editar lo registrado (14.10.2026, Piero): tarea y bloqueo se corrigen; el comentario nuevo se agrega a la tarea.
+  const filaEd = function(x, i){ return `<div class="dci-row dci-edit" data-dciedit="${e(x.id)}"><span class="dci-n">${i + 1}</span><div class="dci-rt">
+      <label><span>📝 Tarea</span><input type="text" data-dcie="tr" maxlength="1000" value="${e(x.tr || x.av || '')}"></label>
+      <label><span>⛔ Bloqueo (opcional)</span><input type="text" data-dcie="bl" maxlength="600" value="${e(x.bl || '')}" placeholder="Sin bloqueo"></label>
+      <label><span>💬 Agregar comentario (opcional)</span><input type="text" data-dcie="co" maxlength="500" placeholder="Algo más que quieras anotar"></label>
+      <div class="dci-edit-acc"><button type="button" class="ix-btn" data-dciguardar="${e(x.id)}">💾 Guardar</button><button type="button" class="dci-chip lnk" data-dcicancelar="1">Cancelar</button></div></div></div>`; };
   const col = function(s){ const l = vis.filter(function(x){ return (x.es || 'Pendiente') === s[0]; }).sort(function(a, b){ return String(a.creada || a.dia).localeCompare(String(b.creada || b.dia)); });
-    return `<div class="dci-col ${s[3]}"><div class="dci-colh">${s[1]} ${s[2]} <b>(${l.length})</b></div>${l.map(fila).join('') || '<div class="dci-vac">Sin tareas</div>'}</div>`; };
+    return `<div class="dci-col ${s[3]}"><div class="dci-colh">${s[1]} ${s[2]} <b>(${l.length})</b></div>${l.map(function(x, i){ return x.id === APP_DCI.editId ? filaEd(x, i) : fila(x, i); }).join('') || '<div class="dci-vac">Sin tareas</div>'}</div>`; };
   const pyList = Object.keys(pys).filter(function(p){ return p !== 'Sin proyecto'; }).sort(function(a, b){ return pys[b] - pys[a]; });
   if(!pyList.length) APP_DCI.pysOff = true;
   // Formulario simple (13.10.2026, Piero: "no siempre hay un proyecto o frente; solo la tarea, el bloqueo opcional y
@@ -14744,6 +14787,18 @@ function appDciAccion(b){
   const c = b.closest('[data-dci]'); if(!c) return;
   const falla = function(r){ appToast((r && r.error) ? 'No se pudo guardar: ' + r.error : 'No se pudo guardar en Drive. Revisa tu conexión.'); appDciCargar(true); };
   if(b.dataset.dcipersona != null){ APP_DCI.fCod = b.dataset.dcipersona; return appDciPintar(); }
+  if(b.dataset.dcieditar){ APP_DCI.editId = b.dataset.dcieditar; appDciPintar(); const i = document.querySelector('[data-dciedit] [data-dcie="tr"]'); if(i){ i.focus(); i.select(); } return; }
+  if(b.dataset.dcicancelar){ APP_DCI.editId = ''; return appDciPintar(); }
+  if(b.dataset.dciguardar){
+    const x = APP_DCI.lista.find(function(y){ return y.id === b.dataset.dciguardar; }), f = b.closest('[data-dciedit]'); if(!x || !f) return;
+    const v = function(k){ const i = f.querySelector(`[data-dcie="${k}"]`); return i ? i.value.trim() : ''; };
+    const tr = v('tr'), bl = v('bl'), co = v('co'); if(!tr) return appToast('Escribe la tarea.');
+    const antes = { tr:x.tr, av:x.av, bl:x.bl, com:(x.com || []).slice() };
+    x.tr = tr; x.av = ''; x.bl = bl; if(co) x.com = (x.com || []).concat([{ tx:co }]); APP_DCI.editId = ''; appDciPintar(); appToast('✏️ Cambios guardados');
+    appDciEnviar({ accion:'editar', id:x.id, av:'', tr:tr, bl:bl, pr:x.pr || 'Media' }).then(function(r){ if(!r || !r.ok) throw r;
+      if(co) return appDciEnviar({ accion:'comentar', id:x.id, tx:co, nombre:x.nombre }); }).catch(function(r){ Object.assign(x, antes); appDciPintar(); falla(r); });
+    return;
+  }
   if(b.dataset.dcipys){ APP_DCI.pysOff = !APP_DCI.pysOff; try{ localStorage.setItem('fp-dci-pys', APP_DCI.pysOff ? '1' : ''); }catch(err){} return appDciPintar(); }
   if(b.dataset.dciagregar){
     const v = function(k){ const i = c.querySelector(`[data-dciv="${k}"]`); return i ? i.value.trim() : ''; };
@@ -17922,7 +17977,7 @@ function appClickInicio(e){
   if(b.dataset.pfocs) return appPfLista(b.dataset.pfocs);
   if(b.dataset.pfprov || b.dataset.pfcli){ const cod = pdPersona(APP_F.indicadores.persona); return b.dataset.pfprov ? appPfLista(cod, 'prov', b.dataset.pfprov) : appPfLista(cod, 'cli', b.dataset.pfcli); }
   if(b.dataset.fcaraRk){ const v = appFPersonas().find(function(x){ return pdPersona(x) === b.dataset.fcaraRk; }); if(v){ APP_F.indicadores.persona = v; window.scrollTo(0, 0); return appRenderInicio(); } }
-  if(b.dataset.dciagregar || b.dataset.dciborrar || b.dataset.dcies || b.dataset.dcipys || b.dataset.dcipersona != null) return appDciAccion(b);   // Daily Call In del Inicio
+  if(b.dataset.dciagregar || b.dataset.dciborrar || b.dataset.dcies || b.dataset.dcipys || b.dataset.dcieditar || b.dataset.dciguardar || b.dataset.dcicancelar || b.dataset.dcipersona != null) return appDciAccion(b);   // Daily Call In del Inicio
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
   if(b.dataset.dashpdf){ const dp = b.dataset.dashpdf.split('|'); appDashImport(+dp[0], dp[1] || ''); return appPanelPdf(); }
   if(b.dataset.gprov) return appGastoProv(b.dataset.gprov);
