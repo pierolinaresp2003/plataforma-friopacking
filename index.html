@@ -1013,6 +1013,7 @@
       padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap;}
     .app-top .app-vista span{opacity:.7;font-size:10px;margin-left:2px;}
     .app-lado{display:none;flex-shrink:0;width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:#fff;align-items:center;justify-content:center;cursor:pointer;padding:0;} .app-lado svg{width:20px;height:20px;} .app-lado:hover{background:rgba(255,255,255,.18);}
+    .app-carpeta{display:none;flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.13);color:#fff;align-items:center;justify-content:center;cursor:pointer;padding:0;} .app-carpeta svg{width:19px;height:19px;} .app-carpeta:hover{background:rgba(255,255,255,.22);}
     .app-top .app-tema{flex-shrink:0;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.13);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .2s ease,background .2s ease;}
     .app-top .app-tema:active{transform:scale(.9) rotate(-20deg);} .app-top .app-tema svg{width:20px;height:20px;}
     body:not(.app-pc) .app-top .app-vista{display:none;}
@@ -13588,7 +13589,7 @@ function appConstruir(){
     `<header class="app-top"><button type="button" class="app-lado" id="appLadoBtn" aria-label="Ocultar o mostrar el menú" title="Ocultar / mostrar el menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><img class="app-logo" src="${logo}" alt="Friopacking">
        <div class="app-tit"><b id="appTit">Inicio</b><span id="appSubTit"></span></div>
        <button type="button" class="app-tema" id="appTemaBtn" aria-label="Cambiar a modo oscuro"></button>
-       <button type="button" class="app-vista" id="appVistaBtn"></button></header>`);
+       <button type="button" class="app-vista" id="appVistaBtn"></button><button type="button" class="app-carpeta" id="appCarpetaBtn" title="Cargar archivos" aria-label="Cargar archivos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></button></header>`);
   document.querySelector('.content').insertAdjacentHTML('afterbegin', '<div id="section-inicio" class="section"></div>');
   appAntesDe(`<nav class="app-tabbar" id="appTabbar"></nav>
     <div class="app-sheet-fondo" id="appSheet"><div class="app-sheet" id="appSheetIn"></div></div>
@@ -13611,6 +13612,7 @@ function appConstruir(){
 
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
   document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(); });
+  document.getElementById('appCarpetaBtn').addEventListener('click', function(){ const f = document.getElementById('fileInput'); if(f) f.click(); });
   // En la web el menú lateral queda siempre oculto; el ☰ abre un menú flotante (14.10.2026, Piero: "que se vea así siempre").
   if(APP_EN_PC) document.body.classList.add('lado-off');
   document.getElementById('appLadoBtn').dataset.lado = '1';   // el clic lo atiende el manejador general [data-lado]
@@ -13839,6 +13841,9 @@ const APP_PC_CSS = `
   /* Menú lateral que se puede ocultar (14.10.2026, Piero: "que se pueda ocultar en la versión web para que no estorbe"). */
   body.app-pc{transition:padding-left .25s ease;} body.app-pc .app-tabbar{transition:transform .25s ease;}
   body.app-pc.lado-off .app-top .app-lado{display:flex;}
+  /* Web: en vez del desplegable de vista, solo la carpeta para cargar archivos (14.10.2026, Piero); solo Compras y Almacén. */
+  body.app-pc .app-top .app-vista{display:none;}
+  body.app-pc.vista-compras .app-top .app-carpeta, body.app-pc.vista-almacen .app-top .app-carpeta{display:flex;}
   body.app-pc .app-side-logo{gap:12px;padding-left:16px;} body.app-pc .app-side-logo img{cursor:pointer;}
   body.app-pc .app-tabbar .app-lado-in{padding:0;gap:0;font-size:0;} body.app-pc .app-tabbar .app-lado-in svg{width:18px;height:18px;flex:0 0 auto;}
   body.app-pc .app-lado-in{display:flex;flex:0 0 auto;width:36px;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;align-items:center;justify-content:center;cursor:pointer;padding:0;margin:0 !important;}
@@ -13890,8 +13895,7 @@ function appMenuFlotante(){
   const col = { compras:'#2f6fe0', almacen:'#13a394', super:'#e8922b', frioteam:'#7c5ce0' };
   m.innerHTML = `<div class="mp-sec">${e(v.nombre || '')}</div>
     ${tabs.map(function(t){ return `<button type="button" class="mp-it${t[0] === act ? ' on' : ''}" data-mptab="${t[0]}"><i>${t[1]}</i><span>${e(t[2])}</span></button>`; }).join('')}
-    ${vis.length > 1 ? `<div class="mp-sec">Cambiar de módulo</div>${vis.map(function(k){ return `<button type="button" class="mp-it mp-mod${k === APP.vista ? ' on' : ''}" data-mpvista="${k}"><i class="mp-dot" style="background:${col[k] || '#5b97de'}">${APP_VISTAS[k].ico}</i><span>${e(APP_VISTAS[k].nombre)}</span>${k === APP.vista ? '<em>actual</em>' : ''}</button>`; }).join('')}` : ''}
-    <div class="mp-pie">${vis.length > 1 ? '<button type="button" class="mp-lnk" data-mpinicio="1">🏠 Pantalla de módulos</button>' : ''}<button type="button" class="mp-lnk" data-mpusr="1">🚪 Cambiar de usuario</button></div>`;
+`;   // solo las pestañas (14.10.2026, Piero); el módulo se cambia tocando el logo
   const b = document.getElementById('appLadoBtn'), r = b ? b.getBoundingClientRect() : { left:16, bottom:64 };
   m.style.left = Math.max(10, r.left) + 'px'; m.style.top = (r.bottom + 8) + 'px';
   void m.offsetWidth; m.classList.add('abierto'); document.getElementById('appMenuFondo').classList.add('abierto');
@@ -13937,7 +13941,7 @@ function appLanzador(forzar){
 }
 document.addEventListener('click', function(e){
   if(e.target.closest('[data-lado]')){ e.stopPropagation(); return appMenuFlotante(); }
-  if(e.target.closest('.app-top .app-logo, .app-side-logo img') && APP.usuario && appVistasPermitidas().length > 1) appLanzador(true);
+  if(e.target.closest('.app-top .app-logo, .app-side-logo img') && APP.usuario) appLanzador(true);   // también con un solo módulo: ahí está "Cambiar de usuario"
 });
 function appArrancar(){
   appPcActivar();
