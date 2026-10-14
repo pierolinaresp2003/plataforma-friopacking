@@ -1852,6 +1852,10 @@
     .rk-t{flex:1;min-width:0;} .rk-t b{display:block;font-size:14px;font-weight:800;} .rk-t i{display:block;height:6px;border-radius:4px;background:rgba(0,0,0,.06);margin:4px 0 3px;overflow:hidden;} .rk-t em{display:block;height:100%;border-radius:4px;background:#5b97de;}
     .rk-t small{display:block;font-size:11.5px;color:var(--ink-soft);} .rk-p{flex:0 0 auto;text-align:right;} .rk-p b{display:block;font-size:18px;font-weight:900;color:#14295a;line-height:1;} .rk-p small{font-size:10.5px;color:var(--ink-soft);}
     .ix-head .rk-av{width:28px;height:28px;margin-right:4px;}
+    .pf-pos{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;} .pf-pos > div{background:var(--surface-2);border-radius:12px;padding:10px 12px;} .pf-pos b{display:block;font-size:20px;font-weight:900;color:#14295a;} .pf-pos span{font-size:11.5px;color:var(--ink-soft);}
+    .pf-dos{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:12px;} .pf-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+    .pf-chip{font-size:12px;background:var(--surface-2);border-radius:999px;padding:4px 10px;color:var(--ink);} .pf-chip b{color:#2f6fe0;margin-left:2px;}
+    .pf-ocs{margin-top:6px;} html[data-theme="dark"] .pf-pos b{color:var(--ink);} html[data-theme="dark"] .pf-chip b{color:#9cc8ff;}
     html[data-theme="dark"] .cara-av{box-shadow:none;} html[data-theme="dark"] .cara.on small{color:#9cc8ff;} html[data-theme="dark"] .cara.on .cara-av{border-color:#6fb6ff;}
     html[data-theme="dark"] .rep-nav button.on{color:var(--ink);} html[data-theme="dark"] .rk-p b{color:var(--ink);} html[data-theme="dark"] .rk-t i{background:rgba(255,255,255,.08);}
     /* Supervisor: requerimientos y tienda (13.10.2026) */
@@ -15245,6 +15249,21 @@ function appIndTendF(porSemana){
   }
   return out;
 }
+// Tramos dentro del período filtrado (14.10.2026, Piero: "la gráfica de los indicadores debe variar en base a lo que
+// se filtre arriba"): hasta 12 días → por día; hasta ~10 semanas → por semana; más → por mes (últimos 12).
+function appTramos(st){
+  const c = appIndCorte(), r = appFRango(st), iso = appIndIso;
+  let a = r ? new Date(r.desde) : new Date(Date.UTC(c.getUTCFullYear(), c.getUTCMonth() - 11, 1)), b = r ? new Date(r.hasta) : new Date(c);
+  if(b > c) b = new Date(c); if(a > b) a = new Date(b);
+  const dias = Math.round((b - a) / 864e5) + 1, out = [];
+  if(dias <= 12){ for(let d = new Date(a); d <= b; d.setUTCDate(d.getUTCDate() + 1)){ if(d.getUTCDay() === 0) continue; out.push({ f:{ desde:iso(d), hasta:iso(d) }, etq:appIndCorto(d) }); } return { tipo:'día', l:out }; }
+  if(dias <= 75){ let w = isoWeekStart(a);
+    while(w <= b){ const e = new Date(w); e.setUTCDate(e.getUTCDate() + 6); const i0 = w < a ? a : w; out.push({ f:{ desde:iso(i0), hasta:iso(e > b ? b : e) }, etq:appIndCorto(i0) }); w = new Date(e); w.setUTCDate(w.getUTCDate() + 1); }
+    return { tipo:'semana', l:out }; }
+  const multi = a.getUTCFullYear() !== b.getUTCFullYear(); let m = new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), 1));
+  while(m <= b){ const e = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 0)); out.push({ f:{ desde:iso(m < a ? a : m), hasta:iso(e > b ? b : e) }, etq:MESES_CORTOS[m.getUTCMonth()] + (multi ? " '" + String(m.getUTCFullYear()).slice(2) : '') }); m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1)); }
+  return { tipo:'mes', l:out.slice(-12) };
+}
 function appIndTendencia(porSemana, extra){
   return appIndTendF(porSemana).map(function(x){ return { etq:x.etq, datos:appIndDatos(Object.assign({}, x.f, extra || {})) }; });
 }
@@ -15282,7 +15301,7 @@ function appIndicadoresHtml(){
   const barra = appFBarra('indicadores', alm ? { pry:1 } : { persona:1, pry:1, compradores:1 }), foto = alm ? appFotoAlmacen(st) : appFotoComprador(st);
   const datos0 = appIndDatos(per.f), datos = Array.isArray(datos0) ? datos0.filter(deCompra) : datos0;
   if(!Array.isArray(datos) || (st.persona && !datos.length)) return barra + foto + '<div class="ini-card"><div class="ini-vacio">No hay tiempos con esos filtros.</div></div>';
-  const porSemana = st.per === 'semana' || st.per === 'semanaAnt', tend = appIndTendencia(porSemana, { persona:st.persona || undefined, pry:st.pry || undefined });
+  const TR = appTramos(st), tend = TR.l.map(function(x){ return { etq:x.etq, datos:appIndDatos(Object.assign({}, x.f, st.persona ? { persona:st.persona } : {}, st.pry ? { pry:st.pry } : {})) }; });
   tend.forEach(function(t){ t.datos = Array.isArray(t.datos) ? t.datos.filter(deCompra) : []; });
   const cuenta = { ok:0, late:0, warn:0 };
   datos.forEach(function(d){ const c = appIndClase(d.st.cumplePct); if(cuenta[c] != null) cuenta[c]++; });
@@ -15304,7 +15323,7 @@ function appIndicadoresHtml(){
         ${pct != null ? `<div class="ind-barra"><i class="ok" style="width:${pct.toFixed(1)}%"></i><i class="warn" style="width:${(100 - pct).toFixed(1)}%"></i></div>
         <div class="ind-ley"><span><i class="ok"></i>A tiempo ${st.cumpleN}</span><span><i class="warn"></i>Fuera de meta ${st.noCumpleN}</span></div>` : ''}`
         : '<div class="ini-vacio">No hay casos terminados en este período.</div>'}
-      <div class="ind-sub">% a tiempo · ${porSemana ? 'últimas 6 semanas' : 'por mes desde enero ' + appIndCorte().getUTCFullYear()}</div>
+      <div class="ind-sub">% a tiempo · por ${TR.tipo} · ${escapeHtml(per.largo)}</div>
       <div class="ind-tend" style="grid-template-columns:repeat(${tend.length},1fr)">${barras}</div>
       ${st.n ? '<div class="ind-ver">Ver los ' + st.n + ' casos ›</div>' : ''}
     </div>`;
@@ -15384,11 +15403,49 @@ function appFotoComprador(st){
   const rank = !cod && lista.length ? `<div class="rk">${lista.map(function(x, i){
     return `<button type="button" class="rk-r" data-fcara-rk="${e(x.cod)}"><span class="rk-n">${['🥇','🥈','🥉'][i] || (i + 1)}</span>${av(x.cod)}<span class="rk-t"><b>${e(PD_PERSONAS[x.cod] || x.cod)}</b><i><em style="width:${(x.pts / max * 100).toFixed(1)}%"></em></i><small>${appN(x.oc.size)} OC · ${appN(x.sku.size)} SKU · ${appN(x.ped.size)} directos</small></span><span class="rk-p"><b>${appN(x.pts)}</b><small>pts</small></span></button>`; }).join('')}</div>` : '';
   const k = function(v, t, cls){ return `<div class="${cls || ''}"><b>${v}</b><span>${t}</span></div>`; };
+  const det = cod ? appFotoPersonaHtml(cod, st, desde, hasta, pryFn, lista) : '';
   return `<div class="ini-card ix">
       <div class="ix-head"><b>${cod ? av(cod) + ' ' + e(PD_PERSONAS[cod] || cod) : '🏆 Compradores'}</b><span>${e(r ? r.label : 'todo lo cargado')}</span><i class="ix-info" title="Puntos como en el Daily: 1 por OC emitida, 1 por SKU puesto en OC y 1 por pedido directo, sumados en el período.">ⓘ</i></div>
       <div class="ix-kpis">${k(appN(sum('pts')), 'Puntos', 'ac')}${k(appN(sum('oc')), 'OC emitidas')}${k(appN(sum('sku')), 'SKU hechos')}</div>
       ${rank}
-      ${cod && APP_DAILY_COMPRAS.indexOf(cod) !== -1 ? `<button type="button" class="ix-btn" data-cmpimg="${e(cod)}">🖼️ Resumen de ${e(PD_PERSONAS[cod])} en imágenes</button>` : '<div class="ix-tip">🖼️ Toca una cara arriba para ver a esa persona y sacar su resumen en imágenes</div>'}</div>`;
+      ${cod && APP_DAILY_COMPRAS.indexOf(cod) !== -1 ? `<button type="button" class="ix-btn" data-cmpimg="${e(cod)}">🖼️ Resumen de ${e(PD_PERSONAS[cod])} en imágenes</button>` : '<div class="ix-tip">🖼️ Toca una cara arriba para ver a esa persona y sacar su resumen en imágenes</div>'}</div>${det}`;
+}
+// Qué hizo una persona en el período (14.10.2026, Piero: "el resumen de Piero está vacío; debe mostrar algo de lo que
+// se hizo"): puesto en el equipo, actividad por día/semana/mes, OC emitidas con proveedor y cliente, proveedores y clientes.
+function appFotoPersonaHtml(cod, st, desde, hasta, pryFn, lista){
+  const e = escapeHtml, en = function(d){ return d && d >= desde && d <= hasta; };
+  const OC = new Map(), DIR = new Map();
+  appDailyFilas().forEach(function(r){
+    if(pryFn && !pryFn(r)) return;
+    const fp = isoDay(r.fPedido), fo = isoDay(r.fOrden);
+    if(r.esPedidoDirecto && r.codPedido && en(fp) && pdPersona(r.responsablePedido) === cod){ const g = DIR.get(r.codPedido) || { f:fp, n:0 }; g.n++; DIR.set(r.codPedido, g); }
+    if(!r.codOrden || !en(fo) || /anul/i.test(r.estadoOrden || '') || pdPersona(r.usuarioCompras) !== cod) return;
+    const g = OC.get(r.codOrden) || { oc:r.codOrden, f:fo, prov:r.proveedor || '', cli:r.proyecto || '', sku:new Set() };
+    g.sku.add(r.idProducto || r.producto || ''); if(!g.cli && r.proyecto) g.cli = r.proyecto; OC.set(r.codOrden, g);
+  });
+  const ocs = [...OC.values()].sort(function(a, b){ return a.f < b.f ? 1 : -1; });
+  const pos = lista.findIndex(function(x){ return x.cod === cod; }), yo = lista[pos], prom = lista.length ? lista.reduce(function(a, x){ return a + x.pts; }, 0) / lista.length : 0;
+  // Actividad por tramo (puntos = OC + SKU + pedidos directos)
+  const TR = appTramos(st), act = TR.l.map(function(t){ const d0 = t.f.desde, d1 = t.f.hasta;
+    const o = ocs.filter(function(g){ return g.f >= d0 && g.f <= d1; }); let pts = o.length + o.reduce(function(a, g){ return a + g.sku.size; }, 0);
+    DIR.forEach(function(g){ if(g.f >= d0 && g.f <= d1) pts++; }); return { etq:t.etq, pts:pts, oc:o.length }; });
+  const mx = Math.max.apply(null, act.map(function(x){ return x.pts; }).concat([1]));
+  const barras = act.map(function(x){ return `<div class="ind-t"><i><em class="ok" style="height:${x.pts ? Math.max(4, Math.round(x.pts / mx * 100)) : 0}%"></em></i><b>${x.pts || '—'}</b><small>${e(x.etq)}</small></div>`; }).join('');
+  const top = function(campo, n){ const m = new Map(); ocs.forEach(function(g){ const k = campo === 'prov' ? appImpNombre(g.prov) : appImpNombre(g.cli); if(k) m.set(k, (m.get(k) || 0) + 1); });
+    return [...m.entries()].sort(function(a, b){ return b[1] - a[1]; }).slice(0, n); };
+  const chips = function(l){ return l.map(function(x){ return `<span class="pf-chip">${e(polarCorta(x[0], 28))} <b>${x[1]}</b></span>`; }).join('') || '<span class="ix-sub">—</span>'; };
+  const fila = function(g){ return appFilaHtml('data-oc="' + e(g.oc) + '"', '', polarCorta(appImpNombre(g.prov) || '—', 38), 'OC ' + e(g.oc.replace(/^000\d-0*/, '')) + ' · ' + e(rqFecha(new Date(g.f + 'T12:00:00Z'))) + (g.cli ? ' · ' + e(polarCorta(appImpNombre(g.cli), 26)) : ''), g.sku.size + ' SKU', ''); };
+  return `<div class="ini-card ix pf">
+      <div class="pf-pos">${yo ? `<div><b>#${pos + 1}</b><span>de ${lista.length} en el equipo</span></div><div><b>${appN(yo.pts)}</b><span>puntos · promedio del equipo ${appN(prom)}</span></div>` : '<div><b>—</b><span>sin actividad en el período</span></div>'}
+        <div><b>${appN(DIR.size)}</b><span>pedidos directos</span></div><div><b>${appN(yo ? yo.cer.size : 0)}</b><span>pedidos cerrados</span></div></div>
+      <div class="ix-sub" style="margin-top:12px;font-weight:800;">📈 Actividad por ${TR.tipo} <small style="font-weight:600;">(puntos: OC + SKU + directos)</small></div>
+      <div class="ind-tend" style="grid-template-columns:repeat(${act.length},1fr)">${barras}</div>
+      <div class="pf-dos"><div><div class="ix-sub" style="font-weight:800;">🏭 Proveedores con más OC</div><div class="pf-chips">${chips(top('prov', 5))}</div></div>
+        <div><div class="ix-sub" style="font-weight:800;">🏢 Clientes atendidos</div><div class="pf-chips">${chips(top('cli', 5))}</div></div></div>
+      <div class="ix-sub" style="margin-top:12px;font-weight:800;">🧾 OC emitidas (${appN(ocs.length)}) · la más reciente primero</div>
+      <div class="m-lista pf-ocs">${ocs.slice(0, 8).map(fila).join('') || '<div class="ini-vacio">No emitió OC en este período.</div>'}</div>
+      ${ocs.length > 8 ? `<button type="button" class="ini-link" data-pfocs="${e(cod)}">Ver las ${appN(ocs.length)} OC ›</button>` : ''}
+    </div>`;
 }
 // ===================================================================================================
 // APP DEL CELULAR — pantallas nuevas (30.09.2026, Piero: "mejoremos cómo se ve gasto, inventario y
@@ -17888,10 +17945,17 @@ function appNormReq(t){
 }
 function appClickInicio(e){
   const b = e.target.closest('button, [data-clic]'); if(!b || b.type === 'submit') return;
+  // La cara elegida queda a la vista en su fila (si estaba al final, se desliza hasta ella).
+  if(b.classList.contains('cara') || b.classList.contains('rk-r')) setTimeout(function(){ document.querySelectorAll('.caras').forEach(function(f){ const c = f.querySelector('.cara.on'); if(c) f.scrollLeft = c.offsetLeft - f.clientWidth / 2 + c.offsetWidth / 2; }); }, 30);
   if(b.dataset.inddet) return appIndDetalle(b.dataset.inddet);
   if(b.dataset.fcara != null){ const w = b.closest('[data-fbar]'); if(w){ APP_F[w.dataset.fbar].persona = b.dataset.fcara; return appRenderInicio(); } }
   if(b.dataset.pcper != null){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
   if(b.dataset.repsec){ APP_REP.sec = b.dataset.repsec; return appRenderInicio(); }
+  if(b.dataset.pfocs){ const st = APP_F.indicadores, r = appFRango(st), d0 = r ? appIndIso(r.desde) : '1900-01-01', d1 = r ? appIndIso(r.hasta) : '2100-01-01', pf = appFPry(st.pry), cod = b.dataset.pfocs, M = new Map();
+    appDailyFilas().forEach(function(x){ const fo = isoDay(x.fOrden); if(!x.codOrden || !fo || fo < d0 || fo > d1 || /anul/i.test(x.estadoOrden || '') || pdPersona(x.usuarioCompras) !== cod || (pf && !pf(x))) return;
+      const g = M.get(x.codOrden) || { oc:x.codOrden, f:fo, prov:x.proveedor || '', cli:x.proyecto || '', n:new Set() }; g.n.add(x.idProducto || x.producto || ''); M.set(x.codOrden, g); });
+    const l = [...M.values()].sort(function(a, c){ return a.f < c.f ? 1 : -1; });
+    return appListaAbrir('🧾 OC de ' + escapeHtml(PD_PERSONAS[cod] || cod), escapeHtml(appFLabel(st)), '<div class="ini-card m-lista">' + l.map(function(g){ return appFilaHtml('data-oc="' + escapeHtml(g.oc) + '"', '', polarCorta(appImpNombre(g.prov) || '—', 40), 'OC ' + escapeHtml(g.oc.replace(/^000\d-0*/, '')) + ' · ' + escapeHtml(rqFecha(new Date(g.f + 'T12:00:00Z'))) + (g.cli ? ' · ' + escapeHtml(polarCorta(appImpNombre(g.cli), 28)) : ''), g.n.size + ' SKU', ''); }).join('') + '</div>'); }
   if(b.dataset.fcaraRk){ const v = appFPersonas().find(function(x){ return pdPersona(x) === b.dataset.fcaraRk; }); if(v){ APP_F.indicadores.persona = v; window.scrollTo(0, 0); return appRenderInicio(); } }
   if(b.dataset.dciagregar || b.dataset.dciborrar || b.dataset.dcies || b.dataset.dcipys || b.dataset.dcipersona != null) return appDciAccion(b);   // Daily Call In del Inicio
   if(b.dataset.dashimp){ const dp = b.dataset.dashimp.split('|'); return appDashImport(+dp[0], dp[1] || ''); }
