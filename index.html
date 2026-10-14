@@ -3743,14 +3743,24 @@ async function publishSnapshot(){
   try{
     const snapshot = buildSnapshot();
     const jsonStr = JSON.stringify(snapshot);
+    // GitHub a veces responde 500/502/503 sin cuerpo (falla suya, pasajera): se reintenta hasta 4 veces con espera
+    // creciente antes de mostrar el error (14.10.2026, Piero: "GitHub respondió 500 en git/ref/heads/main").
     const gh = async (path, opts)=>{
-      const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/${path}`, Object.assign({
-        headers: {
-          "Authorization": "Bearer " + token,
-          "Accept": "application/vnd.github+json",
-          "Content-Type": "application/json",
-        },
-      }, opts||{}));
+      let res = null;
+      for(let intento = 0; intento < 4; intento++){
+        if(intento){ btn.textContent = "Reintentando (" + intento + ")..."; await new Promise(function(ok){ setTimeout(ok, 1500 * intento); }); }
+        try{
+          res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/${path}`, Object.assign({
+            cache: 'no-store',
+            headers: {
+              "Authorization": "Bearer " + token,
+              "Accept": "application/vnd.github+json",
+              "Content-Type": "application/json",
+            },
+          }, opts||{}));
+        }catch(e){ res = null; if(intento === 3) throw new Error("no hay conexión con GitHub (" + escapeHtml(e.message || '') + "). Revisa el internet e inténtalo de nuevo."); continue; }
+        if(res.status < 500) break;
+      }
       if(!res.ok){
         const body = await res.text();
         if(res.status === 401 || res.status === 403){
@@ -3759,6 +3769,7 @@ async function publishSnapshot(){
             + " Ya lo borré de este navegador: vuelve a hacer clic en ☁ y pega un token nuevo con permiso <i>Contents: Read and write</i> sobre el repo "
             + GH_OWNER + "/" + GH_REPO + ".<br><span style=\"opacity:.7;font-size:11.5px;\">Respuesta de GitHub: " + escapeHtml(body.slice(0,140)) + "</span>");
         }
+        if(res.status >= 500) throw new Error("GitHub está fallando en este momento (respondió " + res.status + " varias veces). No es tu archivo ni tu token: espera unos minutos y vuelve a darle a ☁.");
         throw new Error("GitHub respondió " + res.status + " en " + path.split('?')[0] + ": " + body.slice(0,180));
       }
       return res.json();
