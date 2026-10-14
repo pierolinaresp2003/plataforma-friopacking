@@ -1555,6 +1555,18 @@
   @keyframes appHojaBaja{from{transform:none;}to{transform:translateY(100%);}}
   @keyframes appFondoSale{from{opacity:1;}to{opacity:0;}}
   html.sin-trans, html.sin-trans *{transition:none !important;}
+  .mp{position:fixed;z-index:400;width:270px;max-height:calc(100vh - 90px);overflow-y:auto;background:var(--card,#fff);border:1px solid var(--border);border-radius:18px;padding:8px;
+    box-shadow:0 24px 60px rgba(10,20,50,.28);opacity:0;transform:translateY(-6px) scale(.97);transform-origin:top left;pointer-events:none;transition:opacity .16s ease,transform .16s ease;}
+  .mp.abierto{opacity:1;transform:none;pointer-events:auto;}
+  .mp-fondo{position:fixed;inset:0;z-index:399;display:none;} .mp-fondo.abierto{display:block;}
+  .mp-sec{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);padding:10px 10px 6px;}
+  .mp-it{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;border-radius:12px;padding:9px 10px;font:inherit;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;text-align:left;}
+  .mp-it:hover{background:var(--surface-2);} .mp-it.on{background:rgba(62,198,172,.16);color:#0f6b60;} .mp-it i{font-style:normal;width:24px;text-align:center;font-size:17px;}
+  .mp-it em{margin-left:auto;font-style:normal;font-size:11px;font-weight:700;color:var(--ink-soft);}
+  .mp-mod .mp-dot{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;font-size:15px;}
+  .mp-pie{display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--border);margin-top:8px;padding-top:6px;}
+  .mp-lnk{border:0;background:none;text-align:left;font:inherit;font-size:13px;font-weight:700;color:var(--ink-soft);padding:8px 10px;border-radius:10px;cursor:pointer;} .mp-lnk:hover{background:var(--surface-2);color:var(--ink);}
+  html[data-theme="dark"] .mp{box-shadow:0 24px 60px rgba(0,0,0,.55);} html[data-theme="dark"] .mp-it.on{color:#7fe0cf;}
   .app-tema.gira svg{animation:appTemaGira .35s cubic-bezier(.22,.8,.2,1);} @keyframes appTemaGira{from{transform:rotate(-90deg) scale(.6);}to{transform:none;}}
   @media (max-width:760px){
     /* La animación mueve la pantalla 34 px de costado: sin recorte el documento se ensanchaba un instante,
@@ -13599,7 +13611,8 @@ function appConstruir(){
 
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
   document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(); });
-  try{ if(localStorage.getItem('fp-lado') === 'off') document.body.classList.add('lado-off'); }catch(err){}
+  // En la web el menú lateral queda siempre oculto; el ☰ abre un menú flotante (14.10.2026, Piero: "que se vea así siempre").
+  if(APP_EN_PC) document.body.classList.add('lado-off');
   document.getElementById('appLadoBtn').dataset.lado = '1';   // el clic lo atiende el manejador general [data-lado]
   appTemaIcono();
   document.getElementById('appSheet').addEventListener('click', function(e){ if(e.target === this) appCerrarSheet(); });
@@ -13855,6 +13868,34 @@ function appPcActivar(){
 }
 // Pantalla de inicio para elegir el módulo (13.10.2026, Piero: "al iniciar el app debe haber como una pestaña
 // de inicio para ir a módulo de compras, almacén o supervisor"). Solo si el usuario tiene más de uno.
+// Menú flotante del ☰ (14.10.2026, Piero: "al darle a las 3 barras que se abra como ventana flotante ahí cerca para
+// seleccionar a qué módulo se quiere ir"): las pestañas del módulo actual y los otros módulos.
+function appMenuCerrar(){ const m = document.getElementById('appMenuPop'), f = document.getElementById('appMenuFondo'); if(m) m.classList.remove('abierto'); if(f) f.classList.remove('abierto'); }
+function appMenuFlotante(){
+  let m = document.getElementById('appMenuPop');
+  if(m && m.classList.contains('abierto')) return appMenuCerrar();
+  if(!m){ document.body.insertAdjacentHTML('beforeend', '<div id="appMenuFondo" class="mp-fondo"></div><div id="appMenuPop" class="mp" role="menu"></div>'); m = document.getElementById('appMenuPop');
+    // Tocar afuera solo cierra el menú (no abre lo que haya debajo).
+    document.getElementById('appMenuFondo').addEventListener('click', function(e){ e.stopPropagation(); appMenuCerrar(); });
+    m.addEventListener('click', function(e){ const b = e.target.closest('button'); if(!b) return;
+      appMenuCerrar();
+      if(b.dataset.mptab){ const t = document.querySelector('#appTabbar [data-tab="' + b.dataset.mptab + '"]'); if(t) t.click(); return; }
+      if(b.dataset.mpvista){ if(b.dataset.mpvista !== APP.vista) appElegirVista(b.dataset.mpvista); else appInicio(); return; }
+      if(b.dataset.mpinicio) return appLanzador(true);
+      if(b.dataset.mpusr) return appCerrarUsuario(); });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape') appMenuCerrar(); }); }
+  const e = escapeHtml, v = APP_VISTAS[APP.vista] || {}, act = APP.enInicio ? APP.pantalla : ((document.querySelector('.section.active') || {}).id || '').replace(/^section-/, '');
+  const tabs = (v.tabs || []).filter(function(t){ return t[0] !== 'polar'; });
+  const vis = appVistasPermitidas().filter(function(k){ return APP_VISTAS[k]; });
+  const col = { compras:'#2f6fe0', almacen:'#13a394', super:'#e8922b', frioteam:'#7c5ce0' };
+  m.innerHTML = `<div class="mp-sec">${e(v.nombre || '')}</div>
+    ${tabs.map(function(t){ return `<button type="button" class="mp-it${t[0] === act ? ' on' : ''}" data-mptab="${t[0]}"><i>${t[1]}</i><span>${e(t[2])}</span></button>`; }).join('')}
+    ${vis.length > 1 ? `<div class="mp-sec">Cambiar de módulo</div>${vis.map(function(k){ return `<button type="button" class="mp-it mp-mod${k === APP.vista ? ' on' : ''}" data-mpvista="${k}"><i class="mp-dot" style="background:${col[k] || '#5b97de'}">${APP_VISTAS[k].ico}</i><span>${e(APP_VISTAS[k].nombre)}</span>${k === APP.vista ? '<em>actual</em>' : ''}</button>`; }).join('')}` : ''}
+    <div class="mp-pie">${vis.length > 1 ? '<button type="button" class="mp-lnk" data-mpinicio="1">🏠 Pantalla de módulos</button>' : ''}<button type="button" class="mp-lnk" data-mpusr="1">🚪 Cambiar de usuario</button></div>`;
+  const b = document.getElementById('appLadoBtn'), r = b ? b.getBoundingClientRect() : { left:16, bottom:64 };
+  m.style.left = Math.max(10, r.left) + 'px'; m.style.top = (r.bottom + 8) + 'px';
+  void m.offsetWidth; m.classList.add('abierto'); document.getElementById('appMenuFondo').classList.add('abierto');
+}
 function appLanzador(forzar){
   const vs = appVistasPermitidas().filter(function(k){ return APP_VISTAS[k]; });
   if(vs.length < 2 && !forzar) return;
@@ -13895,7 +13936,7 @@ function appLanzador(forzar){
   el.classList.add('abierto'); el._desdeLogo = !!forzar;
 }
 document.addEventListener('click', function(e){
-  if(e.target.closest('[data-lado]')){ const off = document.body.classList.toggle('lado-off'); try{ localStorage.setItem('fp-lado', off ? 'off' : ''); }catch(err){} return; }
+  if(e.target.closest('[data-lado]')){ e.stopPropagation(); return appMenuFlotante(); }
   if(e.target.closest('.app-top .app-logo, .app-side-logo img') && APP.usuario && appVistasPermitidas().length > 1) appLanzador(true);
 });
 function appArrancar(){
@@ -14671,7 +14712,7 @@ function appDciEnviar(d){
 function appDciPintar(){ const c = document.querySelector('#section-inicio [data-dci]'); if(!c) return;
   const borr = {}; c.querySelectorAll('textarea,input,select').forEach(function(i){ if(i.dataset.dciv) borr[i.dataset.dciv] = i.value; });
   c.outerHTML = appDailyModHtml();
-  const n = document.querySelector('#section-inicio [data-dci]'); if(n) n.querySelectorAll('textarea,input').forEach(function(i){ if(i.dataset.dciv && borr[i.dataset.dciv] != null && /^(py|tr|bl)$/.test(i.dataset.dciv)) i.value = borr[i.dataset.dciv]; }); }
+  const n = document.querySelector('#section-inicio [data-dci]'); if(n) n.querySelectorAll('textarea,input').forEach(function(i){ if(i.dataset.dciv && borr[i.dataset.dciv] != null && /^(tr|bl|co)$/.test(i.dataset.dciv)) i.value = borr[i.dataset.dciv]; }); }
 function dciFecha(x){ const d = x.dia, h = String(x.creada || '').slice(11, 16);
   return (+d.slice(8, 10)) + ' de ' + POLAR_MESES[+d.slice(5, 7) - 1] + (h ? ' · ' + h : ''); }
 // ---------- Módulo Daily Call In (13.10.2026, Piero) ----------
