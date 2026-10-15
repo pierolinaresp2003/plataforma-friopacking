@@ -2073,7 +2073,14 @@
     .ge-det{display:flex;flex-direction:column;gap:10px;} .ge-acc{display:flex;gap:8px;flex-wrap:wrap;} .ge-acc .ix-btn{flex:1;min-width:150px;margin:0;}
     .ge-t{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--amber);border-radius:10px;padding:8px 11px;} .ge-t.pro{border-left-color:var(--info);}
     .ge-t b{display:block;font-size:13px;color:var(--ink);line-height:1.35;} .ge-t small{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:2px;} .ge-t small.bl{color:var(--red-ink);font-weight:700;}
-    @media(max-width:520px){ .ge-info{grid-template-columns:repeat(2,minmax(0,1fr));} .ge-grid{grid-template-columns:1fr;} .ge-k b{font-size:16px;} }
+    .ge-ing{margin-left:auto;background:rgba(255,255,255,.18) !important;}
+    .ing-l{padding:4px 12px !important;} .ing-r{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);} .ing-r:last-child{border-bottom:0;}
+    .ing-h{flex:0 0 44px;font-size:14px;font-weight:900;color:var(--brand-ink);font-variant-numeric:tabular-nums;}
+    .ing-av{width:34px;height:34px;border-radius:50%;object-fit:cover;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;}
+    .ing-t,.ing-m{min-width:0;} .ing-t{flex:1;} .ing-t b,.ing-m b{display:block;font-size:13px;color:var(--ink);line-height:1.25;overflow-wrap:anywhere;} .ing-t small,.ing-m small{display:block;font-size:11.5px;color:var(--ink-soft);overflow-wrap:anywhere;}
+    .ing-m{text-align:right;flex:0 0 auto;max-width:42%;} .ing-k{margin-bottom:4px;}
+    @media(max-width:520px){ .ing-r{flex-wrap:wrap;row-gap:2px;} .ing-t{flex:1 1 calc(100% - 100px);} .ing-m{flex:1 1 100%;max-width:none;text-align:left;padding-left:98px;} .ing-m b,.ing-m small{display:inline;font-size:11.5px;} .ing-m small::before{content:' · ';} }
+    @media(max-width:520px){ .ge-ing{margin-left:0;} .ge-info{grid-template-columns:repeat(2,minmax(0,1fr));} .ge-grid{grid-template-columns:1fr;} .ge-k b{font-size:16px;} }
     .td-aviso{font-size:13px;color:#5b6b7a;background:#e6eef9;border-radius:12px;padding:10px 12px;margin:4px 0 10px;line-height:1.4;}
     /* Modo oscuro de lo nuevo (13.10.2026, Piero: "el modo oscuro debe estar bien optimizado") */
     html[data-theme="dark"] .dci-ban,html[data-theme="dark"] .dci-hero.eq{background:linear-gradient(90deg,rgba(13,20,33,.55),rgba(13,20,33,.2)),linear-gradient(#2a3547,#2a3547),var(--marmol) left center/1600px 520px no-repeat,#161f2e;background-blend-mode:normal,multiply,normal,normal;border-color:#2a3547;}
@@ -13817,11 +13824,17 @@ function appRevisarAcceso(){
   if(appNecesitaClave()) appBienvenida(APP.usuario.correo);                // subió a Logística/Gerencia: clave
 }
 if(APP.usuario){
-  if(APP_ACCESO[APP.usuario.tipo].indexOf(APP.vista) === -1) APP.vista = appVistaInicial(APP.usuario.tipo);
+  if(appVistasPermitidas().indexOf(APP.vista) === -1) APP.vista = appVistaInicial(APP.usuario.tipo);
   // Gerencia con la clave ya puesta (acceso guardado o en esta sesión): no se le vuelve a pedir.
   if(appVeGerencial(APP.usuario.tipo) && RQ_MOVIL.matches && !appNecesitaClave()){ gerAbierto = true; try{ sessionStorage.setItem(GER_SESION, '1'); }catch(err){} }
 } else APP.vista = null;
-function appVistasPermitidas(){ return APP.usuario ? APP_ACCESO[APP.usuario.tipo] : ['supervisor']; }
+function appVistasPermitidas(){
+  if(!APP.usuario) return ['supervisor'];
+  const l = (APP_ACCESO[APP.usuario.tipo] || []).slice();
+  // Piero también ve el módulo Gerencial (ahí está el registro de ingresos al app, 15.10.2026).
+  if(appUsuarioDe(APP.usuario.correo) === 'plinares' && l.indexOf('gerencial') === -1) l.push('gerencial');
+  return l;
+}
 
 function appLogo(){ const l = document.querySelector('.sidebar-brand .logo-lockup'); return l ? l.src : ''; }
 // Modo claro / oscuro desde el botón de arriba (13.10.2026, Piero: "quita el desplegable de arriba a la derecha en el
@@ -14533,6 +14546,7 @@ function appRenderInicio(){
   const v = APP.vista || 'supervisor';
   const ph = { supervisor:'N° de requerimiento, proyecto o pregunta…', logistica:'Código, producto, OC o pregunta…', compras:'OC, pedido, proveedor o pregunta…', almacen:'Código, producto o pregunta…', gerencia:'Pregunta por un indicador o el gasto…' }[v];
   const hay = appHayDatos();
+  if(hay) appRegistrarIngreso();
   if(hay && SUPERVISOR_ROL && APP.usuario){
     const antes = APP.usuario.tipo; appRevisarAcceso();
     if(!APP.usuario) return;
@@ -18436,7 +18450,7 @@ function appGerEquipoHtml(){
   return `<div class="ge rqm">
     <div class="rqm-cab ge-cab"><small>RESUMEN GERENCIAL · LOGÍSTICA</small><h2>Equipo Logística</h2>
       <p>Qué hizo cada uno ${e(G.R.label)} y qué tiene pendiente hoy. Toca a una persona para ver su detalle.</p>
-      <div class="ge-per">${GE_PER.map(function(x){ return `<button type="button" data-geperiodo="${x[0]}" class="${APP_GE.per === x[0] ? 'on' : ''}">${x[1]}</button>`; }).join('')}</div>
+      <div class="ge-per">${GE_PER.map(function(x){ return `<button type="button" data-geperiodo="${x[0]}" class="${APP_GE.per === x[0] ? 'on' : ''}">${x[1]}</button>`; }).join('')}<button type="button" class="ge-ing" data-geingresos="1">🔐 Ingresos al app</button></div>
       <div class="rqm-info ge-info">${tile('🧾', 'OC emitidas', appN(sum(function(p){ return p.n.oc; }))) + tile('📦', 'SKU en OC', appN(sum(function(p){ return p.n.sku; })))
         + tile('📥', 'Guías de almacén', appN(sum(function(p){ return (p.n.grc || 0) + (p.n.grr || 0); }))) + tile('⛔', 'OC vencidas hoy', appN(sum(function(p){ return p.n.venc; })))
         + tile('🚢', 'Embarques en tránsito', appN(G.emb.tr)) + tile('🗓️', 'Daily completado', dd.t ? Math.round(dd.f / dd.t * 100) + '%' : '—')}</div></div>
@@ -18458,6 +18472,50 @@ function appGePersona(cod){
       <div class="ge-sec"><b>🗓️ Daily abierto</b><small>⏳ ${p.d.pen} por iniciar · 🔄 ${p.d.pro} en proceso · ✅ ${p.d.fin} hechas ${e(G.R.label)}</small></div>
       ${tareas || '<div class="ini-card"><div class="ini-vacio">Sin tareas abiertas en su Daily.</div></div>'}
     </div>`);
+}
+
+// ---------- Registro de ingresos al app (15.10.2026, Piero: "un registro de quiénes se loguean, con el nombre registrado,
+// su correo, la fecha y la hora; que esté también en el Drive"). Cada vez que se abre la app (una vez por sesión) se anota
+// en la hoja de Leo, pestaña "Ingresos al app" (polar-aprende.gs v8). Se ve desde el módulo Gerencial. ----------
+function appIngresoDispositivo(){
+  const ua = navigator.userAgent || '';
+  const so = /iPhone|iPad|iPod/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Macintosh|Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'Otro';
+  let inst = false; try{ inst = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }catch(err){}
+  return so + (inst ? ' · app instalada' : ' · navegador');
+}
+function appRegistrarIngreso(){
+  if(!POLAR_APRENDE_URL || !APP.usuario || !APP.usuario.correo || appNecesitaClave()) return;
+  try{ if(sessionStorage.getItem('fp_ingreso') === '1') return; sessionStorage.setItem('fp_ingreso', '1'); }catch(err){ return; }
+  const nombre = APP.usuario.nombre || appNombrePorCorreo(APP.usuario.correo) || '';
+  fetch(POLAR_APRENDE_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body:JSON.stringify({ tipo:'ingreso', correo:APP.usuario.correo, nombre:nombre, acceso:APP.usuario.tipo || '', vista:APP.vista || '', dispositivo:appIngresoDispositivo() }) })
+    .catch(function(){ try{ sessionStorage.removeItem('fp_ingreso'); }catch(err){} });
+}
+const APP_ING = { dias:30, l:null };
+function appIngresosHtml(l){
+  const e = escapeHtml, hoy = dciHoy(), d7 = new Date(hoy + 'T12:00:00Z'); d7.setUTCDate(d7.getUTCDate() - 6); const s7 = d7.toISOString().slice(0, 10);
+  const uniq = function(a){ return new Set(a.map(function(x){ return x.c; })).size; };
+  const hoyL = l.filter(function(x){ return x.f === hoy; }), semL = l.filter(function(x){ return x.f >= s7; });
+  const dias = new Map(); l.forEach(function(x){ (dias.get(x.f) || dias.set(x.f, []).get(x.f)).push(x); });
+  const MOD = { gerencial:'Gerencial', compras:'Compras', almacen:'Almacén', super:'Supervisor', frioteam:'Frioteam' };
+  const fila = function(x){ const cod = String(x.c || '').split('@')[0].toUpperCase();
+    return `<div class="ing-r"><b class="ing-h">${e(String(x.h || '').slice(0, 5))}</b>${PD_PERSONAS[cod] ? dciFoto(cod, 'ing-av') : `<span class="ing-av dci-ini" style="background:var(--brand-mid)">${e(dciIni(x.n || x.c))}</span>`}
+      <span class="ing-t"><b>${e(x.n || '—')}</b><small>${e(x.c)}</small></span><span class="ing-m"><b>${e(MOD[x.v] || x.v || '—')}</b><small>${e(x.d || '')}</small></span></div>`; };
+  const diaTxt = function(f){ const d = new Date(f + 'T12:00:00Z'); const t = d.toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long', timeZone:'UTC' }); return t.charAt(0).toUpperCase() + t.slice(1); };
+  return `<div class="ge-k k3 ing-k"><span><b>${uniq(hoyL)}</b><small>Personas hoy</small></span><span><b>${uniq(semL)}</b><small>Personas en 7 días</small></span><span><b>${appN(l.length)}</b><small>Ingresos en ${APP_ING.dias} días</small></span></div>
+    ${[...dias.entries()].map(function(g){ return `<div class="ge-sec"><b>📅 ${e(diaTxt(g[0]))}</b><small>${uniq(g[1])} persona${uniq(g[1]) === 1 ? '' : 's'} · ${g[1].length} ingreso${g[1].length === 1 ? '' : 's'}</small></div><div class="ini-card ing-l">${g[1].map(fila).join('')}</div>`; }).join('')
+      || '<div class="ini-card"><div class="ini-vacio">Todavía no hay ingresos registrados.</div></div>'}
+    <div class="av-nota">Se anota una vez cada vez que alguien abre la app, con la hora de Lima. Todo queda en la hoja de Leo (Drive), pestaña <b>Ingresos al app</b>.</div>`;
+}
+function appIngresosAbrir(){
+  appListaAbrir('🔐 Ingresos al app', 'Quién entró, con su correo, fecha y hora · últimos ' + APP_ING.dias + ' días',
+    `<div id="ingCuerpo">${APP_ING.l ? appIngresosHtml(APP_ING.l) : '<div class="ini-card"><div class="ini-vacio">⏳ Leyendo el registro…</div></div>'}</div>`);
+  if(!POLAR_APRENDE_URL) return;
+  fetch(POLAR_APRENDE_URL + '?accion=ingresos&dias=' + APP_ING.dias + '&_=' + Date.now()).then(function(r){ return r.json(); }).then(function(d){
+    if(!d || !d.ok || !Array.isArray(d.ingresos)) throw new Error('sin ingresos');
+    APP_ING.l = d.ingresos; const c = document.getElementById('ingCuerpo'); if(c) c.innerHTML = appIngresosHtml(APP_ING.l);
+  }).catch(function(){ const c = document.getElementById('ingCuerpo');
+    if(c && !APP_ING.l) c.innerHTML = '<div class="ini-card"><div class="ini-vacio">⚠️ No pude leer el registro. Falta actualizar el Apps Script de la hoja de Leo (polar-aprende.gs v8).</div></div>'; });
 }
 
 // ---------- Inicio: Supervisor ----------
@@ -18648,6 +18706,7 @@ function appClickInicio(e){
   if(b.dataset.inddet) return appIndDetalle(b.dataset.inddet);
   if(b.dataset.geper) return appGePersona(b.dataset.geper);
   if(b.dataset.geperiodo){ APP_GE.per = b.dataset.geperiodo; return appRenderInicio(); }
+  if(b.dataset.geingresos) return appIngresosAbrir();
   if(b.dataset.fcara != null){ const w = b.closest('[data-fbar]'); if(w){ APP_F[w.dataset.fbar].persona = b.dataset.fcara; return appRenderInicio(); } }
   if(b.dataset.pcper != null){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
   if(b.dataset.repsec){ APP_REP.sec = b.dataset.repsec; return appRenderInicio(); }

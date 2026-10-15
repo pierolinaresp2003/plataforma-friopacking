@@ -30,6 +30,10 @@
  * También guarda la FOTO de cada colaborador (pestaña "Daily fotos", imagen chica en texto). Las columnas nuevas se
  * agregan solas al final de la hoja; no se pierde nada de lo ya registrado.
  *
+ * Desde el 15.10.2026 (v8): guarda cada INGRESO A LA APP en la pestaña "Ingresos al app": fecha, hora (Lima), nombre,
+ * correo, acceso, módulo con el que entró y dispositivo. Se anota una vez por cada vez que se abre la app. La plataforma lo
+ * lee con doGet?accion=ingresos&dias=30 (lo ve el módulo Gerencial).
+ *
  * ACTUALIZAR (si ya estaba instalado): pega este archivo encima del anterior → Guardar →
  *   Implementar → Administrar implementaciones → ✏️ editar → Versión: Nueva versión → Implementar.
  *   Así la URL /exec sigue siendo la misma y no hay que tocar el index.html.
@@ -42,6 +46,7 @@ function doPost(e) {
     const d = JSON.parse(e.postData.contents || '{}');
     if (d.tipo === 'tarea') return tareaGuardar(d);
     if (d.tipo === 'dci') return dciGuardar(d);
+    if (d.tipo === 'ingreso') return ingresoGuardar(d);
     const pregunta = String(d.pregunta || '').trim().slice(0, 300);
     if (!pregunta) return salida({ ok: false });
     const libro = SpreadsheetApp.getActiveSpreadsheet();
@@ -84,6 +89,7 @@ function doPost(e) {
 function doGet(e) {
   if (e && e.parameter && e.parameter.accion === 'tareas') return tareasLeer();
   if (e && e.parameter && e.parameter.accion === 'dci') return dciLeer();
+  if (e && e.parameter && e.parameter.accion === 'ingresos') return ingresosLeer(e.parameter.dias);
   return salida({ ok: true, servicio: 'Polar aprende' });
 }
 
@@ -245,3 +251,41 @@ function dciGuardar(d) {
   } finally { lock.releaseLock(); }
 }
 function salida(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+
+// ---------- Ingresos a la app (15.10.2026, v8) ----------
+const HOJA_ING = 'Ingresos al app';
+const COLS_ING = ['Fecha', 'Hora', 'Nombre', 'Correo', 'Acceso', 'Módulo', 'Dispositivo'];
+function hojaIngresos() {
+  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  let h = libro.getSheetByName(HOJA_ING);
+  if (!h) {
+    h = libro.insertSheet(HOJA_ING);
+    h.appendRow(COLS_ING);
+    h.setFrozenRows(1);
+    h.getRange(1, 1, 1, COLS_ING.length).setFontWeight('bold').setBackground('#0a1e64').setFontColor('#ffffff');
+    h.getRange('A:B').setNumberFormat('@');   // fecha y hora como texto (aaaa-mm-dd · hh:mm:ss, hora de Lima)
+    h.setColumnWidth(3, 260); h.setColumnWidth(4, 260); h.setColumnWidth(7, 220);
+  }
+  return h;
+}
+function ingresoGuardar(d) {
+  const correo = txt(d.correo, 120).toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+$/.test(correo)) return salida({ ok: false });
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const t = new Date();
+    hojaIngresos().appendRow([Utilities.formatDate(t, 'America/Lima', 'yyyy-MM-dd'), Utilities.formatDate(t, 'America/Lima', 'HH:mm:ss'),
+      txt(d.nombre, 120), correo, txt(d.acceso, 30), txt(d.vista, 30), txt(d.dispositivo, 80)]);
+    return salida({ ok: true });
+  } finally { lock.releaseLock(); }
+}
+function ingresosLeer(dias) {
+  const h = hojaIngresos(), n = h.getLastRow();
+  if (n < 2) return salida({ ok: true, ingresos: [] });
+  const d0 = new Date(); d0.setDate(d0.getDate() - Math.min(366, Math.max(1, Number(dias) || 30)));
+  const desde = Utilities.formatDate(d0, 'America/Lima', 'yyyy-MM-dd'), ini = Math.max(2, n - 5000 + 1);
+  const l = h.getRange(ini, 1, n - ini + 1, COLS_ING.length).getDisplayValues()
+    .filter(function (f) { return f[0] && String(f[0]) >= desde; })
+    .map(function (f) { return { f: f[0], h: f[1], n: f[2], c: f[3], a: f[4], v: f[5], d: f[6] }; });
+  return salida({ ok: true, ingresos: l.reverse() });
+}
