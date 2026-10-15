@@ -2140,6 +2140,10 @@
       box-shadow:0 1px 2px rgba(15,37,87,.05);animation:lzEntra .4s cubic-bezier(.22,.8,.2,1) both;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;outline:none;}
     .lz-card:hover{transform:translateX(4px);border-color:var(--lz-a);box-shadow:0 10px 26px rgba(15,37,87,.10);} .lz-card:focus-visible{border-color:var(--lz-a);} .lz-card.pulsado{transform:scale(.98);}
     .lz-card > *{pointer-events:none;}
+    .lz-logistica{--lz-a:#1a9c86;--lz-g:linear-gradient(135deg,#55c3ab,#123a9e);--lz-s:rgba(26,156,134,.28);}
+    .lz-grupo{display:flex;flex-direction:column;} .lz-grupo .lz-go svg{transition:transform .2s ease;} .lz-grupo.on > .lz-card .lz-go svg{transform:rotate(90deg);}
+    .lz-subs{display:none;flex-direction:column;gap:10px;margin:10px 0 0 26px;padding-left:16px;border-left:2px solid #d9e2ef;} .lz-grupo.on .lz-subs{display:flex;}
+    .lz-subs .lz-card{padding:13px 14px 13px 16px;} .lz-subs .lz-ic{width:44px;height:44px;border-radius:12px;} .lz-subs .lz-ic svg{width:23px;height:23px;} .lz-subs .lz-tx b{font-size:16px;}
     .lz-ic{flex:0 0 auto;width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:var(--lz-g);box-shadow:0 6px 14px var(--lz-s);} .lz-ic svg{width:28px;height:28px;}
     .lz-tx{flex:1;min-width:0;} .lz-tx b{display:block;font-size:18px;font-weight:900;color:#0a1e64;} .lz-tx span{display:block;margin-top:3px;font-size:13px;color:#5b6b7a;line-height:1.4;}
     .lz-go{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#eff4fb;transition:background .15s ease;} .lz-go svg{width:16px;height:16px;}
@@ -14238,6 +14242,7 @@ function appLanzador(forzar){
   if(!el){ document.body.insertAdjacentHTML('beforeend', '<div id="appLanz" class="lz"></div>'); el = document.getElementById('appLanz');
     // Entrar al instante (13.10.2026, Piero): el lanzador se desvanece en el acto y el módulo se arma a la vez. En el historial queda el lanzador, así "atrás" vuelve a esta pantalla.
     el.addEventListener('click', function(e){ if(e.target.closest('[data-lzusr]')){ el.classList.remove('abierto'); return appCerrarUsuario(); }
+      const gr = e.target.closest('[data-lzgrupo]'); if(gr){ gr.parentNode.classList.toggle('on'); return; }
       const b = e.target.closest('[data-lzv]'); if(!b || el._yendo) return;
       el._yendo = true; b.classList.add('pulsado'); el.classList.add('fuera');
       const v = b.dataset.lzv, desdeLogo = el._desdeLogo;
@@ -14258,6 +14263,13 @@ function appLanzador(forzar){
   // Pantalla de módulos en dos partes (14.10.2026, Piero: "más fresca, natural y profesional; el logo es muy pequeño y en
   // la web quedan espacios sin usar"): a la izquierda la marca (logo grande, saludo, fecha) y a la derecha los módulos.
   const correo = APP.usuario && APP.usuario.correo ? APP.usuario.correo : '';
+  const tarjeta = function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${80 + i * 60}ms"><span class="lz-ic">${ico[k] || ''}</span><span class="lz-tx"><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span></span><span class="lz-go">${go}</span></button>`; };
+  // Gerencia (15.10.2026, Piero): primero el módulo Gerencial y abajo "Logística", que abre Compras, Almacén y Supervisor.
+  const resto = vs.filter(function(k){ return k !== 'gerencial'; });
+  const tarjetas = vs.indexOf('gerencial') !== -1 && resto.length
+    ? tarjeta('gerencial', 0) + `<div class="lz-grupo" style="animation-delay:140ms"><button type="button" class="lz-card lz-logistica" data-lzgrupo="1"><span class="lz-ic">${sv('<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>')}</span><span class="lz-tx"><b>Logística</b><span>${resto.map(function(k){ return APP_VISTAS[k].nombre; }).join(', ').replace(/, ([^,]*)$/, ' y $1')}</span></span><span class="lz-go">${go}</span></button>
+        <div class="lz-subs">${resto.map(function(k, i){ return tarjeta(k, i); }).join('')}</div></div>`
+    : vs.map(tarjeta).join('');
   el.innerHTML = `<div class="lz-in">
     <aside class="lz-brand"><div class="lz-marca">${copo}</div><img class="lz-casco" src="${dciEspartano()}" alt="">
       <div class="lz-brand-top"><img class="lz-logo" src="${appLogo()}" alt="Grupo Friopacking"></div>
@@ -14265,7 +14277,7 @@ function appLanzador(forzar){
       <div class="lz-brand-pie"><b>Grupo Friopacking</b><span>Logística · Cadena de frío · Perú</span></div></aside>
     <main class="lz-main"><div class="lz-main-in">
       <h2>¿A qué módulo quieres entrar?</h2><p class="lz-sub">Puedes volver aquí cuando quieras tocando el logo.</p>
-      <div class="lz-cards">${vs.map(function(k, i){ const v = APP_VISTAS[k]; return `<button type="button" class="lz-card lz-${k}" data-lzv="${k}" style="animation-delay:${80 + i * 60}ms"><span class="lz-ic">${ico[k] || ''}</span><span class="lz-tx"><b>${v.nombre}</b><span>${escapeHtml(ext[k] || v.desc)}</span></span><span class="lz-go">${go}</span></button>`; }).join('')}</div>
+      <div class="lz-cards">${tarjetas}</div>
       <div class="lz-usr-fila">${correo ? `<span>👤 ${escapeHtml(correo)}</span>` : ''}<button type="button" class="lz-usr" data-lzusr="1">Cambiar de usuario</button></div>
     </div></main></div>`;
   el.classList.add('abierto'); el._desdeLogo = !!forzar;
