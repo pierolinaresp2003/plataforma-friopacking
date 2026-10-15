@@ -13752,7 +13752,7 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 // es una página estática, no hay un servidor con la lista de usuarios. Qué vistas ve cada tipo:
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
 // La vista Gerencia ya no existe (12.10.2026, Piero): Compras y Almacén tienen lo gerencial; el acceso Gerencia entra a Compras.
-const APP_ACCESO = { gerencial:['gerencial','super'], gerencia:['compras','almacen','super'], logistica:['compras','almacen','super'], compras:['compras','almacen','super'], almacen:['almacen','compras','super'], supervisor:['super'], frioteam:['frioteam'] };
+const APP_ACCESO = { gerencial:['gerencial','compras','almacen','super'], gerencia:['compras','almacen','super'], logistica:['compras','almacen','super'], compras:['compras','almacen','super'], almacen:['almacen','compras','super'], supervisor:['super'], frioteam:['frioteam'] };
 function appVistaInicial(t){ return (APP_ACCESO[t] || [t])[0]; }
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
 // y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
@@ -13769,7 +13769,7 @@ function appNecesitaClave(){
   try{ return sessionStorage.getItem(APP_SESION) !== '1'; }catch(err){ return true; }
 }
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
-// Gerencia de Logística (15.10.2026, Piero): entran al módulo Gerencial y a Supervisor, no a Compras ni Almacén.
+// Gerencia de Logística (15.10.2026, Piero): entran primero al módulo Gerencial; también tienen Compras, Almacén y Supervisor.
 const APP_GERENCIAL_USR = ['kalegria', 'mlujan', 'apl'];
 // Respaldo: copia de DB Supervisores del 29.09.2026 (nombre, correo y Acceso; sin DNI), para que cada uno
 // entre con su acceso y se le salude por su nombre aunque el link publicado todavía no traiga la base.
