@@ -14757,10 +14757,12 @@ function almReqPedHtml(pend0){
   // ven sus ítems. Del proyecto con el req. más reciente al más antiguo.
   const cab = `<div class="m-pl-tit"><span>${t[0]} ${t[1]}</span><b>${appN(reqs.size)} req. · ${appN(pend.length)} ítems</b></div>`;
   if(!APP_AS.pry || !G.has(APP_AS.pry)){ APP_AS.pry = '';
-    return tiles + cab + `<div class="m-sec-nota">${t[3]} · ${appN(L.length)} proyecto${L.length === 1 ? '' : 's'} · el más reciente primero · toca uno para ver sus ítems</div>
-    <div class="m-fams">${L.map(function(x){ const n = new Set(x[1].map(function(p){ return p.req; })).size, fu = new Set(x[1].filter(function(p){ return p.d > meta; }).map(function(p){ return p.req; })).size;
-      return `<button type="button" class="ini-card m-fam" data-aspry="${e(x[0])}" style="border-left:4px solid ${appColorFamilia(x[0])}"><span class="m-fam-ic">${/^Stock|^SIN PROYECTO/i.test(x[0]) ? '📦' : '🏗️'}</span>
-        <span class="m-fam-tx"><b>${e(x[0])}</b><small>${appN(n)} req. · ${appN(x[1].length)} ítem${x[1].length === 1 ? '' : 's'}${fu ? ` · <em class="rojo">${appN(fu)} fuera de meta</em>` : ''} · <em class="${x[1][0].d > meta ? 'ambar' : ''}">más reciente: ${x[1][0].d} d.h.</em></small></span></button>`; }).join('')}</div>`; }
+    return tiles + cab + `<div class="m-sec-nota">${t[3]} · ${appN(L.length)} proyecto${L.length === 1 ? '' : 's'} · por cliente en orden alfabético · toca un proyecto para ver sus ítems</div>
+    <div class="m-fams">${L.map(function(x){ const p0 = x[1][0], id = p0.ipy && !/^SIN PROYECTO/i.test(p0.ipy) ? p0.ipy : ''; return { x:x, cli:appImpNombre(p0.pry) || 'Stock / sin proyecto', id:id }; })
+      // En orden alfabético por cliente y luego por PRY; cada tarjeta con el PRY y el nombre del proyecto, y el color de su cliente (20.10.2026, Piero).
+      .sort(function(a, b){ return a.cli.localeCompare(b.cli, 'es') || a.id.localeCompare(b.id, 'es'); }).map(function(o){ const x = o.x, n = new Set(x[1].map(function(p){ return p.req; })).size, fu = new Set(x[1].filter(function(p){ return p.d > meta; }).map(function(p){ return p.req; })).size, nomP = (pryInfo(o.id) || {}).n || '';
+        return `<button type="button" class="ini-card m-fam" data-aspry="${e(x[0])}" style="border-left:5px solid ${appColorFamilia(o.cli)}"><span class="m-fam-ic">${o.id ? '🏗️' : '📦'}</span>
+          <span class="m-fam-tx"><b>${e(o.cli)}</b><small><span class="mono">${e(o.id || 'Sin proyecto')}</span>${nomP ? ' · ' + e(polarCorta(nomP, 34)) : ''}<br>${appN(n)} req. · ${appN(x[1].length)} ítem${x[1].length === 1 ? '' : 's'}${fu ? ` · <em class="rojo">${appN(fu)} fuera de meta</em>` : ''} · <em class="${x[1][0].d > meta ? 'ambar' : ''}">más reciente: ${x[1][0].d} d.h.</em></small></span></button>`; }).join('')}</div>`; }
   const L1 = L.filter(function(x){ return x[0] === APP_AS.pry; });
   return tiles + cab + `<div class="ind-chips"><button type="button" data-aspry="">‹ Todos los proyectos</button><button type="button" class="on">${e(polarCorta(APP_AS.pry, 50))}</button></div>
     <div class="m-sec-nota">${t[3]} · el más reciente primero · toca un ítem para ver el detalle</div>
