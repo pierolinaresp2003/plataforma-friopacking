@@ -14725,24 +14725,26 @@ function appAlmSegHtml(){
 // Req. por pasar a pedido como lista general, igual que "Pedidos sin OC" de Compras (20.10.2026, Piero: "que sea lista general así
 // como en compras"): una fila por ítem, agrupadas por proyecto (cliente · PRY), primero el proyecto con el req. más antiguo y dentro
 // el más antiguo primero. Color según la meta del Indicador 1. Toca una fila para ver el requerimiento.
-// Separados en 3 (20.10.2026, Piero): lo que se atiende del stock de Lurín (el libre por orden de llegada alcanza), lo que hay
-// que revisar en otra sede (Lurín no alcanza, pero Ica o Trujillo tienen) y lo que hay que pasar a pedido (no hay en ninguna).
+// Separados en 4 (20.10.2026, Piero): 1) stock actual en Lurín (el libre por orden de llegada alcanza); 2) en camino a Lurín (lo que
+// falta lo cubre una OC que ya viene, como las importaciones); 3) stock en otra sede (Ica o Trujillo); 4) no hay: va a compra.
 function almReqPedHtml(pend0){
-  const meta = (INDICATORS.find(function(i){ return i.key === 'd1'; }) || {}).meta || 2, e = escapeHtml, G = new Map(), C = { stock:[], pedido:[], sede:[] };
+  const meta = (INDICATORS.find(function(i){ return i.key === 'd1'; }) || {}).meta || 2, e = escapeHtml, G = new Map(), C = { stock:[], camino:[], sede:[], pedido:[] };
   if(!pend0.length) return '<div class="ini-vacio">✅ No hay req. por atender.</div>';
-  pend0.forEach(function(p){ const lm = p.ln ? rqLimaLibre(p.ln) : null, st = p.ln ? rqStockDe(p.ln.idProducto) : null, otras = st ? (+st.ica || 0) + (+st.trujillo || 0) : 0;
-    p.lib = lm ? lm.libre : 0; p.st = st;
-    C[lm && lm.falta > 0 && lm.libre >= lm.falta - 0.001 ? 'stock' : otras > 0 ? 'sede' : 'pedido'].push(p); });
-  const T = { stock:['🟢', 'Atender desde stock', 'en', 'Lurín tiene stock libre que alcanza (por orden de llegada de los req.)'],
-    pedido:['🔵', 'Pasar a pedido', 'lu', 'No hay stock en Lurín ni en otra sede: hay que generar el pedido a Compras'],
-    sede:['🟠', 'Revisar otra sede', 'pd', 'Lurín no alcanza, pero hay stock en Ica o Trujillo: revisar si se atiende desde allá'] };
+  pend0.forEach(function(p){ const x = p.ln ? rqFifoDe(p.ln) : null, st = p.ln ? rqStockDe(p.ln.idProducto) : null, otras = st ? (+st.ica || 0) + (+st.trujillo || 0) : 0;
+    p.lib = x ? x.disp : 0; p.st = st; p.cam = x ? x.cam : [];
+    C[x && x.falta > 0 && x.asig >= x.falta - 0.001 ? 'stock' : x && x.falta > 0 && x.asig + x.camQ >= x.falta - 0.001 ? 'camino' : otras > 0 ? 'sede' : 'pedido'].push(p); });
+  const T = { stock:['🟢', 'Stock en Lurín', 'en', 'Lurín tiene stock libre que alcanza (por orden de llegada de los req.): se atiende de stock'],
+    camino:['🚢', 'En camino a Lurín', 'lu', 'Lurín no alcanza, pero lo que falta ya viene en una OC (importación u OC directa): esperar su llegada'],
+    sede:['🏬', 'Stock en otra sede', 'pd', 'Ni Lurín ni lo que viene alcanzan, pero hay stock en Ica o Trujillo: revisar si se atiende desde allá'],
+    pedido:['🛒', 'Para compra', 'vc', 'No hay stock en ninguna sede ni viene en camino: hay que pasarlo a pedido de compra'] };
   if(!T[APP_AS.rp]) APP_AS.rp = 'stock';
   const tile = function(k){ const n = new Set(C[k].map(function(p){ return p.req; })).size;
     return `<button type="button" class="pc-${T[k][2]}${APP_AS.rp === k ? ' sel' : ''}" data-asrp="${k}"><b>${appN(n)}</b><span>${T[k][1]} · ${appN(C[k].length)} ítems</span></button>`; };
-  const tiles = `<div class="m-resumen m-pl-tabs imp-tabs">${tile('stock')}${tile('pedido')}${tile('sede')}</div>`, pend = C[APP_AS.rp], t = T[APP_AS.rp];
+  const tiles = `<div class="m-resumen m-pl-tabs imp-tabs">${tile('stock')}${tile('camino')}${tile('sede')}${tile('pedido')}</div>`, pend = C[APP_AS.rp], t = T[APP_AS.rp];
   if(!pend.length) return tiles + `<div class="m-pl-tit"><span>${t[0]} ${t[1]}</span><b>0</b></div><div class="ini-vacio">✅ Nada en este grupo.</div>`;
   const stk = function(p){ const x = p.st, q = function(v){ return appN(v || 0, 2); };
-    return x ? '<br>📦 Lurín libre ' + q(p.lib) + (APP_AS.rp === 'stock' ? '' : ' · Ica ' + q(x.ica) + ' · Trujillo ' + q(x.trujillo)) : ''; };
+    const cam = p.cam.map(function(c){ const eta = c.y.lleg && c.y.lleg.eta; return (/^0002-/.test(c.y.oc) ? '🌎 ' : '') + 'OC ' + e(String(c.y.oc).replace(/^000\d-0*/, '')) + ' · ' + q(c.q) + (eta ? ' · llega ' + appDDMM(new Date(eta)) : ''); }).join(' / ');
+    return (x ? '<br>📦 Lurín libre ' + q(p.lib) + (APP_AS.rp === 'stock' || APP_AS.rp === 'camino' ? '' : ' · Ica ' + q(x.ica) + ' · Trujillo ' + q(x.trujillo)) : '') + (cam && APP_AS.rp === 'camino' ? '<br>🚢 ' + cam : ''); };
   pend.forEach(function(p){ const k = (appImpNombre(p.pry) || 'Stock / sin proyecto') + (p.ipy && !/^SIN PROYECTO/i.test(p.ipy) ? ' · ' + p.ipy : ''); if(!G.has(k)) G.set(k, []); G.get(k).push(p); });
   const L = [...G.entries()].map(function(x){ x[1].sort(function(a, b){ return b.d - a.d || String(a.req).localeCompare(String(b.req)); }); return x; }).sort(function(a, b){ return b[1][0].d - a[1][0].d || b[1].length - a[1].length; });
   const cls = function(d){ return d > meta ? 'rojo' : d === meta ? 'ambar' : 'verde'; }, reqs = new Set(pend.map(function(p){ return p.req; })), fuera = new Set(pend.filter(function(p){ return p.d > meta; }).map(function(p){ return p.req; }));
