@@ -14764,26 +14764,41 @@ function almReqPedHtml(pend0){
 // (cada OC se toca para ver su trazabilidad); en otra sede dónde y cuánto; para compra, que no hay en ninguna sede.
 const ALM_IT = { n:0, m:new Map() };
 function almItemDet(id){
-  const it = ALM_IT.m.get(String(id)); if(!it) return; const p = it.p, r = p.ln, x = rqFifoDe(r) || {}, st = p.st || {}, e = escapeHtml, um = e(x.um || p.um || '');
-  const q = function(v){ return appN(v || 0, 2) + ' ' + um; }, t = function(v, l){ return `<div><span>${l}</span><b>${v}</b></div>`; };
-  const G = { stock:['🟢 Stock en Lurín', 'Se atiende con el stock de Lurín'], camino:['🚢 En camino a Lurín', 'Lo que falta ya viene en camino'], sede:['🏬 Stock en otra sede', 'Revisar si se atiende desde otra sede'], pedido:['🛒 Para compra', 'No hay en ninguna sede ni viene en camino'] }[it.g] || ['', ''];
-  const sedes = `<div class="ini-card-tit">📦 Stock por sede</div><div class="m-tiles k4">${t(q(st.lima), 'Lurín (total)')}${t(q(x.disp), 'Lurín libre para este req.')}${t(q(st.ica), 'Ica')}${t(q(st.trujillo), 'Trujillo')}</div>`;
+  // Con el diseño de la Ficha del SKU de Compras (20.10.2026, Piero: "hazlo dinámico así como en otros módulos").
+  const it = ALM_IT.m.get(String(id)); if(!it) return; const p = it.p, r = p.ln, x = rqFifoDe(r) || {}, e = escapeHtml, cod = r.idProducto || '';
+  const st = appSkuStock(cod), um = e(x.um || p.um || ''), n = function(v){ return appN(Math.round((v || 0) * 100) / 100); };
+  const tile = function(t, v, cls){ return `<div class="${cls || ''}"><span>${t}</span><b>${v}</b></div>`; }, fila2 = function(l, v){ return v ? `<div><span>${l}</span><b>${v}</b></div>` : ''; };
+  const G = { stock:['🟢', 'Se atiende con stock de Lurín'], camino:['🚢', 'En camino a Lurín'], sede:['🏬', 'Hay stock en otra sede'], pedido:['🛒', 'Para compra'] }[it.g] || ['', ''];
+  const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', pInfo = pryInfo(pryId) || {};
+  const falta = x.falta != null ? x.falta : (p.q || 0), ok = function(v){ return (v || 0) >= falta - 0.001; };
   let bloque = '';
-  if(it.g === 'stock') bloque = `<div class="ini-card-tit">🟢 Lurín</div><div class="m-tiles k4">${t(q(x.lima), 'Stock en Lurín')}${t(q(x.antes), 'Ya tomado por req. anteriores')}${t(q(x.disp), 'Libre')}${t(q(x.asig), 'Le toca a este req.')}</div>
-      <div class="av-nota">El stock se reparte por orden de llegada de los requerimientos: este req. alcanza a cubrir lo que falta (${q(x.falta)}).</div>`;
-  else if(it.g === 'camino') bloque = `<div class="ini-card-tit">🚢 OC que lo traen</div><div class="ini-card m-lista">${(x.cam || []).map(function(c){ const y = c.y, l = y.lleg || {};
-      return appFilaHtml('data-oc="' + e(y.oc) + '"', l.est && l.est[0] === 'tarde' ? 'rojo' : '', (/^0002-/.test(y.oc) ? '🌎 ' : '') + (appImpNombre(y.prov) || 'OC ' + y.oc),
-        'OC ' + e(y.oc) + (l.est ? ' · ' + e(l.est[1]) : '') + '<br>Viene ' + e(appN(y.q, 2) + ' ' + (y.um || '')) + ' sin requerimiento · para este req. ' + q(c.q),
-        l.etaTxt ? 'llega ' + e(l.etaTxt) : '—', 'toca para ver la OC'); }).join('')}</div>
-      <div class="av-nota">Lurín tiene ${q(x.disp)} libres para este req. y lo que falta lo cubre${(x.cam || []).length > 1 ? 'n estas OC' : ' esta OC'} (por orden de llegada).</div>`;
-  else if(it.g === 'sede'){ const f = x.falta || p.q || 0, ok = function(v){ return (v || 0) >= f - 0.001; };
-    bloque = `<div class="ini-card-tit">🏬 Dónde hay</div><div class="m-tiles">${t(q(st.ica) + (ok(st.ica) ? ' ✅ alcanza' : ''), 'Ica')}${t(q(st.trujillo) + (ok(st.trujillo) ? ' ✅ alcanza' : ''), 'Trujillo')}</div>
-      <div class="av-nota">Faltan ${q(f)} y Lurín solo tiene ${q(x.disp)} libres: coordinar el traslado desde ${[(st.ica || 0) > 0 ? 'Ica' : '', (st.trujillo || 0) > 0 ? 'Trujillo' : ''].filter(Boolean).join(' o ')}.</div>`; }
-  else bloque = `<div class="av-nota">Faltan ${q(x.falta || p.q)}: no hay stock libre en Lurín, Ica ni Trujillo, ni viene en una OC sin requerimiento. Hay que pasarlo a pedido de compra.</div>`;
-  appListaAbrir(e(G[0]), e(G[1]), `<div class="ini-card"><div class="ini-card-tit">${e(p.pr || '—')}</div>
-      <div class="m-tiles k4">${t(e(String(r.idProducto || '—')), 'Código')}${t(q(x.falta || p.q), 'Falta atender')}${t(p.d + ' d.h.', 'Esperando')}${t(e(appImpNombre(p.pry) || 'Stock / sin proyecto'), 'Cliente')}</div>
-      ${bloque}${sedes}
-      <button type="button" class="ix-btn" data-ocreq="${e(p.req)}">📋 Ver el requerimiento ${e(String(p.req).replace(/^0001-0*/, ''))}${p.sol ? ' · ' + e(polarCorta(p.sol, 30)) : ''}</button></div>`);
+  if(it.g === 'stock') bloque = `<div class="ini-card"><div class="ini-card-tit">🟢 Stock en Lurín</div>
+      <div class="m-tiles sku-stock">${tile('En Lurín', n(x.lima) + ' ' + um, 'ok')}${tile('Ya de req. anteriores', n(x.antes) + ' ' + um)}${tile('Libre', n(x.disp) + ' ' + um, x.disp ? 'ok' : '')}${tile('Le toca a este req.', n(x.asig) + ' ' + um, 'ok')}</div>
+      <small class="sku-nota">El stock se reparte por orden de llegada de los requerimientos: alcanza para lo que falta (${n(falta)} ${um}). Se puede despachar.</small></div>`;
+  else if(it.g === 'camino') bloque = `<div class="ini-card"><div class="ini-card-tit">🚢 OC que lo traen · trazabilidad</div>
+      ${(x.cam || []).map(function(c){ const y = c.y, l = y.lleg || {}, imp = /^0002-/.test(y.oc), ii = imp ? (ocImportInfo(y.oc) || {}) : {};
+        const paso = imp ? (ii.etd ? '🚢 Zarpó el ' + appDDMM(ii.etd) : ii.fReal ? '📦 Lista en fábrica desde ' + appDDMM(ii.fReal) + ' · por zarpar' : '🏭 En fabricación') : '🚚 Compra nacional';
+        return `<div class="sku-dl">${fila2('OC', `<button type="button" class="m-link mono" data-oc="${e(y.oc)}">${e(y.oc)}</button>${imp ? ' 🌎 importación' : ''}`)}${fila2('Proveedor', e(appImpNombre(y.prov) || '—'))}
+          ${fila2('Estado', `${e(paso)} · <span class="asis-est ${e(l.est ? l.est[0] : '')}">${e(l.est ? l.est[1] : '')}</span>`)}${fila2('Llega a Lurín', e(l.etaTxt || 'por definir'))}
+          ${fila2('Para este req.', n(c.q) + ' ' + um + ' de ' + n(y.q) + ' que vienen sin requerimiento')}</div>`; }).join('<hr style="border:0;border-top:2px dashed var(--border);margin:6px 0">')}
+      <small class="sku-nota">Toca la OC para ver su trazabilidad completa. Lo que viene sin requerimiento se reparte por orden de llegada de los req.</small></div>`;
+  else if(it.g === 'sede') bloque = `<div class="ini-card"><div class="ini-card-tit">🏬 Dónde hay</div>
+      <div class="m-tiles sku-stock">${tile('Ica', n(st.ica) + ' ' + um + (ok(st.ica) ? ' · alcanza' : ''), st.ica ? 'ok' : '')}${tile('Trujillo', n(st.trujillo) + ' ' + um + (ok(st.trujillo) ? ' · alcanza' : ''), st.trujillo ? 'ok' : '')}</div>
+      <small class="sku-nota">Faltan ${n(falta)} ${um} y Lurín solo tiene ${n(x.disp)} libres: coordinar el traslado desde ${[(st.ica || 0) > 0 ? 'Ica' : '', (st.trujillo || 0) > 0 ? 'Trujillo' : ''].filter(Boolean).join(' o ')}${ok(st.ica) || ok(st.trujillo) ? '' : ' (no alcanza para todo)'}.</small></div>`;
+  else bloque = `<div class="ini-card"><div class="ini-card-tit">🛒 Para compra</div><small class="sku-nota">Faltan ${n(falta)} ${um}: no hay stock libre en Lurín, Ica ni Trujillo, ni viene en una OC sin requerimiento. Hay que pasarlo a pedido de compra.</small></div>`;
+  const cuerpo = `<div class="oc-hero"><div class="oc-num"><b>${e(p.pr || cod)}</b></div>
+      <small><span class="mono">${e(cod)}</span> · ${e(r.familia || 'Sin familia')}</small>
+      <div class="sku-estado"><b>${n(falta)} ${um}</b><span class="${p.d > 2 ? 'rojo' : p.d === 2 ? 'ambar' : ''}">${G[0]} ${e(G[1])}${r.fReq ? ' · req. del ' + appDDMM(r.fReq) + ' · ' + p.d + ' d.h.' : ''}</span></div></div>
+    ${rqCobHtml(r)}
+    ${bloque}
+    <div class="ini-card"><div class="ini-card-tit">🏬 Stock en sedes</div>
+      <div class="m-tiles sku-stock">${tile('Lurín', n(st.lima) + ' ' + um, st.lima ? 'ok' : '')}${tile('Ica', n(st.ica) + ' ' + um, st.ica ? 'ok' : '')}${tile('Trujillo', n(st.trujillo) + ' ' + um, st.trujillo ? 'ok' : '')}${tile('En tránsito', n(st.transito) + ' ' + um, st.transito ? 'ok' : '')}</div></div>
+    <div class="ini-card"><div class="ini-card-tit">📋 Requerimiento</div><div class="sku-dl">
+      ${fila2('Requerimiento', `<button type="button" class="m-link mono" data-ocreq="${e(p.req)}">${e(String(p.req).replace(/^000\d-0*/, ''))}</button>`)}
+      ${fila2('Cliente', e(appImpNombre(p.pry) || 'Stock / sin proyecto'))}${fila2('Proyecto', pryId ? '<span class="mono">' + e(pryId) + '</span>' + (pInfo.n ? ' · ' + e(pInfo.n) : '') : '')}
+      ${fila2('Solicitó', e(p.sol || ''))}${fila2('Observación', r.obs ? '<i>' + e(r.obs) + '</i>' : '')}</div></div>`;
+  appListaAbrir(G[0] + ' ' + e(G[1]), e(cod) + ' · Req. ' + e(String(p.req).replace(/^000\d-0*/, '')), cuerpo);
+  document.getElementById('appOC').classList.add('ancho');
 }
 // Registro de los req. que cada uno pasó a pedido (20.10.2026, Piero: "a ellos se les debe medir también por los req que pasan
 // a pedido", como a los compradores por sus OC). Sale de las líneas del Indicador 1 (fecha del req. → fecha del pedido, meta
