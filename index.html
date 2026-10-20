@@ -14702,7 +14702,7 @@ function appComprasHtml(){
 // el diseño igual y la idea igual"). Caras arriba (en la web junto al año, mes, cliente y el ícono de descarga); con una
 // persona: su reporte (Javier el análisis semanal; Katherine y Marycarmen recepción y despacho) al pedir el detalle y sus
 // pendientes; en "Todos": los tiempos de Almacén y los pendientes de todos. El período de los reportes es el de la barra.
-const APP_AS = { persona:'', det:false, rp:'stock' };
+const APP_AS = { persona:'', det:false, rp:'stock', pry:'' };
 function appAlmSegHtml(){
   const cod = APP_AS.persona || '', e = escapeHtml, st = APP_F.indicadores, r = appFRango(st), jav = cod === 'JCENTENO';
   const corte = isoDay(appIndCorte());   // hasta la fecha de corte: hay guías con fechas mal digitadas (año 2100)
@@ -14753,9 +14753,18 @@ function almReqPedHtml(pend0){
     return appFilaHtml(id ? 'data-asit="' + id + '"' : 'data-ocreq="' + e(p.req) + '"', cls(p.d), p.pr || '—',
     'Req. ' + e(String(p.req).replace(/^0001-0*/, '')) + (p.fr ? ' · del ' + e(appDDMM(p.fr)) : '') + (p.sol ? '<br>👷 ' + e(polarCorta(p.sol, 36)) : '') + stk(p),
     p.q != null ? appN(p.q, 2) + ' ' + e(p.um) : '—', p.d + ' d.h.'); };
-  return tiles + `<div class="m-pl-tit"><span>${t[0]} ${t[1]}</span><b>${appN(reqs.size)} req. · ${appN(pend.length)} ítems</b></div>
-    <div class="m-sec-nota">${t[3]} · ${appN(fuera.size)} req. llevan más de ${meta} días hábiles (meta) · por proyecto, el más reciente primero · toca un ítem para ver el detalle</div>
-    <div class="sku-lista">${L.map(function(x){ const n = new Set(x[1].map(function(p){ return p.req; })).size, v = x[1][x[1].length - 1].d;
+  // Primero una tarjeta por proyecto con sus pendientes, como las familias de Inventario (20.10.2026, Piero); al tocar una se
+  // ven sus ítems. Del proyecto con el req. más reciente al más antiguo.
+  const cab = `<div class="m-pl-tit"><span>${t[0]} ${t[1]}</span><b>${appN(reqs.size)} req. · ${appN(pend.length)} ítems</b></div>`;
+  if(!APP_AS.pry || !G.has(APP_AS.pry)){ APP_AS.pry = '';
+    return tiles + cab + `<div class="m-sec-nota">${t[3]} · ${appN(L.length)} proyecto${L.length === 1 ? '' : 's'} · el más reciente primero · toca uno para ver sus ítems</div>
+    <div class="m-fams">${L.map(function(x){ const n = new Set(x[1].map(function(p){ return p.req; })).size, fu = new Set(x[1].filter(function(p){ return p.d > meta; }).map(function(p){ return p.req; })).size;
+      return `<button type="button" class="ini-card m-fam" data-aspry="${e(x[0])}" style="border-left:4px solid ${appColorFamilia(x[0])}"><span class="m-fam-ic">${/^Stock|^SIN PROYECTO/i.test(x[0]) ? '📦' : '🏗️'}</span>
+        <span class="m-fam-tx"><b>${e(x[0])}</b><small>${appN(n)} req. · ${appN(x[1].length)} ítem${x[1].length === 1 ? '' : 's'}${fu ? ` · <em class="rojo">${appN(fu)} fuera de meta</em>` : ''} · <em class="${x[1][0].d > meta ? 'ambar' : ''}">más reciente: ${x[1][0].d} d.h.</em></small></span></button>`; }).join('')}</div>`; }
+  const L1 = L.filter(function(x){ return x[0] === APP_AS.pry; });
+  return tiles + cab + `<div class="ind-chips"><button type="button" data-aspry="">‹ Todos los proyectos</button><button type="button" class="on">${e(polarCorta(APP_AS.pry, 50))}</button></div>
+    <div class="m-sec-nota">${t[3]} · el más reciente primero · toca un ítem para ver el detalle</div>
+    <div class="sku-lista">${L1.map(function(x){ const n = new Set(x[1].map(function(p){ return p.req; })).size, v = x[1][x[1].length - 1].d;
       return `<details class="sku-grupo" open style="--fam:${appColorFamilia(x[0])}"><summary><i></i><span>${e(x[0])}</span>
         <small>${n} req. · ${x[1].length} ítem${x[1].length === 1 ? '' : 's'} · <em class="sku-prio ${cls(v)}">el más antiguo: ${v} d.h.</em></small><b>${x[1].length}</b></summary>
         <div class="sku-filas">${x[1].map(fila).join('')}</div></details>`; }).join('')}</div>`;
@@ -19182,7 +19191,8 @@ function appClickInicio(e){
   if(b.dataset.pcper != null){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
   if(b.dataset.asper != null){ APP_AS.persona = b.dataset.asper; return appRenderInicio(); }
   if(b.dataset.asdet){ APP_AS.det = !APP_AS.det; return appRenderInicio(); }
-  if(b.dataset.asrp){ APP_AS.rp = b.dataset.asrp; return appRenderInicio(); }
+  if(b.dataset.asrp){ APP_AS.rp = b.dataset.asrp; APP_AS.pry = ''; return appRenderInicio(); }
+  if(b.dataset.aspry != null){ APP_AS.pry = b.dataset.aspry; appRenderInicio(); return window.scrollTo(0, document.querySelector('.imp-tabs') ? document.querySelector('.imp-tabs').getBoundingClientRect().top + window.scrollY - 90 : 0); }
   if(b.dataset.asit) return almItemDet(b.dataset.asit);
   if(b.dataset.repsec){ APP_REP.sec = b.dataset.repsec; return appRenderInicio(); }
   if(b.dataset.pfocs) return appPfLista(b.dataset.pfocs);
