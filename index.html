@@ -9756,7 +9756,7 @@ const PEDIDOS_CERRADOS_MANUAL = new Set([
 // ResponsablePedido viene como nombre ("Melissa Sihuairo") y UsuarioCompras como código ("MSIHUAIRO").
 // La regla de Nisira es inicial del nombre + apellido, así que se deriva sola; el sufijo "(solo paso)"
 // se ignora y los casos que no siguen la regla van en la tabla de excepciones.
-const RESP_PEDIDO_USUARIO = { 'MANUEL': 'MLUJAN' };
+const RESP_PEDIDO_USUARIO = { 'MANUEL': 'MLUJAN', 'MARY CONDORI CARDENAS': 'MCONDORI' };   // así viene en PedidoSinReq (20.10.2026)
 function usuarioDeResponsablePedido(nombre){
   const n = sinAcentos(String(nombre||'')).toUpperCase().replace(/\(.*?\)/g,'').trim();
   if(!n) return '';
@@ -14711,12 +14711,33 @@ function appAlmSegHtml(){
   const caras = `<div class="m-filtros pc-per">${appCarasHtml('asper', cod, APP_DAILY_ALMACEN.map(function(c){ return [c, c]; }))}</div>`;
   const baja = cod && hayMov ? `<button type="button" class="pc-img-btn cmp-baja" data-${jav ? 'anaimg' : 'arimg'}="1" title="Descargar el reporte de ${e(PD_PERSONAS[cod])} (según el período elegido)" aria-label="Descargar reporte">${APP_ICO_BAJA}</button>` : '';
   const D = appDailyAlmDatos(isoDay(new Date())), P = {}; D.todos.forEach(function(x){ P[x.cod] = x; });
-  const pend = (cod ? [cod] : ['JCENTENO', 'KALBUJAR']).map(function(c){ return almPendCard(P[c], appDailyColor(c)); }).join('');
+  // Javier y Marycarmen: los req. por pasar a pedido en lista, como los pendientes de Compras (20.10.2026, Piero).
+  const pend = cod === 'JCENTENO' || cod === 'MCONDORI' ? almReqPedHtml(P.JCENTENO.pend) + (cod === 'MCONDORI' ? almPendCard(P[cod], appDailyColor(cod)) : '')
+    : (cod ? [cod] : ['JCENTENO', 'KALBUJAR']).map(function(c){ return almPendCard(P[c], appDailyColor(c)); }).join('');
   return `<div class="cmp-top">${caras}${appFBarra('indicadores', { pry:1 })}${baja}</div>`
     + (cod ? `<button type="button" class="cmp-det${APP_AS.det ? ' on' : ''}" data-asdet="1">${APP_AS.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom)}</button>${APP_AS.det ? (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` : '') + appAlmRepCuerpo() : ''}`
         : (gerAbierto ? appIndicadoresHtml(true) : ''))
     + appSecHtml('📝', 'Pedidos generados', 'req → pedido · ' + e(appFLabel(Object.assign({}, st, { persona:'' }))), almPedRegHtml(cod, st))
     + appSecHtml('⏳', 'Pendientes de Almacén', cod ? e(PD_PERSONAS[cod]) : 'Todo el equipo', pend);
+}
+// Req. por pasar a pedido como lista general, igual que "Pedidos sin OC" de Compras (20.10.2026, Piero: "que sea lista general así
+// como en compras"): una fila por ítem, agrupadas por proyecto (cliente · PRY), primero el proyecto con el req. más antiguo y dentro
+// el más antiguo primero. Color según la meta del Indicador 1. Toca una fila para ver el requerimiento.
+function almReqPedHtml(pend){
+  const meta = (INDICATORS.find(function(i){ return i.key === 'd1'; }) || {}).meta || 2, e = escapeHtml, G = new Map();
+  if(!pend.length) return '<div class="ini-vacio">✅ No hay req. por pasar a pedido.</div>';
+  pend.forEach(function(p){ const k = (appImpNombre(p.pry) || 'Stock / sin proyecto') + (p.ipy && !/^SIN PROYECTO/i.test(p.ipy) ? ' · ' + p.ipy : ''); if(!G.has(k)) G.set(k, []); G.get(k).push(p); });
+  const L = [...G.entries()].map(function(x){ x[1].sort(function(a, b){ return b.d - a.d || String(a.req).localeCompare(String(b.req)); }); return x; }).sort(function(a, b){ return b[1][0].d - a[1][0].d || b[1].length - a[1].length; });
+  const cls = function(d){ return d > meta ? 'rojo' : d === meta ? 'ambar' : 'verde'; }, reqs = new Set(pend.map(function(p){ return p.req; })), fuera = new Set(pend.filter(function(p){ return p.d > meta; }).map(function(p){ return p.req; }));
+  const fila = function(p){ return appFilaHtml('data-ocreq="' + e(p.req) + '"', cls(p.d), p.pr || '—',
+    'Req. ' + e(String(p.req).replace(/^0001-0*/, '')) + (p.fr ? ' · del ' + e(appDDMM(p.fr)) : '') + (p.sol ? '<br>👷 ' + e(polarCorta(p.sol, 36)) : ''),
+    p.q != null ? appN(p.q, 2) + ' ' + e(p.um) : '—', p.d + ' d.h.'); };
+  return `<div class="m-pl-tit"><span>📝 Req. por pasar a pedido</span><b>${appN(reqs.size)} req. · ${appN(pend.length)} ítems</b></div>
+    <div class="m-sec-nota">${appN(fuera.size)} req. llevan más de ${meta} días hábiles (meta) · por proyecto, el más antiguo primero · toca una fila para ver el req.</div>
+    <div class="sku-lista">${L.map(function(x){ const n = new Set(x[1].map(function(p){ return p.req; })).size, v = x[1][0].d;
+      return `<details class="sku-grupo" open style="--fam:${appColorFamilia(x[0])}"><summary><i></i><span>${e(x[0])}</span>
+        <small>${n} req. · ${x[1].length} ítem${x[1].length === 1 ? '' : 's'} · <em class="sku-prio ${cls(v)}">el más antiguo: ${v} d.h.</em></small><b>${x[1].length}</b></summary>
+        <div class="sku-filas">${x[1].map(fila).join('')}</div></details>`; }).join('')}</div>`;
 }
 // Registro de los req. que cada uno pasó a pedido (20.10.2026, Piero: "a ellos se les debe medir también por los req que pasan
 // a pedido", como a los compradores por sus OC). Sale de las líneas del Indicador 1 (fecha del req. → fecha del pedido, meta
@@ -14727,35 +14748,43 @@ function almPedReg(st){
     const pf = appFPry(st.pry), meta = (INDICATORS.find(function(i){ return i.key === 'd1'; }) || {}).meta || 2, P = new Map();
     ((DATA && DATA.procesoRows) || []).forEach(function(x){
       const fp = isoDay(x.fPedido); if(x.d1 == null || !x.codPedido || !fp || fp < d0 || fp > d1 || (pf && !pf(x))) return;
-      const c = pdPersona(x.responsableD1) || 'JCENTENO', y = P.get(c) || { cod:c, ped:new Map(), n:0, ok:0, dias:0 };
+      const c = pdPersona(x.responsableD1) || 'JCENTENO', y = P.get(c) || { cod:c, ped:new Map(), dir:new Map(), n:0, ok:0, dias:0 };
       const g = y.ped.get(x.codPedido) || { cp:x.codPedido, req:x.codRequerimiento || '', pry:x.proyecto || '', fr:x.fReq, fp:fp, d:0, n:0 };
       g.n++; g.d = Math.max(g.d, x.d1); y.ped.set(x.codPedido, g); y.n++; y.dias += x.d1; if(x.d1 <= meta) y.ok++; P.set(c, y); });
+    // Pedidos directos (PedidoSinReq, sin requerimiento): cuentan como generados por quien figura en la columna F; no tienen
+    // tiempo req → pedido que medir (20.10.2026, Piero).
+    (PEDIDO_SIN_REQ_ROWS || []).concat(PEDIDO_SIN_REQ_PEND || []).forEach(function(x){
+      const fp = isoDay(x.fPedido); if(!x.codPedido || !fp || fp < d0 || fp > d1 || (pf && !pf(x)) || psrRepetida(x)) return;
+      const c = pdPersona(x.responsablePedido); if(!c) return;
+      const y = P.get(c) || { cod:c, ped:new Map(), dir:new Map(), n:0, ok:0, dias:0 }, g = y.dir.get(x.codPedido) || { cp:x.codPedido, fp:fp, sku:new Set(), directo:true };
+      g.sku.add(x.idProducto || x.producto || ''); y.dir.set(x.codPedido, g); P.set(c, y); });
     return { meta:meta, P:P };
   });
 }
 function almPedRegHtml(cod, st){
   const R = almPedReg(st), e = escapeHtml, pct = function(y){ return y.n ? Math.round(y.ok / y.n * 100) : null; }, prom = function(y){ return y.n ? (y.dias / y.n).toFixed(1) : '—'; };
   const k = function(v, t, cls){ return `<div class="${cls || ''}"><b>${v}</b><span>${t}</span></div>`; };
-  const kpis = function(y){ const p = pct(y); return `<div class="ix-kpis cuatro">${k(appN(y.ped.size), 'Pedidos generados', 'ac')}${k(appN(y.n), 'Ítems')}${k(p == null ? '—' : p + '%', 'A tiempo (≤ ' + R.meta + ' d.h.)')}${k(prom(y), 'Días háb. promedio')}</div>`; };
-  const vacio = { ped:new Map(), n:0, ok:0, dias:0 };
+  const kpis = function(y){ const p = pct(y); return `<div class="ix-kpis cuatro">${k(appN(y.ped.size + y.dir.size), 'Pedidos generados' + (y.dir.size ? ' · ' + appN(y.dir.size) + ' directo' + (y.dir.size === 1 ? '' : 's') : ''), 'ac')}${k(appN(y.n), 'Ítems')}${k(p == null ? '—' : p + '%', 'A tiempo (≤ ' + R.meta + ' d.h.)')}${k(prom(y), 'Días háb. promedio')}</div>`; };
+  const vacio = { ped:new Map(), dir:new Map(), n:0, ok:0, dias:0 }, tPed = function(y){ return y.ped.size + y.dir.size; };
   if(!cod){   // Todos: el equipo de Almacén lado a lado (y quien más haya generado pedidos, al final)
     const L = APP_DAILY_ALMACEN.map(function(c){ return R.P.get(c) || Object.assign({ cod:c }, vacio); })
-      .concat([...R.P.values()].filter(function(y){ return APP_DAILY_ALMACEN.indexOf(y.cod) === -1; })).sort(function(a, b){ return b.ped.size - a.ped.size; });
-    const tot = L.reduce(function(a, y){ a.ped += y.ped.size; a.n += y.n; a.ok += y.ok; a.dias += y.dias; return a; }, { ped:0, n:0, ok:0, dias:0 });
-    const max = Math.max.apply(null, L.map(function(y){ return y.ped.size; }).concat([1]));
-    return `<div class="ini-card ix">${kpis({ ped:{ size:tot.ped }, n:tot.n, ok:tot.ok, dias:tot.dias })}
+      .concat([...R.P.values()].filter(function(y){ return APP_DAILY_ALMACEN.indexOf(y.cod) === -1 && y.ped.size; })).sort(function(a, b){ return tPed(b) - tPed(a); });
+    const tot = L.reduce(function(a, y){ a.ped += y.ped.size; a.dir += y.dir.size; a.n += y.n; a.ok += y.ok; a.dias += y.dias; return a; }, { ped:0, dir:0, n:0, ok:0, dias:0 });
+    const max = Math.max.apply(null, L.map(tPed).concat([1]));
+    return `<div class="ini-card ix">${kpis({ ped:{ size:tot.ped }, dir:{ size:tot.dir }, n:tot.n, ok:tot.ok, dias:tot.dias })}
       <div class="ix-rank alm"><div class="ix-rh"><span></span><span>Persona</span><span>Pedidos</span><span>Ítems</span><span>A tiempo</span><span>% a tiempo</span><span>Días prom.</span></div>${L.map(function(y, i){ const p = pct(y), al = APP_DAILY_ALMACEN.indexOf(y.cod) !== -1;
-        return `<div class="ix-r"${al ? ` data-clic="1" data-asper="${e(y.cod)}"` : ''}><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${e(PD_PERSONAS[y.cod] || y.cod)}</b><i><em style="width:${(y.ped.size / max * 100).toFixed(1)}%"></em></i></span><span>${appN(y.ped.size)}</span><span>${appN(y.n)}</span><span>${appN(y.ok)}</span><span>${p == null ? '—' : p + '%'}</span><b>${prom(y)}</b></div>`; }).join('')}</div></div>`;
+        return `<div class="ix-r"${al ? ` data-clic="1" data-asper="${e(y.cod)}"` : ''}><span class="n">${['🥇','🥈','🥉'][i] || (i + 1)}</span><span class="t"><b>${e(PD_PERSONAS[y.cod] || y.cod)}</b><i><em style="width:${(tPed(y) / max * 100).toFixed(1)}%"></em></i></span><span title="${appN(y.dir.size)} directos">${appN(tPed(y))}</span><span>${appN(y.n)}</span><span>${appN(y.ok)}</span><span>${p == null ? '—' : p + '%'}</span><b>${prom(y)}</b></div>`; }).join('')}</div></div>`;
   }
-  const y = R.P.get(cod) || Object.assign({ cod:cod }, vacio), L = [...y.ped.values()].sort(function(a, b){ return a.fp < b.fp ? 1 : a.fp > b.fp ? -1 : b.d - a.d; });
+  const y = R.P.get(cod) || Object.assign({ cod:cod }, vacio), L = [...y.ped.values()].concat([...y.dir.values()]).sort(function(a, b){ return a.fp < b.fp ? 1 : a.fp > b.fp ? -1 : b.d - a.d; });
   if(!L.length) return `<div class="ini-card ix">${kpis(y)}<div class="ini-vacio">No generó pedidos en este período.</div></div>`;
   // Por semana si el período es corto; si no, por mes. La barra es la cantidad de pedidos; el color, el % a tiempo.
   const corto = (new Date(L[0].fp) - new Date(L[L.length - 1].fp)) < 62 * 864e5, B = new Map();
-  L.forEach(function(g){ const kk = corto ? isoDay(isoWeekStart(new Date(g.fp + 'T00:00:00Z'))) : g.fp.slice(0, 7), b = B.get(kk) || { n:0, ok:0 }; b.n++; if(g.d <= R.meta) b.ok++; B.set(kk, b); });
+  L.forEach(function(g){ const kk = corto ? isoDay(isoWeekStart(new Date(g.fp + 'T00:00:00Z'))) : g.fp.slice(0, 7), b = B.get(kk) || { n:0, m:0, ok:0 }; b.n++; if(!g.directo){ b.m++; if(g.d <= R.meta) b.ok++; } B.set(kk, b); });
   const ks = [...B.keys()].sort().slice(-12), maxB = Math.max.apply(null, ks.map(function(kk){ return B.get(kk).n; }).concat([1]));
-  const tend = `<div class="ind-sub">Pedidos por ${corto ? 'semana' : 'mes'} · color = % a tiempo</div><div class="ind-tend" style="grid-template-columns:repeat(${ks.length},1fr)">${ks.map(function(kk){ const b = B.get(kk), p = Math.round(b.ok / b.n * 100);
-    return `<div class="ind-t" title="${p}% a tiempo"><i><em class="${appIndClase(p)}" style="height:${Math.max(4, b.n / maxB * 100).toFixed(0)}%"></em></i><b>${b.n}</b><small>${corto ? almFechaCorta(kk) : MESES_CORTOS[+kk.slice(5) - 1]}</small></div>`; }).join('')}</div>`;
+  const tend = `<div class="ind-sub">Pedidos por ${corto ? 'semana' : 'mes'} · color = % a tiempo</div><div class="ind-tend" style="grid-template-columns:repeat(${ks.length},1fr)">${ks.map(function(kk){ const b = B.get(kk), p = b.m ? Math.round(b.ok / b.m * 100) : null;
+    return `<div class="ind-t" title="${p == null ? 'solo pedidos directos' : p + '% a tiempo'}"><i><em class="${appIndClase(p)}" style="height:${Math.max(4, b.n / maxB * 100).toFixed(0)}%"></em></i><b>${b.n}</b><small>${corto ? almFechaCorta(kk) : MESES_CORTOS[+kk.slice(5) - 1]}</small></div>`; }).join('')}</div>`;
   const tope = 30, filas = L.slice(0, tope).map(function(g){ const t = g.d <= R.meta;
+    if(g.directo) return appFilaHtml(`data-q="pedido ${e(g.cp)}"`, '', 'Pedido ' + g.cp.replace(/^0001-0*/, '') + ' · pedido directo', 'sin requerimiento · ' + e(rqFecha(new Date(g.fp + 'T12:00:00Z'))) + ' · ' + g.sku.size + ' ítem' + (g.sku.size === 1 ? '' : 's'), 'directo', 'sin req.');
     return appFilaHtml(`data-q="pedido ${e(g.cp)}"`, t ? '' : 'rojo', 'Pedido ' + g.cp.replace(/^0001-0*/, '') + ' · ' + polarCorta(appImpNombre(g.pry) || 'Sin cliente', 34),
       'req ' + e(String(g.req).replace(/^0001-0*/, '')) + ' · ' + e(g.fr ? rqFecha(g.fr) : '—') + ' → ' + e(rqFecha(new Date(g.fp + 'T12:00:00Z'))) + ' · ' + g.n + ' ítem' + (g.n === 1 ? '' : 's'),
       g.d + ' d.h.', t ? 'a tiempo' : 'fuera de meta'); }).join('');
@@ -15115,7 +15144,7 @@ function appDailyAlmDatos(dia){
       const X = r.codPedido && fp === dia ? P[pedCreador(r.codPedido)] : null;   // a quien generó el pedido
       if(X){ const g = X.ped.get(r.codPedido) || { k:r.codPedido, req:r.codRequerimiento || '', pry:r.proyecto || '', n:0, pr:[] }; g.n++; g.pr.push(r.producto || ''); X.ped.set(r.codPedido, g); X.items++; }
       // Para el daily: al cierre de ese día, req. todavía sin pedido ni salida (Javier) y lo que ya llegó y no sale a obra (Katherine y Marycarmen).
-      if(fr && fr <= dia && fr >= desde && (!fp || fp > dia) && (!fs || fs > dia) && !r.codOrden) J.pend.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fReq) });
+      if(fr && fr <= dia && fr >= desde && (!fp || fp > dia) && (!fs || fs > dia) && !r.codOrden) J.pend.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fReq), fr:r.fReq, ipy:r.idProyecto || '', sol:r.responsable || '', q:r.cantidad, um:r.unidad || '' });
       if(fc && fc <= dia && fc >= desde && (!fs || fs > dia)) despachar.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fRecep) });
     });
     P.KALBUJAR.pend = despachar; P.MCONDORI.pend = despachar;
