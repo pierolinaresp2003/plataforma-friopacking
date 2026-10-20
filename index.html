@@ -14712,12 +14712,14 @@ function appAlmSegHtml(){
   const baja = cod && hayMov ? `<button type="button" class="pc-img-btn cmp-baja" data-${jav ? 'anaimg' : 'arimg'}="1" title="Descargar el reporte de ${e(PD_PERSONAS[cod])} (según el período elegido)" aria-label="Descargar reporte">${APP_ICO_BAJA}</button>` : '';
   const D = appDailyAlmDatos(isoDay(new Date())), P = {}; D.todos.forEach(function(x){ P[x.cod] = x; });
   // Javier y Marycarmen: los req. por pasar a pedido en lista, como los pendientes de Compras (20.10.2026, Piero).
+  // Con una persona, sus pedidos generados van dentro del "detalle completo" y arriba quedan sus pendientes, como en Compras (20.10.2026, Piero).
+  const regPed = appSecHtml('📝', 'Pedidos generados', 'req → pedido · ' + e(appFLabel(Object.assign({}, st, { persona:'' }))), almPedRegHtml(cod, st));
   const pend = cod === 'JCENTENO' || cod === 'MCONDORI' ? almReqPedHtml(P.JCENTENO.pend) + (cod === 'MCONDORI' ? almPendCard(P[cod], appDailyColor(cod)) : '')
     : (cod ? [cod] : ['JCENTENO', 'KALBUJAR']).map(function(c){ return almPendCard(P[c], appDailyColor(c)); }).join('');
   return `<div class="cmp-top">${caras}${appFBarra('indicadores', { pry:1 })}${baja}</div>`
-    + (cod ? `<button type="button" class="cmp-det${APP_AS.det ? ' on' : ''}" data-asdet="1">${APP_AS.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom)}</button>${APP_AS.det ? (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` : '') + appAlmRepCuerpo() : ''}`
+    + (cod ? `<button type="button" class="cmp-det${APP_AS.det ? ' on' : ''}" data-asdet="1">${APP_AS.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom)}</button>${APP_AS.det ? regPed + (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` : '') + appAlmRepCuerpo() : ''}`
         : (gerAbierto ? appIndicadoresHtml(true) : ''))
-    + appSecHtml('📝', 'Pedidos generados', 'req → pedido · ' + e(appFLabel(Object.assign({}, st, { persona:'' }))), almPedRegHtml(cod, st))
+    + (cod ? '' : regPed)
     + appSecHtml('⏳', 'Pendientes de Almacén', cod ? e(PD_PERSONAS[cod]) : 'Todo el equipo', pend);
 }
 // Req. por pasar a pedido como lista general, igual que "Pedidos sin OC" de Compras (20.10.2026, Piero: "que sea lista general así
