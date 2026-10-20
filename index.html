@@ -2977,10 +2977,15 @@ let DATA = null; // { orders: [...], corte: Date, excluded: n, totalRows: n, fro
 // aclaró (01.09.2026) que el campo "ResponsablePedido" que trae Reporte Maestro.xlsx no refleja
 // quién ejecuta el paso en la práctica, así que no se usa directamente.
 let PEDIDO_SIN_REQ_RESP = {};
+// Quién generó cada pedido (20.10.2026, Piero): columna "UsuarioCreacionPedido" (BS) de Reporte Maestro.xlsx,
+// que la macro trae de R.ETAN (BH). Manda sobre la regla fija de JCENTENO; sin esa columna todo queda como antes.
+let PEDIDO_CREADOR = {};
+const USR_NISIRA_APP = { CCONDORI:'MCONDORI' };   // usuario de Nisira → código de la plataforma
 function responsableD1For(codPedido){
-  const directo = codPedido && PEDIDO_SIN_REQ_RESP[codPedido];
+  const directo = codPedido && (PEDIDO_CREADOR[codPedido] || PEDIDO_SIN_REQ_RESP[codPedido]);
   return directo || 'JCENTENO';
 }
+function pedCreador(cp){ return pdPersona(responsableD1For(cp)); }
 
 // PEDIDO_SIN_REQ_ROWS (04.09.2026 ronda 37): "pedidos directos" completos, con OC/monto/fechas propias
 // — a diferencia de PEDIDO_SIN_REQ_RESP (arriba), que solo guarda el responsable. Piero confirmó que
@@ -3884,6 +3889,7 @@ function buildSnapshot(){
       // fecha final (siguen abiertos), y "proceso.rows" de arriba solo contiene casos con al menos un
       // indicador calculable. Los días hábiles transcurridos NO se guardan aquí: se calculan al vuelo
       // contra la fecha de hoy en el navegador de quien mire el link, para que la alerta no quede vieja.
+      creadorPedido: PEDIDO_CREADOR,   // quién generó cada pedido (20.10.2026)
       alertas: (DATA.alertRows||[]).map(a => ({
         tp: a.tipo, py: a.proyecto, pr: a.producto, ip: a.idProducto, pv: a.proveedor, og: a.origen,
         cr: a.codRequerimiento, cp: a.codPedido, rp: a.responsable, fd: isoDay(a.fDesde),
@@ -4187,6 +4193,7 @@ function loadFromSnapshot(snap){
   // ronda no trae "proceso.pedidoDirecto" y queda en [] (el Reporte de Compras por responsable simplemente
   // no las suma hasta que se vuelva a publicar con ambos archivos cargados). origen se recalcula por
   // CodOrden (no se publica aparte: es una función pura del código, ver origenForDocumento).
+  PEDIDO_CREADOR = (snap.proceso && snap.proceso.creadorPedido) || {};
   PEDIDO_SIN_REQ_ROWS = (snap.proceso && snap.proceso.pedidoDirecto) ? snap.proceso.pedidoDirecto.map(r => ({
     proyecto: "SIN PROYECTO (compra de almacén)", idProyecto: r.ipy || '', producto: r.pr, idProducto: r.ip, familia: r.fa || 'Sin familia',
     proveedor: r.pv || "", cantidadOrden: (r.qo != null ? r.qo : null), cantRecepcion: (r.qr != null ? r.qr : null), unidad: r.um || "", estadoOrden: r.eo || "",
@@ -4479,6 +4486,7 @@ function processWorkbook(wb, filename){
     motivoDescr: findCol(headerRow, ["MotivoDescr"]),
     fechaPedido: findCol(headerRow, ["FechaPedido"]),
     responsablePedido: findCol(headerRow, ["ResponsablePedido"]),
+    usuarioCreaPedido: findCol(headerRow, ["UsuarioCreacionPedido","Ususario Creacion Pedido","Usuario Creacion Pedido"]),
     // Quien pidió el requerimiento (23.09.2026): va en copia en los correos a proveedores.
     nombreResponsable: findCol(headerRow, ["NombreResponsable"]),
     // Observación del requerimiento (06.10.2026, Piero: que salga en Pedidos sin OC para cotizar).
@@ -4611,6 +4619,7 @@ function processWorkbook(wb, filename){
   // Se reconstruye completo en cada carga de Reporte Maestro.xlsx (única fuente con Familia) — ver
   // PEDIDO_SIN_REQ_ROWS arriba.
   FAMILIA_BY_PRODUCTO = {};
+  PEDIDO_CREADOR = {};
   // Alertas de atención (pedido de Piero, 01.09.2026): requerimientos/pedidos que TODAVÍA no pasan al
   // siguiente paso — estos casos casi siempre tienen d1..d6 en null (nada calculable todavía), así que
   // se arman en un dataset aparte, ANTES del "continue" de más abajo que descarta esas filas de
@@ -4630,6 +4639,7 @@ function processWorkbook(wb, filename){
       const codOrdenAt = codOrdenAtRaw === "-" ? "" : codOrdenAtRaw;
       const codPedidoAtRaw = col.codPedido!==-1 ? (r[col.codPedido]||"").toString().trim() : "";
       const codPedidoAt = codPedidoAtRaw === "-" ? "" : codPedidoAtRaw;
+      if(codPedidoAt && col.usuarioCreaPedido!==-1){ const u = (r[col.usuarioCreaPedido]||"").toString().trim().toUpperCase(); if(u && u.charAt(0) !== '#') PEDIDO_CREADOR[codPedidoAt] = USR_NISIRA_APP[u] || u; }
 
       // Camino se define por si la línea tiene Pedido o no — corrección de Piero, 01.09.2026 tarde:
       // si tiene CodPedido real, quiere decir que pasó a Compras → Camino 2 (compra). Si no tiene
@@ -12306,7 +12316,7 @@ function rqPasoDetalle(r, j){
     lineas: lin(r.fReq ? 'Pedido el ' + rqFecha(r.fReq) + (r.responsable ? ' por ' + r.responsable : '') : '', 'Cantidad pedida: ' + n(r.cantidad) + um,
       r.estadoCalc === 'En Revisión' ? 'En revisión de almacén ' + rqHace(r.fReq) : '',
       // Quién lo pasó de requerimiento a pedido de compra (14.10.2026, Piero): el responsable del Indicador 1 (Almacén,
-      // Javier; o quien figure en PedidoSinReq para los directos). ResponsablePedido del Reporte Maestro es el comprador.
+      // quien figure en UsuarioCreacionPedido, 20.10.2026; o en PedidoSinReq para los directos). ResponsablePedido del Reporte Maestro es el comprador.
       r.codPedido ? 'Lo pasó a pedido de compra: ' + (function(c){ return PD_PERSONAS[pdPersona(c)] || c; })(responsableD1For(r.codPedido)) + (r.fPedido ? ' el ' + rqFecha(r.fPedido) : '') : '') };
   if(j === 1){
     if(directo) return { ico:'🛒', cls:'', titulo:'No pasó por Compras', lineas:['Se atendió directo del stock del almacén.'] };
@@ -13398,8 +13408,8 @@ function pdFilasCalc(){
     if(pdOcPendiente(r)) out.push(Object.assign(base, { tipo:'oc', persona: pdPersona(r.usuarioCompras) }));
     // En un pedido directo el ResponsablePedido es quien lo pidió (almacén, oficina…), no un comprador:
     // igual cuenta como pendiente, sin comprador asignado hasta que alguien emita la OC (06.10.2026, Piero).
-    else if(pdPedidoAbierto(r)){ const per = pdPersona(r.responsablePedido);
-      out.push(Object.assign(base, { tipo:'ped', persona: pdEsComprador(per) ? per : '', solicitante: r.responsablePedido })); }
+    // La columna F es quien lo generó, no a quién le toca (20.10.2026, Piero): queda sin comprador asignado.
+    else if(pdPedidoAbierto(r)) out.push(Object.assign(base, { tipo:'ped', persona: '', solicitante: r.responsablePedido }));
   });
   out.forEach(function(r){ if(r.tipo === 'oc') r.fCompromiso = ocFechaVale(r.codOrden, r.fCompromiso); });
   return out.filter(function(r){ return pdEsComprador(r.persona) || (r.directo && r.tipo === 'ped' && !r.persona); });
@@ -13848,7 +13858,8 @@ const APP_VISTAS = {
   almacen:    { nombre:'Almacén',    ico:'🏬', desc:'Inventario, indicadores y OTIF.',
     // Mismo orden que Compras, sin Compras, Importaciones, Gasto ni Presupuesto (12.10.2026, Piero).
     // Sin Inicio y con el Daily primero (15.10.2026, Piero), como en Compras.
-    tabs:[['daily','🗓️','Daily'], ['indicadores','📊','Indicadores'], ['almrep','📑','Almacén'], ['polar'], ['inventario','📦','Inventario'], ['otif','🎯','OTIF']] },
+    // Indicadores + Almacén en "Seguimiento", por persona como en Compras; Inventario tercero (20.10.2026, Piero).
+    tabs:[['daily','🗓️','Daily'], ['almseg','🧭','Seguimiento'], ['inventario','📦','Inventario'], ['polar'], ['otif','🎯','OTIF']] },
   // Supervisor (13.10.2026, Piero): trazabilidad de requerimientos y consulta de stock por producto. Reemplaza a la vista
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
   super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
@@ -13865,7 +13876,7 @@ function appVeGerencial(t){ return t === 'gerencia' || t === 'compras' || t === 
 // Vistas que usan el Inicio y las pantallas de Logística (Compras y Almacén son partes de ella).
 function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v === 'almacen'; }
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
-const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto', gastopresu:'Gasto y presupuesto', almrep:'Almacén', inventario:'Inventario',
+const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto', gastopresu:'Gasto y presupuesto', almrep:'Almacén', almseg:'Seguimiento', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones', daily:'Daily Call In', supreq:'Requerimientos', tienda:'Consulta de producto', equipo:'Equipo Logística' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
@@ -14618,6 +14629,7 @@ function appInicio(pantalla){
   if(APP.vista === 'gerencial' && (!pantalla || pantalla === 'inicio' || ['equipo', 'indicadores', 'daily', 'gastopresu', 'otif'].indexOf(pantalla) === -1)) pantalla = 'equipo';
   // Importaciones vuelve a ser su propio módulo (19.10.2026, Piero: "todo lo que son importaciones ponlo en otro módulo").
   if(APP.vista === 'compras' && pantalla === 'indicadores'){ APP_PC.persona = pdPersona(APP_F.indicadores.persona) || ''; pantalla = 'pendcompras'; }   // Reportes vive dentro de Compras (19.10.2026)
+  if(APP.vista === 'almacen' && (pantalla === 'indicadores' || pantalla === 'almrep')) pantalla = 'almseg';   // viven en Seguimiento (20.10.2026)
   if(APP.vista === 'super' && pantalla !== 'tienda') pantalla = 'supreq';
   if((APP.vista === 'compras' || APP.vista === 'almacen') && (!pantalla || pantalla === 'inicio')) pantalla = 'daily';
   if(!(APP.enInicio && APP.pantalla === (APP_PANTALLAS[pantalla] ? pantalla : 'inicio'))) appNavPush();
@@ -14662,6 +14674,8 @@ function appGastoPresuHtml(){
   return `<div class="ind-chips gp-tabs"><button type="button" data-gpsub="gasto" class="${APP_GP.sub === 'gasto' ? 'on' : ''}">💰 Gasto</button><button type="button" data-gpsub="presu" class="${APP_GP.sub === 'presu' ? 'on' : ''}">💼 Presupuesto</button></div>`
     + APP_PANT_FN[APP_GP.sub]();
 }
+function appSecHtml(ico, t, sub, cuerpo){ return cuerpo ? `<div class="cmp-sec"><b>${ico} ${t}</b>${sub ? '<small>' + sub + '</small>' : ''}</div>${cuerpo}` : ''; }
+const APP_ICO_BAJA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg>';
 // Compras + Reportes en una sola pestaña, por persona (19.10.2026, Piero: "que se pueda seleccionar a una persona y de
 // ahí salga todo lo que corresponde a esa persona… debe ser individual excepto cuando se seleccione todos"). Una sola fila
 // de caras arriba (en la web junto al año, mes, cliente y el ícono de descarga); debajo: su resumen y sus compras pendientes.
@@ -14672,22 +14686,41 @@ function appComprasHtml(){
   const gente = new Set(); pdFilas().forEach(function(r){ if(r.persona) gente.add(r.persona); });
   appFPersonas().forEach(function(v){ const c = pdPersona(v); if(APP_DAILY_EQUIPO.indexOf(c) !== -1) gente.add(c); });
   const caras = `<div class="m-filtros pc-per">${appCarasHtml('pcper', cod, [...gente].filter(Boolean).sort(function(a, b){ return nom(a).localeCompare(nom(b)); }).map(function(c){ return [c, c]; }))}</div>`;
-  const sec = function(ico, t, sub, cuerpo){ return cuerpo ? `<div class="cmp-sec"><b>${ico} ${t}</b>${sub ? '<small>' + sub + '</small>' : ''}</div>${cuerpo}` : ''; };
+  const sec = appSecHtml;
   const quien = cod ? e(PD_PERSONAS[cod] || cod) : 'Todo el equipo';
   const mide = !cod || (vF && cod !== 'CMORA');
   const rep = gerAbierto && mide ? appFBarra('indicadores', { pry:1 }) : '';
   // Web: caras, año, mes, cliente y el ícono para descargar el reporte de la persona en una sola fila (19.10.2026, Piero).
-  const baja = gerAbierto && cod && APP_DAILY_COMPRAS.indexOf(cod) !== -1 ? `<button type="button" class="pc-img-btn cmp-baja" data-cmpimg="${e(cod)}" title="Descargar el reporte de ${e(PD_PERSONAS[cod] || cod)} (según el período elegido)" aria-label="Descargar reporte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg></button>` : '';
+  const baja = gerAbierto && cod && APP_DAILY_COMPRAS.indexOf(cod) !== -1 ? `<button type="button" class="pc-img-btn cmp-baja" data-cmpimg="${e(cod)}" title="Descargar el reporte de ${e(PD_PERSONAS[cod] || cod)} (según el período elegido)" aria-label="Descargar reporte">${APP_ICO_BAJA}</button>` : '';
   return `<div class="cmp-top">${caras}${rep}${baja}</div>`
     // Las imágenes de la persona solo al pedirlas (19.10.2026, Piero: "que solo se vean si se da algo como ver detalle completo").
     + (gerAbierto && mide ? (cod ? `<button type="button" class="cmp-det${APP_PC.det ? ' on' : ''}" data-pcdet="1">${APP_PC.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom(cod))}</button>${APP_PC.det ? appFotoComprador(st, true) : ''}`
         : '') : '')   // en "Todos" sin el ranking de compradores (19.10.2026, Piero)
     + sec('🛒', 'Compras pendientes', quien, appPendComprasHtml(false, true));   // los tiempos van como 4.ª imagen del reporte (19.10.2026)
 }
-const APP_PANT_FN = { almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appComprasHtml(); },
+// Almacén → Seguimiento (20.10.2026, Piero: "combinar así como hiciste en compras el módulo de indicadores y de almacén…
+// el diseño igual y la idea igual"). Caras arriba (en la web junto al año, mes, cliente y el ícono de descarga); con una
+// persona: su reporte (Javier el análisis semanal; Katherine y Marycarmen recepción y despacho) al pedir el detalle y sus
+// pendientes; en "Todos": los tiempos de Almacén y los pendientes de todos. El período de los reportes es el de la barra.
+const APP_AS = { persona:'', det:false };
+function appAlmSegHtml(){
+  const cod = APP_AS.persona || '', e = escapeHtml, st = APP_F.indicadores, r = appFRango(st), jav = cod === 'JCENTENO';
+  const corte = isoDay(appIndCorte());   // hasta la fecha de corte: hay guías con fechas mal digitadas (año 2100)
+  APP_AR.per = 'custom'; APP_AR.desde = r ? appIndIso(r.desde) : '2020-01-01'; APP_AR.hasta = r && appIndIso(r.hasta) < corte ? appIndIso(r.hasta) : corte; APP_AR.sub = jav ? 'jav' : 'kat';
+  const nom = (PD_PERSONAS[cod] || '').split(' ')[0], hayMov = almMovRows().length > 0;
+  const caras = `<div class="m-filtros pc-per">${appCarasHtml('asper', cod, APP_DAILY_ALMACEN.map(function(c){ return [c, c]; }))}</div>`;
+  const baja = cod && hayMov ? `<button type="button" class="pc-img-btn cmp-baja" data-${jav ? 'anaimg' : 'arimg'}="1" title="Descargar el reporte de ${e(PD_PERSONAS[cod])} (según el período elegido)" aria-label="Descargar reporte">${APP_ICO_BAJA}</button>` : '';
+  const D = appDailyAlmDatos(isoDay(new Date())), P = {}; D.todos.forEach(function(x){ P[x.cod] = x; });
+  const pend = (cod ? [cod] : ['JCENTENO', 'KALBUJAR']).map(function(c){ return almPendCard(P[c], appDailyColor(c)); }).join('');
+  return `<div class="cmp-top">${caras}${appFBarra('indicadores', { pry:1 })}${baja}</div>`
+    + (cod ? `<button type="button" class="cmp-det${APP_AS.det ? ' on' : ''}" data-asdet="1">${APP_AS.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom)}</button>${APP_AS.det ? (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` : '') + appAlmRepCuerpo() : ''}`
+        : (gerAbierto ? appIndicadoresHtml(true) : ''))
+    + appSecHtml('⏳', 'Pendientes de Almacén', cod ? e(PD_PERSONAS[cod]) : 'Todo el equipo', pend);
+}
+const APP_PANT_FN = { almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appComprasHtml(); }, almseg:function(){ return appAlmSegHtml(); },
   pendlog:function(){ return appPendLogHtml() + (APP.vista === 'compras' && gerAbierto ? `<div class="cmp-sec"><b>🌎 Comex</b><small>Camila Mora</small></div>${appFBarra('indicadores', { pry:1 })}${appComexHtml(APP_F.indicadores)}` : ''); }, daily:function(){ return appDailyModHtml(); }, supreq:function(){ return appSupReqHtml(); }, equipo:function(){ return appGerEquipoHtml(); }, tienda:function(){ return appTiendaHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
-  const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC, APP_PL, APP_CORREO.v, APP_F.indicadores, APP_REP.sec], pendlog:[APP_PL, APP_F.indicadores],
+  const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC, APP_PL, APP_CORREO.v, APP_F.indicadores, APP_REP.sec], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
     indicadores:[APP_F.indicadores, APP_REP.sec], otif:[APP_F.otif] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (APP.vista || '');
 }
@@ -14704,7 +14737,7 @@ function appPrecalentar(){
   if(appEsLogistica(v)){
     q.push(function(){ if(dciEsAdmin()) appDailyHtml(); }, function(){ pdFilas(); });
     if(v === 'compras') q.push(function(){ appPantallaHtml('pendcompras'); }, function(){ appPantallaHtml('gastopresu'); });
-    else q.push(function(){ appPantallaHtml('almrep'); }, function(){ appInvIndice(); }, function(){ appPantallaHtml('inventario'); });
+    else q.push(function(){ appPantallaHtml('almseg'); }, function(){ appInvIndice(); }, function(){ appPantallaHtml('inventario'); });
   }
   if(appVeGerencial(v) && gerAbierto){
     q.push(function(){ appPantallaHtml('indicadores'); }, function(){ appIndDatos(appFIndF(APP_F0.indicadores)); });
@@ -14742,7 +14775,7 @@ function appRenderInicio(){
   } else if(APP.pantalla === 'daily' || APP.pantalla === 'supreq' || APP.pantalla === 'tienda' || APP.pantalla === 'equipo'){
     cont.innerHTML = APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     return;
-  } else if(APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'almrep' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog'){
+  } else if(APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'almrep' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog' || APP.pantalla === 'almseg'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
     if(APP.pantalla === 'inventario') setTimeout(appInvCompletar, 0);
     return;
@@ -14891,7 +14924,7 @@ function appDailyDatos(dia){
       if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '' }); porPed.set(r.codPedido, g); }
       // Solo los pedidos DIRECTOS los genera el comprador; los que vienen de un requerimiento salen solos
       // (07.10.2026, Piero: "nosotros no generamos pedidos, estos vienen solos a partir de un req").
-      if(r.codPedido && fp && fp <= dia && r.codOrden && fo && fo > dia){ const x = per(r.responsablePedido); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:dh(r.fPedido), req:r.codRequerimiento || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '', fa:r.familia || '' }); }
+      if(r.codPedido && r.codRequerimiento && fp && fp <= dia && r.codOrden && fo && fo > dia){ const x = per(r.responsablePedido); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:dh(r.fPedido), req:r.codRequerimiento || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '', fa:r.familia || '' }); }
       if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
       if(!r.codOrden || !r.usuarioCompras) return;
       const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden);
@@ -15015,7 +15048,7 @@ function appDailyPersonaHtml(dia, cod){
 }
 // ---------- Daily de Almacén (12.10.2026, Piero: Javier Centeno, Katherine Albujar y Marycarmen Condori) ----------
 // Lo que hace cada uno sale de los datos:
-//   Pedidos generados a partir de requerimientos → Javier Centeno (Indicador 1, Req → Pedido).
+//   Pedidos generados a partir de requerimientos → quien lo generó (UsuarioCreacionPedido, 20.10.2026; antes siempre Javier).
 //   Guías de recepción (GRC) y de salida (GRR) → quien figura en la columna RESPONSABLE de las hojas Ingresos y
 //   Movimientos de Reporte Almacen.xlsx (12.10.2026: Marycarmen genera la mayoría en Lurín).
 // Puntos: 1 por pedido generado o guía y 1 por ítem (12.10.2026, Piero: la misma lógica que los compradores).
@@ -15035,7 +15068,8 @@ function appDailyAlmDatos(dia){
     RQ.filas.forEach(function(r){
       if(r.estadoCalc === 'Archivado') return;
       const fr = isoDay(r.fReq), fp = isoDay(r.fPedido), fc = isoDay(r.fRecep), fs = isoDay(r.fSalida) || isoDay(r.fObra);
-      if(r.codPedido && fp === dia){ const g = J.ped.get(r.codPedido) || { k:r.codPedido, req:r.codRequerimiento || '', pry:r.proyecto || '', n:0, pr:[] }; g.n++; g.pr.push(r.producto || ''); J.ped.set(r.codPedido, g); J.items++; }
+      const X = r.codPedido && fp === dia ? P[pedCreador(r.codPedido)] : null;   // a quien generó el pedido
+      if(X){ const g = X.ped.get(r.codPedido) || { k:r.codPedido, req:r.codRequerimiento || '', pry:r.proyecto || '', n:0, pr:[] }; g.n++; g.pr.push(r.producto || ''); X.ped.set(r.codPedido, g); X.items++; }
       // Para el daily: al cierre de ese día, req. todavía sin pedido ni salida (Javier) y lo que ya llegó y no sale a obra (Katherine y Marycarmen).
       if(fr && fr <= dia && fr >= desde && (!fp || fp > dia) && (!fs || fs > dia) && !r.codOrden) J.pend.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fReq) });
       if(fc && fc <= dia && fc >= desde && (!fs || fs > dia)) despachar.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fRecep) });
@@ -15070,25 +15104,30 @@ function appDailyAlmDetHtml(dia){
   return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día</div>${l.map(fila).join('')}
     <div class="m-rk-nota">Puntos: 1 por pedido generado o guía (recepción o salida) y 1 por ítem. Las guías van a quien figura como RESPONSABLE en el Reporte Almacén. Toca a una persona para ver su detalle.</div></div>` + appDailyTareasHtml(dia, '');
 }
+function almNReq(r){ return r ? `<button type="button" class="mono m-link" data-ocreq="${escapeHtml(r)}">${escapeHtml(r.replace(/^0001-0*/, ''))}</button>` : '—'; }
+function almPendCard(x, col){
+  const e = escapeHtml, t = APP_ALM_TXT[x.cod];
+  const porReq = new Map(); x.pend.forEach(function(p){ const g = porReq.get(p.req) || { req:p.req, pry:p.pry, d:p.d, n:0, pr:p.pr }; g.n++; g.d = Math.max(g.d, p.d); porReq.set(p.req, g); });
+  const pend = [...porReq.values()].sort(function(a, b){ return b.d - a.d; });
+  const filasPend = pend.slice(0, 40).map(function(g){ const c = g.d > 10 ? 'var(--red)' : g.d > 2 ? '#f2b632' : col;
+    return `<div class="m-pp-tr">${almNReq(g.req)}<span class="m-pp-prov">${e(polarCorta(g.pr, 38))}${g.n > 1 ? ` <small>y ${g.n - 1} más</small>` : ''}</span><span class="m-pp-sub">${e(polarCorta(appImpNombre(g.pry), 22))}</span><b style="color:${c}">${g.d} d.h.</b></div>`; }).join('');
+  return `<div class="ini-card m-pp-col${pend.length ? '' : ' ok'}" style="--c:#f2b632"><div class="m-pp-al"><i>⏳</i><div><p>${t.al}</p><small>${pend.length ? pend.length + ' requerimiento' + (pend.length === 1 ? '' : 's') + ' · ' + x.pend.length + ' ítems · el más antiguo lleva ' + pend[0].d + ' d.h.' : t.ok}</small></div><b>${appN(pend.length)}</b></div>${filasPend}</div>`;
+}
 function appDailyAlmPersonaHtml(dia, cod){
   const D = appDailyAlmDatos(dia), x = D.todos.find(function(y){ return y.cod === cod; }), i = D.lista.indexOf(x), t = APP_ALM_TXT[cod], col = appDailyColor(cod);
   const nom = PD_PERSONAS[cod], ini = nom.split(' ').map(function(w){ return w.charAt(0); }).slice(0, 2).join(''), e = escapeHtml, nomCod = ALMACEN_DATA && ALMACEN_DATA.almMov ? ALMACEN_DATA.almMov.nom || {} : {};
   const kpi = function(ic, v, tt, sub){ return `<div class="m-pp-kpi${v ? '' : ' cero'}" style="--c:${col}"><i>${ic}</i><b>${appN(v)}</b><span>${tt}</span><small>${sub}</small></div>`; };
-  const nReq = function(r){ return r ? `<button type="button" class="mono m-link" data-ocreq="${e(r)}">${e(r.replace(/^0001-0*/, ''))}</button>` : '—'; };
+  const nReq = almNReq;
   const hizo = [...x.ped.values()].map(function(g){ return `<div class="m-pp-tr"><span class="mono">📝 ${e(g.k.replace(/^0001-0*/, ''))}</span><span class="m-pp-prov">${e(polarCorta(appImpNombre(g.pry), 40))}</span><span class="m-pp-sub">req ${nReq(g.req)}</span><b>${g.n} ítem${g.n === 1 ? '' : 's'}</b></div>`; })
     .concat([...x.grc.values(), ...x.grr.values()].map(function(g){ const pr = nomCod[g.pr[0]] || g.pr[0];
       return `<div class="m-pp-tr"><span class="mono">${g.t === 'i' ? '📥' : '🚚'} ${e(g.k)}</span><span class="m-pp-prov">${e(polarCorta(g.quien || pr, 40))}${g.sede ? ' · ' + e(g.sede) : ''}</span><span class="m-pp-sub">${g.req ? 'req ' + nReq(g.req) : g.oc ? 'OC ' + e(g.oc) : e(polarCorta(pr, 26))}</span><b>${g.n} ítem${g.n === 1 ? '' : 's'}</b></div>`; })).join('');
-  const porReq = new Map(); x.pend.forEach(function(p){ const g = porReq.get(p.req) || { req:p.req, pry:p.pry, d:p.d, n:0, pr:p.pr }; g.n++; g.d = Math.max(g.d, p.d); porReq.set(p.req, g); });
-  const pend = [...porReq.values()].sort(function(a, b){ return b.d - a.d; });
-  const filasPend = pend.slice(0, 40).map(function(g){ const c = g.d > 10 ? 'var(--red)' : g.d > 2 ? '#f2b632' : col;
-    return `<div class="m-pp-tr">${nReq(g.req)}<span class="m-pp-prov">${e(polarCorta(g.pr, 38))}${g.n > 1 ? ` <small>y ${g.n - 1} más</small>` : ''}</span><span class="m-pp-sub">${e(polarCorta(appImpNombre(g.pry), 22))}</span><b style="color:${c}">${g.d} d.h.</b></div>`; }).join('');
   return `<div class="m-pp-hero" style="--c:${col}"><span class="m-pp-av">${e(ini)}</span>
       <div class="m-pp-nom"><b>${e(nom)}</b><span>${i >= 0 ? (['🥇 1.º', '🥈 2.º', '🥉 3.º'][i] || '#' + (i + 1)) + ' del día · ' : ''}${x.pts} pts</span><small>${appDailyFechaTxt(dia)}</small></div>
       <div class="m-pp-monto"><b>${appN(x.items)}</b><small>ítems</small></div></div>
     <div class="m-pp-kpis">${cod === 'JCENTENO' || x.ped.size ? kpi('📝', x.ped.size, 'Pedidos generados', 'a partir de requerimientos') : ''}${kpi('📥', x.grc.size, 'Guías de recepción', 'GRC generadas')}${kpi('🚚', x.grr.size, 'Guías de salida', 'GRR generadas')}</div>
     ${hizo ? `<div class="ini-card m-pp-hizo"><div class="m-pp-tit">✅ Lo que hizo ese día</div>${hizo}</div>` : ''}
     <div class="m-pp-tit">📌 Para el daily</div>
-    <div class="ini-card m-pp-col${pend.length ? '' : ' ok'}" style="--c:#f2b632"><div class="m-pp-al"><i>⏳</i><div><p>${t.al}</p><small>${pend.length ? pend.length + ' requerimiento' + (pend.length === 1 ? '' : 's') + ' · ' + x.pend.length + ' ítems · el más antiguo lleva ' + pend[0].d + ' d.h.' : t.ok}</small></div><b>${appN(pend.length)}</b></div>${filasPend}</div>
+    ${almPendCard(x, col)}
     ${appDailyTareasHtml(dia, cod)}`;
 }
 // Detalle completo de una tarjeta del comprador, sin cortar textos (07.10.2026, Piero: "las letras se cortan").
@@ -15972,12 +16011,12 @@ function appIndDetalle(clave){
 // emisión de OC, aprobación de OC y entrega en Lurín").
 const APP_IND_COMPRA = ['d2', 'd3', 'd4'];
 const APP_REP = { sec:'equipo' };
-function appIndicadoresHtml(){
+function appIndicadoresHtml(soloTiempos){   // soloTiempos: sin barra ni foto (Seguimiento de Almacén)
   if(!gerAbierto) return APP_GER_LOCK;
   // En la vista Almacén solo lo de Almacén (12.10.2026): Generación de pedido (Javier) y Despacho (Katherine).
   const alm = APP.vista === 'almacen', claves = alm ? ['d1', 'd6'] : APP_IND_COMPRA;
   const st = alm ? Object.assign({}, APP_F.indicadores, { persona:'' }) : APP_F.indicadores, k = 'f', per = { f:appFIndF(st), largo:appFLabel(st) }, deCompra = function(d){ return claves.indexOf(d.ind.key) !== -1; };
-  const barra = appFBarra('indicadores', alm ? { pry:1 } : { persona:1, pry:1, compradores:1 }), foto = alm ? appFotoAlmacen(st) : appFotoComprador(st);
+  const barra = soloTiempos ? '' : appFBarra('indicadores', alm ? { pry:1 } : { persona:1, pry:1, compradores:1 }), foto = soloTiempos ? '' : alm ? appFotoAlmacen(st) : appFotoComprador(st);
   const datos0 = appIndDatos(per.f), datos = Array.isArray(datos0) ? datos0.filter(deCompra) : datos0;
   if(!Array.isArray(datos) || (st.persona && !datos.length)) return barra + foto + '<div class="ini-card"><div class="ini-vacio">No hay tiempos con esos filtros.</div></div>';
   // Siempre por mes desde enero (14.10.2026, Piero: "estaba bien que siempre salga el progreso mensual, si no se pierde
@@ -18162,15 +18201,16 @@ function appAlmRepHtml(){
   // Dos reportes en una pestaña (12.10.2026): el de Katherine y el análisis semanal que presenta Javier.
   // Filtros en listas desplegables, como en Compras (12.10.2026, Piero: "mejora esa parte de los filtros").
   const jav = APP_AR.sub === 'jav', op = function(v, t, sel){ return `<option value="${v}"${v === sel ? ' selected' : ''}>${t}</option>`; };
-  const P = almMovRows().length ? almPeriodo() : { desde:'', hasta:'' }, suc = jav ? (APP_AR.sucJ || 'ALL') : (APP_AR.suc || 'LIM');
-  const sedes = Object.keys(ALM_SEDES).concat(jav ? ['ALL'] : []);
+  const P = almMovRows().length ? almPeriodo() : { desde:'', hasta:'' };
   const filtros = `<div class="m-filtros">
       <label><span>📑 Reporte</span><select class="ini-select" id="arSub">${op('kat', 'Recepción y despacho · Katherine', jav ? 'jav' : 'kat')}${op('jav', 'Análisis semanal · Javier', jav ? 'jav' : 'kat')}</select></label>
       <label><span>📅 Período</span><select class="ini-select" id="arPer">${[['semana', 'Última semana'], ['semanaAnt', 'Semana anterior'], ['mes', 'Mes'], ['custom', 'Personalizado (elegir fechas)']].map(function(x){ return op(x[0], x[1], APP_AR.per || 'semana'); }).join('')}</select></label>
       ${APP_AR.per === 'custom' ? `<label><span>Desde</span><input type="date" class="ini-select" data-ardesde="1" value="${escapeHtml(P.desde)}"></label><label><span>Hasta</span><input type="date" class="ini-select" data-arhasta="1" value="${escapeHtml(P.hasta)}"></label>` : ''}
-      <label><span>🏬 Sede</span><select class="ini-select" id="arSuc">${sedes.map(function(k){ return op(k, k === 'ALL' ? 'Todas las sedes' : ALM_SEDES[k], suc); }).join('')}</select></label></div>`;
+      ${almSedeSel()}</div>`;
   return filtros + appAlmRepCuerpo();
 }
+function almSedeSel(){ const jav = APP_AR.sub === 'jav', suc = jav ? (APP_AR.sucJ || 'ALL') : (APP_AR.suc || 'LIM');
+  return `<label><span>🏬 Sede</span><select class="ini-select" id="arSuc">${Object.keys(ALM_SEDES).concat(jav ? ['ALL'] : []).map(function(k){ return `<option value="${k}"${k === suc ? ' selected' : ''}>${k === 'ALL' ? 'Todas las sedes' : ALM_SEDES[k]}</option>`; }).join('')}</select></label>`; }
 function appAlmRepCuerpo(){
   if(!almMovRows().length) return '<div class="ini-card"><div class="ini-vacio">Carga <b>Reporte Almacen.xlsx</b> (hojas Ingresos y Movimientos) y publica para ver la recepción y el despacho.</div></div>';
   const R = almRep(), r = R.rec, d = R.des, e = escapeHtml;
@@ -18650,7 +18690,7 @@ function appFotoAlmDatos(desde, hasta){ return appMemo('fotoAlm:' + desde + hast
   const T = almPersonasVacias(), P = {}; T.forEach(function(x){ P[x.cod] = x; });
   RQ.filas.forEach(function(x){ if(x.estadoCalc === 'Archivado') return;
     const fp = isoDay(x.fPedido);
-    if(x.codPedido && fp && fp >= desde && fp <= hasta){ P.JCENTENO.ped.set(x.codPedido, 1); P.JCENTENO.items++; } });
+    if(x.codPedido && fp && fp >= desde && fp <= hasta){ const X = P[pedCreador(x.codPedido)]; if(X){ X.ped.set(x.codPedido, 1); X.items++; } } });
   almMovRows().forEach(function(m){ if(m.f < desde || m.f > hasta) return; const x = P[almPersona(m.r)]; if(!x) return;
     (m.t === 'i' ? x.grc : x.grr).set(m.d, 1); x.items++; });
   return almCerrar(T).sort(function(a, b){ return b.pts - a.pts; });
@@ -18722,7 +18762,7 @@ function geDatos(){
       k:[[N(x.ped.size), 'Pedidos generados'], [N(x.items), 'Ítems'], [N(cola.rev.size), 'Req. en revisión', cola.rev.size ? 'ojo' : 'bien']],
       st:cola.rev.size ? ['ojo', '⏳ ' + cola.rev.size + ' req. por revisar'] : ['bien', '✅ Sin req. por revisar'], n:{ ped:x.ped.size } });
     P.push({ cod:x.cod, area:'Almacén', rol:'Recepción y despacho',
-      k:[[N(x.grc.size), 'Guías de recepción'], [N(x.grr.size), 'Guías de salida'], [N(x.items), 'Ítems']], st:null, n:{ grc:x.grc.size, grr:x.grr.size } }); });
+      k:(x.ped.size ? [[N(x.ped.size), 'Pedidos generados']] : []).concat([[N(x.grc.size), 'Guías de recepción'], [N(x.grr.size), 'Guías de salida'], [N(x.items), 'Ítems']]), st:null, n:{ ped:x.ped.size, grc:x.grc.size, grr:x.grr.size } }); });
   P.forEach(function(p){ p.d = geDaily(p.cod, R.desde);
     if(!p.st) p.st = p.d.bl ? ['mal', '⛔ ' + p.d.bl + ' bloqueo' + (p.d.bl === 1 ? '' : 's')] : ['bien', '✅ Al día']; });
   return { R:R, P:P, emb:emb, cola:cola };
@@ -19006,6 +19046,8 @@ function appClickInicio(e){
   if(b.dataset.geingresos) return appIngresosAbrir();
   if(b.dataset.fcara != null){ const w = b.closest('[data-fbar]'); if(w){ APP_F[w.dataset.fbar].persona = b.dataset.fcara; return appRenderInicio(); } }
   if(b.dataset.pcper != null){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
+  if(b.dataset.asper != null){ APP_AS.persona = b.dataset.asper; return appRenderInicio(); }
+  if(b.dataset.asdet){ APP_AS.det = !APP_AS.det; return appRenderInicio(); }
   if(b.dataset.repsec){ APP_REP.sec = b.dataset.repsec; return appRenderInicio(); }
   if(b.dataset.pfocs) return appPfLista(b.dataset.pfocs);
   if(b.dataset.psver) return appPsVer(b.dataset.psver);
