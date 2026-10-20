@@ -14746,17 +14746,44 @@ function almReqPedHtml(pend0){
     const cam = p.cam.map(function(c){ const eta = c.y.lleg && c.y.lleg.eta; return (/^0002-/.test(c.y.oc) ? '🌎 ' : '') + 'OC ' + e(String(c.y.oc).replace(/^000\d-0*/, '')) + ' · ' + q(c.q) + (eta ? ' · llega ' + appDDMM(new Date(eta)) : ''); }).join(' / ');
     return (x ? '<br>📦 Lurín libre ' + q(p.lib) + (APP_AS.rp === 'stock' || APP_AS.rp === 'camino' ? '' : ' · Ica ' + q(x.ica) + ' · Trujillo ' + q(x.trujillo)) : '') + (cam && APP_AS.rp === 'camino' ? '<br>🚢 ' + cam : ''); };
   pend.forEach(function(p){ const k = (appImpNombre(p.pry) || 'Stock / sin proyecto') + (p.ipy && !/^SIN PROYECTO/i.test(p.ipy) ? ' · ' + p.ipy : ''); if(!G.has(k)) G.set(k, []); G.get(k).push(p); });
-  const L = [...G.entries()].map(function(x){ x[1].sort(function(a, b){ return b.d - a.d || String(a.req).localeCompare(String(b.req)); }); return x; }).sort(function(a, b){ return b[1][0].d - a[1][0].d || b[1].length - a[1].length; });
+  // Del más reciente al más antiguo (20.10.2026, Piero): las filas y los proyectos (por su req. más reciente).
+  const L = [...G.entries()].map(function(x){ x[1].sort(function(a, b){ return a.d - b.d || String(b.req).localeCompare(String(a.req)); }); return x; }).sort(function(a, b){ return a[1][0].d - b[1][0].d || b[1].length - a[1].length; });
   const cls = function(d){ return d > meta ? 'rojo' : d === meta ? 'ambar' : 'verde'; }, reqs = new Set(pend.map(function(p){ return p.req; })), fuera = new Set(pend.filter(function(p){ return p.d > meta; }).map(function(p){ return p.req; }));
-  const fila = function(p){ return appFilaHtml('data-ocreq="' + e(p.req) + '"', cls(p.d), p.pr || '—',
+  const fila = function(p){ const id = p.ln ? (p.ln.__aid || (p.ln.__aid = ++ALM_IT.n)) : 0; if(id) ALM_IT.m.set(String(id), { p:p, g:APP_AS.rp });
+    return appFilaHtml(id ? 'data-asit="' + id + '"' : 'data-ocreq="' + e(p.req) + '"', cls(p.d), p.pr || '—',
     'Req. ' + e(String(p.req).replace(/^0001-0*/, '')) + (p.fr ? ' · del ' + e(appDDMM(p.fr)) : '') + (p.sol ? '<br>👷 ' + e(polarCorta(p.sol, 36)) : '') + stk(p),
     p.q != null ? appN(p.q, 2) + ' ' + e(p.um) : '—', p.d + ' d.h.'); };
   return tiles + `<div class="m-pl-tit"><span>${t[0]} ${t[1]}</span><b>${appN(reqs.size)} req. · ${appN(pend.length)} ítems</b></div>
-    <div class="m-sec-nota">${t[3]} · ${appN(fuera.size)} req. llevan más de ${meta} días hábiles (meta) · por proyecto, el más antiguo primero · toca una fila para ver el req.</div>
-    <div class="sku-lista">${L.map(function(x){ const n = new Set(x[1].map(function(p){ return p.req; })).size, v = x[1][0].d;
+    <div class="m-sec-nota">${t[3]} · ${appN(fuera.size)} req. llevan más de ${meta} días hábiles (meta) · por proyecto, el más reciente primero · toca un ítem para ver el detalle</div>
+    <div class="sku-lista">${L.map(function(x){ const n = new Set(x[1].map(function(p){ return p.req; })).size, v = x[1][x[1].length - 1].d;
       return `<details class="sku-grupo" open style="--fam:${appColorFamilia(x[0])}"><summary><i></i><span>${e(x[0])}</span>
         <small>${n} req. · ${x[1].length} ítem${x[1].length === 1 ? '' : 's'} · <em class="sku-prio ${cls(v)}">el más antiguo: ${v} d.h.</em></small><b>${x[1].length}</b></summary>
         <div class="sku-filas">${x[1].map(fila).join('')}</div></details>`; }).join('')}</div>`;
+}
+// Detalle de un ítem según su tarjeta (20.10.2026, Piero): en Lurín cuánto hay y cuánto le toca; en camino qué OC y cuándo llega
+// (cada OC se toca para ver su trazabilidad); en otra sede dónde y cuánto; para compra, que no hay en ninguna sede.
+const ALM_IT = { n:0, m:new Map() };
+function almItemDet(id){
+  const it = ALM_IT.m.get(String(id)); if(!it) return; const p = it.p, r = p.ln, x = rqFifoDe(r) || {}, st = p.st || {}, e = escapeHtml, um = e(x.um || p.um || '');
+  const q = function(v){ return appN(v || 0, 2) + ' ' + um; }, t = function(v, l){ return `<div><span>${l}</span><b>${v}</b></div>`; };
+  const G = { stock:['🟢 Stock en Lurín', 'Se atiende con el stock de Lurín'], camino:['🚢 En camino a Lurín', 'Lo que falta ya viene en camino'], sede:['🏬 Stock en otra sede', 'Revisar si se atiende desde otra sede'], pedido:['🛒 Para compra', 'No hay en ninguna sede ni viene en camino'] }[it.g] || ['', ''];
+  const sedes = `<div class="ini-card-tit">📦 Stock por sede</div><div class="m-tiles k4">${t(q(st.lima), 'Lurín (total)')}${t(q(x.disp), 'Lurín libre para este req.')}${t(q(st.ica), 'Ica')}${t(q(st.trujillo), 'Trujillo')}</div>`;
+  let bloque = '';
+  if(it.g === 'stock') bloque = `<div class="ini-card-tit">🟢 Lurín</div><div class="m-tiles k4">${t(q(x.lima), 'Stock en Lurín')}${t(q(x.antes), 'Ya tomado por req. anteriores')}${t(q(x.disp), 'Libre')}${t(q(x.asig), 'Le toca a este req.')}</div>
+      <div class="av-nota">El stock se reparte por orden de llegada de los requerimientos: este req. alcanza a cubrir lo que falta (${q(x.falta)}).</div>`;
+  else if(it.g === 'camino') bloque = `<div class="ini-card-tit">🚢 OC que lo traen</div><div class="ini-card m-lista">${(x.cam || []).map(function(c){ const y = c.y, l = y.lleg || {};
+      return appFilaHtml('data-oc="' + e(y.oc) + '"', l.est && l.est[0] === 'tarde' ? 'rojo' : '', (/^0002-/.test(y.oc) ? '🌎 ' : '') + (appImpNombre(y.prov) || 'OC ' + y.oc),
+        'OC ' + e(y.oc) + (l.est ? ' · ' + e(l.est[1]) : '') + '<br>Viene ' + e(appN(y.q, 2) + ' ' + (y.um || '')) + ' sin requerimiento · para este req. ' + q(c.q),
+        l.etaTxt ? 'llega ' + e(l.etaTxt) : '—', 'toca para ver la OC'); }).join('')}</div>
+      <div class="av-nota">Lurín tiene ${q(x.disp)} libres para este req. y lo que falta lo cubre${(x.cam || []).length > 1 ? 'n estas OC' : ' esta OC'} (por orden de llegada).</div>`;
+  else if(it.g === 'sede'){ const f = x.falta || p.q || 0, ok = function(v){ return (v || 0) >= f - 0.001; };
+    bloque = `<div class="ini-card-tit">🏬 Dónde hay</div><div class="m-tiles">${t(q(st.ica) + (ok(st.ica) ? ' ✅ alcanza' : ''), 'Ica')}${t(q(st.trujillo) + (ok(st.trujillo) ? ' ✅ alcanza' : ''), 'Trujillo')}</div>
+      <div class="av-nota">Faltan ${q(f)} y Lurín solo tiene ${q(x.disp)} libres: coordinar el traslado desde ${[(st.ica || 0) > 0 ? 'Ica' : '', (st.trujillo || 0) > 0 ? 'Trujillo' : ''].filter(Boolean).join(' o ')}.</div>`; }
+  else bloque = `<div class="av-nota">Faltan ${q(x.falta || p.q)}: no hay stock libre en Lurín, Ica ni Trujillo, ni viene en una OC sin requerimiento. Hay que pasarlo a pedido de compra.</div>`;
+  appListaAbrir(e(G[0]), e(G[1]), `<div class="ini-card"><div class="ini-card-tit">${e(p.pr || '—')}</div>
+      <div class="m-tiles k4">${t(e(String(r.idProducto || '—')), 'Código')}${t(q(x.falta || p.q), 'Falta atender')}${t(p.d + ' d.h.', 'Esperando')}${t(e(appImpNombre(p.pry) || 'Stock / sin proyecto'), 'Cliente')}</div>
+      ${bloque}${sedes}
+      <button type="button" class="ix-btn" data-ocreq="${e(p.req)}">📋 Ver el requerimiento ${e(String(p.req).replace(/^0001-0*/, ''))}${p.sol ? ' · ' + e(polarCorta(p.sol, 30)) : ''}</button></div>`);
 }
 // Registro de los req. que cada uno pasó a pedido (20.10.2026, Piero: "a ellos se les debe medir también por los req que pasan
 // a pedido", como a los compradores por sus OC). Sale de las líneas del Indicador 1 (fecha del req. → fecha del pedido, meta
@@ -19141,6 +19168,7 @@ function appClickInicio(e){
   if(b.dataset.asper != null){ APP_AS.persona = b.dataset.asper; return appRenderInicio(); }
   if(b.dataset.asdet){ APP_AS.det = !APP_AS.det; return appRenderInicio(); }
   if(b.dataset.asrp){ APP_AS.rp = b.dataset.asrp; return appRenderInicio(); }
+  if(b.dataset.asit) return almItemDet(b.dataset.asit);
   if(b.dataset.repsec){ APP_REP.sec = b.dataset.repsec; return appRenderInicio(); }
   if(b.dataset.pfocs) return appPfLista(b.dataset.pfocs);
   if(b.dataset.psver) return appPsVer(b.dataset.psver);
