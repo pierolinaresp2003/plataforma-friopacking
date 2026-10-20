@@ -14702,7 +14702,7 @@ function appComprasHtml(){
 // el diseño igual y la idea igual"). Caras arriba (en la web junto al año, mes, cliente y el ícono de descarga); con una
 // persona: su reporte (Javier el análisis semanal; Katherine y Marycarmen recepción y despacho) al pedir el detalle y sus
 // pendientes; en "Todos": los tiempos de Almacén y los pendientes de todos. El período de los reportes es el de la barra.
-const APP_AS = { persona:'', det:false };
+const APP_AS = { persona:'', det:false, rp:'stock' };
 function appAlmSegHtml(){
   const cod = APP_AS.persona || '', e = escapeHtml, st = APP_F.indicadores, r = appFRango(st), jav = cod === 'JCENTENO';
   const corte = isoDay(appIndCorte());   // hasta la fecha de corte: hay guías con fechas mal digitadas (año 2100)
@@ -14725,17 +14725,32 @@ function appAlmSegHtml(){
 // Req. por pasar a pedido como lista general, igual que "Pedidos sin OC" de Compras (20.10.2026, Piero: "que sea lista general así
 // como en compras"): una fila por ítem, agrupadas por proyecto (cliente · PRY), primero el proyecto con el req. más antiguo y dentro
 // el más antiguo primero. Color según la meta del Indicador 1. Toca una fila para ver el requerimiento.
-function almReqPedHtml(pend){
-  const meta = (INDICATORS.find(function(i){ return i.key === 'd1'; }) || {}).meta || 2, e = escapeHtml, G = new Map();
-  if(!pend.length) return '<div class="ini-vacio">✅ No hay req. por pasar a pedido.</div>';
+// Separados en 3 (20.10.2026, Piero): lo que se atiende del stock de Lurín (el libre por orden de llegada alcanza), lo que hay
+// que revisar en otra sede (Lurín no alcanza, pero Ica o Trujillo tienen) y lo que hay que pasar a pedido (no hay en ninguna).
+function almReqPedHtml(pend0){
+  const meta = (INDICATORS.find(function(i){ return i.key === 'd1'; }) || {}).meta || 2, e = escapeHtml, G = new Map(), C = { stock:[], pedido:[], sede:[] };
+  if(!pend0.length) return '<div class="ini-vacio">✅ No hay req. por atender.</div>';
+  pend0.forEach(function(p){ const lm = p.ln ? rqLimaLibre(p.ln) : null, st = p.ln ? rqStockDe(p.ln.idProducto) : null, otras = st ? (+st.ica || 0) + (+st.trujillo || 0) : 0;
+    p.lib = lm ? lm.libre : 0; p.st = st;
+    C[lm && lm.falta > 0 && lm.libre >= lm.falta - 0.001 ? 'stock' : otras > 0 ? 'sede' : 'pedido'].push(p); });
+  const T = { stock:['🟢', 'Atender desde stock', 'en', 'Lurín tiene stock libre que alcanza (por orden de llegada de los req.)'],
+    pedido:['🔵', 'Pasar a pedido', 'lu', 'No hay stock en Lurín ni en otra sede: hay que generar el pedido a Compras'],
+    sede:['🟠', 'Revisar otra sede', 'pd', 'Lurín no alcanza, pero hay stock en Ica o Trujillo: revisar si se atiende desde allá'] };
+  if(!T[APP_AS.rp]) APP_AS.rp = 'stock';
+  const tile = function(k){ const n = new Set(C[k].map(function(p){ return p.req; })).size;
+    return `<button type="button" class="pc-${T[k][2]}${APP_AS.rp === k ? ' sel' : ''}" data-asrp="${k}"><b>${appN(n)}</b><span>${T[k][1]} · ${appN(C[k].length)} ítems</span></button>`; };
+  const tiles = `<div class="m-resumen m-pl-tabs imp-tabs">${tile('stock')}${tile('pedido')}${tile('sede')}</div>`, pend = C[APP_AS.rp], t = T[APP_AS.rp];
+  if(!pend.length) return tiles + `<div class="m-pl-tit"><span>${t[0]} ${t[1]}</span><b>0</b></div><div class="ini-vacio">✅ Nada en este grupo.</div>`;
+  const stk = function(p){ const x = p.st, q = function(v){ return appN(v || 0, 2); };
+    return x ? '<br>📦 Lurín libre ' + q(p.lib) + (APP_AS.rp === 'stock' ? '' : ' · Ica ' + q(x.ica) + ' · Trujillo ' + q(x.trujillo)) : ''; };
   pend.forEach(function(p){ const k = (appImpNombre(p.pry) || 'Stock / sin proyecto') + (p.ipy && !/^SIN PROYECTO/i.test(p.ipy) ? ' · ' + p.ipy : ''); if(!G.has(k)) G.set(k, []); G.get(k).push(p); });
   const L = [...G.entries()].map(function(x){ x[1].sort(function(a, b){ return b.d - a.d || String(a.req).localeCompare(String(b.req)); }); return x; }).sort(function(a, b){ return b[1][0].d - a[1][0].d || b[1].length - a[1].length; });
   const cls = function(d){ return d > meta ? 'rojo' : d === meta ? 'ambar' : 'verde'; }, reqs = new Set(pend.map(function(p){ return p.req; })), fuera = new Set(pend.filter(function(p){ return p.d > meta; }).map(function(p){ return p.req; }));
   const fila = function(p){ return appFilaHtml('data-ocreq="' + e(p.req) + '"', cls(p.d), p.pr || '—',
-    'Req. ' + e(String(p.req).replace(/^0001-0*/, '')) + (p.fr ? ' · del ' + e(appDDMM(p.fr)) : '') + (p.sol ? '<br>👷 ' + e(polarCorta(p.sol, 36)) : ''),
+    'Req. ' + e(String(p.req).replace(/^0001-0*/, '')) + (p.fr ? ' · del ' + e(appDDMM(p.fr)) : '') + (p.sol ? '<br>👷 ' + e(polarCorta(p.sol, 36)) : '') + stk(p),
     p.q != null ? appN(p.q, 2) + ' ' + e(p.um) : '—', p.d + ' d.h.'); };
-  return `<div class="m-pl-tit"><span>📝 Req. por pasar a pedido</span><b>${appN(reqs.size)} req. · ${appN(pend.length)} ítems</b></div>
-    <div class="m-sec-nota">${appN(fuera.size)} req. llevan más de ${meta} días hábiles (meta) · por proyecto, el más antiguo primero · toca una fila para ver el req.</div>
+  return tiles + `<div class="m-pl-tit"><span>${t[0]} ${t[1]}</span><b>${appN(reqs.size)} req. · ${appN(pend.length)} ítems</b></div>
+    <div class="m-sec-nota">${t[3]} · ${appN(fuera.size)} req. llevan más de ${meta} días hábiles (meta) · por proyecto, el más antiguo primero · toca una fila para ver el req.</div>
     <div class="sku-lista">${L.map(function(x){ const n = new Set(x[1].map(function(p){ return p.req; })).size, v = x[1][0].d;
       return `<details class="sku-grupo" open style="--fam:${appColorFamilia(x[0])}"><summary><i></i><span>${e(x[0])}</span>
         <small>${n} req. · ${x[1].length} ítem${x[1].length === 1 ? '' : 's'} · <em class="sku-prio ${cls(v)}">el más antiguo: ${v} d.h.</em></small><b>${x[1].length}</b></summary>
@@ -15146,7 +15161,7 @@ function appDailyAlmDatos(dia){
       const X = r.codPedido && fp === dia ? P[pedCreador(r.codPedido)] : null;   // a quien generó el pedido
       if(X){ const g = X.ped.get(r.codPedido) || { k:r.codPedido, req:r.codRequerimiento || '', pry:r.proyecto || '', n:0, pr:[] }; g.n++; g.pr.push(r.producto || ''); X.ped.set(r.codPedido, g); X.items++; }
       // Para el daily: al cierre de ese día, req. todavía sin pedido ni salida (Javier) y lo que ya llegó y no sale a obra (Katherine y Marycarmen).
-      if(fr && fr <= dia && fr >= desde && (!fp || fp > dia) && (!fs || fs > dia) && !r.codOrden) J.pend.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fReq), fr:r.fReq, ipy:r.idProyecto || '', sol:r.responsable || '', q:r.cantidad, um:r.unidad || '' });
+      if(fr && fr <= dia && fr >= desde && (!fp || fp > dia) && (!fs || fs > dia) && !r.codOrden) J.pend.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fReq), fr:r.fReq, ipy:r.idProyecto || '', sol:r.responsable || '', q:r.cantidad, um:r.unidad || '', ln:r });
       if(fc && fc <= dia && fc >= desde && (!fs || fs > dia)) despachar.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fRecep) });
     });
     P.KALBUJAR.pend = despachar; P.MCONDORI.pend = despachar;
@@ -19123,6 +19138,7 @@ function appClickInicio(e){
   if(b.dataset.pcper != null){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
   if(b.dataset.asper != null){ APP_AS.persona = b.dataset.asper; return appRenderInicio(); }
   if(b.dataset.asdet){ APP_AS.det = !APP_AS.det; return appRenderInicio(); }
+  if(b.dataset.asrp){ APP_AS.rp = b.dataset.asrp; return appRenderInicio(); }
   if(b.dataset.repsec){ APP_REP.sec = b.dataset.repsec; return appRenderInicio(); }
   if(b.dataset.pfocs) return appPfLista(b.dataset.pfocs);
   if(b.dataset.psver) return appPsVer(b.dataset.psver);
