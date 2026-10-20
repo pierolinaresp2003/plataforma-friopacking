@@ -14507,7 +14507,9 @@ function appBienvenida(correoFijo){
     e.preventDefault();
     const c = correo.value.trim().toLowerCase(), reg = !document.getElementById('bvReg').hidden, pass = document.getElementById('bvPass');
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c)) return err('Escribe tu correo corporativo (@friopacking.pe o @grupofriopacking.pe).');
-    if(!tipoDe(c) && !appCorreoValido(c) && !/@frioteam\./.test(c)) return alta(c);
+    // Solo correos de la empresa (20.10.2026, Piero: "que los correos solo sean friopacking.pe y grupofriopacking.pe").
+    if(!/@(friopacking|grupofriopacking)\.pe$/.test(c)) return err('Solo se puede entrar con correo @friopacking.pe o @grupofriopacking.pe.');
+    if(!tipoDe(c) && !appCorreoValido(c)) return alta(c);
     if(pass.value.length < 6) return err(reg ? 'Tu clave debe tener al menos 6 caracteres.' : 'Escribe tu clave.');
     if(reg && pass.value !== document.getElementById('bvPass2').value) return err('Las dos claves no coinciden.');
     if(reg && !document.getElementById('bvCod').value.trim()) return err('Escribe el código de registro que te dio Logística.');
