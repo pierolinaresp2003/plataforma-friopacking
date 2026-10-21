@@ -431,10 +431,14 @@
   .par-svg .acum{fill:none;stroke:var(--amber);stroke-width:2.2;} .par-svg .l80{stroke:var(--red);stroke-dasharray:4 4;stroke-width:1.3;}
   .par-tabla{width:100%;border-collapse:collapse;font-size:12.5px;}
   .par-tabla th{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;text-align:left;padding:7px 8px;border-bottom:2px solid var(--border);white-space:nowrap;}
-  .par-tabla td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  .par-tabla td{padding:7px 7px;border-bottom:1px solid var(--border);vertical-align:middle;} .par-tabla th{padding:6px 7px !important;}
   .par-tabla .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
   .par-tabla .anio{color:var(--ink-soft);} .par-tabla .anio.vacio{opacity:.35;}
   .par-tabla .stk{font-weight:800;} .par-tabla .ped b{color:var(--amber);font-size:14px;} .par-tabla .ped .no{color:var(--muted);}
+  .par-tabla td.prod{min-width:200px;max-width:280px;white-space:normal;} .par-tabla td.prod b{font-weight:600;color:var(--ink);font-size:12.5px;} .par-tabla td.prod small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .par-tabla td.sal,.par-tabla .sal{color:var(--seg-a);} .par-tabla th.anio-h{text-align:center;border-bottom:1px solid var(--border);}
+  .par-tabla td.org small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;} .par-org{font-size:11.5px;font-weight:700;white-space:nowrap;}
+  .par-res{margin:6px 0 12px;background:var(--bg);border-radius:10px;overflow:hidden;} .par-res td:first-child{font-weight:700;color:var(--ink-soft);white-space:nowrap;}
   .par-cls{display:inline-block;min-width:22px;text-align:center;border-radius:6px;font-weight:800;font-size:11px;padding:2px 6px;}
   .par-cls.A{background:var(--teal);color:#fff;} .par-cls.B{background:var(--azul-bg);color:var(--brand-ink);} .par-cls.C{background:var(--bg);color:var(--ink-soft);}
   .par-mas{margin-top:10px;background:none;border:1px dashed var(--border);border-radius:8px;padding:8px 12px;color:var(--brand-ink);font-weight:700;cursor:pointer;width:100%;}
@@ -8321,7 +8325,8 @@ function invComprasPorCodigo(){
     ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){
       if(!r.codigo || !(r.anio >= 2023)) return;
       const usd = (r.moneda === 'US$' || r.moneda === 'USD') ? (+r.montoNativo || 0) : (+r.montoPEN || 0) / tc;
-      const x = m.get(r.codigo) || { usd:0, q:{} }; x.usd += usd; x.q[r.anio] = (x.q[r.anio] || 0) + (+r.cantidad || 0); m.set(r.codigo, x);
+      const x = m.get(r.codigo) || { usd:0, q:{}, org:{}, pv:{} }; x.usd += usd; x.q[r.anio] = (x.q[r.anio] || 0) + (+r.cantidad || 0);
+      x.org[r.origen || 'nacional'] = (x.org[r.origen || 'nacional'] || 0) + usd; x.pv[r.proveedor || '—'] = (x.pv[r.proveedor || '—'] || 0) + usd; m.set(r.codigo, x);
     });
     return m;
   });
@@ -8329,13 +8334,19 @@ function invComprasPorCodigo(){
 function invParetoFilas(g){
   const C = invComprasPorCodigo(), yF = appIndCorte().getUTCFullYear(), anios = []; for(let y = 2023; y <= yF; y++) anios.push(y);
   const l = g.rows.map(function(r){
-    const cods = (r.codigos && r.codigos.length) ? r.codigos : [r.codigo], q = {}; let usd = 0;
-    cods.forEach(function(c){ const x = C.get(c); if(!x) return; usd += x.usd; anios.forEach(function(y){ q[y] = (q[y] || 0) + (x.q[y] || 0); }); });
-    return { r:r, usd:usd, q:q, stock:(+r.lima || 0) + (+r.ica || 0) + (+r.trujillo || 0), pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
+    const cods = (r.codigos && r.codigos.length) ? r.codigos : [r.codigo], q = {}, sal = {}, org = {}, pv = {}; let usd = 0;
+    cods.forEach(function(c){ const x = C.get(c); if(!x) return; usd += x.usd; anios.forEach(function(y){ q[y] = (q[y] || 0) + (x.q[y] || 0); });
+      Object.keys(x.org).forEach(function(k){ org[k] = (org[k] || 0) + x.org[k]; }); Object.keys(x.pv).forEach(function(k){ pv[k] = (pv[k] || 0) + x.pv[k]; }); });
+    // Lo que salió cada año (hojas Movimientos del Reporte Almacén, las 3 sedes; el producto ya viene homologado).
+    (r.kardexMovs || []).forEach(function(m){ if(m.q < 0 && m.f){ const y = +m.f.slice(0, 4); if(y >= 2023) sal[y] = (sal[y] || 0) - m.q; } });
+    const pvTop = Object.keys(pv).sort(function(a, b){ return pv[b] - pv[a]; })[0] || '';
+    const origen = org.importado && org.nacional ? 'mixto' : org.importado ? 'importado' : org.nacional ? 'nacional' : '';
+    return { r:r, usd:usd, q:q, sal:sal, origen:origen, pv:pvTop, stock:(+r.lima || 0) + (+r.ica || 0) + (+r.trujillo || 0), pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
   }).sort(function(a, b){ return b.usd - a.usd || (b.r.consumoMensual || 0) - (a.r.consumoMensual || 0); });
   const tot = l.reduce(function(a, x){ return a + x.usd; }, 0); let ac = 0;
   l.forEach(function(x){ const antes = ac; ac += x.usd; x.acum = tot ? ac / tot : 0; x.cls = !x.usd ? '' : (antes / (tot || 1) < 0.8 ? 'A' : (antes / (tot || 1) < 0.95 ? 'B' : 'C')); });
-  return { l:l, tot:tot, anios:anios };
+  const cods = new Set(); g.rows.forEach(function(r){ ((r.codigos && r.codigos.length) ? r.codigos : [r.codigo]).forEach(function(c){ cods.add(c); }); });
+  return { l:l, tot:tot, anios:anios, cods:cods };
 }
 function invParetoHtml(g){
   const P = invParetoFilas(g), e = escapeHtml, n = function(v, d){ return v ? Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }) : '—'; };
@@ -8352,6 +8363,17 @@ function invParetoHtml(g){
       + `<text x="${pl - 6}" y="${pt + 8}" text-anchor="end">${usd(mx).replace('US$ ', '$')}</text><text x="${pl - 6}" y="${H - pb}" text-anchor="end">0</text>`
       + `<text x="${pl}" y="${H - 6}">Productos ordenados por monto comprado ${P.anios[0]}–${P.anios[P.anios.length - 1]} →</text></svg>`;
   }
+  // Resumen de la familia por año (21.10.2026, Piero: "a modo de resumen por familia la cantidad que se compró al año y la que salió").
+  const resAnio = P.anios.map(function(y){ let usdY = 0, nc = 0, ns = 0, porUm = {};
+    P.l.forEach(function(x){ const u = (x.r.unidad || '').trim() || '—', c = x.q[y] || 0, sl = x.sal[y] || 0; if(c){ nc++; } if(sl){ ns++; } if(c || sl){ const o = porUm[u] = porUm[u] || { c:0, s:0 }; o.c += c; o.s += sl; } });
+    ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.anio === y && P.cods.has(r.codigo)) usdY += (r.moneda === 'US$' || r.moneda === 'USD') ? (+r.montoNativo || 0) : (+r.montoPEN || 0) / TIPO_CAMBIO['US$']; });
+    return { y:y, usd:usdY, nc:nc, ns:ns, porUm:porUm }; });
+  const ums = [...new Set(resAnio.reduce(function(a, r){ return a.concat(Object.keys(r.porUm)); }, []))].sort(function(a, b){ return (resAnio.reduce(function(t, r){ return t + ((r.porUm[b] || {}).c || 0); }, 0)) - (resAnio.reduce(function(t, r){ return t + ((r.porUm[a] || {}).c || 0); }, 0)); }).slice(0, 4);
+  const resumen = `<table class="par-tabla par-res"><thead><tr><th>Resumen de la familia</th>${resAnio.map(function(r){ return '<th class="num" colspan="2">' + r.y + '</th>'; }).join('')}</tr>
+    <tr><th></th>${resAnio.map(function(){ return '<th class="num">Compró</th><th class="num">Salió</th>'; }).join('')}</tr></thead><tbody>
+    <tr><td>Monto comprado</td>${resAnio.map(function(r){ return '<td class="num" colspan="2"><b>' + usd(r.usd) + '</b></td>'; }).join('')}</tr>
+    ${ums.map(function(u){ return '<tr><td>Cantidad (' + e(u) + ')</td>' + resAnio.map(function(r){ const o = r.porUm[u] || { c:0, s:0 }; return '<td class="num">' + n(o.c) + '</td><td class="num sal">' + n(o.s) + '</td>'; }).join('') + '</tr>'; }).join('')}
+    <tr><td>Productos con movimiento</td>${resAnio.map(function(r){ return '<td class="num">' + (r.nc || '—') + '</td><td class="num sal">' + (r.ns || '—') + '</td>'; }).join('')}</tr></tbody></table>`;
   const ver = invParetoVer === 'todos' ? P.l : P.l.filter(function(x){ return invParetoVer === 'pedir' ? x.pedir > 0 : x.cls === 'A'; });
   const chip = function(k, t, c){ return `<button type="button" data-parver="${k}" class="${invParetoVer === k ? 'on' : ''}">${t} (${c})</button>`; };
   return `<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>
@@ -8361,13 +8383,16 @@ function invParetoHtml(g){
     <div class="par-kpis"><div><span>Productos</span><b>${n(P.l.length, 0)}</b></div><div><span>Comprado ${P.anios[0]}–${P.anios[P.anios.length - 1]}</span><b>${usd(P.tot)}</b></div>
       <div><span>Clase A (80 % del monto)</span><b>${n(A.length, 0)}</b> <small>productos</small></div><div><span>Por pedir</span><b>${n(pedir, 0)}</b> <small>productos</small></div></div>
     ${svg}
+    ${resumen}
     <div class="ks-bar" style="margin-top:10px;"><span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}</div>
-    <table class="par-tabla"><thead><tr><th>#</th><th>Código</th><th>Descripción</th><th>UM</th><th>Clase</th><th class="num">US$ comprado</th>
-      ${P.anios.map(function(y){ return '<th class="num">' + y + '</th>'; }).join('')}<th class="num">Consumo / mes</th><th class="num">Stock actual</th><th class="num">A pedir</th><th></th></tr></thead>
+    <table class="par-tabla"><thead><tr><th rowspan="2">#</th><th rowspan="2">Producto</th><th rowspan="2">Clase</th><th rowspan="2">Origen · proveedor</th><th rowspan="2" class="num">US$ comprado</th>
+      ${P.anios.map(function(y){ return '<th class="num anio-h" colspan="2">' + y + '</th>'; }).join('')}<th rowspan="2" class="num">Consumo / mes</th><th rowspan="2" class="num">Stock actual</th><th rowspan="2" class="num">A pedir</th><th rowspan="2"></th></tr>
+      <tr>${P.anios.map(function(){ return '<th class="num">Compró</th><th class="num">Salió</th>'; }).join('')}</tr></thead>
     <tbody>${ver.map(function(x, i){ const r = x.r;
-      return `<tr><td>${i + 1}</td><td class="mono">${e(r.codigo)}</td><td style="white-space:normal;">${e(r.descripcion || '—')}</td><td>${e((r.unidad || '').trim())}</td>
-        <td>${x.cls ? '<span class="par-cls ' + x.cls + '">' + x.cls + '</span>' : '—'}</td><td class="num">${usd(x.usd)}</td>
-        ${P.anios.map(function(y){ return '<td class="num anio' + (x.q[y] ? '' : ' vacio') + '">' + n(x.q[y]) + '</td>'; }).join('')}
+      return `<tr><td>${i + 1}</td><td class="prod"><b>${e(r.descripcion || '—')}</b><small><span class="mono">${e(r.codigo)}</span> · ${e((r.unidad || '').trim())}</small></td>
+        <td>${x.cls ? '<span class="par-cls ' + x.cls + '">' + x.cls + '</span>' : '—'}</td>
+        <td class="org">${x.origen ? '<span class="par-org ' + x.origen + '">' + { nacional:'🇵🇪 Nacional', importado:'🌎 Importación', mixto:'🇵🇪🌎 Mixto' }[x.origen] + '</span><small>' + e(polarCorta(appImpNombre(x.pv), 26)) + '</small>' : '—'}</td><td class="num">${usd(x.usd)}</td>
+        ${P.anios.map(function(y){ return '<td class="num anio' + (x.q[y] ? '' : ' vacio') + '">' + n(x.q[y]) + '</td><td class="num anio sal' + (x.sal[y] ? '' : ' vacio') + '">' + n(x.sal[y]) + '</td>'; }).join('')}
         <td class="num">${n(r.consumoMensual)}</td><td class="num stk" title="Lima ${n(r.lima)} · Ica ${n(r.ica)} · Trujillo ${n(r.trujillo)} · en tránsito ${n(r.transito)}">${n(x.stock)}</td>
         <td class="num ped">${x.pedir ? '<b>' + n(x.pedir, 0) + '</b>' : '<span class="no">—</span>'}</td>
         <td><button type="button" class="pedir-kdx" data-cod="${e(r.codigo)}" title="Ver el kardex de este producto">📈</button></td></tr>`; }).join('')}</tbody></table>
