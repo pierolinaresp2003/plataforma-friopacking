@@ -14696,9 +14696,16 @@ const APP_ICO_BAJA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 // Compras + Reportes en una sola pestaña, por persona (19.10.2026, Piero: "que se pueda seleccionar a una persona y de
 // ahí salga todo lo que corresponde a esa persona… debe ser individual excepto cuando se seleccione todos"). Una sola fila
 // de caras arriba (en la web junto al año, mes, cliente y el ícono de descarga); debajo: su resumen y sus compras pendientes.
+// La misma persona para los reportes (21.10.2026: se fija también al tocar la cara, ANTES de pintar, para que lo
+// guardado de cada pantalla corresponda a quien se eligió; Piero: "al colocar la cara de alguien no se actualiza bien lo de abajo").
+function appPcPersonaF(){ const cod = APP_PC.persona || ''; APP_F.indicadores.persona = cod ? (appFPersonas().find(function(v){ return pdPersona(v) === cod; }) || '') : ''; return APP_F.indicadores.persona; }
+// Solo el año (o años) del período elegido arriba (21.10.2026, Piero: "debe ser solo del año igual en lo que sale abajo en
+// las tablas"; la data ahora trae desde 2023). Sin período (todos los años) no filtra. Fechas vacías se dejan.
+function appFEnAnios(st){ const r = appFRango(st); if(!r) return function(){ return true; };
+  const a = (r.desde || appIndCorte()).getUTCFullYear(), b = (r.hasta || appIndCorte()).getUTCFullYear();
+  return function(f){ if(!f) return true; const y = new Date(+f).getUTCFullYear(); return y >= a && y <= b; }; }
 function appComprasHtml(){
-  const cod = APP_PC.persona || '', vF = cod ? (appFPersonas().find(function(v){ return pdPersona(v) === cod; }) || '') : '';
-  APP_F.indicadores.persona = vF;   // la misma persona para los reportes
+  const cod = APP_PC.persona || '', vF = appPcPersonaF();
   const st = APP_F.indicadores, e = escapeHtml, nom = function(c){ return (PD_PERSONAS[c] || c || '').split(' ')[0]; };
   const gente = new Set(); pdFilas().forEach(function(r){ if(r.persona) gente.add(r.persona); });
   appFPersonas().forEach(function(v){ const c = pdPersona(v); if(APP_DAILY_EQUIPO.indexOf(c) !== -1) gente.add(c); });
@@ -14721,6 +14728,7 @@ function appComprasHtml(){
 // pendientes; en "Todos": los tiempos de Almacén y los pendientes de todos. El período de los reportes es el de la barra.
 const APP_AS = { persona:'', det:false, rp:'stock', pry:'' };
 function appAlmSegHtml(){
+  APP_F.indicadores.persona = '';   // los reportes son compartidos con Compras: aquí sin el comprador elegido allá (21.10.2026)
   const cod = APP_AS.persona || '', e = escapeHtml, st = APP_F.indicadores, r = appFRango(st), jav = cod === 'JCENTENO';
   const corte = isoDay(appIndCorte());   // hasta la fecha de corte: hay guías con fechas mal digitadas (año 2100)
   APP_AR.per = 'custom'; APP_AR.desde = r ? appIndIso(r.desde) : '2020-01-01'; APP_AR.hasta = r && appIndIso(r.hasta) < corte ? appIndIso(r.hasta) : corte; APP_AR.sub = jav ? 'jav' : 'kat';
@@ -14732,8 +14740,10 @@ function appAlmSegHtml(){
   // Javier y Marycarmen: los req. por pasar a pedido en lista, como los pendientes de Compras (20.10.2026, Piero).
   // Con una persona, sus pedidos generados van dentro del "detalle completo" y arriba quedan sus pendientes, como en Compras (20.10.2026, Piero).
   const regPed = appSecHtml('📝', 'Pedidos generados', 'req → pedido · ' + e(appFLabel(Object.assign({}, st, { persona:'' }))), almPedRegHtml(cod, st));
-  const pend = cod === 'JCENTENO' || cod === 'MCONDORI' ? almReqPedHtml(P.JCENTENO.pend)
-    : (cod ? [cod] : ['JCENTENO', 'KALBUJAR']).map(function(c){ return almPendCard(P[c], appDailyColor(c)); }).join('');
+  // Solo el año elegido arriba (21.10.2026, Piero: "igual para almacén").
+  const enAnio = appFEnAnios(st), delAnio = function(x){ return Object.assign({}, x, { pend:x.pend.filter(function(p){ return enAnio(p.fr || p.fc); }) }); };
+  const pend = cod === 'JCENTENO' || cod === 'MCONDORI' ? almReqPedHtml(delAnio(P.JCENTENO).pend)
+    : (cod ? [cod] : ['JCENTENO', 'KALBUJAR']).map(function(c){ return almPendCard(delAnio(P[c]), appDailyColor(c)); }).join('');
   return `<div class="cmp-top">${caras}${appFBarra('indicadores', { pry:1 })}${baja}</div>`
     + (cod ? `<button type="button" class="cmp-det${APP_AS.det ? ' on' : ''}" data-asdet="1">${APP_AS.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom)}</button>${APP_AS.det ? (pedAlm ? almHojasHtml(cod) : '') + (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` : '') + appAlmRepCuerpo() : ''}`
         : (gerAbierto ? appIndicadoresHtml(true) : ''))
@@ -15296,7 +15306,7 @@ function appDailyAlmDatos(dia){
       if(X){ const g = X.ped.get(r.codPedido) || { k:r.codPedido, req:r.codRequerimiento || '', pry:r.proyecto || '', n:0, pr:[] }; g.n++; g.pr.push(r.producto || ''); X.ped.set(r.codPedido, g); X.items++; }
       // Para el daily: al cierre de ese día, req. todavía sin pedido ni salida (Javier) y lo que ya llegó y no sale a obra (Katherine y Marycarmen).
       if(fr && fr <= dia && fr >= desde && (!fp || fp > dia) && (!fs || fs > dia) && !r.codOrden) J.pend.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fReq), fr:r.fReq, ipy:r.idProyecto || '', sol:r.responsable || '', q:r.cantidad, um:r.unidad || '', ln:r });
-      if(fc && fc <= dia && fc >= desde && (!fs || fs > dia)) despachar.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fRecep) });
+      if(fc && fc <= dia && fc >= desde && (!fs || fs > dia)) despachar.push({ req:r.codRequerimiento || '', pr:r.producto || '', pry:r.proyecto || '', d:dh(r.fRecep), fc:r.fRecep });
     });
     P.KALBUJAR.pend = despachar; P.MCONDORI.pend = despachar;
     const sinResp = new Set();
@@ -17209,7 +17219,8 @@ function appPendComprasHtml(soloLista, sinCaras){
   const personas = new Map(); todas.forEach(function(r){ personas.set(r.persona, (personas.get(r.persona) || 0) + 1); });
   // El buscador busca en todo, aunque haya un comprador elegido (13.10.2026, Piero).
   const per = APP_PC.q && soloLista !== 'datos' ? '' : APP_PC.persona;
-  const filas = per ? todas.filter(function(r){ return r.persona === per; }) : todas;
+  const enAnio = sinCaras && !APP_PC.q ? appFEnAnios(APP_F.indicadores) : function(){ return true; };   // solo el año de arriba (21.10.2026)
+  const filas = (per ? todas.filter(function(r){ return r.persona === per; }) : todas).filter(function(r){ return enAnio(r.tipo === 'oc' ? (r.fOrden || r.fCompromiso) : r.fPedido); });
   const ocs = new Map(), peds = new Map();
   filas.forEach(function(r){
     const pry = /^pedido directo/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : (r.proyecto || '');
@@ -17228,7 +17239,9 @@ function appPendComprasHtml(soloLista, sinCaras){
   // Entregadas: del año / mes elegido (por defecto el mes en curso); con el buscador, todas.
   const entAll = appEntregadas().filter(function(o){ return !per || o.persona === per; });
   // Entregadas vuelve a ser pestaña (12.10.2026, Piero: "una pestaña que muestre las OC que se entregaron").
-  const entY = +APP_PC.entAnio || c.getUTCFullYear(), entM = APP_PC.entMes === '0' ? 0 : (+APP_PC.entMes || (APP_PC.entAnio ? 0 : c.getUTCMonth() + 1));
+  // Por defecto, el año elegido arriba (21.10.2026): si no es el año en curso, todo ese año.
+  const rF = sinCaras ? appFRango(APP_F.indicadores) : null, yBar = rF ? Math.min(rF.hasta.getUTCFullYear(), c.getUTCFullYear()) : 0;
+  const entY = +APP_PC.entAnio || yBar || c.getUTCFullYear(), entM = APP_PC.entMes === '0' ? 0 : (+APP_PC.entMes || (APP_PC.entAnio || (yBar && yBar !== c.getUTCFullYear()) ? 0 : c.getUTCMonth() + 1));
   const entPer = entAll.filter(function(o){ return o.f && o.f.getUTCFullYear() === entY && (!entM || o.f.getUTCMonth() + 1 === entM); });
   const S = { venc:['🔴', 'Vencidas', 'vc', venc, 'Ya pasó la fecha de entrega · la más atrasada primero'],
     luego:['🔵', 'Más adelante', 'lu', luego, 'Todavía no vence · la entrega más próxima primero'], ped:['⚪', 'Pedidos sin OC', 'pd', pl, 'Compras todavía no emite la orden · el más antiguo primero'],
@@ -19279,8 +19292,8 @@ function appClickInicio(e){
   if(b.dataset.geperiodo){ APP_GE.per = b.dataset.geperiodo; return appRenderInicio(); }
   if(b.dataset.geingresos) return appIngresosAbrir();
   if(b.dataset.fcara != null){ const w = b.closest('[data-fbar]'); if(w){ APP_F[w.dataset.fbar].persona = b.dataset.fcara; return appRenderInicio(); } }
-  if(b.dataset.pcper != null){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
-  if(b.dataset.asper != null){ APP_AS.persona = b.dataset.asper; return appRenderInicio(); }
+  if(b.dataset.pcper != null){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; if(APP.pantalla === 'pendcompras') appPcPersonaF(); return appRenderInicio(); }
+  if(b.dataset.asper != null){ APP_AS.persona = b.dataset.asper; APP_F.indicadores.persona = ''; return appRenderInicio(); }
   if(b.dataset.asdet){ APP_AS.det = !APP_AS.det; return appRenderInicio(); }
   if(b.dataset.asrp){ APP_AS.rp = b.dataset.asrp; APP_AS.pry = ''; return appRenderInicio(); }
   if(b.dataset.aspry != null){ APP_AS.pry = b.dataset.aspry; appRenderInicio(); return window.scrollTo(0, document.querySelector('.imp-tabs') ? document.querySelector('.imp-tabs').getBoundingClientRect().top + window.scrollY - 90 : 0); }
@@ -19322,7 +19335,7 @@ function appClickInicio(e){
       const bt = document.querySelector('#invLista [data-invsel="' + CSS.escape(cod) + '"]'), card = bt && bt.closest('.m-prod'); if(x && card) card.outerHTML = appInvTarjeta(x); };
     pinta(antes); if(APP_INV.sel && APP_INV.sel !== antes) pinta(APP_INV.sel); return; }
   if(b.dataset.invbuscar){ APP_INV.q = b.dataset.invbuscar; APP_INV.sel = b.dataset.invbuscar; return appInicio('inventario'); }
-  if(b.dataset.pcper !== undefined){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
+  if(b.dataset.pcper !== undefined){ APP_PC.persona = b.dataset.pcper; APP_PC.tope = 20; APP_PC.fam = ''; if(APP.pantalla === 'pendcompras') appPcPersonaF(); return appRenderInicio(); }
   if(b.dataset.pcdet){ APP_PC.det = !APP_PC.det; return appRenderInicio(); }
   if(b.dataset.pcsec){ APP_PC.sec = b.dataset.pcsec; APP_PC.q = ''; APP_PC.tope = 20; return appRenderInicio(); }
   if(b.dataset.pcmas){ APP_PC.tope += 30; return appRenderInicio(); }
