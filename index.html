@@ -450,6 +450,8 @@
   .ks-svg{width:100%;height:auto;display:block;} .ks-svg text{font-size:11px;fill:var(--ink-soft);}
   .ks-svg .grid{stroke:var(--border);} .ks-svg .in{fill:var(--green);} .ks-svg .out{fill:var(--seg-a);}
   .ks-svg .stk{fill:none;stroke:var(--ink);stroke-width:2.2;} .ks-svg .dot{fill:var(--card);stroke:var(--ink);stroke-width:2;}
+  .ks-svg .kband{fill:var(--ink);opacity:.045;} .ks-svg .kyear{stroke:var(--ink-soft);stroke-dasharray:2 4;} .ks-svg text.kylbl{font-size:12px;font-weight:800;}
+  .ks-svg .rop{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:6 4;} .ks-svg text.roplbl{fill:var(--amber);font-weight:700;} .ks-svg .dot.in{stroke:var(--green);} .ks-svg .dot.out{stroke:var(--seg-a);}
   .ks-svg .cons{stroke:var(--amber);stroke-width:1.6;stroke-dasharray:6 4;} .ks-svg .hit{fill:transparent;cursor:pointer;} .ks-svg .hit:hover{fill:rgba(90,120,170,.08);}
   .ks-tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--ink);display:none;white-space:nowrap;z-index:5;}
   .ks-ley{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin:6px 0 10px;}
@@ -8306,7 +8308,7 @@ function drawPedirPorCategoria(){
 }
 // ---------- Inventario simple (21.10.2026, Piero) ----------
 const INV_SIMPLE = true;
-let invParetoVer = 'A', kdxAnio = 'u12', kmvAbierto = '';   // Pareto: 'A' (clase A), 'pedir' o 'todos'
+let invParetoVer = 'A', kdxAnio = 'todo', kmvAbierto = '';   // Pareto: 'A' (clase A), 'pedir' o 'todos'
 // Compras por código y año desde Consulta (OC atendidas/aprobadas): cantidad y monto en US$ (US$ tal cual; soles y euros convertidos
 // con el tipo de cambio de referencia de la plataforma).
 function invComprasPorCodigo(){
@@ -8374,63 +8376,75 @@ function invParetoBind(box, g){
   const volver = box.querySelector('#pedirVolver'); if(volver) volver.addEventListener('click', function(){ pedirCatSel = null; invParetoVer = 'A'; drawPedirPorCategoria(); });
   box.querySelectorAll('.pedir-kdx').forEach(function(btn){ btn.addEventListener('click', function(){ kardexCodigoDirecto = btn.dataset.cod; drawKardex(); const card = document.getElementById('kardexCard'); if(card) card.scrollIntoView({ behavior:'smooth', block:'start' }); }); });
 }
-// Producto: vista simple (21.10.2026, Piero): stock por sede, consumo mensual, punto de reorden y cuánto pedir; gráfico de barras por
-// mes (lo que entró y lo que salió) con la línea del stock al cierre de cada mes; se elige sede y año, y al pasar el mouse sale el detalle.
+// Producto: vista simple (21.10.2026, Piero): stock por sede, consumo mensual, punto de reorden y cuánto pedir. El gráfico muestra cada
+// movimiento tal cual (Piero: "quiero ver el movimiento tal cual según ingreso y salida, no un resumen por mes… que se vean todos los años
+// a la vez"): arriba la línea del stock después de cada ingreso/salida, abajo cada movimiento como barra (verde entra, azul sale), con
+// todos los años juntos (franja por año). Al pasar el mouse sale el detalle; se puede acercar a un año con los botones.
 function drawKardexSimple(p){
   const box = document.getElementById('kardexChart'), e = escapeHtml, um = e((p.unidad || '').trim());
   const n = function(v, d){ return v == null || isNaN(v) ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }); };
   const suc = kardexSucursal || 'lima', meses = Math.max(0, Number((document.getElementById('mesesAbastecer') || {}).value) || 3);
   let pr = null; try{ pr = pedirRowsFor(meses, 'todos').rows.find(function(x){ return x.codigo === p.codigo; }); }catch(err){}
-  const aPedir = pr && pr.hayQuePedir !== false && pr.aPedir > 0 ? Math.round(pr.aPedir) : 0;
-  const movs = (p.kardexMovs || []).filter(function(m){ return (m.s || 'lima') === suc; });
-  const corte = appIndCorte(), yC = corte.getUTCFullYear(), mC = corte.getUTCMonth(), MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'];
-  const M = new Map(); let fMin = '';
-  movs.forEach(function(m){ if(!m.f) return; const k = m.f.slice(0, 7), x = M.get(k) || { inn:0, out:0 }; if(m.q > 0) x.inn += m.q; else x.out -= m.q; M.set(k, x); if(!fMin || m.f < fMin) fMin = m.f; });
-  const y0 = fMin ? Math.min(+fMin.slice(0, 4), yC) : yC, keys = [];
-  for(let y = y0; y <= yC; y++) for(let mo = 0; mo < 12; mo++){ if(y === yC && mo > mC) break; keys.push(y + '-' + String(mo + 1).padStart(2, '0')); }
-  // Stock al cierre de cada mes, hacia atrás desde el stock actual de la sede.
-  const fin = {}; let st = +p[suc] || 0;
-  for(let i = keys.length - 1; i >= 0; i--){ fin[keys[i]] = st; const x = M.get(keys[i]); if(x) st = st - x.inn + x.out; }
+  const aPedir = pr && pr.hayQuePedir !== false && pr.aPedir > 0 ? Math.round(pr.aPedir) : 0, rop = ropEfectivo(p), cons = +p.consumoMensual || 0;
+  const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'], DIA = 864e5;
+  // Movimientos de la sede, en orden; stock antes/después de cada uno, hacia atrás desde el stock actual.
+  const mv = (p.kardexMovs || []).filter(function(m){ return m.f && (m.s || 'lima') === suc && m.q; }).map(function(m, i){ return { f:m.f, t:+fromIsoDay(m.f), q:m.q, i:i }; })
+    .sort(function(a, b){ return a.t - b.t || a.i - b.i; });
+  let st = +p[suc] || 0; for(let i = mv.length - 1; i >= 0; i--){ mv[i].des = st; st -= mv[i].q; mv[i].ant = st; }
+  const corte = appIndCorte(), yC = corte.getUTCFullYear(), y0 = mv.length ? Math.min(new Date(mv[0].t).getUTCFullYear(), yC) : yC;
   const anios = []; for(let y = y0; y <= yC; y++) anios.push(y);
-  if(kdxAnio !== 'u12' && anios.indexOf(+kdxAnio) === -1) kdxAnio = 'u12';
-  const vis = kdxAnio === 'u12' ? keys.slice(-12) : keys.filter(function(k){ return +k.slice(0, 4) === +kdxAnio; });
-  const cons = +p.consumoMensual || 0;
-  const tiles = `<div class="ks-tiles">${KARDEX_SUCURSALES.map(function(s){ return '<div><span>' + e(s.key === 'lima' ? 'Lima' : s.label) + '</span><b>' + n(p[s.key]) + '</b></div>'; }).join('')}
-    <div><span>En tránsito</span><b>${n(p.transito)}</b></div><div><span>Consumo / mes</span><b>${n(cons)}</b></div><div><span>Punto de reorden</span><b>${n(ropEfectivo(p))}</b></div>
+  if(kdxAnio !== 'todo' && anios.indexOf(+kdxAnio) === -1) kdxAnio = 'todo';
+  const t0 = kdxAnio === 'todo' ? Date.UTC(y0, 0, 1) : Date.UTC(+kdxAnio, 0, 1), t1 = kdxAnio === 'todo' || +kdxAnio === yC ? +corte + DIA : Date.UTC(+kdxAnio + 1, 0, 1);
+  const vis = mv.filter(function(m){ return m.t >= t0 && m.t < t1; });
+  const ini = vis.length ? vis[0].ant : (mv.filter(function(m){ return m.t < t0; }).pop() || { des: +p[suc] || 0 }).des;
+  const tiles = `<div class="ks-tiles">${KARDEX_SUCURSALES.map(function(x){ return '<div><span>' + e(x.key === 'lima' ? 'Lima' : x.label) + '</span><b>' + n(p[x.key]) + '</b></div>'; }).join('')}
+    <div><span>En tránsito</span><b>${n(p.transito)}</b></div><div><span>Consumo / mes</span><b>${n(cons)}</b></div><div><span>Punto de reorden</span><b>${n(rop)}</b></div>
     <div class="ped"><span>A pedir (${n(meses)} ${meses === 1 ? 'mes' : 'meses'})</span><b>${aPedir ? n(aPedir, 0) + ' ' + um : 'No'}</b></div></div>`;
-  const bar = `<div class="ks-bar"><span class="lbl">Sede</span>${KARDEX_SUCURSALES.map(function(s){ return `<button type="button" data-ksuc="${s.key}" class="${s.key === suc ? 'on' : ''}">${e(s.label)}</button>`; }).join('')}
-    <span class="sep"></span><span class="lbl">Período</span><button type="button" data-kanio="u12" class="${kdxAnio === 'u12' ? 'on' : ''}">Últimos 12 meses</button>${anios.map(function(y){ return `<button type="button" data-kanio="${y}" class="${String(kdxAnio) === String(y) ? 'on' : ''}">${y}</button>`; }).join('')}</div>`;
-  // Gráfico
-  const W = 1000, H = 300, pl = 52, pr2 = 16, pt = 14, pb = 30, D = vis.map(function(k){ const x = M.get(k) || { inn:0, out:0 }; return { k:k, inn:x.inn, out:x.out, fin:fin[k] }; });
-  const vals = D.reduce(function(a, d){ return a.concat([d.inn, d.out, d.fin]); }, [cons, 1]), mx = Math.max.apply(null, vals), mn = Math.min(0, Math.min.apply(null, vals));
-  const yv = function(v){ return pt + (H - pt - pb) * (mx - v) / ((mx - mn) || 1); }, cw = (W - pl - pr2) / Math.max(1, D.length);
-  let g = ''; for(let i = 0; i <= 4; i++){ const v = mn + (mx - mn) * i / 4, y = yv(v); g += `<line class="grid" x1="${pl}" x2="${W - pr2}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"/><text x="${pl - 6}" y="${(y + 4).toFixed(1)}" text-anchor="end">${n(v, v < 10 ? 1 : 0)}</text>`; }
-  const bw = Math.min(26, cw * 0.32), y0v = yv(0);
-  const barras = D.map(function(d, i){ const cx = pl + cw * i + cw / 2;
-    return `<rect class="in" x="${(cx - bw - 1).toFixed(1)}" y="${yv(d.inn).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, y0v - yv(d.inn)).toFixed(1)}" rx="2"/>`
-      + `<rect class="out" x="${(cx + 1).toFixed(1)}" y="${yv(d.out).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, y0v - yv(d.out)).toFixed(1)}" rx="2"/>`
-      + `<text x="${cx.toFixed(1)}" y="${H - 10}" text-anchor="middle">${MES[+d.k.slice(5) - 1]}${kdxAnio === 'u12' && (i === 0 || d.k.slice(5) === '01') ? ' ’' + d.k.slice(2, 4) : ''}</text>`; }).join('');
-  const linea = D.map(function(d, i){ return (pl + cw * i + cw / 2).toFixed(1) + ',' + yv(d.fin).toFixed(1); }).join(' ');
-  const puntos = D.map(function(d, i){ return `<circle class="dot" cx="${(pl + cw * i + cw / 2).toFixed(1)}" cy="${yv(d.fin).toFixed(1)}" r="3.5"/>`; }).join('');
-  const hits = D.map(function(d, i){ return `<rect class="hit" x="${(pl + cw * i).toFixed(1)}" y="${pt}" width="${cw.toFixed(1)}" height="${H - pt - pb}" data-kmes="${i}"/>`; }).join('');
-  const svg = `<svg class="ks-svg" viewBox="0 0 ${W} ${H}">${g}${cons ? `<line class="cons" x1="${pl}" x2="${W - pr2}" y1="${yv(cons).toFixed(1)}" y2="${yv(cons).toFixed(1)}"/>` : ''}${barras}<polyline class="stk" points="${linea}"/>${puntos}${hits}</svg>`;
-  const totIn = D.reduce(function(a, d){ return a + d.inn; }, 0), totOut = D.reduce(function(a, d){ return a + d.out; }, 0);
-  const tabla = `<table class="ks-mes"><thead><tr><th></th>${D.map(function(d){ return '<th>' + MES[+d.k.slice(5) - 1] + (kdxAnio === 'u12' ? ' ’' + d.k.slice(2, 4) : '') + '</th>'; }).join('')}<th>Total</th></tr></thead><tbody>
-    <tr><td>Entró</td>${D.map(function(d){ return '<td>' + (d.inn ? n(d.inn) : '·') + '</td>'; }).join('')}<td><b>${n(totIn)}</b></td></tr>
-    <tr><td>Salió</td>${D.map(function(d){ return '<td>' + (d.out ? n(d.out) : '·') + '</td>'; }).join('')}<td><b>${n(totOut)}</b></td></tr>
-    <tr><td>Stock al cierre</td>${D.map(function(d){ return '<td>' + n(d.fin) + '</td>'; }).join('')}<td></td></tr></tbody></table>`;
+  const bar = `<div class="ks-bar"><span class="lbl">Sede</span>${KARDEX_SUCURSALES.map(function(x){ return `<button type="button" data-ksuc="${x.key}" class="${x.key === suc ? 'on' : ''}">${e(x.label)}</button>`; }).join('')}
+    <span class="sep"></span><span class="lbl">Ver</span><button type="button" data-kanio="todo" class="${kdxAnio === 'todo' ? 'on' : ''}">Todos los años</button>${anios.map(function(y){ return `<button type="button" data-kanio="${y}" class="${String(kdxAnio) === String(y) ? 'on' : ''}">${y}</button>`; }).join('')}</div>`;
+  // Escalas: arriba el stock (con el punto de reorden), abajo cada movimiento.
+  const W = 1000, pl = 56, pr2 = 16, Ht = 230, Hb = 120, gap = 18, pb = 26, H = Ht + gap + Hb + pb, plotW = W - pl - pr2;
+  const x = function(t){ return pl + (t - t0) / ((t1 - t0) || 1) * plotW; };
+  const sv = vis.reduce(function(a, m){ return a.concat([m.ant, m.des]); }, [ini, rop || 0, 0]), sMax = Math.max.apply(null, sv) || 1, sMin = Math.min(0, Math.min.apply(null, sv));
+  const ys = function(v){ return 8 + (Ht - 16) * (sMax - v) / ((sMax - sMin) || 1); };
+  const qMax = Math.max.apply(null, vis.map(function(m){ return Math.abs(m.q); }).concat([1])), yb0 = Ht + gap + Hb / 2;
+  const yq = function(q){ return yb0 - q / qMax * (Hb / 2 - 4); };
+  let fondo = '';
+  for(let y = new Date(t0).getUTCFullYear(), k = 0; Date.UTC(y, 0, 1) < t1; y++, k++){ const a1 = Math.max(t0, Date.UTC(y, 0, 1)), a2 = Math.min(t1, Date.UTC(y + 1, 0, 1)), xa = x(a1), xb = x(a2);
+    if(k % 2 === 1) fondo += `<rect class="kband" x="${xa.toFixed(1)}" y="0" width="${(xb - xa).toFixed(1)}" height="${Ht + gap + Hb}"/>`;
+    if(k > 0) fondo += `<line class="kyear" x1="${xa.toFixed(1)}" x2="${xa.toFixed(1)}" y1="0" y2="${Ht + gap + Hb}"/>`;
+    if(xb - xa > 30) fondo += `<text class="kylbl" x="${((xa + xb) / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${kdxAnio === 'todo' ? y : ''}</text>`;
+    if(kdxAnio !== 'todo') for(let mo = 0; mo < 12; mo++){ const tm = Date.UTC(y, mo, 1); if(tm < t0 || tm >= t1) continue; fondo += `<text x="${x(tm).toFixed(1)}" y="${H - 8}">${MES[mo]}</text>`; } }
+  let grid = ''; for(let i = 0; i <= 4; i++){ const v = sMin + (sMax - sMin) * i / 4, yy = ys(v); grid += `<line class="grid" x1="${pl}" x2="${W - pr2}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}"/><text x="${pl - 6}" y="${(yy + 4).toFixed(1)}" text-anchor="end">${n(v, v < 10 ? 1 : 0)}</text>`; }
+  grid += `<text x="${pl - 6}" y="${(yq(qMax) + 4).toFixed(1)}" text-anchor="end">+${n(qMax, 0)}</text><text x="${pl - 6}" y="${(yq(-qMax) + 4).toFixed(1)}" text-anchor="end">−${n(qMax, 0)}</text><line class="grid" x1="${pl}" x2="${W - pr2}" y1="${yb0}" y2="${yb0}"/>`;
+  // Línea del stock en escalones: plano hasta cada movimiento y ahí sube o baja.
+  let d = `M${pl},${ys(ini).toFixed(1)}`; vis.forEach(function(m){ const xx = x(m.t).toFixed(1); d += ` H${xx} V${ys(m.des).toFixed(1)}`; }); d += ` H${W - pr2}`;
+  const ropL = rop ? `<line class="rop" x1="${pl}" x2="${W - pr2}" y1="${ys(rop).toFixed(1)}" y2="${ys(rop).toFixed(1)}"/><text class="roplbl" x="${W - pr2 - 4}" y="${(ys(rop) - 4).toFixed(1)}" text-anchor="end">Punto de reorden ${n(rop)}</text>` : '';
+  const bw = Math.max(2, Math.min(8, plotW / Math.max(60, vis.length) * 0.7));
+  const marcas = vis.map(function(m, i){ const xx = x(m.t), c = m.q > 0 ? 'in' : 'out';
+    return `<rect class="${c}" x="${(xx - bw / 2).toFixed(1)}" y="${Math.min(yq(m.q), yb0).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(yq(m.q) - yb0)).toFixed(1)}" rx="1"/>`
+      + `<circle class="dot ${c}" cx="${xx.toFixed(1)}" cy="${ys(m.des).toFixed(1)}" r="3.4"/>`
+      + `<rect class="hit" x="${(xx - Math.max(4, bw)).toFixed(1)}" y="0" width="${(Math.max(4, bw) * 2).toFixed(1)}" height="${Ht + gap + Hb}" data-kmv="${i}"/>`; }).join('');
+  const svg = `<svg class="ks-svg" viewBox="0 0 ${W} ${H}">${fondo}${grid}${ropL}<path class="stk" d="${d}"/>${marcas}<text x="${pl + 6}" y="${Ht + gap + 10}">Movimientos (verde entra · azul sale)</text></svg>`;
+  // Resumen por año (todos los años a la vez).
+  const pa = anios.map(function(y){ const l = mv.filter(function(m){ return new Date(m.t).getUTCFullYear() === y; }), last = l.length ? l[l.length - 1].des : null;
+    return { y:y, inn:l.reduce(function(a, m){ return a + (m.q > 0 ? m.q : 0); }, 0), out:l.reduce(function(a, m){ return a + (m.q < 0 ? -m.q : 0); }, 0), n:l.length, fin:last }; });
+  const tabla = `<table class="ks-mes"><thead><tr><th></th>${pa.map(function(r){ return '<th>' + r.y + '</th>'; }).join('')}</tr></thead><tbody>
+    <tr><td>Entró</td>${pa.map(function(r){ return '<td>' + (r.inn ? n(r.inn) : '·') + '</td>'; }).join('')}</tr>
+    <tr><td>Salió</td>${pa.map(function(r){ return '<td>' + (r.out ? n(r.out) : '·') + '</td>'; }).join('')}</tr>
+    <tr><td>Salió por mes (prom.)</td>${pa.map(function(r){ const ms = r.y === yC ? corte.getUTCMonth() + 1 : 12; return '<td>' + (r.out ? n(r.out / ms) : '·') + '</td>'; }).join('')}</tr>
+    <tr><td>Movimientos</td>${pa.map(function(r){ return '<td>' + (r.n || '·') + '</td>'; }).join('')}</tr></tbody></table>`;
   box.innerHTML = tiles + bar + `<div class="ks-chart">${svg}<div class="ks-tip" id="ksTip"></div></div>`
-    + `<div class="ks-ley"><span><i style="background:var(--green)"></i>Entró</span><span><i style="background:var(--seg-a)"></i>Salió</span><span><i style="background:var(--ink);height:3px"></i>Stock al cierre del mes</span>${cons ? '<span><i style="background:var(--amber);height:2px"></i>Consumo mensual (' + n(cons) + ' ' + um + ')</span>' : ''}<span>· Salió en el período: <b>${n(totOut)}</b> ${um} (≈ ${n(totOut / Math.max(1, D.length))} por mes)</span></div>` + tabla;
+    + `<div class="ks-ley"><span><i style="background:var(--ink);height:3px"></i>Stock después de cada movimiento</span><span><i style="background:var(--green)"></i>Ingreso</span><span><i style="background:var(--seg-a)"></i>Salida</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${vis.length} movimientos${kdxAnio === 'todo' ? ' desde ' + y0 : ' en ' + kdxAnio}</span></div>` + tabla;
   box.querySelectorAll('[data-ksuc]').forEach(function(b){ b.addEventListener('click', function(){ kardexSucursal = b.dataset.ksuc; drawKardexSimple(p); }); });
   box.querySelectorAll('[data-kanio]').forEach(function(b){ b.addEventListener('click', function(){ kdxAnio = b.dataset.kanio; drawKardexSimple(p); }); });
   const tip = box.querySelector('#ksTip'), ch = box.querySelector('.ks-chart');
   box.querySelectorAll('.ks-svg .hit').forEach(function(h){
-    h.addEventListener('mouseenter', function(){ const d = D[+h.dataset.kmes], k = d.k;
-      tip.innerHTML = `<b>${MES[+k.slice(5) - 1]} ${k.slice(0, 4)}</b><br>Entró: <b>${n(d.inn)}</b> ${um}<br>Salió: <b>${n(d.out)}</b> ${um}<br>Stock al cierre: <b>${n(d.fin)}</b> ${um}`;
+    h.addEventListener('mouseenter', function(){ const m = vis[+h.dataset.kmv], f = new Date(m.t);
+      tip.innerHTML = `<b>${f.getUTCDate()} ${MES[f.getUTCMonth()]} ${f.getUTCFullYear()}</b> · ${m.q > 0 ? '<span style="color:var(--green)">Ingreso</span>' : '<span style="color:var(--seg-a)">Salida</span>'}<br>Cantidad: <b>${m.q > 0 ? '+' : '−'}${n(Math.abs(m.q))}</b> ${um}<br>Stock: ${n(m.ant)} → <b>${n(m.des)}</b> ${um}`;
       tip.style.display = 'block'; });
-    h.addEventListener('mousemove', function(ev){ const r = ch.getBoundingClientRect(); let x = ev.clientX - r.left + 14; if(x + 170 > r.width) x -= 190; tip.style.left = x + 'px'; tip.style.top = (ev.clientY - r.top - 10) + 'px'; });
+    h.addEventListener('mousemove', function(ev){ const r = ch.getBoundingClientRect(); let xx = ev.clientX - r.left + 14; if(xx + 180 > r.width) xx -= 200; tip.style.left = xx + 'px'; tip.style.top = (ev.clientY - r.top - 10) + 'px'; });
     h.addEventListener('mouseleave', function(){ tip.style.display = 'none'; });
-    h.addEventListener('click', function(){ h.dispatchEvent(new Event('mouseenter')); });
   });
 }
 function drawPedirDetalle(grupos){
