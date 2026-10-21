@@ -452,6 +452,10 @@
   .ks-svg .stk{fill:none;stroke:var(--ink);stroke-width:2.2;} .ks-svg .dot{fill:var(--card);stroke:var(--ink);stroke-width:2;}
   .ks-svg .kband{fill:var(--ink);opacity:.045;} .ks-svg .kyear{stroke:var(--ink-soft);stroke-dasharray:2 4;} .ks-svg text.kylbl{font-size:12px;font-weight:800;}
   .ks-svg .rop{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:6 4;} .ks-svg text.roplbl{fill:var(--amber);font-weight:700;} .ks-svg .dot.in{stroke:var(--green);} .ks-svg .dot.out{stroke:var(--seg-a);}
+  .ks-svg .area{stroke:none;} .ks-svg .stk{stroke:var(--teal) !important;stroke-width:2.4 !important;stroke-linejoin:round;} .ks-svg .tick{stroke:var(--ink-soft);}
+  .ks-svg .guia{stroke:var(--ink-soft);stroke-width:1;stroke-dasharray:3 3;pointer-events:none;} .ks-svg .foco{fill:var(--card);stroke:var(--teal);stroke-width:2.5;pointer-events:none;}
+  .ks-svg .sel{fill:rgba(26,156,134,.12);stroke:var(--teal);stroke-width:1;pointer-events:none;} .ks-svg .capa{fill:transparent;cursor:crosshair;} .ks-svg text.sub{font-size:10.5px;font-weight:700;}
+  .ks-hint{margin-left:auto;font-size:11.5px;color:var(--ink-soft);}
   .ks-svg .cons{stroke:var(--amber);stroke-width:1.6;stroke-dasharray:6 4;} .ks-svg .hit{fill:transparent;cursor:pointer;} .ks-svg .hit:hover{fill:rgba(90,120,170,.08);}
   .ks-tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--ink);display:none;white-space:nowrap;z-index:5;}
   .ks-ley{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin:6px 0 10px;}
@@ -8376,10 +8380,12 @@ function invParetoBind(box, g){
   const volver = box.querySelector('#pedirVolver'); if(volver) volver.addEventListener('click', function(){ pedirCatSel = null; invParetoVer = 'A'; drawPedirPorCategoria(); });
   box.querySelectorAll('.pedir-kdx').forEach(function(btn){ btn.addEventListener('click', function(){ kardexCodigoDirecto = btn.dataset.cod; drawKardex(); const card = document.getElementById('kardexCard'); if(card) card.scrollIntoView({ behavior:'smooth', block:'start' }); }); });
 }
-// Producto: vista simple (21.10.2026, Piero): stock por sede, consumo mensual, punto de reorden y cuánto pedir. El gráfico muestra cada
-// movimiento tal cual (Piero: "quiero ver el movimiento tal cual según ingreso y salida, no un resumen por mes… que se vean todos los años
-// a la vez"): arriba la línea del stock después de cada ingreso/salida, abajo cada movimiento como barra (verde entra, azul sale), con
-// todos los años juntos (franja por año). Al pasar el mouse sale el detalle; se puede acercar a un año con los botones.
+// Producto: vista simple (21.10.2026, Piero): stock por sede, consumo mensual, punto de reorden y cuánto pedir. Gráfico (Piero: "quiero ver
+// el movimiento tal cual… todos los años a la vez" y luego "hay demasiados puntos seguidos… la línea no se ve profesional… que sea dinámico,
+// fácil de usar e intuitivo"): un área con el stock día a día (sube y baja en la fecha real de cada movimiento, los del mismo día juntos),
+// abajo las barras de lo que entró y salió cada día; al mover el mouse una guía vertical muestra el stock de ese día y sus movimientos;
+// se acerca arrastrando sobre el gráfico (o con los botones de año) y con doble clic vuelve a todo.
+let kdxRango = null;   // { t0, t1 } del zoom (null = todos los años)
 function drawKardexSimple(p){
   const box = document.getElementById('kardexChart'), e = escapeHtml, um = e((p.unidad || '').trim());
   const n = function(v, d){ return v == null || isNaN(v) ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }); };
@@ -8387,65 +8393,90 @@ function drawKardexSimple(p){
   let pr = null; try{ pr = pedirRowsFor(meses, 'todos').rows.find(function(x){ return x.codigo === p.codigo; }); }catch(err){}
   const aPedir = pr && pr.hayQuePedir !== false && pr.aPedir > 0 ? Math.round(pr.aPedir) : 0, rop = ropEfectivo(p), cons = +p.consumoMensual || 0;
   const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'], DIA = 864e5;
-  // Movimientos de la sede, en orden; stock antes/después de cada uno, hacia atrás desde el stock actual.
-  const mv = (p.kardexMovs || []).filter(function(m){ return m.f && (m.s || 'lima') === suc && m.q; }).map(function(m, i){ return { f:m.f, t:+fromIsoDay(m.f), q:m.q, i:i }; })
-    .sort(function(a, b){ return a.t - b.t || a.i - b.i; });
-  let st = +p[suc] || 0; for(let i = mv.length - 1; i >= 0; i--){ mv[i].des = st; st -= mv[i].q; mv[i].ant = st; }
-  const corte = appIndCorte(), yC = corte.getUTCFullYear(), y0 = mv.length ? Math.min(new Date(mv[0].t).getUTCFullYear(), yC) : yC;
+  const fTxt = function(t){ const f = new Date(t); return f.getUTCDate() + ' ' + MES[f.getUTCMonth()] + ' ' + f.getUTCFullYear(); };
+  // Un punto por DÍA (lo del mismo día junto) y el stock al cierre de cada día, hacia atrás desde el stock actual de la sede.
+  const D = new Map();
+  (p.kardexMovs || []).forEach(function(m){ if(!m.f || (m.s || 'lima') !== suc || !m.q) return; const x = D.get(m.f) || { f:m.f, t:+fromIsoDay(m.f), inn:0, out:0, ni:0, no:0 };
+    if(m.q > 0){ x.inn += m.q; x.ni++; } else { x.out -= m.q; x.no++; } D.set(m.f, x); });
+  const dias = [...D.values()].sort(function(a, b){ return a.t - b.t; });
+  let st = +p[suc] || 0; for(let i = dias.length - 1; i >= 0; i--){ dias[i].des = st; st -= dias[i].inn - dias[i].out; dias[i].ant = st; }
+  const corte = appIndCorte(), yC = corte.getUTCFullYear(), y0 = dias.length ? Math.min(new Date(dias[0].t).getUTCFullYear(), yC) : yC;
   const anios = []; for(let y = y0; y <= yC; y++) anios.push(y);
-  if(kdxAnio !== 'todo' && anios.indexOf(+kdxAnio) === -1) kdxAnio = 'todo';
-  const t0 = kdxAnio === 'todo' ? Date.UTC(y0, 0, 1) : Date.UTC(+kdxAnio, 0, 1), t1 = kdxAnio === 'todo' || +kdxAnio === yC ? +corte + DIA : Date.UTC(+kdxAnio + 1, 0, 1);
-  const vis = mv.filter(function(m){ return m.t >= t0 && m.t < t1; });
-  const ini = vis.length ? vis[0].ant : (mv.filter(function(m){ return m.t < t0; }).pop() || { des: +p[suc] || 0 }).des;
+  const T0 = Date.UTC(y0, 0, 1), T1 = +corte + DIA;
+  if(kdxRango && (kdxRango.t1 - kdxRango.t0 < 7 * DIA || kdxRango.t0 < T0 - DIA || kdxRango.t1 > T1 + DIA)) kdxRango = null;
+  const t0 = kdxRango ? kdxRango.t0 : T0, t1 = kdxRango ? kdxRango.t1 : T1;
+  const stockEn = function(t){ let v = dias.length ? dias[0].ant : (+p[suc] || 0); for(let i = 0; i < dias.length && dias[i].t <= t; i++) v = dias[i].des; return v; };
+  const vis = dias.filter(function(d){ return d.t >= t0 && d.t < t1; }), ini = stockEn(t0 - 1);
+  const anioSel = kdxRango ? (function(){ const a = new Date(t0).getUTCFullYear(); return t0 === Date.UTC(a, 0, 1) && (t1 === Date.UTC(a + 1, 0, 1) || (a === yC && t1 === T1)) ? a : null; })() : 'todo';
   const tiles = `<div class="ks-tiles">${KARDEX_SUCURSALES.map(function(x){ return '<div><span>' + e(x.key === 'lima' ? 'Lima' : x.label) + '</span><b>' + n(p[x.key]) + '</b></div>'; }).join('')}
     <div><span>En tránsito</span><b>${n(p.transito)}</b></div><div><span>Consumo / mes</span><b>${n(cons)}</b></div><div><span>Punto de reorden</span><b>${n(rop)}</b></div>
     <div class="ped"><span>A pedir (${n(meses)} ${meses === 1 ? 'mes' : 'meses'})</span><b>${aPedir ? n(aPedir, 0) + ' ' + um : 'No'}</b></div></div>`;
   const bar = `<div class="ks-bar"><span class="lbl">Sede</span>${KARDEX_SUCURSALES.map(function(x){ return `<button type="button" data-ksuc="${x.key}" class="${x.key === suc ? 'on' : ''}">${e(x.label)}</button>`; }).join('')}
-    <span class="sep"></span><span class="lbl">Ver</span><button type="button" data-kanio="todo" class="${kdxAnio === 'todo' ? 'on' : ''}">Todos los años</button>${anios.map(function(y){ return `<button type="button" data-kanio="${y}" class="${String(kdxAnio) === String(y) ? 'on' : ''}">${y}</button>`; }).join('')}</div>`;
-  // Escalas: arriba el stock (con el punto de reorden), abajo cada movimiento.
-  const W = 1000, pl = 56, pr2 = 16, Ht = 230, Hb = 120, gap = 18, pb = 26, H = Ht + gap + Hb + pb, plotW = W - pl - pr2;
-  const x = function(t){ return pl + (t - t0) / ((t1 - t0) || 1) * plotW; };
-  const sv = vis.reduce(function(a, m){ return a.concat([m.ant, m.des]); }, [ini, rop || 0, 0]), sMax = Math.max.apply(null, sv) || 1, sMin = Math.min(0, Math.min.apply(null, sv));
-  const ys = function(v){ return 8 + (Ht - 16) * (sMax - v) / ((sMax - sMin) || 1); };
-  const qMax = Math.max.apply(null, vis.map(function(m){ return Math.abs(m.q); }).concat([1])), yb0 = Ht + gap + Hb / 2;
-  const yq = function(q){ return yb0 - q / qMax * (Hb / 2 - 4); };
-  let fondo = '';
-  for(let y = new Date(t0).getUTCFullYear(), k = 0; Date.UTC(y, 0, 1) < t1; y++, k++){ const a1 = Math.max(t0, Date.UTC(y, 0, 1)), a2 = Math.min(t1, Date.UTC(y + 1, 0, 1)), xa = x(a1), xb = x(a2);
-    if(k % 2 === 1) fondo += `<rect class="kband" x="${xa.toFixed(1)}" y="0" width="${(xb - xa).toFixed(1)}" height="${Ht + gap + Hb}"/>`;
-    if(k > 0) fondo += `<line class="kyear" x1="${xa.toFixed(1)}" x2="${xa.toFixed(1)}" y1="0" y2="${Ht + gap + Hb}"/>`;
-    if(xb - xa > 30) fondo += `<text class="kylbl" x="${((xa + xb) / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${kdxAnio === 'todo' ? y : ''}</text>`;
-    if(kdxAnio !== 'todo') for(let mo = 0; mo < 12; mo++){ const tm = Date.UTC(y, mo, 1); if(tm < t0 || tm >= t1) continue; fondo += `<text x="${x(tm).toFixed(1)}" y="${H - 8}">${MES[mo]}</text>`; } }
-  let grid = ''; for(let i = 0; i <= 4; i++){ const v = sMin + (sMax - sMin) * i / 4, yy = ys(v); grid += `<line class="grid" x1="${pl}" x2="${W - pr2}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}"/><text x="${pl - 6}" y="${(yy + 4).toFixed(1)}" text-anchor="end">${n(v, v < 10 ? 1 : 0)}</text>`; }
-  grid += `<text x="${pl - 6}" y="${(yq(qMax) + 4).toFixed(1)}" text-anchor="end">+${n(qMax, 0)}</text><text x="${pl - 6}" y="${(yq(-qMax) + 4).toFixed(1)}" text-anchor="end">−${n(qMax, 0)}</text><line class="grid" x1="${pl}" x2="${W - pr2}" y1="${yb0}" y2="${yb0}"/>`;
-  // Línea del stock en escalones: plano hasta cada movimiento y ahí sube o baja.
-  let d = `M${pl},${ys(ini).toFixed(1)}`; vis.forEach(function(m){ const xx = x(m.t).toFixed(1); d += ` H${xx} V${ys(m.des).toFixed(1)}`; }); d += ` H${W - pr2}`;
-  const ropL = rop ? `<line class="rop" x1="${pl}" x2="${W - pr2}" y1="${ys(rop).toFixed(1)}" y2="${ys(rop).toFixed(1)}"/><text class="roplbl" x="${W - pr2 - 4}" y="${(ys(rop) - 4).toFixed(1)}" text-anchor="end">Punto de reorden ${n(rop)}</text>` : '';
-  const bw = Math.max(2, Math.min(8, plotW / Math.max(60, vis.length) * 0.7));
-  const marcas = vis.map(function(m, i){ const xx = x(m.t), c = m.q > 0 ? 'in' : 'out';
-    return `<rect class="${c}" x="${(xx - bw / 2).toFixed(1)}" y="${Math.min(yq(m.q), yb0).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(yq(m.q) - yb0)).toFixed(1)}" rx="1"/>`
-      + `<circle class="dot ${c}" cx="${xx.toFixed(1)}" cy="${ys(m.des).toFixed(1)}" r="3.4"/>`
-      + `<rect class="hit" x="${(xx - Math.max(4, bw)).toFixed(1)}" y="0" width="${(Math.max(4, bw) * 2).toFixed(1)}" height="${Ht + gap + Hb}" data-kmv="${i}"/>`; }).join('');
-  const svg = `<svg class="ks-svg" viewBox="0 0 ${W} ${H}">${fondo}${grid}${ropL}<path class="stk" d="${d}"/>${marcas}<text x="${pl + 6}" y="${Ht + gap + 10}">Movimientos (verde entra · azul sale)</text></svg>`;
-  // Resumen por año (todos los años a la vez).
-  const pa = anios.map(function(y){ const l = mv.filter(function(m){ return new Date(m.t).getUTCFullYear() === y; }), last = l.length ? l[l.length - 1].des : null;
-    return { y:y, inn:l.reduce(function(a, m){ return a + (m.q > 0 ? m.q : 0); }, 0), out:l.reduce(function(a, m){ return a + (m.q < 0 ? -m.q : 0); }, 0), n:l.length, fin:last }; });
+    <span class="sep"></span><span class="lbl">Ver</span><button type="button" data-kanio="todo" class="${anioSel === 'todo' ? 'on' : ''}">Todos los años</button>${anios.map(function(y){ return `<button type="button" data-kanio="${y}" class="${anioSel === y ? 'on' : ''}">${y}</button>`; }).join('')}
+    <span class="ks-hint">Arrastra sobre el gráfico para acercar · doble clic para ver todo</span></div>`;
+  // Escalas
+  const W = 1000, pl = 50, pr2 = 14, top = 10, Ht = 240, gap = 16, Hb = 86, pb = 24, H = top + Ht + gap + Hb + pb, plotW = W - pl - pr2;
+  const x = function(t){ return pl + (t - t0) / ((t1 - t0) || 1) * plotW; }, tDe = function(px){ return t0 + (px - pl) / plotW * (t1 - t0); };
+  const ax = niceAxisRange(vis.reduce(function(a, d){ return a.concat([d.des, d.ant]); }, [ini, rop || 0, 1]), 5), sMin = Math.min(0, ax.niceMin), sMax = ax.niceMax;
+  const ys = function(v){ return top + Ht * (sMax - v) / ((sMax - sMin) || 1); };
+  const qMax = Math.max.apply(null, vis.map(function(d){ return Math.max(d.inn, d.out); }).concat([1])), yb0 = top + Ht + gap + Hb / 2;
+  const yq = function(q){ return yb0 - q / qMax * (Hb / 2 - 2); };
+  let g = '';
+  for(let v = Math.ceil(sMin / ax.step) * ax.step; v <= sMax + 1e-9; v += ax.step){ const yy = ys(v); g += `<line class="grid" x1="${pl}" x2="${W - pr2}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}"/><text x="${pl - 8}" y="${(yy + 4).toFixed(1)}" text-anchor="end">${n(v, 1)}</text>`; }
+  // Eje de tiempo: años (y meses si el rango es corto), con franja alterna por año.
+  const meses2 = (t1 - t0) / (30.4 * DIA);
+  for(let y = new Date(t0).getUTCFullYear(), k = 0; Date.UTC(y, 0, 1) < t1; y++, k++){ const xa = x(Math.max(t0, Date.UTC(y, 0, 1))), xb = x(Math.min(t1, Date.UTC(y + 1, 0, 1)));
+    if(y % 2 === 1) g = `<rect class="kband" x="${xa.toFixed(1)}" y="${top}" width="${(xb - xa).toFixed(1)}" height="${Ht + gap + Hb}"/>` + g;
+    if(meses2 > 18){ if(xb - xa > 28) g += `<text class="kylbl" x="${((xa + xb) / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${y}</text>`; }
+    else for(let mo = 0; mo < 12; mo++){ const tm = Date.UTC(y, mo, 1); if(tm < t0 || tm >= t1) continue; if(meses2 > 8 && mo % 2) continue;
+      g += `<line class="tick" x1="${x(tm).toFixed(1)}" x2="${x(tm).toFixed(1)}" y1="${top + Ht}" y2="${top + Ht + 4}"/><text x="${x(tm).toFixed(1)}" y="${H - 6}" text-anchor="middle">${MES[mo]}${mo === 0 || tm === Math.max(t0, tm) && x(tm) - pl < 30 ? ' ’' + String(y).slice(2) : ''}</text>`; } }
+  // Stock: área + línea en escalones (sin puntos: los detalles salen con la guía).
+  let d = `M${pl},${ys(ini).toFixed(1)}`; vis.forEach(function(v){ d += ` H${x(v.t).toFixed(1)} V${ys(v.des).toFixed(1)}`; }); d += ` H${W - pr2}`;
+  const area = d + ` V${ys(Math.max(0, sMin)).toFixed(1)} H${pl} Z`;
+  const ropL = rop ? `<line class="rop" x1="${pl}" x2="${W - pr2}" y1="${ys(rop).toFixed(1)}" y2="${ys(rop).toFixed(1)}"/><text class="roplbl" x="${pl + 6}" y="${(ys(rop) - 5).toFixed(1)}">Punto de reorden ${n(rop)}</text>` : '';
+  const bw = Math.max(2.5, Math.min(8, plotW / Math.max(1, (t1 - t0) / DIA) * 0.8));
+  const barras = vis.map(function(v){ const xx = x(v.t);
+    return (v.inn ? `<rect class="in" x="${(xx - bw / 2).toFixed(1)}" y="${yq(v.inn).toFixed(1)}" width="${bw.toFixed(1)}" height="${(yb0 - yq(v.inn)).toFixed(1)}" rx="1"/>` : '')
+      + (v.out ? `<rect class="out" x="${(xx - bw / 2).toFixed(1)}" y="${yb0.toFixed(1)}" width="${bw.toFixed(1)}" height="${(yq(-v.out) - yb0).toFixed(1)}" rx="1"/>` : ''); }).join('');
+  const svg = `<svg class="ks-svg" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="ksGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--teal)" stop-opacity=".32"/><stop offset="1" stop-color="var(--teal)" stop-opacity=".03"/></linearGradient></defs>
+    ${g}<path class="area" d="${area}" fill="url(#ksGrad)"/>${ropL}<path class="stk" d="${d}"/>
+    <line class="grid" x1="${pl}" x2="${W - pr2}" y1="${yb0}" y2="${yb0}"/><text x="${pl - 8}" y="${(top + Ht + gap + 8).toFixed(1)}" text-anchor="end">+${n(qMax, 0)}</text><text x="${pl - 8}" y="${(top + Ht + gap + Hb).toFixed(1)}" text-anchor="end">−${n(qMax, 0)}</text>
+    <text class="sub" x="${pl + 4}" y="${(top + Ht + gap + 9).toFixed(1)}">Entradas ↑ · Salidas ↓ por día</text>${barras}
+    <line class="guia" id="ksGuia" x1="0" x2="0" y1="${top}" y2="${top + Ht + gap + Hb}" style="display:none"/><circle class="foco" id="ksFoco" r="5" style="display:none"/>
+    <rect class="sel" id="ksSel" y="${top}" height="${Ht + gap + Hb}" width="0" style="display:none"/>
+    <rect class="capa" id="ksCapa" x="${pl}" y="${top}" width="${plotW}" height="${Ht + gap + Hb}"/></svg>`;
+  const pa = anios.map(function(y){ const l = dias.filter(function(v){ return new Date(v.t).getUTCFullYear() === y; });
+    return { y:y, inn:l.reduce(function(a, v){ return a + v.inn; }, 0), out:l.reduce(function(a, v){ return a + v.out; }, 0), n:l.reduce(function(a, v){ return a + v.ni + v.no; }, 0) }; });
   const tabla = `<table class="ks-mes"><thead><tr><th></th>${pa.map(function(r){ return '<th>' + r.y + '</th>'; }).join('')}</tr></thead><tbody>
     <tr><td>Entró</td>${pa.map(function(r){ return '<td>' + (r.inn ? n(r.inn) : '·') + '</td>'; }).join('')}</tr>
     <tr><td>Salió</td>${pa.map(function(r){ return '<td>' + (r.out ? n(r.out) : '·') + '</td>'; }).join('')}</tr>
     <tr><td>Salió por mes (prom.)</td>${pa.map(function(r){ const ms = r.y === yC ? corte.getUTCMonth() + 1 : 12; return '<td>' + (r.out ? n(r.out / ms) : '·') + '</td>'; }).join('')}</tr>
     <tr><td>Movimientos</td>${pa.map(function(r){ return '<td>' + (r.n || '·') + '</td>'; }).join('')}</tr></tbody></table>`;
   box.innerHTML = tiles + bar + `<div class="ks-chart">${svg}<div class="ks-tip" id="ksTip"></div></div>`
-    + `<div class="ks-ley"><span><i style="background:var(--ink);height:3px"></i>Stock después de cada movimiento</span><span><i style="background:var(--green)"></i>Ingreso</span><span><i style="background:var(--seg-a)"></i>Salida</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${vis.length} movimientos${kdxAnio === 'todo' ? ' desde ' + y0 : ' en ' + kdxAnio}</span></div>` + tabla;
-  box.querySelectorAll('[data-ksuc]').forEach(function(b){ b.addEventListener('click', function(){ kardexSucursal = b.dataset.ksuc; drawKardexSimple(p); }); });
-  box.querySelectorAll('[data-kanio]').forEach(function(b){ b.addEventListener('click', function(){ kdxAnio = b.dataset.kanio; drawKardexSimple(p); }); });
-  const tip = box.querySelector('#ksTip'), ch = box.querySelector('.ks-chart');
-  box.querySelectorAll('.ks-svg .hit').forEach(function(h){
-    h.addEventListener('mouseenter', function(){ const m = vis[+h.dataset.kmv], f = new Date(m.t);
-      tip.innerHTML = `<b>${f.getUTCDate()} ${MES[f.getUTCMonth()]} ${f.getUTCFullYear()}</b> · ${m.q > 0 ? '<span style="color:var(--green)">Ingreso</span>' : '<span style="color:var(--seg-a)">Salida</span>'}<br>Cantidad: <b>${m.q > 0 ? '+' : '−'}${n(Math.abs(m.q))}</b> ${um}<br>Stock: ${n(m.ant)} → <b>${n(m.des)}</b> ${um}`;
-      tip.style.display = 'block'; });
-    h.addEventListener('mousemove', function(ev){ const r = ch.getBoundingClientRect(); let xx = ev.clientX - r.left + 14; if(xx + 180 > r.width) xx -= 200; tip.style.left = xx + 'px'; tip.style.top = (ev.clientY - r.top - 10) + 'px'; });
-    h.addEventListener('mouseleave', function(){ tip.style.display = 'none'; });
+    + `<div class="ks-ley"><span><i style="background:var(--teal);height:3px"></i>Stock</span><span><i style="background:var(--green)"></i>Entró</span><span><i style="background:var(--seg-a)"></i>Salió</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}</span></div>` + tabla;
+  const redibujar = function(){ drawKardexSimple(p); };
+  box.querySelectorAll('[data-ksuc]').forEach(function(b){ b.addEventListener('click', function(){ kardexSucursal = b.dataset.ksuc; redibujar(); }); });
+  box.querySelectorAll('[data-kanio]').forEach(function(b){ b.addEventListener('click', function(){ const a = b.dataset.kanio; kdxRango = a === 'todo' ? null : { t0:Date.UTC(+a, 0, 1), t1:+a === yC ? T1 : Date.UTC(+a + 1, 0, 1) }; redibujar(); }); });
+  // Interacción: guía con el stock del día y sus movimientos; arrastrar = acercar; doble clic = todo.
+  const svgEl = box.querySelector('.ks-svg'), capa = box.querySelector('#ksCapa'), tip = box.querySelector('#ksTip'), ch = box.querySelector('.ks-chart');
+  const guia = box.querySelector('#ksGuia'), foco = box.querySelector('#ksFoco'), sel = box.querySelector('#ksSel');
+  const vx = function(ev){ const r = svgEl.getBoundingClientRect(); return Math.max(pl, Math.min(W - pr2, (ev.clientX - r.left) * W / r.width)); };
+  let arr = null;
+  capa.addEventListener('mousemove', function(ev){
+    const px = vx(ev);
+    if(arr != null){ sel.style.display = ''; sel.setAttribute('x', Math.min(arr, px)); sel.setAttribute('width', Math.abs(px - arr)); tip.style.display = 'none'; return; }
+    // el día con movimiento más cercano (a menos de 8 px); si no, el stock de la fecha del mouse
+    let best = null, bd = 8; vis.forEach(function(v){ const dd = Math.abs(x(v.t) - px); if(dd < bd){ bd = dd; best = v; } });
+    const t = best ? best.t : tDe(px), stk = best ? best.des : stockEn(t), xx = best ? x(best.t) : px;
+    guia.setAttribute('x1', xx); guia.setAttribute('x2', xx); guia.style.display = ''; foco.setAttribute('cx', xx); foco.setAttribute('cy', ys(stk)); foco.style.display = '';
+    tip.innerHTML = `<b>${fTxt(t)}</b><br>Stock: <b>${n(stk)}</b> ${um}` + (best ? `<br>${best.inn ? '<span style="color:var(--green)">Entró +' + n(best.inn) + '</span>' + (best.ni > 1 ? ' (' + best.ni + ')' : '') : ''}${best.inn && best.out ? ' · ' : ''}${best.out ? '<span style="color:var(--seg-a)">Salió −' + n(best.out) + '</span>' + (best.no > 1 ? ' (' + best.no + ')' : '') : ''}<br><small>Antes ${n(best.ant)} → después ${n(best.des)}</small>` : '');
+    const r = ch.getBoundingClientRect(); let lx = ev.clientX - r.left + 16; if(lx + 190 > r.width) lx -= 210; tip.style.left = lx + 'px'; tip.style.top = Math.max(0, ev.clientY - r.top - 50) + 'px'; tip.style.display = 'block';
   });
+  capa.addEventListener('mouseleave', function(){ tip.style.display = 'none'; guia.style.display = 'none'; foco.style.display = 'none'; });
+  capa.addEventListener('mousedown', function(ev){ ev.preventDefault(); arr = vx(ev); });
+  window.addEventListener('mouseup', function fin(ev){ window.removeEventListener('mouseup', fin); if(arr == null) return; const px = vx(ev), a = Math.min(arr, px), b2 = Math.max(arr, px); arr = null; sel.style.display = 'none';
+    if(b2 - a > 12){ kdxRango = { t0:Math.round(tDe(a)), t1:Math.round(tDe(b2)) }; redibujar(); } });
+  capa.addEventListener('dblclick', function(){ kdxRango = null; redibujar(); });
 }
 function drawPedirDetalle(grupos){
   const box = document.getElementById('pedirDetalle');
