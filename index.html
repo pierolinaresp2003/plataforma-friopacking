@@ -439,13 +439,15 @@
   .par-anios>div{background:var(--bg);border-radius:12px;padding:10px 12px;} .par-anios .y{font-size:12px;font-weight:800;color:var(--ink-soft);} .par-anios>div>b{display:block;font-size:19px;color:var(--ink);margin:2px 0 6px;}
   .par-anios small{display:block;font-size:11.5px;color:var(--ink-soft);margin:2px 0 6px;} .par-anios small b{color:var(--ink);}
   .pa-b{height:7px;background:var(--card);border-radius:4px;overflow:hidden;} .pa-b i{display:block;height:100%;border-radius:4px;} .pa-b i.c{background:var(--green);} .pa-b i.s{background:var(--seg-a);}
-  .par-lista{display:flex;flex-direction:column;} .par-fila{display:grid;grid-template-columns:28px minmax(220px,2.2fr) minmax(140px,1.2fr) 124px 86px 70px 70px 34px;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);}
+  .par-lista{display:flex;flex-direction:column;} .par-fila{display:grid;grid-template-columns:28px minmax(200px,2fr) minmax(130px,1.1fr) 232px 80px 64px 64px 34px;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);}
   .par-fila .pos{font-size:12px;color:var(--ink-soft);font-weight:700;} .par-fila .prod b{font-size:13px;font-weight:600;color:var(--ink);display:block;line-height:1.25;} .par-fila small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;}
   .par-fila .org b{font-size:12px;white-space:nowrap;} .par-fila .kv{text-align:right;} .par-fila .kv span{display:block;font-size:10px;color:var(--ink-soft);text-transform:uppercase;font-weight:700;letter-spacing:.03em;}
   .par-fila .kv b{font-size:15px;color:var(--ink);} .par-fila .kv.ped b{color:var(--amber);} .par-fila .kv.ped.no b{color:var(--muted);font-weight:500;}
   .par-mini{width:124px;height:34px;} .par-mini .c{fill:var(--green);} .par-mini .s{fill:var(--seg-a);} .par-mini text{font-size:7.5px;fill:var(--ink-soft);}
   .ks-hint .lg{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px;vertical-align:-1px;} .ks-hint .lg.c{background:var(--green);} .ks-hint .lg.s{background:var(--seg-a);}
-  @media (max-width:1000px){ .par-fila{grid-template-columns:24px 1fr 124px 70px 70px 34px;} .par-fila .org,.par-fila .kv:nth-of-type(1){display:none;} }
+  .par-yr{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;} .par-yr div{background:var(--bg);border-radius:7px;padding:3px 4px;text-align:center;line-height:1.2;}
+  .par-yr span{display:block;font-size:9.5px;font-weight:800;color:var(--ink-soft);} .par-yr b{display:block;font-size:12px;font-variant-numeric:tabular-nums;} .par-yr b.c{color:var(--green);} .par-yr b.s{color:var(--seg-a);} .par-yr b.cero{color:var(--muted);font-weight:400;}
+  @media (max-width:1000px){ .par-fila{grid-template-columns:24px 1fr 232px 64px 64px 34px;} .par-fila .org,.par-fila .kv:nth-of-type(1){display:none;} }
   .par-tabla td.prod{min-width:200px;max-width:280px;white-space:normal;} .par-tabla td.prod b{font-weight:600;color:var(--ink);font-size:12.5px;} .par-tabla td.prod small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;}
   .par-tabla td.sal,.par-tabla .sal{color:var(--seg-a);} .par-tabla th.anio-h{text-align:center;border-bottom:1px solid var(--border);}
   .par-tabla td.org small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;} .par-org{font-size:11.5px;font-weight:700;white-space:nowrap;}
@@ -8399,10 +8401,9 @@ function invParetoHtml(g){
   const ver = invParetoVer === 'todos' ? P.l : P.l.filter(function(x){ return invParetoVer === 'pedir' ? x.pedir > 0 : x.cls === 'A'; });
   const chip = function(k, t, c){ return `<button type="button" data-parver="${k}" class="${invParetoVer === k ? 'on' : ''}">${t} (${c})</button>`; };
   // Mini barras por año de cada producto: verde compró, azul salió (escala propia de la fila).
-  const mini = function(x){ const mx = Math.max.apply(null, P.anios.map(function(y){ return Math.max(x.q[y] || 0, x.sal[y] || 0); }).concat([1])), w = 30;
-    return `<svg class="par-mini" viewBox="0 0 ${P.anios.length * w} 34">${P.anios.map(function(y, i){ const hc = (x.q[y] || 0) / mx * 24, hs = (x.sal[y] || 0) / mx * 24;
-      return `<rect class="c" x="${i * w + 5}" y="${26 - hc}" width="9" height="${Math.max(hc, 0.6)}" rx="1.5"/><rect class="s" x="${i * w + 15}" y="${26 - hs}" width="9" height="${Math.max(hs, 0.6)}" rx="1.5"/><text x="${i * w + 15}" y="33.5" text-anchor="middle">${String(y).slice(2)}</text>`; }).join('')}
-      <title>${P.anios.map(function(y){ return y + ': compró ' + n(x.q[y]) + ' · salió ' + n(x.sal[y]); }).join('\n')}</title></svg>`; };
+  // Números por año (21.10.2026, Piero: "necesito ver los números, no solo el gráfico"): cada año con lo que compró (verde) y lo que salió (azul).
+  const mini = function(x){ return `<div class="par-yr">${P.anios.map(function(y){ const c = x.q[y] || 0, sl = x.sal[y] || 0;
+      return `<div><span>${y}</span><b class="c${c ? '' : ' cero'}">${c ? n(c) : '·'}</b><b class="s${sl ? '' : ' cero'}">${sl ? n(sl) : '·'}</b></div>`; }).join('')}</div>`; };
   const ORG = { nacional:'🇵🇪 Nacional', importado:'🌎 Importación', mixto:'🇵🇪🌎 Mixto' };
   return `<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>
   <div class="par-box" id="pedirParetoFoto">
@@ -8411,7 +8412,7 @@ function invParetoHtml(g){
     ${anios}
     ${svg}
     <div class="ks-bar" style="margin-top:8px;"><span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}
-      <span class="ks-hint"><i class="lg c"></i>compró <i class="lg s"></i>salió por año</span></div>
+      <span class="ks-hint">Por año: <i class="lg c"></i>compró (arriba) <i class="lg s"></i>salió (abajo)</span></div>
     <div class="par-lista">${ver.map(function(x, i){ const r = x.r;
       return `<div class="par-fila"><span class="pos">${i + 1}</span>
         <div class="prod"><b>${e(r.descripcion || '—')}</b><small><span class="mono">${e(r.codigo)}</span> · ${e((r.unidad || '').trim())}${x.cls ? ' · <span class="par-cls ' + x.cls + '">' + x.cls + '</span> ' + usdK(x.usd) : ''}</small></div>
