@@ -14125,7 +14125,7 @@ function appConstruir(){
     if(e.target.id === 'arSub'){ APP_AR.sub = e.target.value; return appRenderInicio(); }
     if(e.target.id === 'arPer'){ APP_AR.per = e.target.value; if(APP_AR.per === 'custom' && !APP_AR.desde){ const p = almPeriodo(); APP_AR.desde = p.desde; APP_AR.hasta = p.hasta; } return appRenderInicio(); }
     if(e.target.id === 'arSuc'){ APP_AR[APP_AR.sub === 'jav' ? 'sucJ' : 'suc'] = e.target.value; return appRenderInicio(); }
-    if(e.target.dataset.ardesde || e.target.dataset.arhasta){ APP_AR[e.target.dataset.ardesde ? 'desde' : 'hasta'] = e.target.value; return appRenderInicio(); }
+    if(e.target.dataset.ardesde || e.target.dataset.arhasta){ if(appFechaOk(e.target.value)) APP_AR[e.target.dataset.ardesde ? 'desde' : 'hasta'] = e.target.value; return appFechaDiferida(e.target); }
     if(e.target.id === 'prCli' || e.target.id === 'prPry'){ APP_PR[e.target.id === 'prCli' ? 'cli' : 'pry'] = e.target.value; if(e.target.id === 'prCli') APP_PR.pry = ''; return appRenderInicio(); }
     const fb = e.target.closest && e.target.closest('[data-fbar]');
     if(fb && e.target.dataset.fcampo){ const st = APP_F[fb.dataset.fbar], c = e.target.dataset.fcampo, v = e.target.value;
@@ -14134,6 +14134,7 @@ function appConstruir(){
         return appRenderInicio(); }
       if(c === 'mes'){ if(st.per !== 'ym' && st.per !== 'anio'){ const r = appFRango(st); st.anio = String(r ? r.desde.getUTCFullYear() : appIndCorte().getUTCFullYear()); }
         st.mes = v; st.per = v ? 'ym' : 'anio'; return appRenderInicio(); }
+      if(c === 'desde' || c === 'hasta'){ if(appFechaOk(v)) st[c] = v; return appFechaDiferida(e.target); }
       st[c] = v;
       if(c === 'per' && st.per === 'custom' && !st.desde && !st.hasta){ const r = appFRango({ per:'mes' }); st.desde = appIndIso(r.desde); st.hasta = appIndIso(appIndCorte()); }
       appRenderInicio(); }
@@ -15736,7 +15737,8 @@ function supGrupos(){
   base.forEach(function(r){ const k = r.codRequerimiento; if(!k) return;
     const g = M.get(k) || { cod:k, py:r.proyecto || '', id:r.idProyecto || '', resp:r.responsable || '', f:r.fReq, items:[], n:{ rev:0, com:0, oc:0, alm:0, sal:0, obra:0, arch:0 }, fin:0, txt:'' };
     g.items.push(r); g.n[supPaso(r)]++; if(r.estadoCalc !== 'Archivado' && rqItemListo(r)) g.fin++; g.txt += ' ' + (r.producto || '') + ' ' + (r.idProducto || ''); M.set(k, g); });
-  const l = [...M.values()];
+  // Solo el año en curso (21.10.2026, Piero: "en la parte de supervisor solo lo que es del presente año"; la data ahora trae desde 2023).
+  const anio = appIndCorte().getUTCFullYear(), l = [...M.values()].filter(function(g){ return g.f && new Date(+g.f).getUTCFullYear() === anio; });
   l.forEach(function(g){ g.cli = appImpNombre(g.py || '') || '—'; g.pryN = /^SIN PROYECTO/i.test(g.id) ? 'Sin proyecto (almacén)' : (pryNombre(g.id) || '');
     g.tot = g.items.length - g.n.arch; g.ok = g.fin; g.pct = g.tot ? dciN2(g.ok / g.tot * 100) : 0; g.txt = polarNorm(g.cod + ' ' + g.py + ' ' + g.id + ' ' + g.resp + g.txt); });
   l.sort(function(a, b){ return (b.f || 0) - (a.f || 0); });
@@ -16050,6 +16052,15 @@ const APP_IND_TXT = {
 function appIndClase(p){ return p == null ? 'muted' : (p >= 80 ? 'ok' : (p >= 50 ? 'late' : 'warn')); }
 function appIndEstado(p){ return p == null ? 'Sin datos' : (p >= 80 ? '✅ Bien' : (p >= 50 ? '⚠️ Por mejorar' : '🔴 Crítico')); }
 function appIndIso(d){ return d.toISOString().slice(0, 10); }
+// Fechas personalizadas (21.10.2026, Piero: "en la personalizada se pueda colocar bien el número porque a veces se
+// buguea"): al escribir día/mes/año cada dígito disparaba 'change' y la pantalla se redibujaba a la mitad (el año
+// quedaba en 0002). Ahora se guarda el valor y se redibuja recién al salir del campo o con Enter.
+function appFechaOk(v){ return !v || +String(v).slice(0, 4) >= 1900; }
+function appFechaDiferida(inp){
+  if(inp._fdif) return; inp._fdif = 1;
+  inp.addEventListener('keydown', function(ev){ if(ev.key === 'Enter') inp.blur(); });
+  inp.addEventListener('blur', function(){ appRenderInicio(); }, { once:true });
+}
 function appIndCorte(){ const c = (DATA && DATA.corte) ? new Date(DATA.corte) : new Date(); return new Date(Date.UTC(c.getUTCFullYear(), c.getUTCMonth(), c.getUTCDate())); }
 function appIndCorto(d){ return d.getUTCDate() + ' ' + MESES_CORTOS[d.getUTCMonth()].toLowerCase(); }
 // Períodos: semana actual (lunes a domingo del día de corte), semana pasada, mes, año y todo.
