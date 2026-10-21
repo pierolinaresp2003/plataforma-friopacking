@@ -338,6 +338,10 @@
   .kdx-kpi.kpi .label{font-size:10.5px;}
   .kdx-kpi.kpi .value{font-size:20px;margin-top:4px;}
   .kdx-kpi.kpi .sub{font-size:11px;margin-top:2px;}
+  /* Años en el kardex (21.10.2026, Piero: "que se diferencie por año"): franja alterna, línea y año arriba. */
+  .kdx-svg .kdx-anio-band{fill:var(--ink);opacity:.05;pointer-events:none;}
+  .kdx-svg .kdx-anio-line{stroke:var(--ink-soft);stroke-width:1.2;stroke-dasharray:2 4;pointer-events:none;}
+  .kdx-svg text.kdx-anio-lbl{font-size:12px;font-weight:800;fill:var(--ink-soft);pointer-events:none;}
   .kdx-svg .kdx-hoy{stroke:var(--ink-soft);stroke-width:1.5;stroke-dasharray:3 3;pointer-events:none;}
   .kdx-svg .kdx-hoy-label{font-size:10.5px;font-weight:700;fill:var(--ink-soft);pointer-events:none;}
   .kdx-svg .kdx-callout{font-size:12px;pointer-events:none;}
@@ -7796,15 +7800,26 @@ function drawKardex(){
   // Las fechas del eje se colocan con xForGlobal (la misma escala que todo lo demás) y no cada N
   // muestras: con las muestras extra de las llegadas, "cada N" podía poner 2 fechas encima de la otra.
   // Se recorre la vista y se escribe una fecha solo si quedó a más de 90px de la anterior.
-  let ultimaXLabel = -1e9;
+  let ultimaXLabel = -1e9, ultimoAnioLbl = 0;
   const xLabelsSvg = idxView.map((i, li)=>{
     const x = xForGlobal(i);
     const esUltima = li === idxView.length-1;
-    if(!esUltima && x - ultimaXLabel < 90) return '';
-    if(esUltima && x - ultimaXLabel < 50) return '';
+    if(!esUltima && x - ultimaXLabel < 100) return '';
+    if(esUltima && x - ultimaXLabel < 60) return '';
     ultimaXLabel = x;
-    return `<text x="${x.toFixed(1)}" y="${H-8}" text-anchor="middle">${weekLabelFor(allPeriods[i].key)}</text>`;
+    // El año (’25) en la primera fecha de cada año (21.10.2026, la data ahora trae desde 2023).
+    const anioL = fromIsoDay(allPeriods[i].key).getUTCFullYear(), conAnio = anioL !== ultimoAnioLbl; ultimoAnioLbl = anioL;
+    return `<text x="${x.toFixed(1)}" y="${H-8}" text-anchor="middle">${weekLabelFor(allPeriods[i].key)}${conAnio ? ' ’' + String(anioL).slice(2) : ''}</text>`;
   }).join('');
+  // Años (21.10.2026, Piero: "en el kardex gráfico se diferencie por año también, ya que ahora se tiene la data
+  // desde el 2023"): franja de fondo alterna por año, línea punteada donde empieza cada año y el año escrito arriba.
+  let anioSvg = '';
+  { const tramos = [];
+    idxView.forEach(function(i){ const a = fromIsoDay(allPeriods[i].key).getUTCFullYear(), t = tramos[tramos.length-1]; if(!t || t.a !== a) tramos.push({ a:a, x0:Math.max(padL, xForGlobal(i)) }); });
+    tramos.forEach(function(t, k){ const x1 = k < tramos.length-1 ? tramos[k+1].x0 : padL + plotW, x0 = t.x0;
+      if(k % 2 === 1) anioSvg += `<rect class="kdx-anio-band" x="${x0.toFixed(1)}" y="${padT}" width="${Math.max(0, x1 - x0).toFixed(1)}" height="${plotH}"></rect>`;
+      if(k > 0) anioSvg += `<line class="kdx-anio-line" x1="${x0.toFixed(1)}" y1="${padT - 4}" x2="${x0.toFixed(1)}" y2="${padT + plotH}"></line>`;
+      if(x1 - x0 > 34) anioSvg += `<text class="kdx-anio-lbl" x="${((x0 + x1) / 2).toFixed(1)}" y="${padT - 7}" text-anchor="middle">${t.a}</text>`; }); }
 
   // Un punto por MOVIMIENTO real (15.09.2026): su fecha, si fue ingreso o salida, cuánto y con qué saldo
   // quedó. Solo se dibujan los que caen dentro de la ventana visible.
@@ -7940,6 +7955,7 @@ function drawKardex(){
   chart.innerHTML = `${pedirBannerSvg}${sucFilterSvg}${origenFilterSvg}${kpiGridSvg}${legendSvg}<svg class="kdx-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet">
     <defs><clipPath id="kdxPlotClip"><rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect></clipPath></defs>
     ${gridSvg}
+    ${anioSvg}
     <rect id="kardexZoomOverlay" class="kdx-zoom-overlay" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"></rect>
     ${bandSvg}
     <path class="kdx-area" clip-path="url(#kdxPlotClip)" d="${areaPath}"></path>
