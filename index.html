@@ -14531,7 +14531,8 @@ function appConstruir(){
   document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(); });
   document.getElementById('appCarpetaBtn').addEventListener('click', function(){ const f = document.getElementById('fileInput'); if(f) f.click(); });
   // En la web el menú lateral queda siempre oculto; el ☰ abre un menú flotante (14.10.2026, Piero: "que se vea así siempre").
-  if(APP_EN_PC) document.body.classList.add('lado-off');
+  // 22.10.2026 (Piero: "en la vista web haz un sidebar a la izquierda con las opciones de los módulos"): el menú lateral queda
+  // siempre a la vista en la web y los módulos salen de la barra de arriba (ver el final de APP_PC_CSS).
   document.getElementById('appLadoBtn').dataset.lado = '1';   // el clic lo atiende el manejador general [data-lado]
   appTemaIcono();
   document.getElementById('appSheet').addEventListener('click', function(e){ if(e.target === this) appCerrarSheet(); });
@@ -14791,6 +14792,13 @@ body.app-pc .rqm-desc{font-size:20px !important;font-weight:800;margin-top:6px;}
   body.app-pc .m-pp-kpis{grid-template-columns:repeat(3,1fr);gap:14px;} body.app-pc .m-pp-kpis > :last-child{grid-column:auto;} body.app-pc .m-pp-kpi{padding:18px 20px;} body.app-pc .m-pp-kpi b{font-size:40px;}
   body.app-pc .m-pp-alertas{grid-template-columns:1.4fr 1fr 1fr;gap:14px;} body.app-pc .m-pp-al{padding:18px 20px;} body.app-pc .m-pp-al > b{font-size:40px;}
   body.app-pc .sku-ped{grid-template-columns:repeat(3,minmax(0,1fr));} body.app-pc .m-pp-hizo{padding:18px 22px;} body.app-pc .m-tar-f{grid-template-columns:minmax(0,1.3fr) auto minmax(0,1fr);align-items:center;}
+  /* Menú lateral fijo con los módulos (22.10.2026, Piero): la barra de arriba queda solo con volver, inicio, tema y carpeta, y el
+     contenido usa todo el ancho que queda a la derecha del menú. */
+  body.app-pc .app-toptabs{display:none !important;}
+  body.app-pc .app-top .app-tema{margin-left:auto;}
+  body.app-pc .app-tabbar .app-lado-in{display:none;}
+  @media (max-width:1320px){ body.app-pc .par-box.app .par-fila{grid-template-columns:28px minmax(180px,1fr) 232px 80px 80px 64px 104px;} body.app-pc .par-box.app .par-fila .org{display:none;} }
+  @media (max-width:1200px){ body.app-pc .ks-tiles{grid-template-columns:repeat(4,minmax(0,1fr));} }
 `;
 function appPcActivar(){
   if(!APP_EN_PC || document.getElementById('appPcCss')) return;
