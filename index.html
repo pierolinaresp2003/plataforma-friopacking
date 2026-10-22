@@ -478,6 +478,7 @@
   .ks-ley{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin:6px 0 10px;}
   .ks-ley i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
   .par-fila:hover{background:var(--row-hover);}
+  .kx-oc{border:0;background:none;padding:0;font:inherit;font-weight:800;color:var(--green);cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;} .kx-oc:hover{text-decoration:underline;}
   .par-fila.alerta{background:#fff6d6;box-shadow:inset 4px 0 0 #f2b632;} .par-fila.alerta:hover{background:#ffefbf;}
   html[data-theme="dark"] .par-fila.alerta{background:rgba(242,182,50,.14);} .par-al{color:var(--amber-ink);background:#fff1c7;border-radius:6px;padding:1px 6px;} .par-rop{display:block;font-size:10.5px;font-weight:800;color:var(--amber-ink);white-space:nowrap;}
   /* Velocidad (22.10.2026): las filas y tarjetas que no están en pantalla no se dibujan hasta que se llega a ellas. */
@@ -4145,7 +4146,7 @@ function buildSnapshot(){
           // entrada por transacción real en vez de una casilla por semana y sucursal, casi todas en cero).
           // + detalle tipo Nisira (22.10.2026): documento, referencia, cliente/proveedor, motivo y proyecto, como índices a "kst".
           kmv: r.kardexMovs ? r.kardexMovs.map(m=>{ const a = [m.f, n(m.q), m.s.charAt(0), m.t ? 1 : 0];
-            if(m.d || m.r || m.cp || m.mo || m.py) a.push(KST.i(m.d), KST.i(m.r), KST.i(m.cp), KST.i(m.mo), KST.i(m.md), KST.i(m.py));
+            if(m.d || m.r || m.cp || m.mo || m.py || m.oc) a.push(KST.i(m.d), KST.i(m.r), KST.i(m.cp), KST.i(m.mo), KST.i(m.md), KST.i(m.py), KST.i(m.oc));
             return a; }) : undefined,
         };
       }),
@@ -4386,8 +4387,8 @@ function loadFromSnapshot(snap){
       kardexIngresosPorSucursal: (kardexVigente && r.kis) ? { ica: r.kis.i, lima: r.kis.l, trujillo: r.kis.t } : undefined,
       kardexMovimientosPorSucursal: (kardexVigente && r.kms) ? { ica: r.kms.i, lima: r.kms.l, trujillo: r.kms.t } : undefined,
       kardexMovs: (kardexVigente && r.kmv) ? r.kmv.map(m=>{ const o = { f:m[0], q:m[1], s: m[2]==='i' ? 'ica' : m[2]==='t' ? 'trujillo' : 'lima' }; if(m[3]) o.t = 1;
-        if(m.length > 4){ const K = snap.almacen.kst || [], tx = function(k){ return k ? K[k - 1] : undefined; }, v = [tx(m[4]), tx(m[5]), tx(m[6]), tx(m[7]), tx(m[8]), tx(m[9])];
-          ['d', 'r', 'cp', 'mo', 'md', 'py'].forEach(function(c, j){ if(v[j]) o[c] = v[j]; }); }
+        if(m.length > 4){ const K = snap.almacen.kst || [], tx = function(k){ return k ? K[k - 1] : undefined; }, v = [tx(m[4]), tx(m[5]), tx(m[6]), tx(m[7]), tx(m[8]), tx(m[9]), tx(m[10])];
+          ['d', 'r', 'cp', 'mo', 'md', 'py', 'oc'].forEach(function(c, j){ if(v[j]) o[c] = v[j]; }); }
         return o; }) : undefined,
       disponible: (r.l||0) + (r.tr||0) - (r.rv||0) - (r.pk||0),
     })),
@@ -5464,7 +5465,7 @@ function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candC
   const ix = function(...nombres){ for(const nm of nombres){ const i = headerRow.findIndex(function(h){ return String(h == null ? '' : h).trim().toUpperCase() === nm; }); if(i !== -1) return i; } return -1; };
   const iXDoc = tras ? ix('DOCUMENTO') : -1, iXRef = tras ? (tras.esSalida ? ix('REQUERIMIENTO') : ix('DOC_PROVEEDOR2', 'DOC_PROVEEDOR')) : -1,
         iXCp = tras ? ix('CLIEPROV') : -1, iXMo = tras ? ix('IDMOTIVO') : -1, iXMd = tras ? ix('MOTIVO') : -1,
-        iXPy = tras ? ix('DOCORDENPRODUCCION', 'PROYECTO') : -1, iXCo = tras ? ix('DSC_CONSUMIDOR', 'CONSUMIDOR') : -1, iXMa = tras && tras.dnf ? ix('MARCA') : -1;
+        iXPy = tras ? ix('DOCORDENPRODUCCION', 'PROYECTO') : -1, iXCo = tras ? ix('DSC_CONSUMIDOR', 'CONSUMIDOR') : -1, iXMa = tras && tras.dnf ? ix('MARCA') : -1, iXOc = tras && !tras.esSalida ? ix('OCOMPRA') : -1;
   const txK = function(i, row){ if(i === -1) return ''; const v = row[i]; return v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); };
   const porCodigo = {};
   const porCodigoPorSucursal = { ica:{}, lima:{}, trujillo:{} };
@@ -5505,7 +5506,8 @@ function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candC
       if((v = txK(iXMo, row))) mv.mo = v;
       if((v = txK(iXMd, row))) mv.md = v.replace(/^(INGRESO|SALIDA) POR\s*/i, '');
       if((v = txK(iXPy, row)) && v !== '-') mv.py = v; else if((v = txK(iXCo, row)) && v !== '-') mv.py = v;
-      if(iXMa !== -1 && /DANFOSS/i.test(txK(iXMa, row))) tras.dnf.add(codigo); }   // marca Danfoss → familia DANFOSS
+      if(iXMa !== -1 && /DANFOSS/i.test(txK(iXMa, row))) tras.dnf.add(codigo);
+      if((v = txK(iXOc, row)) && v !== '-') mv.oc = v.replace(/^[A-Za-z]{2,4}\s+/, ''); }   // OC con la que ingresó (22.10.2026)   // marca Danfoss → familia DANFOSS
     if(iDest !== -1 && sedeInternaKardex(row[iDest])){ mv.t = 1; if(iDDoc !== -1 && row[iDDoc]) tras.dest.add(docKardexKey(row[iDDoc])); if(iDoc !== -1 && row[iDoc]) tras.org.add(docKardexKey(row[iDoc])); }
     else if(tras && !tras.esSalida && ((iDoc !== -1 && tras.dest.has(docKardexKey(row[iDoc]))) || (iODoc !== -1 && row[iODoc] && tras.org.has(docKardexKey(row[iODoc]))))) mv.t = 1;
     (movs[codigo] = movs[codigo] || []).push(mv);
@@ -8597,7 +8599,7 @@ function kxMovsTabla(l){
   // Todo en una pantalla, sin barra lateral (22.10.2026, Piero): documento en una sola columna y nombres largos acortados (completo al pasar el mouse).
   const corto = function(t, k){ t = String(t || ''); const c = (t.split(' - ')[1] || t).replace(/\s+(SOCIEDAD ANONIMA CERRADA|S\.?A\.?C\.?|S\.?A\.?|E\.?I\.?R\.?L\.?)\.?$/i, ''); return c.length > k ? c.slice(0, k - 1) + '…' : c; };
   return `<div class="ks-kdx kx-fit"><div class="ks-kdx-w"><table><thead><tr><th>Fecha</th><th>Documento</th><th>Referencia</th><th>Proveedor / Cliente</th><th class="num">Cantidad</th><th>Motivo</th><th>Proyecto / Consumidor</th></tr></thead><tbody>
-    ${l.map(function(m){ return `<tr class="${m.q > 0 ? 'in' : 'out'}${m.t ? ' tr' : ''}"><td class="f">${fC(m.f)}</td><td class="mono">${e(m.d || '')}</td><td class="mono">${e(m.r || '')}</td><td title="${e(m.cp || '')}">${e(corto(m.cp, 34))}</td><td class="num ${m.q > 0 ? 'qi' : 'qo'}">${n(Math.abs(m.q))}</td><td title="${e(m.md || '')}">${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(corto(m.md, 22))}${m.t ? ' · traslado' : ''}</td><td title="${e(m.py || '')}">${e(corto(m.py, 26))}</td></tr>`; }).join('')}
+    ${l.map(function(m){ return `<tr class="${m.q > 0 ? 'in' : 'out'}${m.t ? ' tr' : ''}"><td class="f">${fC(m.f)}</td><td class="mono">${e(m.d || '')}</td><td class="mono">${e(m.r || '')}</td><td title="${e(m.cp || '')}">${e(corto(m.cp, 34))}</td><td class="num ${m.q > 0 ? 'qi' : 'qo'}">${m.q > 0 && m.oc ? `<button type="button" class="kx-oc" data-kxoc="${e(m.oc)}" title="Ver la OC ${e(m.oc)}">${n(m.q)}</button>` : n(Math.abs(m.q))}</td><td title="${e(m.md || '')}">${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(corto(m.md, 22))}${m.t ? ' · traslado' : ''}</td><td title="${e(m.py || '')}">${e(corto(m.py, 26))}</td></tr>`; }).join('')}
     </tbody><tfoot><tr><td colspan="4">Total</td><td class="num">${n(tot)}</td><td colspan="2"></td></tr></tfoot></table></div></div>`;
 }
 function kxDetalleAnio(cod, y, tipo){
@@ -8606,6 +8608,17 @@ function kxDetalleAnio(cod, y, tipo){
   const tot = l.reduce(function(a, m){ return a + Math.abs(m.q); }, 0), um = (r.unidad || '').trim();
   kxModal(`${cod} — ${tipo === 'in' ? 'Entradas' : 'Salidas'} de Lurín en ${y}: ${Number(tot).toLocaleString('es-PE', { maximumFractionDigits:2 })} ${um}`,
     l.length ? kxMovsTabla(l) + (l.some(function(m){ return m.d; }) ? '' : '<p class="kx-nota">Para ver documento, proveedor/cliente y proyecto, vuelve a cargar el Reporte Almacén y publica.</p>') : '<div class="ini-vacio">Sin movimientos.</div>');
+}
+function kxDetalleOC(oc){
+  const e = escapeHtml, n = function(v, d){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }); };
+  const l = ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){ return r.oc === oc; });
+  if(!l.length){ kxModal('OC ' + oc, '<div class="ini-vacio">Esta OC no está en Reporte Maestro ni en Consulta cargados.</div>'); return; }
+  const r0 = l[0], mon = r0.moneda || '', tot = l.reduce(function(a, r){ return a + (+r.montoNativo || 0); }, 0);
+  kxModal(`OC ${oc} — ${r0.proveedor || ''}`, `<div class="kx-res" style="grid-template-columns:repeat(4,1fr)"><div class="kx-c"><h4>Fecha</h4><b>${r0.fecha ? fmtDate(r0.fecha) : r0.anio ? fmtDate(new Date(Date.UTC(r0.anio, (r0.mes || 1) - 1, r0.dia || 1))) : '—'}</b></div>
+    <div class="kx-c"><h4>Origen</h4><b>${r0.origen === 'importado' ? '🌎 Importación' : '🇵🇪 Nacional'}</b></div><div class="kx-c"><h4>Monto</h4><b>${e(mon)} ${n(tot)}</b></div><div class="kx-c"><h4>Ítems</h4><b>${l.length}</b></div></div>
+    <div class="ks-kdx kx-fit"><div class="ks-kdx-w"><table><thead><tr><th>Código</th><th>Producto</th><th class="num">Cantidad</th><th class="num">Monto (${e(mon)})</th></tr></thead><tbody>
+    ${l.map(function(r){ return `<tr><td class="mono">${e(r.codigo || '')}</td><td>${e(r.producto || '')}</td><td class="num">${n(r.cantidad)}</td><td class="num">${n(r.montoNativo)}</td></tr>`; }).join('')}
+    </tbody></table></div></div><p class="kx-nota">Datos de Consulta (la OC ya no está en Reporte Maestro).</p>`);
 }
 function kxDetalleTransito(cod){
   const r = kxProducto(cod); if(!r) return;
@@ -8633,6 +8646,10 @@ function kxDetalleTransito(cod){
     : `<div class="ini-vacio">No se encontraron OC pendientes de llegar para este código${+r.transito > 0 ? ' (el tránsito sale del Reporte Almacén; carga Reporte Maestro / PedidoSinReq para ver las OC)' : ''}.</div>`);
 }
 document.addEventListener('click', function(ev){
+  const o = ev.target.closest('[data-kxoc]');
+  if(o){ ev.stopPropagation(); ev.preventDefault(); const oc = o.dataset.kxoc; let d = null; try{ d = appOCDatos(oc); }catch(err){}
+    if(d){ const md = document.getElementById('kxModal'); if(md) md.classList.remove('abierto'); return appOCAbrir(oc); }
+    return kxDetalleOC(oc); }   // OC del ingreso: la vista de la OC; si no está en Reporte Maestro (OC antiguas), lo de Consulta
   const a = ev.target.closest('[data-kxmov]'), t = ev.target.closest('[data-kxtr]');
   if(a){ ev.stopPropagation(); ev.preventDefault(); const k = a.dataset.kxmov.split('|'); return kxDetalleAnio(k[0], k[1], k[2]); }
   if(t){ ev.stopPropagation(); ev.preventDefault(); return kxDetalleTransito(t.dataset.kxtr); }
@@ -8797,7 +8814,7 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
       // Años diferenciados como en el gráfico (22.10.2026, Piero): franja gris en los años impares y una fila con el año al cambiar.
       const sep = (k === 0 || mvS[arr[k - 1]].f.slice(0, 4) !== m.f.slice(0, 4)) ? `<tr class="anio${y % 2 ? ' y1' : ''}"><td colspan="10">${y}</td></tr>` : '';
       return sep + `<tr class="${ing ? 'in' : 'out'}${m.t ? ' tr' : ''}${y % 2 ? ' y1' : ''}"><td class="f">${fC(m.f)}</td><td>${e(dd.length > 1 ? dd[0] : '')}</td><td class="mono">${e(dd.length > 1 ? dd.slice(1).join(' ') : (m.d || ''))}</td><td class="mono">${e(m.r || '')}</td><td>${e(m.cp || '')}</td>`
-        + `<td class="num qi">${ing ? n(m.q) : ''}</td><td class="num qo">${ing ? '' : n(-m.q)}</td><td class="num sd">${n(saldo[i])}</td><td>${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(m.md || '')}${m.t ? ' · traslado entre sedes' : ''}</td><td>${e(m.py || '')}</td></tr>`; }).join('')}
+        + `<td class="num qi">${ing ? (m.oc ? `<button type="button" class="kx-oc" data-kxoc="${e(m.oc)}" title="Ver la OC ${e(m.oc)}">${n(m.q)}</button>` : n(m.q)) : ''}</td><td class="num qo">${ing ? '' : n(-m.q)}</td><td class="num sd">${n(saldo[i])}</td><td>${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(m.md || '')}${m.t ? ' · traslado entre sedes' : ''}</td><td>${e(m.py || '')}</td></tr>`; }).join('')}
     </tbody><tfoot><tr><td colspan="5">Totales</td><td class="num">${n(totI)}</td><td class="num">${n(totS)}</td><td colspan="3"></td></tr></tfoot></table></div></div>`;
   if(!cont){ const bI = document.getElementById('btnImgKardex'), mv = document.getElementById('kardexMovs'); if(bI) bI.style.display = 'none'; if(mv) mv.innerHTML = ''; }   // sin foto ni detalle (22.10.2026)
   box.innerHTML = tiles + bar + `<div class="ks-chart">${svg}<div class="ks-tip" id="ksTip"></div></div>`
