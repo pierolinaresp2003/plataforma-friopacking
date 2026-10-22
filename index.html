@@ -502,7 +502,9 @@
   .kx-modal-in{background:var(--card);border-radius:16px;width:min(1100px,96vw);max-height:84vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(10,20,40,.35);}
   .kx-modal-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);}
   .kx-modal-cab b{font-size:14px;color:var(--ink);} .kx-modal-cab button{border:0;background:var(--surface-2);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:14px;color:var(--ink);}
-  .kx-modal-cu{padding:12px 18px 18px;overflow:auto;} .kx-modal-cu .ks-kdx-w{max-height:none;}
+  .kx-modal-cu{padding:12px 18px 18px;overflow:auto;} .kx-modal-cu .ks-kdx-w{max-height:none;overflow-x:hidden;}
+  .kx-modal .ks-kdx td{white-space:normal;word-break:break-word;} .kx-modal .ks-kdx td.f,.kx-modal .ks-kdx td.num{white-space:nowrap;}
+  .kx-modal .ks-kdx td.mono{white-space:nowrap;font-size:10.5px;} .kx-modal .ks-kdx td,.kx-modal .ks-kdx th{padding-left:6px;padding-right:6px;}
   .par-box.app .par-fila{grid-template-columns:28px minmax(200px,2fr) minmax(130px,1.1fr) 232px 80px 80px 64px 104px;cursor:default;}
   .par-ver{border:1px solid var(--brand-2);background:var(--card);color:var(--brand-ink);border-radius:8px;padding:7px 10px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;} .par-ver:hover{background:var(--surface-2);}
   .par-ley{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--ink-soft);margin:2px 0 6px;} .par-ley i{display:inline-block;width:12px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;}
@@ -8577,9 +8579,11 @@ function kxProducto(cod){ return ((ALMACEN_DATA && ALMACEN_DATA.rows) || []).con
 function kxMovsTabla(l){
   const e = escapeHtml, n = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); }, fC = function(f){ return f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4); };
   const tot = l.reduce(function(a, m){ return a + Math.abs(m.q); }, 0);
-  return `<div class="ks-kdx"><div class="ks-kdx-w"><table><thead><tr><th>Fecha</th><th>Doc.</th><th>Número</th><th>Referencia</th><th>Proveedor / Cliente</th><th class="num">Cantidad</th><th>Motivo</th><th>Proyecto / Consumidor</th></tr></thead><tbody>
-    ${l.map(function(m){ const dd = (m.d || '').split(' '); return `<tr class="${m.q > 0 ? 'in' : 'out'}${m.t ? ' tr' : ''}"><td class="f">${fC(m.f)}</td><td>${e(dd.length > 1 ? dd[0] : '')}</td><td class="mono">${e(dd.length > 1 ? dd.slice(1).join(' ') : (m.d || ''))}</td><td class="mono">${e(m.r || '')}</td><td>${e(m.cp || '')}</td><td class="num ${m.q > 0 ? 'qi' : 'qo'}">${n(Math.abs(m.q))}</td><td>${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(m.md || '')}${m.t ? ' · traslado entre sedes' : ''}</td><td>${e(m.py || '')}</td></tr>`; }).join('')}
-    </tbody><tfoot><tr><td colspan="5">Total</td><td class="num">${n(tot)}</td><td colspan="2"></td></tr></tfoot></table></div></div>`;
+  // Todo en una pantalla, sin barra lateral (22.10.2026, Piero): documento en una sola columna y nombres largos acortados (completo al pasar el mouse).
+  const corto = function(t, k){ t = String(t || ''); const c = (t.split(' - ')[1] || t).replace(/\s+(SOCIEDAD ANONIMA CERRADA|S\.?A\.?C\.?|S\.?A\.?|E\.?I\.?R\.?L\.?)\.?$/i, ''); return c.length > k ? c.slice(0, k - 1) + '…' : c; };
+  return `<div class="ks-kdx kx-fit"><div class="ks-kdx-w"><table><thead><tr><th>Fecha</th><th>Documento</th><th>Referencia</th><th>Proveedor / Cliente</th><th class="num">Cantidad</th><th>Motivo</th><th>Proyecto / Consumidor</th></tr></thead><tbody>
+    ${l.map(function(m){ return `<tr class="${m.q > 0 ? 'in' : 'out'}${m.t ? ' tr' : ''}"><td class="f">${fC(m.f)}</td><td class="mono">${e(m.d || '')}</td><td class="mono">${e(m.r || '')}</td><td title="${e(m.cp || '')}">${e(corto(m.cp, 34))}</td><td class="num ${m.q > 0 ? 'qi' : 'qo'}">${n(Math.abs(m.q))}</td><td title="${e(m.md || '')}">${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(corto(m.md, 22))}${m.t ? ' · traslado' : ''}</td><td title="${e(m.py || '')}">${e(corto(m.py, 26))}</td></tr>`; }).join('')}
+    </tbody><tfoot><tr><td colspan="4">Total</td><td class="num">${n(tot)}</td><td colspan="2"></td></tr></tfoot></table></div></div>`;
 }
 function kxDetalleAnio(cod, y, tipo){
   const r = kxProducto(cod); if(!r) return;
@@ -8591,12 +8595,26 @@ function kxDetalleAnio(cod, y, tipo){
 function kxDetalleTransito(cod){
   const r = kxProducto(cod); if(!r) return;
   const e = escapeHtml, um = (r.unidad || '').trim(), n = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
-  const fd = function(d){ return d ? fmtDate(d) : '—'; };
+  const fd = function(d){ return d ? fmtDate(d) : '—'; }, hoy = new Date();
   let l = []; try{ l = trTransitoDe(r.codigo, r.codigos) || []; }catch(err){}
   const tot = l.reduce(function(a, o){ return a + (o.cant || 0); }, 0);
-  kxModal(`${cod} — En tránsito: ${n(r.transito)} ${um}`, l.length ? `<div class="ks-kdx"><div class="ks-kdx-w"><table><thead><tr><th>OC</th><th>Proveedor</th><th>Origen</th><th class="num">Cantidad</th><th>Fecha OC</th><th>Aprobación</th><th>Compromiso</th><th>ETD</th><th>Entrega ref.</th></tr></thead><tbody>
-    ${l.map(function(o){ return `<tr><td class="mono">${e(o.oc)}</td><td>${e(o.proveedor || '')}</td><td>${o.origen === 'importado' ? '🌎 Importación' : o.origen ? '🇵🇪 Nacional' : '—'}</td><td class="num qi">${n(o.cant)} ${e(o.unidad || um)}</td><td class="f">${fd(o.fOrden)}</td><td class="f">${fd(o.fAprob)}</td><td class="f">${fd(o.fCompromiso)}</td><td class="f">${fd(o.etd)}</td><td class="f">${fd(o.fEntregaRef)}</td></tr>`; }).join('')}
-    </tbody><tfoot><tr><td colspan="3">Total en OC pendientes</td><td class="num">${n(tot)}</td><td colspan="5"></td></tr></tfoot></table></div></div>`
+  // Importaciones con lo mismo que se ve en Compras (22.10.2026, Piero: "considera en el en tránsito la misma información que se tiene
+  // de compras para importaciones: el ETD, el zarpe, el ETA…"): estado del embarque, zarpe (ETD), llegada (ETA), agencia, BL y avance
+  // del seguimiento de contenedores (ocImportInfo / embDe); en nacional, la fecha comprometida y si ya está vencida.
+  const fila = function(o){
+    let imp = null; try{ imp = ocImportInfo(o.oc); }catch(err){}
+    const esImp = o.origen === 'importado' || !!imp;
+    let est = '', etd = o.etd, eta = null, extra = '';
+    if(esImp){ const em = imp && imp.emb; etd = (imp && imp.etd) || o.etd; eta = imp && imp.eta;
+      if(em){ const x = embEtiqueta(em); est = `<span class="asis-est ${x[0]}">${x[1]} ${e(x[2])}</span>${em.av != null ? ' <small>' + em.av + '%</small>' : ''}`;
+        extra = [em.ag ? 'Agencia: ' + em.ag : '', em.bl ? 'BL: ' + em.bl : '', em.ob ? '📝 ' + em.ob : ''].filter(Boolean).map(e).join('<br>'); }
+      else est = etd ? '🚢 Zarpó' : (imp && imp.lista ? '🛳️ Por embarcar' : '🏭 Sin zarpe aún'); }
+    else { const f = o.fCompromiso || o.fEntregaRef; est = f && +f < +hoy ? '<span class="asis-est espera">⏰ Vencida</span>' : '🚚 Por entregar'; }
+    return `<tr><td class="mono">${e(o.oc)}</td><td>${e(o.proveedor || '')}</td><td>${esImp ? '🌎 Importación' : '🇵🇪 Nacional'}</td><td class="num qi">${n(o.cant)} ${e(o.unidad || um)}</td><td class="f">${fd(o.fOrden)}</td>
+      <td>${est}</td><td class="f">${esImp ? fd(etd) : '—'}</td><td class="f">${esImp ? fd(eta) : '—'}</td><td class="f">${fd(o.fCompromiso || o.fEntregaRef)}</td><td>${extra}</td></tr>`; };
+  kxModal(`${cod} — En tránsito: ${n(r.transito)} ${um}`, l.length ? `<div class="ks-kdx"><div class="ks-kdx-w"><table><thead><tr><th>OC</th><th>Proveedor</th><th>Origen</th><th class="num">Cantidad</th><th>Fecha OC</th><th>Estado</th><th>Zarpe (ETD)</th><th>Llegada (ETA)</th><th>Entrega comprometida</th><th>Agencia / BL / notas</th></tr></thead><tbody>
+    ${l.map(fila).join('')}
+    </tbody><tfoot><tr><td colspan="3">Total en OC pendientes</td><td class="num">${n(tot)}</td><td colspan="6"></td></tr></tfoot></table></div></div>`
     : `<div class="ini-vacio">No se encontraron OC pendientes de llegar para este código${+r.transito > 0 ? ' (el tránsito sale del Reporte Almacén; carga Reporte Maestro / PedidoSinReq para ver las OC)' : ''}.</div>`);
 }
 document.addEventListener('click', function(ev){
@@ -14770,7 +14788,18 @@ function appToast(txt){
   t.textContent = txt; t.classList.add('ver');
   clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('ver'); }, 2000);
 }
+// Atrás dentro de Inventario (22.10.2026, Piero: "el botón para retroceder debe ser el mismo de la vista web, al lado de la casa"):
+// cierra la ventana de detalle; producto → su familia; familia → todas las familias.
+function appAtrasInv(){
+  const m = document.getElementById('kxModal'); if(m && m.classList.contains('abierto')){ m.classList.remove('abierto'); return true; }
+  if(!APP.enInicio || APP.pantalla !== 'inventario' || APP_INV.q) return false;
+  if(APP_INV.kdx){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
+    const f = document.querySelector('#invLista [data-invkdx="' + CSS.escape(c) + '"]'); if(f) f.closest('.par-fila').scrollIntoView({ block:'center' }); else window.scrollTo(0, 0); return true; }
+  if(APP_INV.fam){ APP_INV.fam = ''; appRenderInicio(); window.scrollTo(0, 0); return true; }
+  return false;
+}
 function appAtras(){
+  if(appAtrasInv()) return true;
   if(!RQ_MOVIL.matches) return false;
   const sheet = document.getElementById('appSheet'), asis = document.getElementById('asis'), bienv = document.getElementById('appBienv');
   if(sheet && sheet.classList.contains('abierto')){ appCerrarSheet(); return true; }
@@ -17367,11 +17396,10 @@ function appInvFamilias(){
 // "Ver detalle ›" que abre el kardex del producto. Botones para volver: producto → familia → todas las familias.
 function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return x.e !== 'nada' && (fam === 'DANFOSS' ? x.dnf : fam === 'ACCESORIOS INOX' ? x.inx : x.fam === fam); }).map(function(x){ return x.r; }); }
 function appInvFamiliaHtml(){
-  return `<button type="button" class="m-volver" data-invfam="">‹ Todas las familias</button>` + invParetoHtml({ label:APP_INV.fam, rows:appInvFamRows(APP_INV.fam) }, true);
+  return invParetoHtml({ label:APP_INV.fam, rows:appInvFamRows(APP_INV.fam) }, true);
 }
 function appInvKdxHtml(){   // el gráfico lo pone appInvKdxPintar después de poner el HTML (ver appRenderInicio)
-  return `<button type="button" class="m-volver" data-invkdxvolver="1">‹ Volver a ${escapeHtml(APP_INV.fam || 'la lista')}</button>
-    <div class="ini-card m-kx" id="appKdx"><h3 class="kx-title"></h3><div class="kx-chart"></div></div>`;
+  return `<div class="ini-card m-kx" id="appKdx"><h3 class="kx-title"></h3><div class="kx-chart"></div></div>`;
 }
 function appInvKdxPintar(){
   const cont = document.getElementById('appKdx'); if(!cont) return;
