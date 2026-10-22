@@ -5713,7 +5713,28 @@ function processSupervisores(wb, filename){
            : { ok:false, message: "no encontré nombres con correo en este archivo." };
 }
 
+// Reporte Almacén trae "Ingresos"/"Movimientos" TAL CUAL de 2. Inventario (22.10.2026, Piero): todas las sedes
+// y motivos. El filtro que antes hacía la macro (3 sedes + motivos, más S26 pérdida/robo) se aplica aquí UNA vez,
+// antes de leer, para que kardex, lotes y recepción/despacho sigan contando lo mismo. Si ya viene filtrada, no toca nada.
+const ALM_MOTIVOS = { ing:['I01','I06','I12','I20','I21','I25','I31','I50','I51','I80','I81'], sal:['S01','S11','S12','S14','S20','S25','S26','S50','S61','S62','S65','S80','S81','S88'] };
+function almFiltrarSedesMotivos(wb){
+  [[/ingres/i, ['codigo','cantidad','fecha'], ALM_MOTIVOS.ing], [/movimient/i, ['producto','cantidad','fecha salida'], ALM_MOTIVOS.sal]].forEach(function(d){
+    const n = wb.SheetNames.find(function(x){ return d[0].test(x); }); if(!n || !wb.Sheets[n]) return;
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:true, defval:null});
+    let h = -1;
+    for(let i = 0; i < Math.min(10, rows.length) && h === -1; i++){ const t = (rows[i] || []).map(function(c){ return sinAcentos((c == null ? '' : c.toString()).trim().toLowerCase()); });
+      if(d[1].every(function(k){ return t.indexOf(k) !== -1; })) h = i; }
+    if(h === -1) return;
+    const iS = findCol(rows[h], ['SUCURSAL']), iM = findCol(rows[h], ['IDMOTIVO']);
+    if(iS === -1 || iM === -1) return;
+    const mot = new Set(d[2]);
+    const ok = rows.slice(h + 1).filter(function(r){ return r && sedeInternaKardex(r[iS]) && mot.has(String(r[iM] == null ? '' : r[iM]).replace(/\s+/g, '').toUpperCase()); });
+    if(ok.length === rows.length - h - 1) return;
+    wb.Sheets[n] = XLSX.utils.aoa_to_sheet(rows.slice(0, h + 1).concat(ok), {cellDates:true});
+  });
+}
 function processAlmacen(wb, filename){
+  almFiltrarSedesMotivos(wb);
   let sheetName = wb.SheetNames.find(n => /an[áa]lisis.*inventario/i.test(n.trim()));
   if(!sheetName) sheetName = wb.SheetNames.find(n => /inventario|stock/i.test(n.trim()));
   if(!sheetName) sheetName = wb.SheetNames[0];
