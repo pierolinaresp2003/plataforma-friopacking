@@ -14585,6 +14585,16 @@ function appSelAbrir(sel){
     if(Math.abs(c.clientX - t.x) > 10 || Math.abs(c.clientY - t.y) > 10) return; ev.preventDefault(); appSelAbrir(t.s); }, { capture:true, passive:false });
   document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape') appSelCerrar(); });
 })();
+function appVolverAlInicioModulo(t){
+  try{ appOCCerrar(); }catch(err){}
+  const m = document.getElementById('kxModal'); if(m) m.classList.remove('abierto');
+  const R = { inventario:[APP_INV, { q:'', sel:'', tope:30, fam:'', kdx:'' }], tienda:[APP_TIENDA, { q:'', fam:'' }], pendcompras:[APP_PC, { q:'', fam:'', tope:20, entTope:60 }],
+    pendlog:[APP_PL, { q:'', tope:15 }], presu:[APP_PR, { q:'' }], gastopresu:[APP_PR, { q:'' }], supreq:[APP_SUP, { q:'' }], almseg:[APP_AS, { det:false }] }[t];
+  if(R) Object.assign(R[0], R[1]);
+  if(t === 'inventario'){ kardexOrigen = null; kdxRango = null; }
+  if(APP_PANTALLAS[t]) appRenderInicio();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
 function appConstruir(){
   const logo = appLogo();
   document.querySelector('.main').insertAdjacentHTML('afterbegin',
@@ -14629,8 +14639,11 @@ function appConstruir(){
     const t = b.dataset.tab;
     if(t === 'polar') return polarAbrir();
     if(t === 'vista') return appAbrirSheet();
-    // Misma pestaña otra vez: solo sube al inicio (no se vuelve a armar la pantalla).
-    if(APP.enInicio && APP.pantalla === (t === 'inicio' ? 'inicio' : t)){ window.scrollTo({ top:0, behavior:'smooth' }); return; }
+    // Misma pestaña otra vez (22.10.2026, Piero: "al hacer click nuevamente al módulo, que vuelva al inicio de ese módulo; así para
+    // todos"): se cierra lo que esté abierto encima, se vuelve a la primera vista del módulo (sin búsqueda, sin familia/producto
+    // abierto, lista desde arriba; los filtros de fecha y de persona se respetan) y se sube al inicio.
+    if(APP.enInicio && APP.pantalla === (t === 'inicio' ? 'inicio' : t)){ appVolverAlInicioModulo(t); return; }
+    if(!APP.enInicio && b.classList.contains('on') && !APP_PANTALLAS[t] && t !== 'inicio'){ try{ appOCCerrar(); }catch(err){} irASeccion(t); window.scrollTo({ top:0, behavior:'smooth' }); return; }
     // Primero se marca la pestaña (respuesta inmediata al dedo) y la pantalla se arma en el cuadro
     // siguiente, cuando el toque ya se pintó.
     this.querySelectorAll('button[data-tab]').forEach(function(x){ x.classList.toggle('on', x === b && t !== 'polar'); });
