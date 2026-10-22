@@ -5230,15 +5230,17 @@ function stockParaReposicion(r){
 // "OK" por el Excel.
 function ropEfectivo(r){
   const ropImp = (r.ropImp != null && r.ropImp > 0) ? r.ropImp : null;
-  if(ropImp == null) return r.rop;
+  if(ropImp == null) return ropRedondo(r.rop);
   const ltNacional = (r.leadTime != null && r.leadTime > 0) ? r.leadTime : null;
   const ltImportado = (r.leadTimeImp != null && r.leadTimeImp > 0) ? r.leadTimeImp : null;
   const compras = comprasDeProducto(r.codigos || [r.codigo]);
   const esImportado = compras.origen != null
     ? (compras.origen === 'importado')
     : (ltNacional == null && ltImportado != null);
-  return esImportado ? ropImp : r.rop;
+  return ropRedondo(esImportado ? ropImp : r.rop);
 }
+// ROP en unidades enteras (22.10.2026, Piero: "el ROP siempre debe estar aproximado en base a .5: si es más redondea arriba y si es menos abajo").
+function ropRedondo(v){ return v == null || isNaN(v) ? v : Math.round(+v); }
 // Completa un producto con su stock para reposición, cuánto le falta para el ROP y su estado.
 function conEstadoRepo(o){
   const stockRepo = stockParaReposicion(o);
@@ -8566,7 +8568,7 @@ function invParetoFilas(g){
     const met = Object.keys(sal).reduce(function(a, y){ return a + sal[y]; }, 0);
     // Alerta de reposición (22.10.2026, Piero: "pintar de amarillo la línea en la que ya se deba pedir porque está por debajo del ROP;
     // si hay bastante importación, el ROP y SS de importación"): origen = el que más se compró en US$; stock de Lurín + en tránsito ≤ ROP.
-    const esImpO = (org.importado || 0) > (org.nacional || 0), ropA = esImpO && r.ropImp > 0 ? r.ropImp : r.rop;
+    const esImpO = (org.importado || 0) > (org.nacional || 0), ropA = ropRedondo(esImpO && r.ropImp > 0 ? r.ropImp : r.rop);
     const posA = (+r.lima || 0) + (+r.transito || 0), alerta = ropA > 0 && posA <= ropA ? { rop:ropA, imp:esImpO && r.ropImp > 0, pos:posA, tr:+r.transito || 0 } : null;
     return { r:r, usd:usd, met:met, alerta:alerta, q:q, sal:sal, origen:origen, pv:pvTop, stock:+r.lima || 0, pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
   }).sort(function(a, b){ return b.met - a.met || (b.r.consumoMensual || 0) - (a.r.consumoMensual || 0) || b.usd - a.usd; });
@@ -8678,7 +8680,7 @@ function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, 
         ${mini(x)}
         <div class="kv"><span>Consumo/mes</span><b>${n(r.consumoMensual)}</b></div>
         <div class="kv"><span>Consumo/año</span><b>${n((+r.consumoMensual || 0) * 12, 0)}</b></div>
-        <div class="kv"><span>Stock Lurín</span><b>${n(x.stock)}</b>${al ? `<small class="par-rop">⚠ ROP${al.imp ? ' imp.' : ''} ${n(al.rop, 1)}</small>` : ''}</div>${app ? `<button type="button" class="par-ver" data-invkdx="${e(r.codigo)}">Ver detalle ›</button>` : ''}</div>`; }).join('') || '<div class="ini-vacio">Nada en esta vista.</div>'}</div>
+        <div class="kv"><span>Stock Lurín</span><b>${n(x.stock)}</b>${al ? `<small class="par-rop">⚠ ROP${al.imp ? ' imp.' : ''} ${n(al.rop, 0)}</small>` : ''}</div>${app ? `<button type="button" class="par-ver" data-invkdx="${e(r.codigo)}">Ver detalle ›</button>` : ''}</div>`; }).join('') || '<div class="ini-vacio">Nada en esta vista.</div>'}</div>
   </div>`;
 }
 function invParetoBind(box, g){
@@ -8703,7 +8705,7 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
   const ltN = p.leadTime > 0 ? p.leadTime : null, ltI = p.leadTimeImp > 0 ? p.leadTimeImp : null, compO = comprasDeProducto(p.codigos || [p.codigo]);
   const impAuto = compO.origen != null ? compO.origen === 'importado' : (ltN == null && ltI != null);
   const esImp = kardexOrigen != null ? kardexOrigen === 'importado' : impAuto;
-  const rop = esImp && p.ropImp > 0 ? p.ropImp : p.rop, ss = esImp && p.stockSeguridadImp > 0 ? p.stockSeguridadImp : p.stockSeguridad;
+  const rop = ropRedondo(esImp && p.ropImp > 0 ? p.ropImp : p.rop), ss = esImp && p.stockSeguridadImp > 0 ? p.stockSeguridadImp : p.stockSeguridad;
   { const tt = cont ? cont.querySelector('.kx-title') : document.getElementById('kardexTitle'), sb = cont ? null : document.getElementById('kardexSub');   // código y nombre juntos, sin "Kardex —"
     if(tt) tt.textContent = p.codigo + ' — ' + (p.descripcion || '').trim() + (p.nCodigos > 1 ? ' (' + p.nCodigos + ' códigos homologados)' : '');
     if(sb && sb.firstChild && sb.firstChild.nodeType === 3) sb.firstChild.textContent = ''; }
