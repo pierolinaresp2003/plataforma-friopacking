@@ -8460,7 +8460,8 @@ function drawPedirPorCategoria(){
   }
   // Familia DANFOSS (21.10.2026, Piero: "debes generar una nueva familia que sea solo de productos danfoss"): junta los productos de
   // marca Danfoss de cualquier familia (comprados a Danfoss o con "DANFOSS" en la descripción). Siguen apareciendo también en su familia.
-  if(INV_SIMPLE){ const danf = rows.filter(invEsDanfoss); if(danf.length) byCat['DANFOSS'] = { label:'DANFOSS', n:danf.length, porUm:{}, rows:danf, primero:true }; }
+  if(INV_SIMPLE){ const danf = rows.filter(invEsDanfoss); if(danf.length) byCat['DANFOSS'] = { label:'DANFOSS', n:danf.length, porUm:{}, rows:danf, primero:true };
+    const inx = rows.filter(invEsInox); if(inx.length) byCat['ACCESORIOS INOX'] = { label:'ACCESORIOS INOX', n:inx.length, porUm:{}, rows:inx, primero:true }; }
   const grupos = Object.keys(byCat).map(k=>byCat[k]).sort((a,b)=> (b.primero ? 1 : 0) - (a.primero ? 1 : 0) || b.n-a.n || a.label.localeCompare(b.label));
 
   document.getElementById('pedirResumen').innerHTML = meses > 0
@@ -8528,6 +8529,11 @@ function invDanfossCods(){
   return appMemo('invDanfoss', function(){ const c = new Set(); ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.codigo && /danfoss/i.test(r.proveedor || '')) c.add(r.codigo); });
     ((ALMACEN_DATA && (ALMACEN_DATA.danfoss || ALMACEN_DATA.dnf)) || []).forEach(function(x){ c.add(x); }); return c; });   // + marca DANFOSS del almacén
 }
+// Familia ACCESORIOS INOX (22.10.2026, Piero: "una familia que sea solo de bridas, codos, concentraciones… todo eso que sea inox, sin
+// considerar tubos inox"): accesorios de tubería (brida, codo, reducción concéntrica/excéntrica/campana/bushing, cap, tee, niple, copla,
+// unión, tapón, cruz, stub end) de acero inoxidable (INOX, AISI, C-304/316, 304L/316L, SS304/316). No entran tubos ni pernería.
+function invEsInox(r){ const d = sinAcentos(String(r.descripcion || '').toUpperCase()).trim();
+  return /^(BRIDA|CODO|REDUCCION|CAP|TEE|NIPLE|COPLA|UNION|TAPON|CRUZ|STUB)\b/.test(d) && /INOX|\bNOX\b|AISI|SS ?3(04|16)|3(04|16)L? ?SS|\bC-? ?3(04|16)|\b3(04|16)L?\b/.test(d); }
 function invEsDanfoss(r){ const c = invDanfossCods(); return /danfoss/i.test(r.descripcion || '') || ((r.codigos && r.codigos.length) ? r.codigos : [r.codigo]).some(function(x){ return c.has(x); }); }
 function invParetoFilas(g){
   const C = invComprasPorCodigo(), yF = appIndCorte().getUTCFullYear(), anios = []; for(let y = 2023; y <= yF; y++) anios.push(y);
@@ -10249,6 +10255,7 @@ function familiaByDescripcion(descripcion){
 function iconForFamilia(nombre){
   const n = (nombre||'').toUpperCase();
   if(n === 'DANFOSS') return '🅳';
+  if(n === 'ACCESORIOS INOX') return '🔩';
   if(n.includes('VALVULA')) return '🚰';
   if(n.includes('TUBERIA') || n.includes('TUBO') || n.includes('ACCESORIO')) return '🔩';
   if(n.includes('FILTRO') || n.includes('SECADOR')) return '🛢️';
@@ -17309,7 +17316,7 @@ function appInvIndice(){
   });
   // Familia de cada código: la misma categoría de "Cuánto pedir por categoría" (07.10.2026, Piero:
   // "la parte de inventario la puedes colocar como antes agrupada por familia").
-  items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; x.dnf = invEsDanfoss(x.r); });   // + DANFOSS (22.10.2026)
+  items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; x.dnf = invEsDanfoss(x.r); x.inx = invEsInox(x.r); });   // + DANFOSS y ACCESORIOS INOX (22.10.2026)
   APP_INV.cache = { firma:firma, items:items };
   return APP_INV.cache;
 }
@@ -17323,7 +17330,7 @@ function appInvFiltrada(){
       .sort(function(a,b){ return b.cons - a.cons || b.tot - a.tot; });
   } else {
     const orden = { sin:0, reponer:1, ok:2, sinmov:3, sinrop:4, nada:5 };
-    l = idx.filter(function(x){ return (APP_INV.fam === 'DANFOSS' ? x.dnf : x.fam === APP_INV.fam) && x.e !== 'nada'; })
+    l = idx.filter(function(x){ return (APP_INV.fam === 'DANFOSS' ? x.dnf : APP_INV.fam === 'ACCESORIOS INOX' ? x.inx : x.fam === APP_INV.fam) && x.e !== 'nada'; })
       .sort(function(a,b){ return orden[a.e] - orden[b.e] || b.cons - a.cons || b.tot - a.tot; });
   }
   return l;
@@ -17337,14 +17344,15 @@ function appInvFamilias(){
     const y = g.get(x.fam) || { fam:x.fam, n:0, sin:0, rep:0 }; y.n++; if(x.e === 'sin') y.sin++; if(x.e === 'reponer') y.rep++; g.set(x.fam, y); });
   // Familia DANFOSS (22.10.2026, Piero: "no veo la familia danfoss"): primera, junta los productos Danfoss de todas las familias.
   const dn = { fam:'DANFOSS', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.dnf) return; dn.n++; if(x.e === 'sin') dn.sin++; if(x.e === 'reponer') dn.rep++; });
+  const ix = { fam:'ACCESORIOS INOX', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.inx) return; ix.n++; if(x.e === 'sin') ix.sin++; if(x.e === 'reponer') ix.rep++; });
   // Orden alfabético (22.10.2026, Piero: "grupo de familias en tarjetas que deben estar ordenadas alfabéticamente").
-  return `<div class="m-fams">${(dn.n ? [dn] : []).concat([...g.values()]).sort(function(a,b){ return a.fam.localeCompare(b.fam, 'es'); }).map(function(y){
+  return `<div class="m-fams">${(dn.n ? [dn] : []).concat(ix.n ? [ix] : []).concat([...g.values()]).sort(function(a,b){ return a.fam.localeCompare(b.fam, 'es'); }).map(function(y){
     return `<button type="button" class="ini-card m-fam" data-invfam="${escapeHtml(y.fam)}"><span class="m-fam-ic">${iconForFamilia(sinAcentos(y.fam))}</span>
       <span class="m-fam-tx"><b>${escapeHtml(y.fam)}</b><small>${appN(y.n)} producto${y.n === 1 ? '' : 's'}${y.sin ? ` · <em class="rojo">${appN(y.sin)} sin stock</em>` : ''}${y.rep ? ` · <em class="ambar">${appN(y.rep)} por reponer</em>` : ''}</small></span></button>`; }).join('')}</div>`;
 }
 // Una familia (22.10.2026, Piero): primero el Pareto y debajo TODOS sus códigos con el detalle por año; cada fila tiene
 // "Ver detalle ›" que abre el kardex del producto. Botones para volver: producto → familia → todas las familias.
-function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return x.e !== 'nada' && (fam === 'DANFOSS' ? x.dnf : x.fam === fam); }).map(function(x){ return x.r; }); }
+function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return x.e !== 'nada' && (fam === 'DANFOSS' ? x.dnf : fam === 'ACCESORIOS INOX' ? x.inx : x.fam === fam); }).map(function(x){ return x.r; }); }
 function appInvFamiliaHtml(){
   return `<button type="button" class="m-volver" data-invfam="">‹ Todas las familias</button>` + invParetoHtml({ label:APP_INV.fam, rows:appInvFamRows(APP_INV.fam) }, true);
 }
