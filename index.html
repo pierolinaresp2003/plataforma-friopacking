@@ -508,7 +508,29 @@
   .kx-modal-in{background:var(--card);border-radius:16px;width:min(1100px,96vw);max-height:84vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(10,20,40,.35);}
   .kx-modal-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);}
   .kx-modal-cab b{font-size:14px;color:var(--ink);} .kx-modal-cab button{border:0;background:var(--surface-2);border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:14px;color:var(--ink);}
-  .kx-modal-cu{padding:12px 18px 18px;overflow:auto;} .kx-modal-cu .ks-kdx-w{max-height:none;overflow-x:hidden;}
+  .kx-modal-cu{padding:12px 18px 18px;overflow:auto;} .kx-modal-cu .ks-kdx-w{max-height:none;overflow-x:hidden;} .ks-kdx.kx-fit .ks-kdx-w{overflow-x:hidden;}
+  /* Inventario en el celular (22.10.2026, Piero: "adáptalo a la vista del app"): cada movimiento es una tarjeta de 3 líneas
+     (fecha · documento · cantidad / proveedor o cliente · saldo / motivo, referencia y proyecto); el Pareto, una ficha por producto. */
+  @media (max-width:640px){
+    .ks-kdx.kx-fit thead{display:none;} .ks-kdx.kx-fit table,.ks-kdx.kx-fit tbody,.ks-kdx.kx-fit tfoot{display:block;}
+    .ks-kdx.kx-fit .ks-kdx-w{max-height:none;}
+    .ks-kdx.kx-fit tbody tr:not(.anio){display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"f doc q" "cp cp sd" "mo mo mo" "ref py py";column-gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);}
+    .ks-kdx.kx-fit tbody tr.y1:not(.anio){background:var(--surface-2);}
+    .ks-kdx.kx-fit tbody td{display:block;border:0;padding:1px 0;font-size:12px;background:transparent !important;} .ks-kdx.kx-fit tbody td:empty{display:none;}
+    .ks-kdx.kx-fit td.f{grid-area:f;font-weight:700;} .ks-kdx.kx-fit td.c-doc{grid-area:doc;} .ks-kdx.kx-fit td.qi,.ks-kdx.kx-fit td.qo{grid-area:q;font-size:14px;}
+    .ks-kdx.kx-fit td.qi:not(:empty)::before{content:'+';} .ks-kdx.kx-fit td.qo:not(:empty)::before{content:'−';}
+    .ks-kdx.kx-fit td.c-cp{grid-area:cp;color:var(--ink);} .ks-kdx.kx-fit td.sd{grid-area:sd;color:var(--ink-soft);font-size:11px;} .ks-kdx.kx-fit td.sd::before{content:'saldo ';font-weight:500;}
+    .ks-kdx.kx-fit td.c-mo{grid-area:mo;color:var(--ink-soft);font-size:11px;} .ks-kdx.kx-fit td.c-ref{grid-area:ref;color:var(--ink-soft);} .ks-kdx.kx-fit td.c-py{grid-area:py;color:var(--ink-soft);font-size:11px;text-align:right;}
+    .ks-kdx.kx-fit tr.anio{display:block;} .ks-kdx.kx-fit tr.anio td{display:block;padding:6px 10px;}
+    .ks-kdx.kx-fit tfoot tr{display:flex;gap:14px;justify-content:flex-end;padding:8px 10px;font-weight:800;} .ks-kdx.kx-fit tfoot td{display:block;border:0;padding:0;} .ks-kdx.kx-fit tfoot td:empty{display:none;}
+    .ks-kdx.kx-fit tfoot td.qi::before{content:'Ingresos ';font-weight:500;} .ks-kdx.kx-fit tfoot td.qo::before{content:'Salidas ';font-weight:500;}
+    html .par-head h3{display:block;} html .par-head h3 small{margin-top:6px;}
+    html .par-box.app .par-fila,html .par-fila{grid-template-columns:22px repeat(3,1fr);grid-template-areas:"pos prod prod prod" ". yr yr yr" ". k1 k2 k3" ". ver ver ver";row-gap:6px;column-gap:6px;padding:10px 4px;}
+    html .par-fila>.pos{grid-area:pos;} html .par-fila>.prod{grid-area:prod;} html .par-fila>.org{display:none;} html .par-fila>.par-yr{grid-area:yr;grid-template-columns:repeat(auto-fit,minmax(54px,1fr));}
+    html .par-fila>.kv{text-align:left;display:block !important;} html .par-fila>.kv:nth-child(5){grid-area:k1;} html .par-fila>.kv:nth-child(6){grid-area:k2;} html .par-fila>.kv:nth-child(7){grid-area:k3;}
+    html .par-fila>.kv b{font-size:14px;} html .par-fila>.par-ver{grid-area:ver;justify-self:stretch;padding:9px 10px;}
+  }
+  .kx-fit td{white-space:normal;word-break:break-word;} .kx-fit td.f,.kx-fit td.num{white-space:nowrap;} .kx-fit td.mono{white-space:nowrap;font-size:10.5px;} .kx-fit td,.kx-fit th{padding-left:6px;padding-right:6px;}
   .kx-modal .ks-kdx td{white-space:normal;word-break:break-word;} .kx-modal .ks-kdx td.f,.kx-modal .ks-kdx td.num{white-space:nowrap;}
   .kx-modal .ks-kdx td.mono{white-space:nowrap;font-size:10.5px;} .kx-modal .ks-kdx td,.kx-modal .ks-kdx th{padding-left:6px;padding-right:6px;}
   .par-box.app .par-fila{grid-template-columns:28px minmax(200px,2fr) minmax(130px,1.1fr) 232px 80px 80px 64px 104px;cursor:default;}
@@ -4215,24 +4237,31 @@ function showPublishBanner(msg, isError){
   if(!isError) showPublishBanner._t = setTimeout(()=>{ t.style.display = 'none'; }, 9000);
 }
 
+// Estado de la descarga de datos (22.10.2026, Piero: "en el app sale que no se han cargado datos"): con datos grandes la
+// descarga + lectura en el celular puede tardar más de 18 s y el app decía "Todavía no hay datos publicados" aunque sí los
+// había. Ahora el app espera mientras se descarga y, si falla, dice por qué y deja reintentar.
+let SNAP_ESTADO = null;   // null | 'cargando' | 'ok' | 'vacio' | { error:'…' }
 async function loadPublishedSnapshot(manual){
+  SNAP_ESTADO = 'cargando';
   try{
     // Desde Supabase, solo con sesión (20.10.2026). Sin sesión no hay datos: primero se entra con correo y clave.
     if(!sbSesion()) return;
     let snap = null;
     try{
       const buf = await sbDescargarDatos();
-      if(!buf){ if(manual) showPublishBanner('Todavía no hay ninguna versión publicada. Carga tus archivos y usa "Guardar y compartir".', true); return; }
+      if(!buf){ SNAP_ESTADO = 'vacio'; if(manual) showPublishBanner('Todavía no hay ninguna versión publicada. Carga tus archivos y usa "Guardar y compartir".', true); return; }
       const txt = await gunzipToText(buf);
       if(txt) snap = JSON.parse(txt);
     }catch(e){
+      SNAP_ESTADO = { error:(e && e.message) || String(e) };
       if(e.status === 401 || e.status === 403){ if(APP.usuario && RQ_MOVIL.matches) appBienvenida(APP.usuario.correo); return; }
-      if(e.status === 404) return;
+      if(e.status === 404){ SNAP_ESTADO = 'vacio'; return; }
       throw e;
     }
-    if(!snap) return;
-    loadFromSnapshot(snap);
+    if(!snap){ SNAP_ESTADO = { error:'el archivo publicado no se pudo descomprimir' }; return; }
+    loadFromSnapshot(snap); SNAP_ESTADO = 'ok';
   }catch(e){
+    SNAP_ESTADO = { error:(e && e.message) || String(e) };
     // sin snapshot publicado (o abierto como archivo local file://) — se queda en el estado vacío normal
     if(manual) showPublishBanner("No pude descargar la última versión de los datos. Revisa tu conexión a internet.", true);
   }
@@ -8593,13 +8622,45 @@ function kxModal(tit, cuerpo){
   m.querySelector('.kx-modal-cab b').textContent = tit; m.querySelector('.kx-modal-cu').innerHTML = cuerpo; m.classList.add('abierto');
 }
 function kxProducto(cod){ return ((ALMACEN_DATA && ALMACEN_DATA.rows) || []).concat(almOtrosLista ? almOtrosLista() : []).find(function(r){ return r.codigo === cod; }); }
-function kxMovsTabla(l){
+// OC con la que entró un ingreso (22.10.2026, Piero). Viene del Reporte Almacén (OCOMPRA); si la data cargada no la trae
+// (cargada antes del cambio), se busca: 1) Reporte Maestro / PedidoSinReq, mismo código y recepción ±3 días; 2) Consulta,
+// mismo código y proveedor, OC hasta 400 días antes del ingreso (la más cercana, mejor si coincide la cantidad).
+let KX_OCIDX = null;
+function kxOcIdx(){
+  const a = typeof getReqRows === 'function' ? getReqRows() : [], b = PEDIDO_SIN_REQ_ROWS || [], g = (GASTO_DATA && GASTO_DATA.rows) || [];
+  if(KX_OCIDX && KX_OCIDX.a === a && KX_OCIDX.b === b && KX_OCIDX.g === g) return KX_OCIDX;
+  const rm = new Map(), gs = new Map(), push = function(M, k, v){ if(!k) return; let l = M.get(k); if(!l) M.set(k, l = []); l.push(v); };
+  a.concat(b).forEach(function(r){ if(r.codOrden && r.fRecep) push(rm, r.idProducto, r); });
+  g.forEach(function(r){ if(r.oc) push(gs, r.codigo, r); });
+  return KX_OCIDX = { a:a, b:b, g:g, rm:rm, gs:gs };
+}
+function kxOcDe(cod, m){
+  if(m.oc) return { oc:m.oc };
+  if(!(m.q > 0) || m.t || /TRANSFER|DEVOLU|AJUSTE|INVENTARIO|PRODUCC|SALDO/i.test(m.md || '')) return null;
+  const t = +fromIsoDay(m.f); if(!t) return null;
+  let X; try{ X = kxOcIdx(); }catch(err){ return null; }
+  const p = kxProducto(cod), cods = [cod].concat((p && p.codigos) || []), q = m.q, DIA = 864e5;
+  let best = null, bs = Infinity;
+  cods.forEach(function(c){ (X.rm.get(c) || []).forEach(function(r){ const d = Math.abs(+r.fRecep - t) / DIA; if(d > 3) return;
+    const x = (r.cantRecep != null ? r.cantRecep : r.cantRecepcion) || 0, s = d + (Math.abs(x - q) < 1e-6 ? 0 : 5); if(s < bs){ bs = s; best = r.codOrden; } }); });
+  if(best) return { oc:best, est:1 };
+  const nm = function(v){ return String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14); }, pv = nm(m.cp);
+  cods.forEach(function(c){ (X.gs.get(c) || []).forEach(function(r){ if(pv && nm(r.proveedor) !== pv) return;
+    const f = r.fecha ? +r.fecha : Date.UTC(r.anio, (r.mes || 1) - 1, r.dia || 1), d = (t - f) / DIA; if(d < 0 || d > 400) return;
+    const s = d + (Math.abs((+r.cantidad || 0) - q) < 1e-6 ? 0 : 60); if(s < bs){ bs = s; best = r.oc; } }); });
+  return best ? { oc:best, est:1 } : null;
+}
+function kxOcBtn(cod, m, txt){
+  const o = kxOcDe(cod, m); if(!o) return txt;
+  const e = escapeHtml; return `<button type="button" class="kx-oc" data-kxoc="${e(o.oc)}" title="${o.est ? 'OC probable (por código, proveedor y fecha): ' : 'Ver la OC '}${e(o.oc)}">${txt}</button>`;
+}
+function kxMovsTabla(l, cod){
   const e = escapeHtml, n = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); }, fC = function(f){ return f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4); };
   const tot = l.reduce(function(a, m){ return a + Math.abs(m.q); }, 0);
   // Todo en una pantalla, sin barra lateral (22.10.2026, Piero): documento en una sola columna y nombres largos acortados (completo al pasar el mouse).
   const corto = function(t, k){ t = String(t || ''); const c = (t.split(' - ')[1] || t).replace(/\s+(SOCIEDAD ANONIMA CERRADA|S\.?A\.?C\.?|S\.?A\.?|E\.?I\.?R\.?L\.?)\.?$/i, ''); return c.length > k ? c.slice(0, k - 1) + '…' : c; };
   return `<div class="ks-kdx kx-fit"><div class="ks-kdx-w"><table><thead><tr><th>Fecha</th><th>Documento</th><th>Referencia</th><th>Proveedor / Cliente</th><th class="num">Cantidad</th><th>Motivo</th><th>Proyecto / Consumidor</th></tr></thead><tbody>
-    ${l.map(function(m){ return `<tr class="${m.q > 0 ? 'in' : 'out'}${m.t ? ' tr' : ''}"><td class="f">${fC(m.f)}</td><td class="mono">${e(m.d || '')}</td><td class="mono">${e(m.r || '')}</td><td title="${e(m.cp || '')}">${e(corto(m.cp, 34))}</td><td class="num ${m.q > 0 ? 'qi' : 'qo'}">${m.q > 0 && m.oc ? `<button type="button" class="kx-oc" data-kxoc="${e(m.oc)}" title="Ver la OC ${e(m.oc)}">${n(m.q)}</button>` : n(Math.abs(m.q))}</td><td title="${e(m.md || '')}">${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(corto(m.md, 22))}${m.t ? ' · traslado' : ''}</td><td title="${e(m.py || '')}">${e(corto(m.py, 26))}</td></tr>`; }).join('')}
+    ${l.map(function(m){ return `<tr class="${m.q > 0 ? 'in' : 'out'}${m.t ? ' tr' : ''}"><td class="f">${fC(m.f)}</td><td class="mono c-doc">${e(m.d || '')}</td><td class="mono c-ref">${e(m.r || '')}</td><td class="c-cp" title="${e(m.cp || '')}">${e(corto(m.cp, 34))}</td><td class="num ${m.q > 0 ? 'qi' : 'qo'}">${m.q > 0 ? kxOcBtn(cod, m, n(m.q)) : n(Math.abs(m.q))}</td><td class="c-mo" title="${e(m.md || '')}">${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(corto(m.md, 22))}${m.t ? ' · traslado' : ''}</td><td class="c-py" title="${e(m.py || '')}">${e(corto(m.py, 26))}</td></tr>`; }).join('')}
     </tbody><tfoot><tr><td colspan="4">Total</td><td class="num">${n(tot)}</td><td colspan="2"></td></tr></tfoot></table></div></div>`;
 }
 function kxDetalleAnio(cod, y, tipo){
@@ -8607,7 +8668,7 @@ function kxDetalleAnio(cod, y, tipo){
   const l = (r.kardexMovs || []).filter(function(m){ return m.f && m.f.slice(0, 4) === String(y) && (m.s || 'lima') === 'lima' && (tipo === 'in' ? m.q > 0 : m.q < 0); });
   const tot = l.reduce(function(a, m){ return a + Math.abs(m.q); }, 0), um = (r.unidad || '').trim();
   kxModal(`${cod} — ${tipo === 'in' ? 'Entradas' : 'Salidas'} de Lurín en ${y}: ${Number(tot).toLocaleString('es-PE', { maximumFractionDigits:2 })} ${um}`,
-    l.length ? kxMovsTabla(l) + (l.some(function(m){ return m.d; }) ? '' : '<p class="kx-nota">Para ver documento, proveedor/cliente y proyecto, vuelve a cargar el Reporte Almacén y publica.</p>') : '<div class="ini-vacio">Sin movimientos.</div>');
+    l.length ? kxMovsTabla(l, cod) + (l.some(function(m){ return m.d; }) ? '' : '<p class="kx-nota">Para ver documento, proveedor/cliente y proyecto, vuelve a cargar el Reporte Almacén y publica.</p>') : '<div class="ini-vacio">Sin movimientos.</div>');
 }
 function kxDetalleOC(oc){
   const e = escapeHtml, n = function(v, d){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }); };
@@ -8808,14 +8869,16 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
   const MAXF = 800, ini2 = Math.max(0, enR.length - MAXF), fC = function(f){ return f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4); };
   const totI = enR.reduce(function(a, i){ return a + (mvS[i].q > 0 ? mvS[i].q : 0); }, 0), totS = enR.reduce(function(a, i){ return a + (mvS[i].q < 0 ? -mvS[i].q : 0); }, 0);
   const sedeLbl = (KARDEX_SUCURSALES.find(function(xx){ return xx.key === suc; }) || {}).label || suc;
-  const detalle = !enR.length ? '' : `<div class="ks-kdx"><div class="ks-kdx-t">Movimientos ${e(sedeLbl)}<small>${n(enR.length, 0)} movimientos · ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}${ini2 ? ' · se muestran los últimos ' + MAXF : ''}</small></div>
-    <div class="ks-kdx-w"><table><thead><tr><th>Fecha</th><th>Doc.</th><th>Número</th><th>Referencia</th><th>Proveedor / Cliente</th><th class="num">Ingreso</th><th class="num">Salida</th><th class="num">Saldo</th><th>Motivo</th><th>Proyecto / Consumidor</th></tr></thead><tbody>
+  const corto = function(t, k){ t = String(t || ''); const c = (t.split(' - ')[1] || t).replace(/\s+(SOCIEDAD ANONIMA CERRADA|S\.?A\.?C\.?|S\.?A\.?|E\.?I\.?R\.?L\.?)\.?$/i, ''); return c.length > k ? c.slice(0, k - 1) + '…' : c; };
+  // Sin barra lateral, todo en una pantalla (22.10.2026, Piero): documento en una columna; nombres largos acortados (completos al pasar el mouse).
+  const detalle = !enR.length ? '' : `<div class="ks-kdx kx-fit"><div class="ks-kdx-t">Movimientos ${e(sedeLbl)}<small>${n(enR.length, 0)} movimientos · ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}${ini2 ? ' · se muestran los últimos ' + MAXF : ''}</small></div>
+    <div class="ks-kdx-w"><table><thead><tr><th>Fecha</th><th>Documento</th><th>Referencia</th><th>Proveedor / Cliente</th><th class="num">Ingreso</th><th class="num">Salida</th><th class="num">Saldo</th><th>Motivo</th><th>Proyecto / Consumidor</th></tr></thead><tbody>
     ${enR.slice(ini2).map(function(i, k, arr){ const m = mvS[i], dd = (m.d || '').split(' '), ing = m.q > 0, y = +m.f.slice(0, 4);
       // Años diferenciados como en el gráfico (22.10.2026, Piero): franja gris en los años impares y una fila con el año al cambiar.
-      const sep = (k === 0 || mvS[arr[k - 1]].f.slice(0, 4) !== m.f.slice(0, 4)) ? `<tr class="anio${y % 2 ? ' y1' : ''}"><td colspan="10">${y}</td></tr>` : '';
-      return sep + `<tr class="${ing ? 'in' : 'out'}${m.t ? ' tr' : ''}${y % 2 ? ' y1' : ''}"><td class="f">${fC(m.f)}</td><td>${e(dd.length > 1 ? dd[0] : '')}</td><td class="mono">${e(dd.length > 1 ? dd.slice(1).join(' ') : (m.d || ''))}</td><td class="mono">${e(m.r || '')}</td><td>${e(m.cp || '')}</td>`
-        + `<td class="num qi">${ing ? (m.oc ? `<button type="button" class="kx-oc" data-kxoc="${e(m.oc)}" title="Ver la OC ${e(m.oc)}">${n(m.q)}</button>` : n(m.q)) : ''}</td><td class="num qo">${ing ? '' : n(-m.q)}</td><td class="num sd">${n(saldo[i])}</td><td>${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(m.md || '')}${m.t ? ' · traslado entre sedes' : ''}</td><td>${e(m.py || '')}</td></tr>`; }).join('')}
-    </tbody><tfoot><tr><td colspan="5">Totales</td><td class="num">${n(totI)}</td><td class="num">${n(totS)}</td><td colspan="3"></td></tr></tfoot></table></div></div>`;
+      const sep = (k === 0 || mvS[arr[k - 1]].f.slice(0, 4) !== m.f.slice(0, 4)) ? `<tr class="anio${y % 2 ? ' y1' : ''}"><td colspan="9">${y}</td></tr>` : '';
+      return sep + `<tr class="${ing ? 'in' : 'out'}${m.t ? ' tr' : ''}${y % 2 ? ' y1' : ''}"><td class="f">${fC(m.f)}</td><td class="mono c-doc">${e(m.d || '')}</td><td class="mono c-ref">${e(m.r || '')}</td><td class="c-cp" title="${e(m.cp || '')}">${e(corto(m.cp, 30))}</td>`
+        + `<td class="num qi">${ing ? kxOcBtn(p.codigo, m, n(m.q)) : ''}</td><td class="num qo">${ing ? '' : n(-m.q)}</td><td class="num sd">${n(saldo[i])}</td><td class="c-mo" title="${e(m.md || '')}">${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(corto(m.md, 22))}${m.t ? ' · traslado' : ''}</td><td class="c-py" title="${e(m.py || '')}">${e(corto(m.py, 26))}</td></tr>`; }).join('')}
+    </tbody><tfoot><tr><td colspan="4">Totales</td><td class="num">${n(totI)}</td><td class="num">${n(totS)}</td><td colspan="3"></td></tr></tfoot></table></div></div>`;
   if(!cont){ const bI = document.getElementById('btnImgKardex'), mv = document.getElementById('kardexMovs'); if(bI) bI.style.display = 'none'; if(mv) mv.innerHTML = ''; }   // sin foto ni detalle (22.10.2026)
   box.innerHTML = tiles + bar + `<div class="ks-chart">${svg}<div class="ks-tip" id="ksTip"></div></div>`
     + `<div class="ks-ley"><span><i style="background:var(--teal);height:3px"></i>Stock</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}</span></div>` + detalle;   // sin la tabla por año (22.10.2026, Piero)
@@ -15640,9 +15703,11 @@ function appRenderInicio(){
   let cuerpo = '';
   if(!hay){
     appIntentos++;
-    cuerpo = appIntentos > 12
+    const err = SNAP_ESTADO && SNAP_ESTADO.error;
+    cuerpo = err ? '<div class="ini-card"><div class="ini-vacio">⚠️ No pude abrir los datos publicados (' + escapeHtml(err) + ').</div><div class="asis-acc"><button type="button" onclick="loadPublishedSnapshot(true)">🔄 Reintentar</button></div></div>'
+      : appIntentos > 12 && SNAP_ESTADO !== 'cargando'
       ? '<div class="ini-card"><div class="ini-vacio">Todavía no hay datos publicados.' + (appEsLogistica(v) || v === 'gerencia' ? ' Cárgalos desde <b>👥 Vista → Cargar archivos</b>.' : ' Avísale al área de Logística.') + '</div></div>'
-      : '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los datos de la plataforma…</div></div>';
+      : '<div class="ini-card"><div class="ini-vacio">⏳ Descargando los datos de la plataforma…' + (appIntentos > 12 ? ' (son varios MB, puede tardar un poco con señal lenta)' : '') + '</div></div>';
     clearTimeout(appEsperaDatos);
     appEsperaDatos = setTimeout(function(){ if(APP.enInicio) appRenderInicio(); }, 1500);
   } else if(APP.pantalla === 'daily' || APP.pantalla === 'supreq' || APP.pantalla === 'tienda' || APP.pantalla === 'equipo'){
