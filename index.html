@@ -8519,12 +8519,15 @@ function invParetoFilas(g){
       if(m.q < 0) sal[y] = (sal[y] || 0) - m.q; else q[y] = (q[y] || 0) + m.q; });
     const pvTop = Object.keys(pv).sort(function(a, b){ return pv[b] - pv[a]; })[0] || '';
     const origen = org.importado && org.nacional ? 'mixto' : org.importado ? 'importado' : org.nacional ? 'nacional' : '';
-    return { r:r, usd:usd, q:q, sal:sal, origen:origen, pv:pvTop, stock:(+r.lima || 0) + (+r.ica || 0) + (+r.trujillo || 0), pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
-  }).sort(function(a, b){ return b.usd - a.usd || (b.r.consumoMensual || 0) - (a.r.consumoMensual || 0); });
-  const tot = l.reduce(function(a, x){ return a + x.usd; }, 0); let ac = 0;
-  l.forEach(function(x){ const antes = ac; ac += x.usd; x.acum = tot ? ac / tot : 0; x.cls = !x.usd ? '' : (antes / (tot || 1) < 0.8 ? 'A' : (antes / (tot || 1) < 0.95 ? 'B' : 'C')); });
+    // Pareto por CONSUMO (22.10.2026, Piero: "mejor que el pareto esté ordenado en base al consumo que se hizo, es más preciso"):
+    // lo que salió de Lurín desde 2023 (las mismas cifras azules de cada año), no lo comprado en US$.
+    const met = Object.keys(sal).reduce(function(a, y){ return a + sal[y]; }, 0);
+    return { r:r, usd:usd, met:met, q:q, sal:sal, origen:origen, pv:pvTop, stock:(+r.lima || 0) + (+r.ica || 0) + (+r.trujillo || 0), pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
+  }).sort(function(a, b){ return b.met - a.met || (b.r.consumoMensual || 0) - (a.r.consumoMensual || 0) || b.usd - a.usd; });
+  const tot = l.reduce(function(a, x){ return a + x.usd; }, 0), totC = l.reduce(function(a, x){ return a + x.met; }, 0); let ac = 0;
+  l.forEach(function(x){ const antes = ac; ac += x.met; x.acum = totC ? ac / totC : 0; x.cls = !x.met ? '' : (antes / (totC || 1) < 0.8 ? 'A' : (antes / (totC || 1) < 0.95 ? 'B' : 'C')); });
   const cods = new Set(); g.rows.forEach(function(r){ ((r.codigos && r.codigos.length) ? r.codigos : [r.codigo]).forEach(function(c){ cods.add(c); }); });
-  return { l:l, tot:tot, anios:anios, cods:cods };
+  return { l:l, tot:tot, totC:totC, anios:anios, cods:cods };
 }
 // Diseño simple (21.10.2026, Piero: "el diseño que planteas no es simple de ver a la vista"): arriba una tarjeta por año con lo comprado
 // y lo que salió (barras), el Pareto, y una lista corta: producto, clase, de dónde se compra, mini barras por año (compró / salió),
@@ -8545,21 +8548,21 @@ function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, 
   // Pareto (solo en la app, 22.10.2026, Piero: "entras a un grupo y lo primero que ves es el pareto y debajo todos los códigos"):
   // una barra por producto con lo comprado en US$ (mayor a menor) y la línea del % acumulado; la línea punteada es el 80 %.
   let svg = '';
-  const cb = app ? P.l.filter(function(x){ return x.usd > 0; }).slice(0, 150) : [];
+  const cb = app ? P.l.filter(function(x){ return x.met > 0; }).slice(0, 150) : [];
   if(cb.length > 1){
-    const W = 1000, H = 210, pl = 64, pr = 46, pt = 12, pb = 24, mx = cb[0].usd, bw = (W - pl - pr) / cb.length;
+    const W = 1000, H = 210, pl = 64, pr = 46, pt = 12, pb = 24, mx = cb[0].met, bw = (W - pl - pr) / cb.length;
     const yv = function(v){ return pt + (H - pt - pb) * (1 - v / mx); }, yp = function(v){ return pt + (H - pt - pb) * (1 - v); };
     svg = `<svg class="par-svg" viewBox="0 0 ${W} ${H}"><line x1="${pl}" x2="${W - pr}" y1="${H - pb}" y2="${H - pb}" stroke="var(--border)"/>`
       + `<line class="l80" x1="${pl}" x2="${W - pr}" y1="${yp(0.8).toFixed(1)}" y2="${yp(0.8).toFixed(1)}"/><text x="${W - pr + 6}" y="${(yp(0.8) + 4).toFixed(1)}">80 %</text><text x="${W - pr + 6}" y="${yp(1) + 8}">100 %</text>`
-      + cb.map(function(x, i){ return `<rect class="b${x.cls}" x="${(pl + i * bw + 0.5).toFixed(1)}" y="${yv(x.usd).toFixed(1)}" width="${Math.max(1.2, bw - 1).toFixed(1)}" height="${(H - pb - yv(x.usd)).toFixed(1)}" rx="1.5"><title>${e(x.r.codigo)} · ${e(x.r.descripcion || '')} · ${usd(x.usd)} · acumulado ${(x.acum * 100).toFixed(0)} %</title></rect>`; }).join('')
+      + cb.map(function(x, i){ return `<rect class="b${x.cls}" x="${(pl + i * bw + 0.5).toFixed(1)}" y="${yv(x.met).toFixed(1)}" width="${Math.max(1.2, bw - 1).toFixed(1)}" height="${(H - pb - yv(x.met)).toFixed(1)}" rx="1.5"><title>${e(x.r.codigo)} · ${e(x.r.descripcion || '')} · salió ${n(x.met, 0)} ${e((x.r.unidad || '').trim())} · acumulado ${(x.acum * 100).toFixed(0)} %</title></rect>`; }).join('')
       + `<polyline class="acum" points="${cb.map(function(x, i){ return (pl + i * bw + bw / 2).toFixed(1) + ',' + yp(x.acum).toFixed(1); }).join(' ')}"/>`
-      + `<text x="${pl - 8}" y="${pt + 8}" text-anchor="end">${usdK(mx)}</text><text x="${pl - 8}" y="${H - pb}" text-anchor="end">0</text>`
-      + `<text x="${pl}" y="${H - 6}">Productos de mayor a menor compra →</text></svg>`
-      + `<div class="par-ley"><span><i class="bA"></i>Clase A: suman el 80 % de lo comprado (${n(A.length, 0)})</span><span><i class="bB"></i>Clase B: hasta el 95 %</span><span><i class="bC"></i>Clase C: el resto</span><span><i class="acum"></i>% acumulado</span></div>`;
+      + `<text x="${pl - 8}" y="${pt + 8}" text-anchor="end">${n(mx, 0)}</text><text x="${pl - 8}" y="${H - pb}" text-anchor="end">0</text>`
+      + `<text x="${pl}" y="${H - 6}">Productos de mayor a menor consumo (salidas de Lurín ${P.anios[0]}–${P.anios[P.anios.length - 1]}) →</text></svg>`
+      + `<div class="par-ley"><span><i class="bA"></i>Clase A: suman el 80 % del consumo (${n(A.length, 0)})</span><span><i class="bB"></i>Clase B: hasta el 95 %</span><span><i class="bC"></i>Clase C: el resto</span><span><i class="acum"></i>% acumulado</span></div>`;
   }
   return `${app ? '' : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'}
   <div class="par-box${app ? ' app' : ''}"${app ? '' : ' id="pedirParetoFoto"'}>
-    <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${n(P.l.length, 0)} productos · ${usd(P.tot)} comprados ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del monto) · ${n(pedir, 0)} por pedir</small></h3>
+    <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${n(P.l.length, 0)} productos · ${n(P.totC, 0)} unid. salieron de Lurín ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del consumo) · ${usd(P.tot)} comprados</small></h3>
 </div>
     ${svg}
     <div class="ks-bar" style="margin-top:8px;">${app ? '' : `<span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}`}
