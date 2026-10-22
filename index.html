@@ -8468,11 +8468,14 @@ function invParetoFilas(g){
   const C = invComprasPorCodigo(), yF = appIndCorte().getUTCFullYear(), anios = []; for(let y = 2023; y <= yF; y++) anios.push(y);
   const l = g.rows.map(function(r){
     const cods = (r.codigos && r.codigos.length) ? r.codigos : [r.codigo], q = {}, sal = {}, org = {}, pv = {}; let usd = 0;
-    cods.forEach(function(c){ const x = C.get(c); if(!x) return; usd += x.usd; anios.forEach(function(y){ q[y] = (q[y] || 0) + (x.q[y] || 0); });
+    cods.forEach(function(c){ const x = C.get(c); if(!x) return; usd += x.usd;
       Object.keys(x.org).forEach(function(k){ org[k] = (org[k] || 0) + x.org[k]; }); Object.keys(x.pv).forEach(function(k){ pv[k] = (pv[k] || 0) + x.pv[k]; }); });
     // Lo que salió cada año (hojas Movimientos del Reporte Almacén, las 3 sedes; el producto ya viene homologado).
     // Sin traslados entre sedes (m.t): eso no es consumo de la empresa, solo cambia de almacén.
-    (r.kardexMovs || []).forEach(function(m){ if(m.q < 0 && m.f && !m.t){ const y = +m.f.slice(0, 4); if(y >= 2023) sal[y] = (sal[y] || 0) - m.q; } });
+    // Entró por año (22.10.2026, Piero: "en mi excel cuadra perfecto con nisira y en el app no"): ingresos al almacén de las
+    // 3 sedes (hoja Ingresos), no lo pedido en OC — así cuadra con el kardex de Nisira. Sin traslados entre sedes.
+    (r.kardexMovs || []).forEach(function(m){ if(!m.f || m.t) return; const y = +m.f.slice(0, 4); if(y < 2023) return;
+      if(m.q < 0) sal[y] = (sal[y] || 0) - m.q; else q[y] = (q[y] || 0) + m.q; });
     const pvTop = Object.keys(pv).sort(function(a, b){ return pv[b] - pv[a]; })[0] || '';
     const origen = org.importado && org.nacional ? 'mixto' : org.importado ? 'importado' : org.nacional ? 'nacional' : '';
     return { r:r, usd:usd, q:q, sal:sal, origen:origen, pv:pvTop, stock:(+r.lima || 0) + (+r.ica || 0) + (+r.trujillo || 0), pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
@@ -8499,7 +8502,7 @@ function invParetoHtml(g){
     return { y:y, usd:usdY, c:c, s:sl }; });
   const mxA = Math.max.apply(null, resAnio.map(function(r){ return Math.max(r.c, r.s); }).concat([1]));
   const anios = `<div class="par-anios">${resAnio.map(function(r){ return `<div><span class="y">${r.y}</span><b>${usdK(r.usd)}</b>
-      <div class="pa-b"><i class="c" style="width:${(r.c / mxA * 100).toFixed(1)}%"></i></div><small>Compró <b>${n(r.c, 0)}</b> ${e(umP)}</small>
+      <div class="pa-b"><i class="c" style="width:${(r.c / mxA * 100).toFixed(1)}%"></i></div><small>Entró <b>${n(r.c, 0)}</b> ${e(umP)}</small>
       <div class="pa-b"><i class="s" style="width:${(r.s / mxA * 100).toFixed(1)}%"></i></div><small>Salió <b>${n(r.s, 0)}</b> ${e(umP)}</small></div>`; }).join('')}</div>`;
   // Pareto
   const cb = P.l.filter(function(x){ return x.usd > 0; }).slice(0, 100), W = 1000, H = 170, pl = 46, pr = 40, pt = 10, pb = 8;
@@ -8525,7 +8528,7 @@ function invParetoHtml(g){
     ${anios}
     ${svg}
     <div class="ks-bar" style="margin-top:8px;"><span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}
-      <span class="ks-hint">Por año: <i class="lg c"></i>compró (arriba) <i class="lg s"></i>salió (abajo, sin traslados entre sedes)</span></div>
+      <span class="ks-hint">Por año: <i class="lg c"></i>entró (arriba) <i class="lg s"></i>salió (abajo) · almacén, 3 sedes, sin traslados entre sedes</span></div>
     <div class="par-lista">${ver.map(function(x, i){ const r = x.r;
       return `<div class="par-fila"><span class="pos">${i + 1}</span>
         <div class="prod"><b>${e(r.descripcion || '—')}</b><small><span class="mono">${e(r.codigo)}</span> · ${e((r.unidad || '').trim())}${x.cls ? ' · <span class="par-cls ' + x.cls + '">' + x.cls + '</span> ' + usdK(x.usd) : ''}</small></div>
