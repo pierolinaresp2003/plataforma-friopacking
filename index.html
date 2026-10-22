@@ -478,7 +478,7 @@
   .ks-ley{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin:6px 0 10px;}
   .ks-ley i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
   .ks-mes{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;} .ks-mes th,.ks-mes td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;}
-  .ks-mes th:first-child,.ks-mes td:first-child{text-align:left;color:var(--ink-soft);font-weight:700;} .ks-mes th{font-size:11px;color:var(--ink-soft);}
+  .ks-mes th:first-child,.ks-mes td:first-child{text-align:left;color:var(--ink-soft);font-weight:700;} .ks-mes th{font-size:11px;color:var(--ink-soft);} .ks-mes tr.tras td{color:var(--muted);font-size:11px;font-weight:600;}
   @media (max-width:900px){ .ks-tiles{grid-template-columns:repeat(3,minmax(0,1fr));} .par-kpis{grid-template-columns:repeat(2,minmax(0,1fr));} }
   .pedir-tabla{table-layout:fixed;width:100%;}
   .pedir-tabla th,.pedir-tabla td{padding:8px 10px;}
@@ -4096,7 +4096,7 @@ function buildSnapshot(){
           // Movimientos uno por uno, que es lo que dibuja el kardex desde el 15.09.2026: [fecha, cantidad
           // con signo, inicial de la sucursal]. Ocupa bastante menos que los arreglos semanales (una
           // entrada por transacción real en vez de una casilla por semana y sucursal, casi todas en cero).
-          kmv: r.kardexMovs ? r.kardexMovs.map(m=>[m.f, n(m.q), m.s.charAt(0)]) : undefined,
+          kmv: r.kardexMovs ? r.kardexMovs.map(m=> m.t ? [m.f, n(m.q), m.s.charAt(0), 1] : [m.f, n(m.q), m.s.charAt(0)]) : undefined,
         };
       }),
     } : null,
@@ -4334,7 +4334,7 @@ function loadFromSnapshot(snap){
       kardexMovimientos: kardexVigente ? (r.km || undefined) : undefined,
       kardexIngresosPorSucursal: (kardexVigente && r.kis) ? { ica: r.kis.i, lima: r.kis.l, trujillo: r.kis.t } : undefined,
       kardexMovimientosPorSucursal: (kardexVigente && r.kms) ? { ica: r.kms.i, lima: r.kms.l, trujillo: r.kms.t } : undefined,
-      kardexMovs: (kardexVigente && r.kmv) ? r.kmv.map(m=>({ f:m[0], q:m[1], s: m[2]==='i' ? 'ica' : m[2]==='t' ? 'trujillo' : 'lima' })) : undefined,
+      kardexMovs: (kardexVigente && r.kmv) ? r.kmv.map(m=> m[3] ? { f:m[0], q:m[1], s: m[2]==='i' ? 'ica' : m[2]==='t' ? 'trujillo' : 'lima', t:1 } : { f:m[0], q:m[1], s: m[2]==='i' ? 'ica' : m[2]==='t' ? 'trujillo' : 'lima' }) : undefined,
       disponible: (r.l||0) + (r.tr||0) - (r.rv||0) - (r.pk||0),
     })),
   }) : null;
@@ -5373,7 +5373,10 @@ function normalizeSucursalKardex(raw){
   if(s.indexOf('ICA')!==-1) return 'ica';
   return null;
 }
-function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candCantidad, candFecha, candSucursal){
+// Sede interna (traslados): solo "SUCURSAL LIMA/ICA/TRUJILLO" exacto, no "PROYECTOS ICA" ni clientes.
+function sedeInternaKardex(raw){ const s = sinAcentos((raw == null ? '' : raw.toString()).trim().toUpperCase()); return /^SUCURSAL\b/.test(s) ? normalizeSucursalKardex(s) : null; }
+const docKardexKey = function(v){ return v == null ? '' : v.toString().toUpperCase().replace(/\s+/g, ''); };
+function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candCantidad, candFecha, candSucursal, tras){
   if(!sheetName || !wb.Sheets[sheetName]) return null;
   const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, raw:true, defval:null});
   let headerRowIdx = -1, headerRow = null;
@@ -5390,6 +5393,14 @@ function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candC
   // permitirme filtrar el gráfico por esas 3 sucursales") — opcional: si no se encuentra, porCodigoPorSucursal
   // queda vacío y el kardex simplemente no puede filtrar por sucursal para esa hoja (se avisa en drawKardex).
   const iSuc = candSucursal ? findCol(headerRow, candSucursal) : -1;
+  // Traslados entre sedes (22.10.2026, Piero: "según la sede en la que nace y a lo que se dirige"). Salida:
+  // SUCURSAL_DESTINO es una de las 3 sedes → t:1, y su DEST_DOCUMENTO/DOCUMENTO quedan en tras.dest/tras.org.
+  // Ingreso: su DOCUMENTO (u ORG_DOCUMENTO) es uno de esos → t:1. Sigue en el kardex de la sede, pero no
+  // cuenta como compra ni consumo de la empresa (si no, Lurín→Ica se contaba dos veces).
+  const iDest = tras && tras.esSalida ? findCol(headerRow, ["SUCURSAL_DESTINO"]) : -1;
+  const iDDoc = tras && tras.esSalida ? findCol(headerRow, ["DEST_DOCUMENTO"]) : -1;
+  const iDoc = tras ? findCol(headerRow, tras.esSalida ? ["DOCUMENTO2", "DOCUMENTO"] : ["DOCUMENTO"]) : -1;
+  const iODoc = tras && !tras.esSalida ? findCol(headerRow, ["ORG_DOCUMENTO"]) : -1;
   const porCodigo = {};
   const porCodigoPorSucursal = { ica:{}, lima:{}, trujillo:{} };
   const movs = {};
@@ -5421,7 +5432,10 @@ function parseTransaccionesSemanal(wb, sheetName, headerHints, candCodigo, candC
     // de la MISMA semana, el neto es 0 y en el gráfico no pasaba nada. Ejemplo real del código
     // 004300500327: el 10.08.2026 entran 24+24 y el 13.08 entra 27 y salen 24+24+27 — la semana neteaba
     // cero y el pico de 75 unidades era invisible. Ahora se guarda cada transacción con su fecha exacta.
-    (movs[codigo] = movs[codigo] || []).push({ f: isoDay(fecha), q: cant, s: sucKey || 'lima' });
+    const mv = { f: isoDay(fecha), q: cant, s: sucKey || 'lima' };
+    if(iDest !== -1 && sedeInternaKardex(row[iDest])){ mv.t = 1; if(iDDoc !== -1 && row[iDDoc]) tras.dest.add(docKardexKey(row[iDDoc])); if(iDoc !== -1 && row[iDoc]) tras.org.add(docKardexKey(row[iDoc])); }
+    else if(tras && !tras.esSalida && ((iDoc !== -1 && tras.dest.has(docKardexKey(row[iDoc]))) || (iODoc !== -1 && row[iODoc] && tras.org.has(docKardexKey(row[iODoc]))))) mv.t = 1;
+    (movs[codigo] = movs[codigo] || []).push(mv);
   }
   return { porCodigo, porCodigoPorSucursal, movs, minDate, maxDate };
 }
@@ -5886,10 +5900,12 @@ function processAlmacen(wb, filename){
   // para que el kardex hable del mismo producto que ve Piero. Se pasa también la columna "Sucursal" (15.09.2026,
   // "el kardex que se muestre es por sucursal... debes permitirme filtrar el gráfico por esas 3
   // sucursales") para poder desglosar Ingresos/Movimientos por Ica/Lima San Pedro/Trujillo, no solo el total.
-  const kardexIng = parseTransaccionesSemanal(wb, wb.SheetNames.find(n=>/ingres/i.test(n)),
-    ['codigo','cantidad','fecha'], ["Código","Codigo"], ["Cantidad"], ["Fecha"], ["Sucursal"]);
+  const trasK = { dest:new Set(), org:new Set(), esSalida:true };
   const kardexMov = parseTransaccionesSemanal(wb, wb.SheetNames.find(n=>/movimient/i.test(n)),
-    ['producto','cantidad','fecha salida'], ["Producto"], ["Cantidad"], ["Fecha Salida","Fecha de Salida"], ["Sucursal"]);
+    ['producto','cantidad','fecha salida'], ["Producto"], ["Cantidad"], ["Fecha Salida","Fecha de Salida"], ["Sucursal"], trasK);
+  trasK.esSalida = false;
+  const kardexIng = parseTransaccionesSemanal(wb, wb.SheetNames.find(n=>/ingres/i.test(n)),
+    ['codigo','cantidad','fecha'], ["Código","Codigo"], ["Cantidad"], ["Fecha"], ["Sucursal"], trasK);
   let kardexPeriods = null;
   if(kardexIng || kardexMov){
     // Semanas ISO (lunes a domingo) desde la primera transacción real hasta HOY inclusive — así la última
@@ -5932,8 +5948,8 @@ function processAlmacen(wb, filename){
       // (entra la mercadería y de ahí sale), además de ser el que hace que el saldo nunca quede negativo.
       const movsProd = [];
       codigos.forEach(c=>{
-        ((kardexIng && kardexIng.movs[c]) || []).forEach(m=> movsProd.push({ f:m.f, q:m.q, s:m.s }));
-        ((kardexMov && kardexMov.movs[c]) || []).forEach(m=> movsProd.push({ f:m.f, q:-m.q, s:m.s }));
+        ((kardexIng && kardexIng.movs[c]) || []).forEach(m=> movsProd.push(m.t ? { f:m.f, q:m.q, s:m.s, t:1 } : { f:m.f, q:m.q, s:m.s }));
+        ((kardexMov && kardexMov.movs[c]) || []).forEach(m=> movsProd.push(m.t ? { f:m.f, q:-m.q, s:m.s, t:1 } : { f:m.f, q:-m.q, s:m.s }));
       });
       movsProd.sort((a,b)=> a.f < b.f ? -1 : a.f > b.f ? 1 : (b.q - a.q));
       p.kardexMovs = movsProd;
@@ -8359,7 +8375,8 @@ function invParetoFilas(g){
     cods.forEach(function(c){ const x = C.get(c); if(!x) return; usd += x.usd; anios.forEach(function(y){ q[y] = (q[y] || 0) + (x.q[y] || 0); });
       Object.keys(x.org).forEach(function(k){ org[k] = (org[k] || 0) + x.org[k]; }); Object.keys(x.pv).forEach(function(k){ pv[k] = (pv[k] || 0) + x.pv[k]; }); });
     // Lo que salió cada año (hojas Movimientos del Reporte Almacén, las 3 sedes; el producto ya viene homologado).
-    (r.kardexMovs || []).forEach(function(m){ if(m.q < 0 && m.f){ const y = +m.f.slice(0, 4); if(y >= 2023) sal[y] = (sal[y] || 0) - m.q; } });
+    // Sin traslados entre sedes (m.t): eso no es consumo de la empresa, solo cambia de almacén.
+    (r.kardexMovs || []).forEach(function(m){ if(m.q < 0 && m.f && !m.t){ const y = +m.f.slice(0, 4); if(y >= 2023) sal[y] = (sal[y] || 0) - m.q; } });
     const pvTop = Object.keys(pv).sort(function(a, b){ return pv[b] - pv[a]; })[0] || '';
     const origen = org.importado && org.nacional ? 'mixto' : org.importado ? 'importado' : org.nacional ? 'nacional' : '';
     return { r:r, usd:usd, q:q, sal:sal, origen:origen, pv:pvTop, stock:(+r.lima || 0) + (+r.ica || 0) + (+r.trujillo || 0), pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
@@ -8412,7 +8429,7 @@ function invParetoHtml(g){
     ${anios}
     ${svg}
     <div class="ks-bar" style="margin-top:8px;"><span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}
-      <span class="ks-hint">Por año: <i class="lg c"></i>compró (arriba) <i class="lg s"></i>salió (abajo)</span></div>
+      <span class="ks-hint">Por año: <i class="lg c"></i>compró (arriba) <i class="lg s"></i>salió (abajo, sin traslados entre sedes)</span></div>
     <div class="par-lista">${ver.map(function(x, i){ const r = x.r;
       return `<div class="par-fila"><span class="pos">${i + 1}</span>
         <div class="prod"><b>${e(r.descripcion || '—')}</b><small><span class="mono">${e(r.codigo)}</span> · ${e((r.unidad || '').trim())}${x.cls ? ' · <span class="par-cls ' + x.cls + '">' + x.cls + '</span> ' + usdK(x.usd) : ''}</small></div>
@@ -8446,8 +8463,8 @@ function drawKardexSimple(p){
   const fTxt = function(t){ const f = new Date(t); return f.getUTCDate() + ' ' + MES[f.getUTCMonth()] + ' ' + f.getUTCFullYear(); };
   // Un punto por DÍA (lo del mismo día junto) y el stock al cierre de cada día, hacia atrás desde el stock actual de la sede.
   const D = new Map();
-  (p.kardexMovs || []).forEach(function(m){ if(!m.f || (m.s || 'lima') !== suc || !m.q) return; const x = D.get(m.f) || { f:m.f, t:+fromIsoDay(m.f), inn:0, out:0, ni:0, no:0 };
-    if(m.q > 0){ x.inn += m.q; x.ni++; } else { x.out -= m.q; x.no++; } D.set(m.f, x); });
+  (p.kardexMovs || []).forEach(function(m){ if(!m.f || (m.s || 'lima') !== suc || !m.q) return; const x = D.get(m.f) || { f:m.f, t:+fromIsoDay(m.f), inn:0, out:0, ni:0, no:0, ti:0, to:0 };
+    if(m.q > 0){ x.inn += m.q; x.ni++; if(m.t) x.ti += m.q; } else { x.out -= m.q; x.no++; if(m.t) x.to -= m.q; } D.set(m.f, x); });
   const dias = [...D.values()].sort(function(a, b){ return a.t - b.t; });
   let st = +p[suc] || 0; for(let i = dias.length - 1; i >= 0; i--){ dias[i].des = st; st -= dias[i].inn - dias[i].out; dias[i].ant = st; }
   const corte = appIndCorte(), yC = corte.getUTCFullYear(), y0 = dias.length ? Math.min(new Date(dias[0].t).getUTCFullYear(), yC) : yC;
@@ -8496,11 +8513,12 @@ function drawKardexSimple(p){
     <rect class="sel" id="ksSel" y="${top}" height="${Ht + gap + Hb}" width="0" style="display:none"/>
     <rect class="capa" id="ksCapa" x="${pl}" y="${top}" width="${plotW}" height="${Ht + gap + Hb}"/></svg>`;
   const pa = anios.map(function(y){ const l = dias.filter(function(v){ return new Date(v.t).getUTCFullYear() === y; });
-    return { y:y, inn:l.reduce(function(a, v){ return a + v.inn; }, 0), out:l.reduce(function(a, v){ return a + v.out; }, 0), n:l.reduce(function(a, v){ return a + v.ni + v.no; }, 0) }; });
+    return { y:y, inn:l.reduce(function(a, v){ return a + v.inn; }, 0), out:l.reduce(function(a, v){ return a + v.out; }, 0), ti:l.reduce(function(a, v){ return a + v.ti; }, 0), to:l.reduce(function(a, v){ return a + v.to; }, 0), n:l.reduce(function(a, v){ return a + v.ni + v.no; }, 0) }; });
   const tabla = `<table class="ks-mes"><thead><tr><th></th>${pa.map(function(r){ return '<th>' + r.y + '</th>'; }).join('')}</tr></thead><tbody>
     <tr><td>Entró</td>${pa.map(function(r){ return '<td>' + (r.inn ? n(r.inn) : '·') + '</td>'; }).join('')}</tr>
     <tr><td>Salió</td>${pa.map(function(r){ return '<td>' + (r.out ? n(r.out) : '·') + '</td>'; }).join('')}</tr>
-    <tr><td>Salió por mes (prom.)</td>${pa.map(function(r){ const ms = r.y === yC ? corte.getUTCMonth() + 1 : 12; return '<td>' + (r.out ? n(r.out / ms) : '·') + '</td>'; }).join('')}</tr>
+    <tr class="tras"><td>↳ de eso, traslado entre sedes</td>${pa.map(function(r){ return '<td>' + (r.ti || r.to ? '+' + n(r.ti) + ' / −' + n(r.to) : '·') + '</td>'; }).join('')}</tr>
+    <tr><td>Salió por mes (sin traslados)</td>${pa.map(function(r){ const ms = r.y === yC ? corte.getUTCMonth() + 1 : 12; return '<td>' + (r.out - r.to ? n((r.out - r.to) / ms) : '·') + '</td>'; }).join('')}</tr>
     <tr><td>Movimientos</td>${pa.map(function(r){ return '<td>' + (r.n || '·') + '</td>'; }).join('')}</tr></tbody></table>`;
   box.innerHTML = tiles + bar + `<div class="ks-chart">${svg}<div class="ks-tip" id="ksTip"></div></div>`
     + `<div class="ks-ley"><span><i style="background:var(--teal);height:3px"></i>Stock</span><span><i style="background:var(--green)"></i>Entró</span><span><i style="background:var(--seg-a)"></i>Salió</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}</span></div>` + tabla;
@@ -16184,7 +16202,7 @@ function tdItems(){ return appMemo('tienda', function(){
     // Rotación (14.10.2026, Piero): consumo mensual del Reporte Almacén; si no lo trae, salidas de los últimos 6 meses ÷ 6.
     let rot = x.cons || 0, ult = '';
     (r.kardexMovs || []).forEach(function(m){ if(m.q < 0 && m.f > ult) ult = m.f; });
-    if(!(rot > 0)){ let q = 0; (r.kardexMovs || []).forEach(function(m){ if(m.q < 0 && m.f >= limIso) q -= m.q; }); rot = q / 6; }
+    if(!(rot > 0)){ let q = 0; (r.kardexMovs || []).forEach(function(m){ if(m.q < 0 && !m.t && m.f >= limIso) q -= m.q; }); rot = q / 6; }
     const it = { c:r.codigo, d:r.descripcion, u:r.unidad || 'UND', fam:x.fam, l:r.lima || 0, t:r.trujillo || 0, i:r.ica || 0, cam:r.transito || 0, rot:rot, ult:ult,
       w:new Set(f.filter(function(y){ return !y.n; }).map(function(y){ return y.t; })), m:f.filter(function(y){ return y.n; }).map(function(y){ return y.t; }), cod:polarNorm(r.codigo) };
     it.h = (f.find(function(y){ return !y.n; }) || {}).t || '';
