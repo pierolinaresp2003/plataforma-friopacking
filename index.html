@@ -8472,9 +8472,10 @@ function invParetoFilas(g){
       Object.keys(x.org).forEach(function(k){ org[k] = (org[k] || 0) + x.org[k]; }); Object.keys(x.pv).forEach(function(k){ pv[k] = (pv[k] || 0) + x.pv[k]; }); });
     // Lo que salió cada año (hojas Movimientos del Reporte Almacén, las 3 sedes; el producto ya viene homologado).
     // Sin traslados entre sedes (m.t): eso no es consumo de la empresa, solo cambia de almacén.
-    // Entró por año (22.10.2026, Piero: "en mi excel cuadra perfecto con nisira y en el app no"): ingresos al almacén de las
-    // 3 sedes (hoja Ingresos), no lo pedido en OC — así cuadra con el kardex de Nisira. Sin traslados entre sedes.
-    (r.kardexMovs || []).forEach(function(m){ if(!m.f || m.t) return; const y = +m.f.slice(0, 4); if(y < 2023) return;
+    // Entró / salió por año (22.10.2026, Piero: "en mi excel cuadra perfecto con nisira y en el app no" · "solo debe mostrar
+    // ahí lo que corresponde a Lurín"): movimientos reales del almacén de Lurín (hojas Ingresos/Movimientos), no lo pedido en
+    // OC — igual que el kardex de Nisira de SUCURSAL LIMA LURIN (incluye sus traslados a otras sedes, como Nisira).
+    (r.kardexMovs || []).forEach(function(m){ if(!m.f || (m.s || 'lima') !== 'lima') return; const y = +m.f.slice(0, 4); if(y < 2023) return;
       if(m.q < 0) sal[y] = (sal[y] || 0) - m.q; else q[y] = (q[y] || 0) + m.q; });
     const pvTop = Object.keys(pv).sort(function(a, b){ return pv[b] - pv[a]; })[0] || '';
     const origen = org.importado && org.nacional ? 'mixto' : org.importado ? 'importado' : org.nacional ? 'nacional' : '';
@@ -8528,7 +8529,7 @@ function invParetoHtml(g){
     ${anios}
     ${svg}
     <div class="ks-bar" style="margin-top:8px;"><span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}
-      <span class="ks-hint">Por año: <i class="lg c"></i>entró (arriba) <i class="lg s"></i>salió (abajo) · almacén, 3 sedes, sin traslados entre sedes</span></div>
+      <span class="ks-hint">Por año: <i class="lg c"></i>entró (arriba) <i class="lg s"></i>salió (abajo) · almacén Lurín</span></div>
     <div class="par-lista">${ver.map(function(x, i){ const r = x.r;
       return `<div class="par-fila"><span class="pos">${i + 1}</span>
         <div class="prod"><b>${e(r.descripcion || '—')}</b><small><span class="mono">${e(r.codigo)}</span> · ${e((r.unidad || '').trim())}${x.cls ? ' · <span class="par-cls ' + x.cls + '">' + x.cls + '</span> ' + usdK(x.usd) : ''}</small></div>
