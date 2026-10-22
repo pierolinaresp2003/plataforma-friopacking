@@ -14797,6 +14797,13 @@ body.app-pc .rqm-desc{font-size:20px !important;font-weight:800;margin-top:6px;}
   body.app-pc .app-toptabs{display:none !important;}
   body.app-pc .app-top .app-tema{margin-left:auto;}
   body.app-pc .app-tabbar .app-lado-in{display:none;}
+  /* Menú lateral del ancho justo de sus textos (22.10.2026, Piero: "un sidebar normal… ajusta el tamaño para que no quede espacio a la
+     derecha de las letras"): el ancho lo dan las opciones y el contenido empieza justo donde termina el menú (--lado, ver appPintarBarra). */
+  body.app-pc .app-tabbar{width:max-content;min-width:150px;padding:0 10px 20px;}
+  body.app-pc .app-tabbar button{white-space:nowrap;padding:10px 12px;}
+  body.app-pc .app-side-logo{margin:0 -10px 14px;padding:0 16px;}
+  body.app-pc{padding-left:var(--lado,232px);}
+  body.app-pc .app-oc{inset:0 0 0 var(--lado,232px);}
   @media (max-width:1320px){ body.app-pc .par-box.app .par-fila{grid-template-columns:28px minmax(180px,1fr) 232px 80px 80px 64px 104px;} body.app-pc .par-box.app .par-fila .org{display:none;} }
   @media (max-width:1200px){ body.app-pc .ks-tiles{grid-template-columns:repeat(4,minmax(0,1fr));} }
 `;
@@ -15086,6 +15093,7 @@ function appPintarBarra(activa){
   document.getElementById('appVistaBtn').innerHTML = `${v.ico} ${v.nombre} <span>▾</span>`;
   // En la PC las pestañas van a lo largo de la barra azul de arriba (14.10.2026, Piero: "como son pocas opciones, colocar
   // los módulos a lo largo de la barra azul"), en vez del menú ☰.
+  if(APP_EN_PC) requestAnimationFrame(function(){ const w = barra.offsetWidth; if(w) document.body.style.setProperty('--lado', w + 'px'); });   // menú lateral a la medida
   const top = document.getElementById('appTopTabs');
   if(top){ top.innerHTML = tabs.map(function(t){ return `<button type="button" data-tab="${t[0]}" class="${t[0] === activa ? 'on' : ''}"><span class="i">${t[1]}</span>${t[2]}</button>`; }).join('');
     // Si en una ventana angosta no entran todas, vuelve el ☰ a la derecha.
