@@ -447,7 +447,7 @@
   .ks-hint .lg{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 3px 0 8px;vertical-align:-1px;} .ks-hint .lg.c{background:var(--green);} .ks-hint .lg.s{background:var(--seg-a);}
   .par-yr{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;} .par-yr div{background:var(--bg);border-radius:7px;padding:3px 4px;text-align:center;line-height:1.2;}
   .par-yr span{display:block;font-size:9.5px;font-weight:800;color:var(--ink-soft);} .par-yr b{display:block;font-size:12px;font-variant-numeric:tabular-nums;} .par-yr b.c{color:var(--green);} .par-yr b.s{color:var(--seg-a);} .par-yr b.cero{color:var(--muted);font-weight:400;}
-  @media (max-width:1000px){ .par-fila{grid-template-columns:24px 1fr 232px 64px 64px;} .par-fila .org,.par-fila .kv:nth-of-type(1){display:none;} }
+  @media (max-width:1000px){ .par-box.app .par-fila{grid-template-columns:24px 1fr 232px 64px 64px 96px;} .par-fila{grid-template-columns:24px 1fr 232px 64px 64px;} .par-fila .org,.par-fila .kv:nth-of-type(1){display:none;} }
   .par-tabla td.prod{min-width:200px;max-width:280px;white-space:normal;} .par-tabla td.prod b{font-weight:600;color:var(--ink);font-size:12.5px;} .par-tabla td.prod small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;}
   .par-tabla td.sal,.par-tabla .sal{color:var(--seg-a);} .par-tabla th.anio-h{text-align:center;border-bottom:1px solid var(--border);}
   .par-tabla td.org small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;} .par-org{font-size:11.5px;font-weight:700;white-space:nowrap;}
@@ -478,6 +478,11 @@
   .ks-ley{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin:6px 0 10px;}
   .ks-ley i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
   .par-fila:hover{background:var(--row-hover);}
+  .par-box.app .par-fila{grid-template-columns:28px minmax(200px,2fr) minmax(130px,1.1fr) 232px 80px 80px 64px 104px;cursor:default;}
+  .par-ver{border:1px solid var(--brand-2);background:var(--card);color:var(--brand-ink);border-radius:8px;padding:7px 10px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;} .par-ver:hover{background:var(--surface-2);}
+  .par-ley{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--ink-soft);margin:2px 0 6px;} .par-ley i{display:inline-block;width:12px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+  .par-ley i.bA{background:var(--teal);} .par-ley i.bB{background:var(--seg-a);} .par-ley i.bC{background:var(--track-empty);} .par-ley i.acum{height:3px;background:var(--amber);}
+  .m-kx{padding:16px 18px;} .m-kx .kx-title{margin:0 0 10px;font-size:15px;color:var(--ink);}
   .ks-kdx{margin-top:6px;} .ks-kdx-t{font-size:13px;font-weight:800;color:var(--ink);margin:4px 0 6px;} .ks-kdx-t small{font-weight:500;color:var(--ink-soft);margin-left:6px;}
   .ks-kdx-w{max-height:480px;overflow:auto;border:1px solid var(--border);border-radius:10px;}
   .ks-kdx table{width:100%;border-collapse:collapse;font-size:11.5px;} .ks-kdx th{position:sticky;top:0;background:var(--th-bg);color:var(--ink-soft);font-size:10px;text-transform:uppercase;letter-spacing:.03em;text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);white-space:nowrap;z-index:1;}
@@ -8524,33 +8529,49 @@ function invParetoFilas(g){
 // Diseño simple (21.10.2026, Piero: "el diseño que planteas no es simple de ver a la vista"): arriba una tarjeta por año con lo comprado
 // y lo que salió (barras), el Pareto, y una lista corta: producto, clase, de dónde se compra, mini barras por año (compró / salió),
 // stock y a pedir. Los números exactos de cada año salen al pasar el mouse por las mini barras.
-function invParetoHtml(g){
+function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, TODOS los códigos y botón "Ver detalle" en cada fila
   const P = invParetoFilas(g), e = escapeHtml, n = function(v, d){ return v ? Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }) : '—'; };
   const usd = function(v){ return v ? 'US$ ' + Number(v).toLocaleString('es-PE', { maximumFractionDigits:0 }) : '—'; };
   const usdK = function(v){ return !v ? '—' : v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3) + ' mil' : usd(v); };
   const A = P.l.filter(function(x){ return x.cls === 'A'; }), pedir = P.l.filter(function(x){ return x.pedir > 0; }).length;
   // 22.10.2026 (Piero: "eso de arriba no se entiende… mejor quítalo"): sin tarjetas por año ni gráfico de Pareto; queda la lista.
-  const ver = invParetoVer === 'todos' ? P.l : P.l.filter(function(x){ return invParetoVer === 'pedir' ? x.pedir > 0 : x.cls === 'A'; });
+  const ver = (app || invParetoVer === 'todos') ? P.l : P.l.filter(function(x){ return invParetoVer === 'pedir' ? x.pedir > 0 : x.cls === 'A'; });
   const chip = function(k, t, c){ return `<button type="button" data-parver="${k}" class="${invParetoVer === k ? 'on' : ''}">${t} (${c})</button>`; };
   // Mini barras por año de cada producto: verde compró, azul salió (escala propia de la fila).
   // Números por año (21.10.2026, Piero: "necesito ver los números, no solo el gráfico"): cada año con lo que compró (verde) y lo que salió (azul).
   const mini = function(x){ return `<div class="par-yr">${P.anios.map(function(y){ const c = x.q[y] || 0, sl = x.sal[y] || 0;
       return `<div><span>${y}</span><b class="c${c ? '' : ' cero'}">${c ? n(c) : '·'}</b><b class="s${sl ? '' : ' cero'}">${sl ? n(sl) : '·'}</b></div>`; }).join('')}</div>`; };
   const ORG = { nacional:'🇵🇪 Nacional', importado:'🌎 Importación', mixto:'🇵🇪🌎 Mixto' };
-  return `<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>
-  <div class="par-box" id="pedirParetoFoto">
+  // Pareto (solo en la app, 22.10.2026, Piero: "entras a un grupo y lo primero que ves es el pareto y debajo todos los códigos"):
+  // una barra por producto con lo comprado en US$ (mayor a menor) y la línea del % acumulado; la línea punteada es el 80 %.
+  let svg = '';
+  const cb = app ? P.l.filter(function(x){ return x.usd > 0; }).slice(0, 150) : [];
+  if(cb.length > 1){
+    const W = 1000, H = 210, pl = 64, pr = 46, pt = 12, pb = 24, mx = cb[0].usd, bw = (W - pl - pr) / cb.length;
+    const yv = function(v){ return pt + (H - pt - pb) * (1 - v / mx); }, yp = function(v){ return pt + (H - pt - pb) * (1 - v); };
+    svg = `<svg class="par-svg" viewBox="0 0 ${W} ${H}"><line x1="${pl}" x2="${W - pr}" y1="${H - pb}" y2="${H - pb}" stroke="var(--border)"/>`
+      + `<line class="l80" x1="${pl}" x2="${W - pr}" y1="${yp(0.8).toFixed(1)}" y2="${yp(0.8).toFixed(1)}"/><text x="${W - pr + 6}" y="${(yp(0.8) + 4).toFixed(1)}">80 %</text><text x="${W - pr + 6}" y="${yp(1) + 8}">100 %</text>`
+      + cb.map(function(x, i){ return `<rect class="b${x.cls}" x="${(pl + i * bw + 0.5).toFixed(1)}" y="${yv(x.usd).toFixed(1)}" width="${Math.max(1.2, bw - 1).toFixed(1)}" height="${(H - pb - yv(x.usd)).toFixed(1)}" rx="1.5"><title>${e(x.r.codigo)} · ${e(x.r.descripcion || '')} · ${usd(x.usd)} · acumulado ${(x.acum * 100).toFixed(0)} %</title></rect>`; }).join('')
+      + `<polyline class="acum" points="${cb.map(function(x, i){ return (pl + i * bw + bw / 2).toFixed(1) + ',' + yp(x.acum).toFixed(1); }).join(' ')}"/>`
+      + `<text x="${pl - 8}" y="${pt + 8}" text-anchor="end">${usdK(mx)}</text><text x="${pl - 8}" y="${H - pb}" text-anchor="end">0</text>`
+      + `<text x="${pl}" y="${H - 6}">Productos de mayor a menor compra →</text></svg>`
+      + `<div class="par-ley"><span><i class="bA"></i>Clase A: suman el 80 % de lo comprado (${n(A.length, 0)})</span><span><i class="bB"></i>Clase B: hasta el 95 %</span><span><i class="bC"></i>Clase C: el resto</span><span><i class="acum"></i>% acumulado</span></div>`;
+  }
+  return `${app ? '' : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'}
+  <div class="par-box${app ? ' app' : ''}"${app ? '' : ' id="pedirParetoFoto"'}>
     <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${n(P.l.length, 0)} productos · ${usd(P.tot)} comprados ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del monto) · ${n(pedir, 0)} por pedir</small></h3>
 </div>
-    <div class="ks-bar" style="margin-top:8px;"><span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}
+    ${svg}
+    <div class="ks-bar" style="margin-top:8px;">${app ? '' : `<span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}`}
       <span class="ks-hint">Por año: <i class="lg c"></i>entró (arriba) <i class="lg s"></i>salió (abajo) · almacén Lurín</span></div>
     <div class="par-lista">${ver.map(function(x, i){ const r = x.r;
-      return `<div class="par-fila par-abre" data-cod="${e(r.codigo)}" title="Ver el kardex"><span class="pos">${i + 1}</span>
+      return `<div class="par-fila${app ? '' : ' par-abre'}" data-cod="${e(r.codigo)}"${app ? '' : ' title="Ver el kardex"'}><span class="pos">${i + 1}</span>
         <div class="prod"><b>${e(r.descripcion || '—')}</b><small><span class="mono">${e(r.codigo)}</span> · ${e((r.unidad || '').trim())}${x.cls ? ' · <span class="par-cls ' + x.cls + '">' + x.cls + '</span> ' + usdK(x.usd) : ''}</small></div>
         <div class="org">${x.origen ? '<b>' + ORG[x.origen] + '</b><small>' + e(polarCorta(appImpNombre(x.pv), 24)) + '</small>' : '<small>Sin compras</small>'}</div>
         ${mini(x)}
         <div class="kv"><span>Consumo/mes</span><b>${n(r.consumoMensual)}</b></div>
         <div class="kv"><span>Consumo/año</span><b>${n((+r.consumoMensual || 0) * 12, 0)}</b></div>
-        <div class="kv"><span>Stock</span><b>${n(x.stock)}</b></div></div>`; }).join('') || '<div class="ini-vacio">Nada en esta vista.</div>'}</div>
+        <div class="kv"><span>Stock</span><b>${n(x.stock)}</b></div>${app ? `<button type="button" class="par-ver" data-invkdx="${e(r.codigo)}">Ver detalle ›</button>` : ''}</div>`; }).join('') || '<div class="ini-vacio">Nada en esta vista.</div>'}</div>
   </div>`;
 }
 function invParetoBind(box, g){
@@ -8564,8 +8585,8 @@ function invParetoBind(box, g){
 // abajo las barras de lo que entró y salió cada día; al mover el mouse una guía vertical muestra el stock de ese día y sus movimientos;
 // se acerca arrastrando sobre el gráfico (o con los botones de año) y con doble clic vuelve a todo.
 let kdxRango = null;   // { t0, t1 } del zoom (null = todos los años)
-function drawKardexSimple(p){
-  const box = document.getElementById('kardexChart'), e = escapeHtml, um = e((p.unidad || '').trim());
+function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario → familia → producto); sin él, la tarjeta de escritorio
+  const box = cont ? cont.querySelector('.kx-chart') : document.getElementById('kardexChart'), e = escapeHtml, um = e((p.unidad || '').trim());
   const n = function(v, d){ return v == null || isNaN(v) ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }); };
   const suc = kardexSucursal || 'lima', meses = Math.max(0, Number((document.getElementById('mesesAbastecer') || {}).value) || 3);
   let pr = null; try{ pr = pedirRowsFor(meses, 'todos').rows.find(function(x){ return x.codigo === p.codigo; }); }catch(err){}
@@ -8576,7 +8597,7 @@ function drawKardexSimple(p){
   const impAuto = compO.origen != null ? compO.origen === 'importado' : (ltN == null && ltI != null);
   const esImp = kardexOrigen != null ? kardexOrigen === 'importado' : impAuto;
   const rop = esImp && p.ropImp > 0 ? p.ropImp : p.rop, ss = esImp && p.stockSeguridadImp > 0 ? p.stockSeguridadImp : p.stockSeguridad;
-  { const tt = document.getElementById('kardexTitle'), sb = document.getElementById('kardexSub');   // código y nombre juntos, sin "Kardex —"
+  { const tt = cont ? cont.querySelector('.kx-title') : document.getElementById('kardexTitle'), sb = cont ? null : document.getElementById('kardexSub');   // código y nombre juntos, sin "Kardex —"
     if(tt) tt.textContent = p.codigo + ' — ' + (p.descripcion || '').trim() + (p.nCodigos > 1 ? ' (' + p.nCodigos + ' códigos homologados)' : '');
     if(sb && sb.firstChild && sb.firstChild.nodeType === 3) sb.firstChild.textContent = ''; }
   const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Set','Oct','Nov','Dic'], DIA = 864e5;
@@ -8660,10 +8681,10 @@ function drawKardexSimple(p){
       return sep + `<tr class="${ing ? 'in' : 'out'}${m.t ? ' tr' : ''}${y % 2 ? ' y1' : ''}"><td class="f">${fC(m.f)}</td><td>${e(dd.length > 1 ? dd[0] : '')}</td><td class="mono">${e(dd.length > 1 ? dd.slice(1).join(' ') : (m.d || ''))}</td><td class="mono">${e(m.r || '')}</td><td>${e(m.cp || '')}</td>`
         + `<td class="num qi">${ing ? n(m.q) : ''}</td><td class="num qo">${ing ? '' : n(-m.q)}</td><td class="num sd">${n(saldo[i])}</td><td>${m.mo ? '<b>' + e(m.mo) + '</b> ' : ''}${e(m.md || '')}${m.t ? ' · traslado entre sedes' : ''}</td><td>${e(m.py || '')}</td></tr>`; }).join('')}
     </tbody><tfoot><tr><td colspan="5">Totales</td><td class="num">${n(totI)}</td><td class="num">${n(totS)}</td><td colspan="3"></td></tr></tfoot></table></div></div>`;
-  { const bI = document.getElementById('btnImgKardex'), mv = document.getElementById('kardexMovs'); if(bI) bI.style.display = 'none'; if(mv) mv.innerHTML = ''; }   // sin foto ni detalle (22.10.2026)
+  if(!cont){ const bI = document.getElementById('btnImgKardex'), mv = document.getElementById('kardexMovs'); if(bI) bI.style.display = 'none'; if(mv) mv.innerHTML = ''; }   // sin foto ni detalle (22.10.2026)
   box.innerHTML = tiles + bar + `<div class="ks-chart">${svg}<div class="ks-tip" id="ksTip"></div></div>`
     + `<div class="ks-ley"><span><i style="background:var(--teal);height:3px"></i>Stock</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}</span></div>` + detalle;   // sin la tabla por año (22.10.2026, Piero)
-  const redibujar = function(){ drawKardexSimple(p); };
+  const redibujar = function(){ drawKardexSimple(p, cont); };
   box.querySelectorAll('[data-ksuc]').forEach(function(b){ b.addEventListener('click', function(){ kardexSucursal = b.dataset.ksuc; redibujar(); }); });
   box.querySelectorAll('[data-korg]').forEach(function(b){ b.addEventListener('click', function(){ kardexOrigen = (b.dataset.korg === 'importado') === impAuto ? null : b.dataset.korg; redibujar(); }); });
   box.querySelectorAll('[data-kanio]').forEach(function(b){ b.addEventListener('click', function(){ const a = b.dataset.kanio; kdxRango = a === 'todo' ? null : { t0:Date.UTC(+a, 0, 1), t1:+a === yC ? T1 : Date.UTC(+a + 1, 0, 1) }; redibujar(); }); });
@@ -15396,7 +15417,7 @@ function almPedRegHtml(cod, st){
 const APP_PANT_FN = { almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appComprasHtml(); }, almseg:function(){ return appAlmSegHtml(); },
   pendlog:function(){ return appPendLogHtml() + (APP.vista === 'compras' && gerAbierto ? `<div class="cmp-sec"><b>🌎 Comex</b><small>Camila Mora</small></div>${appFBarra('indicadores', { pry:1 })}${appComexHtml(APP_F.indicadores)}` : ''); }, daily:function(){ return appDailyModHtml(); }, supreq:function(){ return appSupReqHtml(); }, equipo:function(){ return appGerEquipoHtml(); }, tienda:function(){ return appTiendaHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
-  const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam], pendcompras:[APP_PC, APP_PL, APP_CORREO.v, APP_F.indicadores, APP_REP.sec], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
+  const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam, APP_INV.kdx], pendcompras:[APP_PC, APP_PL, APP_CORREO.v, APP_F.indicadores, APP_REP.sec], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
     indicadores:[APP_F.indicadores, APP_REP.sec], otif:[APP_F.otif] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (APP.vista || '');
 }
@@ -15453,7 +15474,7 @@ function appRenderInicio(){
     return;
   } else if(APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'almrep' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog' || APP.pantalla === 'almseg'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
-    if(APP.pantalla === 'inventario') setTimeout(appInvCompletar, 0);
+    if(APP.pantalla === 'inventario'){ setTimeout(appInvCompletar, 0); setTimeout(appInvKdxPintar, 0); }   // el kardex se dibuja sobre el HTML ya puesto (también si vino de la memoria)
     return;
   } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'otif'){
     cont.innerHTML = appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
@@ -17165,7 +17186,7 @@ function appGastoProv(prov){
 function appRefrescarCal(){ const c = document.getElementById('iniCal'); if(c) c.innerHTML = appDailyHtml(); }
 
 // ---------- Inventario (Logística) ----------
-const APP_INV = { f:'reponer', q:'', sel:'', tope:30, fam:'' };
+const APP_INV = { f:'reponer', q:'', sel:'', tope:30, fam:'', kdx:'' };   // kdx: código abierto en detalle (familia → producto)
 function appInvIndice(){
   const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [], otros = almOtrosLista();
   const firma = rows.length + '|' + otros.length + '|' + ((DATA && DATA.corte) ? +DATA.corte : 0) + '|' + (document.getElementById('mesesAbastecer') || {}).value;
@@ -17222,11 +17243,31 @@ function appInvFamilias(){
     const y = g.get(x.fam) || { fam:x.fam, n:0, sin:0, rep:0 }; y.n++; if(x.e === 'sin') y.sin++; if(x.e === 'reponer') y.rep++; g.set(x.fam, y); });
   // Familia DANFOSS (22.10.2026, Piero: "no veo la familia danfoss"): primera, junta los productos Danfoss de todas las familias.
   const dn = { fam:'DANFOSS', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.dnf) return; dn.n++; if(x.e === 'sin') dn.sin++; if(x.e === 'reponer') dn.rep++; });
-  return `<div class="m-fams">${(dn.n ? [dn] : []).concat([...g.values()].sort(function(a,b){ return b.n - a.n || a.fam.localeCompare(b.fam); })).map(function(y){
+  // Orden alfabético (22.10.2026, Piero: "grupo de familias en tarjetas que deben estar ordenadas alfabéticamente").
+  return `<div class="m-fams">${(dn.n ? [dn] : []).concat([...g.values()]).sort(function(a,b){ return a.fam.localeCompare(b.fam, 'es'); }).map(function(y){
     return `<button type="button" class="ini-card m-fam" data-invfam="${escapeHtml(y.fam)}"><span class="m-fam-ic">${iconForFamilia(sinAcentos(y.fam))}</span>
       <span class="m-fam-tx"><b>${escapeHtml(y.fam)}</b><small>${appN(y.n)} producto${y.n === 1 ? '' : 's'}${y.sin ? ` · <em class="rojo">${appN(y.sin)} sin stock</em>` : ''}${y.rep ? ` · <em class="ambar">${appN(y.rep)} por reponer</em>` : ''}</small></span></button>`; }).join('')}</div>`;
 }
+// Una familia (22.10.2026, Piero): primero el Pareto y debajo TODOS sus códigos con el detalle por año; cada fila tiene
+// "Ver detalle ›" que abre el kardex del producto. Botones para volver: producto → familia → todas las familias.
+function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return x.e !== 'nada' && (fam === 'DANFOSS' ? x.dnf : x.fam === fam); }).map(function(x){ return x.r; }); }
+function appInvFamiliaHtml(){
+  return `<button type="button" class="m-volver" data-invfam="">‹ Todas las familias</button>` + invParetoHtml({ label:APP_INV.fam, rows:appInvFamRows(APP_INV.fam) }, true);
+}
+function appInvKdxHtml(){   // el gráfico lo pone appInvKdxPintar después de poner el HTML (ver appRenderInicio)
+  return `<button type="button" class="m-volver" data-invkdxvolver="1">‹ Volver a ${escapeHtml(APP_INV.fam || 'la lista')}</button>
+    <div class="ini-card m-kx" id="appKdx"><h3 class="kx-title"></h3><div class="kx-chart"></div></div>`;
+}
+function appInvKdxPintar(){
+  const cont = document.getElementById('appKdx'); if(!cont) return;
+  const x = appInvIndice().items.find(function(y){ return y.r.codigo === APP_INV.kdx; });
+  if(!x){ cont.querySelector('.kx-chart').innerHTML = '<div class="ini-vacio">No se encontró el código ' + escapeHtml(APP_INV.kdx) + '.</div>'; return; }
+  if(!(x.r.kardexMovs && x.r.kardexMovs.length)){ cont.querySelector('.kx-title').textContent = x.r.codigo + ' — ' + (x.r.descripcion || ''); cont.querySelector('.kx-chart').innerHTML = '<div class="ini-vacio">Este código no tiene movimientos en el Reporte Almacén.</div>'; return; }
+  drawKardexSimple(x.r, cont);
+}
 function appInvLista(){
+  if(!APP_INV.q && APP_INV.fam && APP_INV.kdx) return appInvKdxHtml();
+  if(!APP_INV.q && APP_INV.fam) return appInvFamiliaHtml();
   if(!APP_INV.q && !APP_INV.fam) return appInvFamilias();
   const l = appInvFiltrada();
   if(!l.length) return `<div class="ini-vacio">${APP_INV.q ? 'Ningún producto con "' + escapeHtml(APP_INV.q) + '".' : 'Nada en este grupo. ✅'}</div>`;
@@ -19711,6 +19752,8 @@ function appAbrirProyecto(idPry){
   s.value = idPry; s.dispatchEvent(new Event('change', { bubbles:true }));
 }
 function appAbrirInv(q){
+  const x = appInvIndice().items.find(function(y){ return y.r.codigo === q || (y.r.codigos || []).indexOf(q) !== -1; });
+  if(x){ APP_INV.fam = x.fam; APP_INV.kdx = x.r.codigo; APP_INV.q = ''; APP_INV.sel = ''; kardexOrigen = null; kdxRango = null; return appInicio('inventario'); }   // detalle en la app (22.10.2026)
   irASeccion('alertas');
   const i = document.getElementById('searchReposicion'); i.value = q; i.dispatchEvent(new Event('input', { bubbles:true }));
 }
@@ -19772,7 +19815,10 @@ function appClickInicio(e){
   if(b.dataset.gorig !== undefined){ APP_G.orig = b.dataset.gorig; return appRenderInicio(); }
   if(b.dataset.gfam !== undefined){ APP_G.fam = b.dataset.gfam; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invf !== undefined){ APP_INV.f = b.dataset.invf; APP_INV.q = ''; APP_INV.tope = 30; APP_INV.sel = ''; return appRenderInicio(); }
-  if(b.dataset.invfam !== undefined){ APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; appRenderInicio(); return window.scrollTo(0, 0); }
+  if(b.dataset.invfam !== undefined){ APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; APP_INV.kdx = ''; appRenderInicio(); return window.scrollTo(0, 0); }
+  if(b.dataset.invkdx){ if(APP_INV.kdx !== b.dataset.invkdx){ kardexOrigen = null; kdxRango = null; } APP_INV.kdx = b.dataset.invkdx; APP_INV.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
+  if(b.dataset.invkdxvolver){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
+    const f = c && document.querySelector('#invLista [data-invkdx="' + CSS.escape(c) + '"]'); if(f) f.closest('.par-fila').scrollIntoView({ block:'center' }); else window.scrollTo(0, 0); return; }
   // Abrir o cerrar un producto repinta solo esa tarjeta: la lista completa son miles.
   if(b.dataset.invsel){ const antes = APP_INV.sel; APP_INV.sel = antes === b.dataset.invsel ? '' : b.dataset.invsel;
     const idx = appInvIndice().items, pinta = function(cod){ if(!cod) return; const x = idx.find(function(y){ return y.r.codigo === cod; });
