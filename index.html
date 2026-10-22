@@ -17180,7 +17180,7 @@ function appInvIndice(){
   });
   // Familia de cada código: la misma categoría de "Cuánto pedir por categoría" (07.10.2026, Piero:
   // "la parte de inventario la puedes colocar como antes agrupada por familia").
-  items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; });
+  items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; x.dnf = invEsDanfoss(x.r); });   // + DANFOSS (22.10.2026)
   APP_INV.cache = { firma:firma, items:items };
   return APP_INV.cache;
 }
@@ -17194,7 +17194,7 @@ function appInvFiltrada(){
       .sort(function(a,b){ return b.cons - a.cons || b.tot - a.tot; });
   } else {
     const orden = { sin:0, reponer:1, ok:2, sinmov:3, sinrop:4, nada:5 };
-    l = idx.filter(function(x){ return x.fam === APP_INV.fam && x.e !== 'nada'; })
+    l = idx.filter(function(x){ return (APP_INV.fam === 'DANFOSS' ? x.dnf : x.fam === APP_INV.fam) && x.e !== 'nada'; })
       .sort(function(a,b){ return orden[a.e] - orden[b.e] || b.cons - a.cons || b.tot - a.tot; });
   }
   return l;
@@ -17206,7 +17206,9 @@ function appInvFamilias(){
   const g = new Map();
   appInvIndice().items.forEach(function(x){ if(x.e === 'nada') return;
     const y = g.get(x.fam) || { fam:x.fam, n:0, sin:0, rep:0 }; y.n++; if(x.e === 'sin') y.sin++; if(x.e === 'reponer') y.rep++; g.set(x.fam, y); });
-  return `<div class="m-fams">${[...g.values()].sort(function(a,b){ return b.n - a.n || a.fam.localeCompare(b.fam); }).map(function(y){
+  // Familia DANFOSS (22.10.2026, Piero: "no veo la familia danfoss"): primera, junta los productos Danfoss de todas las familias.
+  const dn = { fam:'DANFOSS', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.dnf) return; dn.n++; if(x.e === 'sin') dn.sin++; if(x.e === 'reponer') dn.rep++; });
+  return `<div class="m-fams">${(dn.n ? [dn] : []).concat([...g.values()].sort(function(a,b){ return b.n - a.n || a.fam.localeCompare(b.fam); })).map(function(y){
     return `<button type="button" class="ini-card m-fam" data-invfam="${escapeHtml(y.fam)}"><span class="m-fam-ic">${iconForFamilia(sinAcentos(y.fam))}</span>
       <span class="m-fam-tx"><b>${escapeHtml(y.fam)}</b><small>${appN(y.n)} producto${y.n === 1 ? '' : 's'}${y.sin ? ` · <em class="rojo">${appN(y.sin)} sin stock</em>` : ''}${y.rep ? ` · <em class="ambar">${appN(y.rep)} por reponer</em>` : ''}</small></span></button>`; }).join('')}</div>`;
 }
