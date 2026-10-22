@@ -478,6 +478,9 @@
   .ks-ley{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin:6px 0 10px;}
   .ks-ley i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
   .par-fila:hover{background:var(--row-hover);}
+  /* Velocidad (22.10.2026): las filas y tarjetas que no están en pantalla no se dibujan hasta que se llega a ellas. */
+  .par-fila{content-visibility:auto;contain-intrinsic-size:auto 66px;} .ini-card.m-prod{content-visibility:auto;contain-intrinsic-size:auto 150px;}
+  .ks-kdx tbody tr{content-visibility:auto;contain-intrinsic-size:auto 26px;}
   .kx-res{display:grid;grid-template-columns:1.25fr 0.8fr 1.2fr;gap:12px;margin:4px 0 12px;}
   .kx-c{background:var(--surface-2);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0;}
   .kx-c h4{margin:0 0 4px;font-size:12px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
@@ -6090,6 +6093,9 @@ function processAlmacen(wb, filename){
     productos.forEach(p=>{
       const codigos = p.codigos || [p.codigo];
       const sumaSemana = (fuente, key) => codigos.reduce((a,c)=> a + (((fuente && fuente[c]) || {})[key] || 0), 0);
+      // Velocidad (22.10.2026, Piero: "optimiza el app, está algo lento"): los arreglos por semana solo los usaba el kardex anterior;
+      // con la vista simple (INV_SIMPLE) no se calculan ni se publican (eran ~6 MB del enlace y mucho cálculo con la historia desde 2023).
+      if(!INV_SIMPLE){
       p.kardexIngresos = kardexPeriods.map(per => sumaSemana(kardexIng && kardexIng.porCodigo, per.key));
       p.kardexMovimientos = kardexPeriods.map(per => sumaSemana(kardexMov && kardexMov.porCodigo, per.key));
       // Desglose por sucursal (15.09.2026, ver nota arriba) — mismo cálculo de arriba pero leyendo del
@@ -6102,6 +6108,7 @@ function processAlmacen(wb, filename){
         p.kardexIngresosPorSucursal[suc] = kardexPeriods.map(per => sumaSemana(kardexIng && kardexIng.porCodigoPorSucursal && kardexIng.porCodigoPorSucursal[suc], per.key));
         p.kardexMovimientosPorSucursal[suc] = kardexPeriods.map(per => sumaSemana(kardexMov && kardexMov.porCodigoPorSucursal && kardexMov.porCodigoPorSucursal[suc], per.key));
       });
+      }
       // Lista de movimientos, uno por uno (15.09.2026, ver nota en parseTransacciones): [fecha, cantidad
       // con signo (+ ingreso / − salida), sucursal]. Es lo que dibuja el kardex desde esta ronda; los
       // arreglos semanales de arriba se mantienen porque los usan las imágenes de resumen. En el mismo día
@@ -15728,7 +15735,20 @@ function appDailyMes(n){          // cambia de mes y selecciona su último día 
   APP_DAILY.anio = a; APP_DAILY.mes = m; APP_DAILY.dia = isoDay(d);
 }
 function appDailyTot(l, k){ const u = new Set(); l.forEach(function(x){ x[k].forEach(function(v, key){ u.add(x[k] instanceof Map ? key : v); }); }); return u.size; }   // sin contar dos veces un pedido de dos personas
-function appDailyActividad(dia){ return (appDailyEsAlm() ? appDailyAlmDatos(dia) : appDailyDatos(dia)).lista.reduce(function(a, x){ return a + x.pts; }, 0); }
+function appDailyActividad(dia){ if(appDailyEsAlm()) return appDailyAlmAct().get(dia) || 0; return appDailyDatos(dia).lista.reduce(function(a, x){ return a + x.pts; }, 0); }
+// Puntos de Almacén por día para el calendario en UNA pasada (22.10.2026, velocidad): mismo conteo que appDailyAlmDatos
+// (1 por pedido o guía distinta de cada persona + 1 por ítem), sin rehacer todo el detalle de cada día.
+function appDailyAlmAct(){
+  return appMemo('dailyAlmAct', function(){
+    rqPreparar();
+    const per = new Set(APP_DAILY_ALMACEN), D = new Map(), k = new Set();
+    const suma = function(d, clave){ D.set(d, (D.get(d) || 0) + 1 + (k.has(clave) ? 0 : (k.add(clave), 1))); };
+    RQ.filas.forEach(function(r){ if(r.estadoCalc === 'Archivado' || !r.codPedido) return; const fp = isoDay(r.fPedido); if(!fp) return;
+      const c = pedCreador(r.codPedido); if(!per.has(c)) return; suma(fp, fp + '|' + c + '|p|' + r.codPedido); });
+    almMovRows().forEach(function(m){ if(!m.f) return; const c = almPersona(m.r); if(!per.has(c)) return; suma(m.f, m.f + '|' + c + '|' + (m.t === 'i' ? 'i' : 'o') + '|' + m.d); });
+    return D;
+  });
+}
 function appDailyCalHtml(dia){
   const u = appDailyUltimo(), a = APP_DAILY.anio, m = APP_DAILY.mes;
   const nDias = new Date(Date.UTC(a, m + 1, 0)).getUTCDate(), primero = (new Date(Date.UTC(a, m, 1)).getUTCDay() + 6) % 7;
@@ -15749,23 +15769,12 @@ function appDailyCalHtml(dia){
     <div class="m-cal-dias">${celdas}</div>
     <div class="m-cal-ley"><span>Menos</span><span><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i></span><span>Más actividad</span></div>`;
 }
-function appDailyDatos(dia){
-  return appMemo('daily:' + dia, function(){
-    const P = new Map(), per = function(v){ const c = pdPersona(v); if(!PD_PERSONAS[c] || APP_DAILY_EQUIPO.indexOf(c) === -1) return null;
-      if(!P.has(c)) P.set(c, { cod:c, ped:new Map(), oc:new Map(), cer:new Set(), sku:new Set(), venc:new Map(), man:new Map(), sinOC:[] }); return P.get(c); };
-    const ini = new Date(dia + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() - 120); const desde = isoDay(ini);
-    const sig = new Date(dia + 'T00:00:00Z'); do { sig.setUTCDate(sig.getUTCDate() + 1); } while(sig.getUTCDay() === 0); const manana = isoDay(sig);
-    const diaD = new Date(dia + 'T00:00:00Z'), dh = function(f){ return Math.max(0, busdayCount(f, diaD) || 0); };   // días hábiles, como en Pendientes
-    const filas = appDailyFilas(), porPed = new Map(), porOC = new Map();
-    // SKU de pedidos que al cierre del día seguían sin OC, con la regla de Pendientes de Compras: pendiente hoy,
-    // o su OC se emitió después de ese día (07.10.2026, Piero: "detallar a ese día qué pedidos están pendientes").
-    filas.forEach(function(r){
-      const fp = isoDay(r.fPedido), fo = isoDay(r.fOrden), fc = isoDay(r.fRecep), fx = isoDay(r.fCompromiso);
+function appDailyBase(){
+  return appMemo('dailyBase', function(){
+    const filas = appDailyFilas().map(function(r){ return { r:r, fp:isoDay(r.fPedido), fo:isoDay(r.fOrden), fc:isoDay(r.fRecep), fx:isoDay(r.fCompromiso) }; });
+    const porPed = new Map(), porOC = new Map();
+    filas.forEach(function(F){ const r = F.r, fp = F.fp, fo = F.fo, fc = F.fc, fx = F.fx;
       if(r.codPedido){ const g = porPed.get(r.codPedido) || { fp:fp, resp:r.responsablePedido, l:[] }; g.l.push({ co:r.codOrden, fo:fo, uc:r.usuarioCompras, ep:r.estadoPedido || '' }); porPed.set(r.codPedido, g); }
-      // Solo los pedidos DIRECTOS los genera el comprador; los que vienen de un requerimiento salen solos
-      // (07.10.2026, Piero: "nosotros no generamos pedidos, estos vienen solos a partir de un req").
-      if(r.codPedido && r.codRequerimiento && fp && fp <= dia && r.codOrden && fo && fo > dia){ const x = per(r.responsablePedido); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:dh(r.fPedido), req:r.codRequerimiento || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '', fa:r.familia || '' }); }
-      if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
       if(!r.codOrden || !r.usuarioCompras) return;
       const imp = r.origen === 'importado' || /^0002-/.test(r.codOrden);
       const o = porOC.get(r.codOrden) || { uc:r.usuarioCompras, prov:r.proveedor || '', fo:fo, fx:fx, fxD:r.fCompromiso, imp:imp, rec:[], sku:new Set(), items:[], prys:new Set(), anul:/anul/i.test(r.estadoOrden || '') };
@@ -15776,6 +15785,29 @@ function appDailyDatos(dia){
     // OC vencidas con la MISMA regla de Pendientes de Compras (estado de Nisira + OC Finalizadas.xlsx + ETA de
     // importaciones), 07.10.2026: antes salían 12 aquí y 3 en Pendientes.
     const pendHoy = new Set(pdFilas().filter(function(r){ return r.tipo === 'oc'; }).map(function(r){ return r.codOrden; }));
+    const montoOC = new Map(); ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(!r.oc) return; const v = r.montoNativo; if(v == null || isNaN(v)) return;
+      const m = montoOC.get(r.oc) || { s:0, d:0 }; if(monedaLabel(r.moneda) === 'S/') m.s += v; else m.d += v; montoOC.set(r.oc, m); });
+    return { filas:filas, porPed:porPed, porOC:porOC, pendHoy:pendHoy, montoOC:montoOC };
+  });
+}
+function appDailyDatos(dia){
+  return appMemo('daily:' + dia, function(){
+    const P = new Map(), per = function(v){ const c = pdPersona(v); if(!PD_PERSONAS[c] || APP_DAILY_EQUIPO.indexOf(c) === -1) return null;
+      if(!P.has(c)) P.set(c, { cod:c, ped:new Map(), oc:new Map(), cer:new Set(), sku:new Set(), venc:new Map(), man:new Map(), sinOC:[] }); return P.get(c); };
+    const ini = new Date(dia + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() - 120); const desde = isoDay(ini);
+    const sig = new Date(dia + 'T00:00:00Z'); do { sig.setUTCDate(sig.getUTCDate() + 1); } while(sig.getUTCDay() === 0); const manana = isoDay(sig);
+    const diaD = new Date(dia + 'T00:00:00Z'), dh = function(f){ return Math.max(0, busdayCount(f, diaD) || 0); };   // días hábiles, como en Pendientes
+    // Velocidad (22.10.2026, Piero: "optimiza el app"): lo que no depende del día (fechas de cada fila, pedidos, OC, pendientes de hoy
+    // y montos de Consulta) se arma UNA vez en appDailyBase; el calendario pide ~22 días y antes lo rehacía en cada uno.
+    const B = appDailyBase(), porPed = B.porPed, porOC = B.porOC, pendHoy = B.pendHoy;
+    // SKU de pedidos que al cierre del día seguían sin OC, con la regla de Pendientes de Compras: pendiente hoy,
+    // o su OC se emitió después de ese día (07.10.2026, Piero: "detallar a ese día qué pedidos están pendientes").
+    B.filas.forEach(function(F){ const r = F.r, fp = F.fp, fo = F.fo;
+      // Solo los pedidos DIRECTOS los genera el comprador; los que vienen de un requerimiento salen solos
+      // (07.10.2026, Piero: "nosotros no generamos pedidos, estos vienen solos a partir de un req").
+      if(r.codPedido && r.codRequerimiento && fp && fp <= dia && r.codOrden && fo && fo > dia){ const x = per(r.responsablePedido); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:dh(r.fPedido), req:r.codRequerimiento || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '', fa:r.familia || '' }); }
+      if(fp === dia && r.codPedido && r.esPedidoDirecto){ const x = per(r.responsablePedido); if(x && !x.ped.has(r.codPedido)) x.ped.set(r.codPedido, r.producto || ''); }
+    });
     pdFilas().forEach(function(r){ const fp = isoDay(r.fPedido); if(r.tipo !== 'ped' || (fp && fp > dia)) return;   // cada línea cuenta, como en Pendientes
       const x = per(r.persona); if(x) x.sinOC.push({ cp:r.codPedido, pr:r.producto || '', d:fp ? dh(r.fPedido) : 0, req:r.req || '', pry:r.proyecto || '', fp:r.fPedido, q:r.cantPedido, um:r.unidad || '', fa:r.familia || '' }); });
     porOC.forEach(function(o, co){
@@ -15800,7 +15832,7 @@ function appDailyDatos(dia){
     // Monto: Consulta.xlsx (OC aprobadas); si la OC todavía no está ahí (sin aprobar), se suma de sus líneas.
     // Monto en su moneda (07.10.2026, Piero: "si la OC está en soles, ¿por qué la pasas a dólares?"): soles y dólares por separado.
     const sumar = function(map, co, r){ const v = r.montoNativo; if(v == null || isNaN(v)) return; const m = map.get(co) || { s:0, d:0 }; if(monedaLabel(r.moneda) === 'S/') m.s += v; else m.d += v; map.set(co, m); };
-    const montoOC = new Map(); ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.oc) sumar(montoOC, r.oc, r); });
+    const montoOC = new Map(B.montoOC);   // copia: lo de abajo agrega las OC que falten sin tocar la base
     const faltan = new Set(); P.forEach(function(x){ x.oc.forEach(function(o, co){ if(!montoOC.has(co)) faltan.add(co); }); });
     if(faltan.size) polarLineasOC().forEach(function(r){ if(faltan.has(r.codOrden)) sumar(montoOC, r.codOrden, r); });
     const lista = [...P.values()].map(function(x){ x.monto = appDailySuma([...x.oc.keys()].map(function(co){ return montoOC.get(co); })); x.montoPEN = x.monto.s + x.monto.d * TIPO_CAMBIO.USD;
