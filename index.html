@@ -478,6 +478,8 @@
   .ks-ley{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin:6px 0 10px;}
   .ks-ley i{display:inline-block;width:12px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
   .par-fila:hover{background:var(--row-hover);}
+  .par-fila.alerta{background:#fff6d6;box-shadow:inset 4px 0 0 #f2b632;} .par-fila.alerta:hover{background:#ffefbf;}
+  html[data-theme="dark"] .par-fila.alerta{background:rgba(242,182,50,.14);} .par-al{color:var(--amber-ink);background:#fff1c7;border-radius:6px;padding:1px 6px;} .par-rop{display:block;font-size:10.5px;font-weight:800;color:var(--amber-ink);white-space:nowrap;}
   /* Velocidad (22.10.2026): las filas y tarjetas que no están en pantalla no se dibujan hasta que se llega a ellas. */
   .par-fila{content-visibility:auto;contain-intrinsic-size:auto 66px;} .ini-card.m-prod{content-visibility:auto;contain-intrinsic-size:auto 150px;}
   .ks-kdx tbody tr{content-visibility:auto;contain-intrinsic-size:auto 26px;}
@@ -8562,7 +8564,11 @@ function invParetoFilas(g){
     // Pareto por CONSUMO (22.10.2026, Piero: "mejor que el pareto esté ordenado en base al consumo que se hizo, es más preciso"):
     // lo que salió de Lurín desde 2023 (las mismas cifras azules de cada año), no lo comprado en US$.
     const met = Object.keys(sal).reduce(function(a, y){ return a + sal[y]; }, 0);
-    return { r:r, usd:usd, met:met, q:q, sal:sal, origen:origen, pv:pvTop, stock:+r.lima || 0, pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
+    // Alerta de reposición (22.10.2026, Piero: "pintar de amarillo la línea en la que ya se deba pedir porque está por debajo del ROP;
+    // si hay bastante importación, el ROP y SS de importación"): origen = el que más se compró en US$; stock de Lurín + en tránsito ≤ ROP.
+    const esImpO = (org.importado || 0) > (org.nacional || 0), ropA = esImpO && r.ropImp > 0 ? r.ropImp : r.rop;
+    const posA = (+r.lima || 0) + (+r.transito || 0), alerta = ropA > 0 && posA <= ropA ? { rop:ropA, imp:esImpO && r.ropImp > 0, pos:posA, tr:+r.transito || 0 } : null;
+    return { r:r, usd:usd, met:met, alerta:alerta, q:q, sal:sal, origen:origen, pv:pvTop, stock:+r.lima || 0, pedir:(r.hayQuePedir !== false && r.aPedir > 0) ? Math.round(r.aPedir) : 0 };
   }).sort(function(a, b){ return b.met - a.met || (b.r.consumoMensual || 0) - (a.r.consumoMensual || 0) || b.usd - a.usd; });
   const tot = l.reduce(function(a, x){ return a + x.usd; }, 0), totC = l.reduce(function(a, x){ return a + x.met; }, 0); let ac = 0;
   l.forEach(function(x){ const antes = ac; ac += x.met; x.acum = totC ? ac / totC : 0; x.cls = !x.met ? '' : (antes / (totC || 1) < 0.8 ? 'A' : (antes / (totC || 1) < 0.95 ? 'B' : 'C')); });
@@ -8659,19 +8665,20 @@ function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, 
   }
   return `${app ? '' : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'}
   <div class="par-box${app ? ' app' : ''}"${app ? '' : ' id="pedirParetoFoto"'}>
-    <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${n(P.l.length, 0)} productos · ${n(P.totC, 0)} unid. salieron de Lurín ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del consumo) · ${usd(P.tot)} comprados</small></h3>
+    <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${n(P.l.length, 0)} productos · ${n(P.totC, 0)} unid. salieron de Lurín ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del consumo) · ${usd(P.tot)} comprados${P.l.some(function(x){ return x.alerta; }) ? ` · <b class="par-al">⚠ ${n(P.l.filter(function(x){ return x.alerta; }).length, 0)} bajo el punto de reorden</b>` : ''}</small></h3>
 </div>
     ${svg}
     <div class="ks-bar" style="margin-top:8px;">${app ? '' : `<span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}`}
       <span class="ks-hint">Por año: <i class="lg c"></i>entró (arriba) <i class="lg s"></i>salió (abajo) · almacén Lurín</span></div>
     <div class="par-lista">${ver.map(function(x, i){ const r = x.r;
-      return `<div class="par-fila${app ? '' : ' par-abre'}" data-cod="${e(r.codigo)}"${app ? '' : ' title="Ver el kardex"'}><span class="pos">${i + 1}</span>
+      const al = x.alerta, alT = al ? `Por debajo del punto de reorden${al.imp ? ' de importación' : ''}: stock Lurín ${n(x.stock)}${al.tr ? ' + en tránsito ' + n(al.tr) : ''} ≤ ROP ${n(al.rop)}` : '';
+      return `<div class="par-fila${app ? '' : ' par-abre'}${al ? ' alerta' : ''}" data-cod="${e(r.codigo)}"${al ? ` title="${e(alT)}"` : (app ? '' : ' title="Ver el kardex"')}><span class="pos">${i + 1}</span>
         <div class="prod"><b>${e(r.descripcion || '—')}</b><small><span class="mono">${e(r.codigo)}</span> · ${e((r.unidad || '').trim())}${x.cls ? ' · <span class="par-cls ' + x.cls + '">' + x.cls + '</span> ' + usdK(x.usd) : ''}</small></div>
         <div class="org">${x.origen ? '<b>' + ORG[x.origen] + '</b><small>' + e(polarCorta(appImpNombre(x.pv), 24)) + '</small>' : '<small>Sin compras</small>'}</div>
         ${mini(x)}
         <div class="kv"><span>Consumo/mes</span><b>${n(r.consumoMensual)}</b></div>
         <div class="kv"><span>Consumo/año</span><b>${n((+r.consumoMensual || 0) * 12, 0)}</b></div>
-        <div class="kv"><span>Stock Lurín</span><b>${n(x.stock)}</b></div>${app ? `<button type="button" class="par-ver" data-invkdx="${e(r.codigo)}">Ver detalle ›</button>` : ''}</div>`; }).join('') || '<div class="ini-vacio">Nada en esta vista.</div>'}</div>
+        <div class="kv"><span>Stock Lurín</span><b>${n(x.stock)}</b>${al ? `<small class="par-rop">⚠ ROP${al.imp ? ' imp.' : ''} ${n(al.rop, 1)}</small>` : ''}</div>${app ? `<button type="button" class="par-ver" data-invkdx="${e(r.codigo)}">Ver detalle ›</button>` : ''}</div>`; }).join('') || '<div class="ini-vacio">Nada en esta vista.</div>'}</div>
   </div>`;
 }
 function invParetoBind(box, g){
