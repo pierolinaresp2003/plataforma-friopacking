@@ -439,7 +439,7 @@
   .par-anios>div{background:var(--bg);border-radius:12px;padding:10px 12px;} .par-anios .y{font-size:12px;font-weight:800;color:var(--ink-soft);} .par-anios>div>b{display:block;font-size:19px;color:var(--ink);margin:2px 0 6px;}
   .par-anios small{display:block;font-size:11.5px;color:var(--ink-soft);margin:2px 0 6px;} .par-anios small b{color:var(--ink);}
   .pa-b{height:7px;background:var(--card);border-radius:4px;overflow:hidden;} .pa-b i{display:block;height:100%;border-radius:4px;} .pa-b i.c{background:var(--green);} .pa-b i.s{background:var(--seg-a);}
-  .par-lista{display:flex;flex-direction:column;} .par-fila{display:grid;grid-template-columns:28px minmax(200px,2fr) minmax(130px,1.1fr) 232px 80px 64px 64px 34px;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);}
+  .par-lista{display:flex;flex-direction:column;} .par-fila{display:grid;grid-template-columns:28px minmax(200px,2fr) minmax(130px,1.1fr) 232px 80px 80px 64px 34px;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);}
   .par-fila .pos{font-size:12px;color:var(--ink-soft);font-weight:700;} .par-fila .prod b{font-size:13px;font-weight:600;color:var(--ink);display:block;line-height:1.25;} .par-fila small{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;}
   .par-fila .org b{font-size:12px;white-space:nowrap;} .par-fila .kv{text-align:right;} .par-fila .kv span{display:block;font-size:10px;color:var(--ink-soft);text-transform:uppercase;font-weight:700;letter-spacing:.03em;}
   .par-fila .kv b{font-size:15px;color:var(--ink);} .par-fila .kv.ped b{color:var(--amber);} .par-fila .kv.ped.no b{color:var(--muted);font-weight:500;}
@@ -7276,9 +7276,9 @@ function drawKardexMovs(producto){
   });
   if(!movs.length){ box.innerHTML = ''; return; }
   // Solo como opción (21.10.2026, Piero: "esto de abajo que no vaya, solo que salga como una opción si se quiere ver ese detalle completo").
-  if(INV_SIMPLE && kmvAbierto !== producto.codigo){
-    box.innerHTML = '<button type="button" class="par-mas" id="kmvVer">📋 Ver detalle de ingresos y salidas por OC y proyecto (' + movs.length + ')</button>';
-    box.querySelector('#kmvVer').addEventListener('click', function(){ kmvAbierto = producto.codigo; drawKardexMovs(producto); });
+  // 22.10.2026 (Piero: "abajo ya no muestre el detalle de ingresos y salidas"): en la vista simple ya no va.
+  if(INV_SIMPLE){
+    box.innerHTML = '';
     return;
   }
   movs.sort(function(a,b){ return (b.f ? +b.f : 0) - (a.f ? +a.f : 0); });
@@ -8494,27 +8494,7 @@ function invParetoHtml(g){
   const usd = function(v){ return v ? 'US$ ' + Number(v).toLocaleString('es-PE', { maximumFractionDigits:0 }) : '—'; };
   const usdK = function(v){ return !v ? '—' : v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3) + ' mil' : usd(v); };
   const A = P.l.filter(function(x){ return x.cls === 'A'; }), pedir = P.l.filter(function(x){ return x.pedir > 0; }).length;
-  // Tarjetas por año: monto comprado y, en la unidad principal de la familia, cuánto se compró y cuánto salió.
-  const umCnt = {}; P.l.forEach(function(x){ const u = (x.r.unidad || '').trim() || '—'; umCnt[u] = (umCnt[u] || 0) + 1; });
-  const umP = Object.keys(umCnt).sort(function(a, b){ return umCnt[b] - umCnt[a]; })[0] || '';
-  const resAnio = P.anios.map(function(y){ let usdY = 0, c = 0, sl = 0;
-    P.l.forEach(function(x){ if(((x.r.unidad || '').trim() || '—') === umP){ c += x.q[y] || 0; sl += x.sal[y] || 0; } });
-    ((GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.anio === y && P.cods.has(r.codigo)) usdY += (r.moneda === 'US$' || r.moneda === 'USD') ? (+r.montoNativo || 0) : (+r.montoPEN || 0) / TIPO_CAMBIO['US$']; });
-    return { y:y, usd:usdY, c:c, s:sl }; });
-  const mxA = Math.max.apply(null, resAnio.map(function(r){ return Math.max(r.c, r.s); }).concat([1]));
-  const anios = `<div class="par-anios">${resAnio.map(function(r){ return `<div><span class="y">${r.y}</span><b>${usdK(r.usd)}</b>
-      <div class="pa-b"><i class="c" style="width:${(r.c / mxA * 100).toFixed(1)}%"></i></div><small>Entró <b>${n(r.c, 0)}</b> ${e(umP)}</small>
-      <div class="pa-b"><i class="s" style="width:${(r.s / mxA * 100).toFixed(1)}%"></i></div><small>Salió <b>${n(r.s, 0)}</b> ${e(umP)}</small></div>`; }).join('')}</div>`;
-  // Pareto
-  const cb = P.l.filter(function(x){ return x.usd > 0; }).slice(0, 100), W = 1000, H = 170, pl = 46, pr = 40, pt = 10, pb = 8;
-  let svg = '';
-  if(cb.length){
-    const mx = cb[0].usd, bw = (W - pl - pr) / cb.length, yv = function(v){ return pt + (H - pt - pb) * (1 - v / mx); }, yp = function(v){ return pt + (H - pt - pb) * (1 - v); };
-    svg = `<svg class="par-svg" viewBox="0 0 ${W} ${H}"><line class="l80" x1="${pl}" x2="${W - pr}" y1="${yp(0.8)}" y2="${yp(0.8)}"/><text x="${W - pr + 4}" y="${yp(0.8) + 4}">80%</text>`
-      + cb.map(function(x, i){ return `<rect class="b${x.cls}" x="${(pl + i * bw + 1).toFixed(1)}" y="${yv(x.usd).toFixed(1)}" width="${Math.max(1.5, bw - 2).toFixed(1)}" height="${(H - pb - yv(x.usd)).toFixed(1)}" rx="1.5"><title>${e(x.r.descripcion || x.r.codigo)} · ${usd(x.usd)} · acumulado ${(x.acum * 100).toFixed(0)}%</title></rect>`; }).join('')
-      + `<polyline class="acum" points="${cb.map(function(x, i){ return (pl + i * bw + bw / 2).toFixed(1) + ',' + yp(x.acum).toFixed(1); }).join(' ')}"/>`
-      + `<text x="${pl - 6}" y="${pt + 8}" text-anchor="end">${usdK(mx).replace('US$ ', '$')}</text></svg>`;
-  }
+  // 22.10.2026 (Piero: "eso de arriba no se entiende… mejor quítalo"): sin tarjetas por año ni gráfico de Pareto; queda la lista.
   const ver = invParetoVer === 'todos' ? P.l : P.l.filter(function(x){ return invParetoVer === 'pedir' ? x.pedir > 0 : x.cls === 'A'; });
   const chip = function(k, t, c){ return `<button type="button" data-parver="${k}" class="${invParetoVer === k ? 'on' : ''}">${t} (${c})</button>`; };
   // Mini barras por año de cada producto: verde compró, azul salió (escala propia de la fila).
@@ -8525,9 +8505,7 @@ function invParetoHtml(g){
   return `<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>
   <div class="par-box" id="pedirParetoFoto">
     <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${n(P.l.length, 0)} productos · ${usd(P.tot)} comprados ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del monto) · ${n(pedir, 0)} por pedir</small></h3>
-      <button type="button" class="btn secondary" id="btnParetoFoto">📷 Descargar foto</button></div>
-    ${anios}
-    ${svg}
+</div>
     <div class="ks-bar" style="margin-top:8px;"><span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}
       <span class="ks-hint">Por año: <i class="lg c"></i>entró (arriba) <i class="lg s"></i>salió (abajo) · almacén Lurín</span></div>
     <div class="par-lista">${ver.map(function(x, i){ const r = x.r;
@@ -8536,14 +8514,13 @@ function invParetoHtml(g){
         <div class="org">${x.origen ? '<b>' + ORG[x.origen] + '</b><small>' + e(polarCorta(appImpNombre(x.pv), 24)) + '</small>' : '<small>Sin compras</small>'}</div>
         ${mini(x)}
         <div class="kv"><span>Consumo/mes</span><b>${n(r.consumoMensual)}</b></div>
+        <div class="kv"><span>Consumo/año</span><b>${n((+r.consumoMensual || 0) * 12, 0)}</b></div>
         <div class="kv"><span>Stock</span><b>${n(x.stock)}</b></div>
-        <div class="kv ped${x.pedir ? '' : ' no'}"><span>A pedir</span><b>${x.pedir ? n(x.pedir, 0) : '—'}</b></div>
         <button type="button" class="pedir-kdx" data-cod="${e(r.codigo)}" title="Ver el kardex">📈</button></div>`; }).join('') || '<div class="ini-vacio">Nada en esta vista.</div>'}</div>
   </div>`;
 }
 function invParetoBind(box, g){
   box.querySelectorAll('[data-parver]').forEach(function(b){ b.addEventListener('click', function(){ invParetoVer = b.dataset.parver; box.innerHTML = invParetoHtml(g); invParetoBind(box, g); }); });
-  const f = box.querySelector('#btnParetoFoto'); if(f) f.addEventListener('click', function(ev){ downloadSectionImage('pedirParetoFoto', 'pareto-' + sinAcentos(g.label).toLowerCase().replace(/[^a-z0-9]+/g, '-'), ev.currentTarget); });
   const volver = box.querySelector('#pedirVolver'); if(volver) volver.addEventListener('click', function(){ pedirCatSel = null; invParetoVer = 'A'; drawPedirPorCategoria(); });
   box.querySelectorAll('.pedir-kdx').forEach(function(btn){ btn.addEventListener('click', function(){ kardexCodigoDirecto = btn.dataset.cod; drawKardex(); const card = document.getElementById('kardexCard'); if(card) card.scrollIntoView({ behavior:'smooth', block:'start' }); }); });
 }
@@ -8566,7 +8543,7 @@ function drawKardexSimple(p){
   (p.kardexMovs || []).forEach(function(m){ if(!m.f || (m.s || 'lima') !== suc || !m.q) return; const x = D.get(m.f) || { f:m.f, t:+fromIsoDay(m.f), inn:0, out:0, ni:0, no:0, ti:0, to:0 };
     if(m.q > 0){ x.inn += m.q; x.ni++; if(m.t) x.ti += m.q; } else { x.out -= m.q; x.no++; if(m.t) x.to -= m.q; } D.set(m.f, x); });
   const dias = [...D.values()].sort(function(a, b){ return a.t - b.t; });
-  let st = +p[suc] || 0; for(let i = dias.length - 1; i >= 0; i--){ dias[i].des = st; st -= dias[i].inn - dias[i].out; dias[i].ant = st; }
+  let st = +p[suc] || 0; for(let i = dias.length - 1; i >= 0; i--){ dias[i].des = Math.max(0, st); st -= dias[i].inn - dias[i].out; dias[i].ant = Math.max(0, st); }   // stock nunca negativo (22.10.2026, Piero: "si no hay no hay")
   const corte = appIndCorte(), yC = corte.getUTCFullYear(), y0 = dias.length ? Math.min(new Date(dias[0].t).getUTCFullYear(), yC) : yC;
   const anios = []; for(let y = y0; y <= yC; y++) anios.push(y);
   const T0 = Date.UTC(y0, 0, 1), T1 = +corte + DIA;
@@ -8582,9 +8559,9 @@ function drawKardexSimple(p){
     <span class="sep"></span><span class="lbl">Ver</span><button type="button" data-kanio="todo" class="${anioSel === 'todo' ? 'on' : ''}">Todos los años</button>${anios.map(function(y){ return `<button type="button" data-kanio="${y}" class="${anioSel === y ? 'on' : ''}">${y}</button>`; }).join('')}
     <span class="ks-hint">Arrastra sobre el gráfico para acercar · doble clic para ver todo</span></div>`;
   // Escalas
-  const W = 1000, pl = 50, pr2 = 14, top = 10, Ht = 240, gap = 16, Hb = 86, pb = 24, H = top + Ht + gap + Hb + pb, plotW = W - pl - pr2;
+  const W = 1000, pl = 50, pr2 = 14, top = 10, Ht = 260, gap = 0, Hb = 0, pb = 24, H = top + Ht + gap + Hb + pb, plotW = W - pl - pr2;
   const x = function(t){ return pl + (t - t0) / ((t1 - t0) || 1) * plotW; }, tDe = function(px){ return t0 + (px - pl) / plotW * (t1 - t0); };
-  const ax = niceAxisRange(vis.reduce(function(a, d){ return a.concat([d.des, d.ant]); }, [ini, rop || 0, 1]), 5), sMin = Math.min(0, ax.niceMin), sMax = ax.niceMax;
+  const ax = niceAxisRange(vis.reduce(function(a, d){ return a.concat([d.des, d.ant]); }, [ini, rop || 0, 1]), 5), sMin = 0, sMax = ax.niceMax;
   const ys = function(v){ return top + Ht * (sMax - v) / ((sMax - sMin) || 1); };
   const qMax = Math.max.apply(null, vis.map(function(d){ return Math.max(d.inn, d.out); }).concat([1])), yb0 = top + Ht + gap + Hb / 2;
   const yq = function(q){ return yb0 - q / qMax * (Hb / 2 - 2); };
@@ -8607,8 +8584,6 @@ function drawKardexSimple(p){
       + (v.out ? `<rect class="out" x="${(xx - bw / 2).toFixed(1)}" y="${yb0.toFixed(1)}" width="${bw.toFixed(1)}" height="${(yq(-v.out) - yb0).toFixed(1)}" rx="1"/>` : ''); }).join('');
   const svg = `<svg class="ks-svg" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="ksGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--teal)" stop-opacity=".32"/><stop offset="1" stop-color="var(--teal)" stop-opacity=".03"/></linearGradient></defs>
     ${g}<path class="area" d="${area}" fill="url(#ksGrad)"/>${ropL}<path class="stk" d="${d}"/>
-    <line class="grid" x1="${pl}" x2="${W - pr2}" y1="${yb0}" y2="${yb0}"/><text x="${pl - 8}" y="${(top + Ht + gap + 8).toFixed(1)}" text-anchor="end">+${n(qMax, 0)}</text><text x="${pl - 8}" y="${(top + Ht + gap + Hb).toFixed(1)}" text-anchor="end">−${n(qMax, 0)}</text>
-    <text class="sub" x="${pl + 4}" y="${(top + Ht + gap + 9).toFixed(1)}">Entradas ↑ · Salidas ↓ por día</text>${barras}
     <line class="guia" id="ksGuia" x1="0" x2="0" y1="${top}" y2="${top + Ht + gap + Hb}" style="display:none"/><circle class="foco" id="ksFoco" r="5" style="display:none"/>
     <rect class="sel" id="ksSel" y="${top}" height="${Ht + gap + Hb}" width="0" style="display:none"/>
     <rect class="capa" id="ksCapa" x="${pl}" y="${top}" width="${plotW}" height="${Ht + gap + Hb}"/></svg>`;
@@ -8620,8 +8595,9 @@ function drawKardexSimple(p){
     <tr class="tras"><td>↳ de eso, traslado entre sedes</td>${pa.map(function(r){ return '<td>' + (r.ti || r.to ? '+' + n(r.ti) + ' / −' + n(r.to) : '·') + '</td>'; }).join('')}</tr>
     <tr><td>Salió por mes (sin traslados)</td>${pa.map(function(r){ const ms = r.y === yC ? corte.getUTCMonth() + 1 : 12; return '<td>' + (r.out - r.to ? n((r.out - r.to) / ms) : '·') + '</td>'; }).join('')}</tr>
     <tr><td>Movimientos</td>${pa.map(function(r){ return '<td>' + (r.n || '·') + '</td>'; }).join('')}</tr></tbody></table>`;
+  { const bI = document.getElementById('btnImgKardex'), mv = document.getElementById('kardexMovs'); if(bI) bI.style.display = 'none'; if(mv) mv.innerHTML = ''; }   // sin foto ni detalle (22.10.2026)
   box.innerHTML = tiles + bar + `<div class="ks-chart">${svg}<div class="ks-tip" id="ksTip"></div></div>`
-    + `<div class="ks-ley"><span><i style="background:var(--teal);height:3px"></i>Stock</span><span><i style="background:var(--green)"></i>Entró</span><span><i style="background:var(--seg-a)"></i>Salió</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}</span></div>` + tabla;
+    + `<div class="ks-ley"><span><i style="background:var(--teal);height:3px"></i>Stock</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}</span></div>` + tabla;
   const redibujar = function(){ drawKardexSimple(p); };
   box.querySelectorAll('[data-ksuc]').forEach(function(b){ b.addEventListener('click', function(){ kardexSucursal = b.dataset.ksuc; redibujar(); }); });
   box.querySelectorAll('[data-kanio]').forEach(function(b){ b.addEventListener('click', function(){ const a = b.dataset.kanio; kdxRango = a === 'todo' ? null : { t0:Date.UTC(+a, 0, 1), t1:+a === yC ? T1 : Date.UTC(+a + 1, 0, 1) }; redibujar(); }); });
