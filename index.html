@@ -4451,7 +4451,9 @@ document.getElementById('fileInput').addEventListener('change', async function(e
   for(const file of files){
     try{
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, {type:'array', cellDates:true});
+      let wb = null;
+      if(/almac[ée]n/i.test(file.name)){ try{ setStatus('Leyendo ' + file.name + ' (Ingresos y Movimientos por partes)...'); wb = await almLeerReporteGrande(buf); }catch(err){ console.error(err); wb = null; } }   // ver almLeerReporteGrande
+      if(!wb) wb = XLSX.read(buf, {type:'array', cellDates:true});
       const sig = FILE_SIGNATURES.find(s => s.match(file.name, wb.SheetNames));
       parsed.push({ file, wb, sig });
     }catch(err){
@@ -5732,6 +5734,79 @@ function almFiltrarSedesMotivos(wb){
     if(ok.length === rows.length - h - 1) return;
     wb.Sheets[n] = XLSX.utils.aoa_to_sheet(rows.slice(0, h + 1).concat(ok), {cellDates:true});
   });
+}
+// Lector liviano de Reporte Almacen.xlsx (22.10.2026, Piero: "necesito que el app lea este excel"). Con
+// Ingresos/Movimientos TAL CUAL de 2. Inventario, Movimientos pesa ~450 MB por dentro y SheetJS no la puede
+// convertir a texto (la descarta en silencio: la app quedaba sin salidas). Aquí esas 2 hojas se leen por
+// partes (descomprimiendo en flujo), quedándose solo con las columnas que usa la app y con las filas de las
+// 3 sedes y motivos válidos (mismo filtro que almFiltrarSedesMotivos). El resto del libro lo lee SheetJS igual
+// que siempre. Si algo falla, se vuelve a la lectura normal.
+const ALM_COLS = new Set(['CODIGO','TRANSFERENCIA','CANTIDAD','FECHA','SUCURSAL','DOCUMENTO','DOCUMENTO2','ORG_DOCUMENTO','IDMOTIVO','MOTIVO',
+  'OCOMPRA','CLIEPROV','IDPRODUCTO','DSC_PRODUCTO','PRECIOMEX','IMPORTEMEX','GRUPO','RESPONSABLE','TCAMBIO','REQUERIMIENTO','PRODUCTO',
+  'FECHA SALIDA','DOCORDENPRODUCCION','TRANSPORTISTA','PLACA','SUCURSAL_DESTINO','DEST_DOCUMENTO']);
+async function almLeerReporteGrande(buf){
+  if(typeof DecompressionStream === 'undefined') return null;
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let eo = -1; for(let i = u8.length - 22; i >= Math.max(0, u8.length - 70000); i--){ if(dv.getUint32(i, true) === 0x06054b50){ eo = i; break; } }
+  if(eo === -1) return null;
+  const ent = {}; let p = dv.getUint32(eo + 16, true); const nE = dv.getUint16(eo + 10, true), td = new TextDecoder();
+  for(let k = 0; k < nE; k++){ if(dv.getUint32(p, true) !== 0x02014b50) return null;
+    const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    ent[td.decode(u8.subarray(p + 46, p + 46 + nl))] = { m:dv.getUint16(p + 10, true), cs:dv.getUint32(p + 20, true), off:off }; p += 46 + nl + xl + cl; }
+  const datos = function(e){ const s = e.off + 30 + dv.getUint16(e.off + 26, true) + dv.getUint16(e.off + 28, true); return u8.subarray(s, s + e.cs); };
+  const flujo = function(n){ const e = ent[n]; if(!e) return null; const b = new Blob([datos(e)]).stream();
+    return (e.m === 8 ? b.pipeThrough(new DecompressionStream('deflate-raw')) : b).pipeThrough(new TextDecoderStream()).getReader(); };
+  const texto = async function(n){ const r = flujo(n); if(!r) return ''; let t = ''; for(;;){ const x = await r.read(); if(x.done) return t; t += x.value; } };
+  const ent2 = function(t){ return t.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-f]+);/gi, function(m, c){ c = c.toLowerCase();
+    return c === 'amp' ? '&' : c === 'lt' ? '<' : c === 'gt' ? '>' : c === 'quot' ? '"' : c === 'apos' ? "'" : String.fromCodePoint(c[1] === 'x' ? parseInt(c.slice(2), 16) : +c.slice(1)); }); };
+  // Hojas → archivo
+  const wx = await texto('xl/workbook.xml'), rx = await texto('xl/_rels/workbook.xml.rels'), rel = {}, hojas = {};
+  rx.replace(/<Relationship\b[^>]*>/g, function(t){ const id = (t.match(/\bId="([^"]+)"/) || [])[1], tg = (t.match(/\bTarget="([^"]+)"/) || [])[1]; if(id && tg) rel[id] = tg.replace(/^\/?(xl\/)?/, 'xl/'); return t; });
+  wx.replace(/<sheet\b[^>]*>/g, function(t){ const nm = (t.match(/\bname="([^"]*)"/) || [])[1], id = (t.match(/\br:id="([^"]+)"/) || [])[1]; if(nm != null && rel[id]) hojas[ent2(nm)] = rel[id]; return t; });
+  const nI = Object.keys(hojas).find(function(n){ return /ingres/i.test(n); }), nM = Object.keys(hojas).find(function(n){ return /movimient/i.test(n); });
+  if(!nI && !nM) return null;
+  // Textos compartidos y formatos de fecha
+  const ss = []; (await texto('xl/sharedStrings.xml')).replace(/<si>([\s\S]*?)<\/si>/g, function(m, si){
+    let t = ''; si.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').replace(/<t\b[^>]*>([\s\S]*?)<\/t>/g, function(m2, x){ t += x; return m2; }); ss.push(ent2(t)); return m; });
+  const st = await texto('xl/styles.xml'), fmts = {}, esFecha = [];
+  st.replace(/<numFmt\b[^>]*>/g, function(t){ const id = (t.match(/numFmtId="(\d+)"/) || [])[1], f = (t.match(/formatCode="([^"]*)"/) || [])[1]; if(id) fmts[id] = ent2(f || ''); return t; });
+  const tabla = XLSX.SSF.get_table(), xfs = (st.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/) || [])[1] || '';
+  xfs.replace(/<xf\b[^>]*>/g, function(t){ const id = (t.match(/numFmtId="(\d+)"/) || [])[1] || '0', f = fmts[id] != null ? fmts[id] : tabla[id]; esFecha.push(!!f && XLSX.SSF.is_date(f)); return t; });
+  // Fecha igual que SheetJS con cellDates (hora local del equipo)
+  const b0 = new Date(1899, 11, 30, 0, 0, 0), ah = new Date(), lr = b0.getTime() + (ah.getTimezoneOffset() - b0.getTimezoneOffset()) * 6e4, cr = ah.getTimezoneOffset();
+  const fecha = function(v){ const r = new Date(); r.setTime(v * 864e5 + lr); if(r.getTimezoneOffset() !== cr) r.setTime(r.getTime() + (r.getTimezoneOffset() - cr) * 6e4); return r; };
+  const colN = function(c){ let n = 0; for(let i = 0; i < c.length; i++) n = n * 26 + c.charCodeAt(i) - 64; return n - 1; };
+  const valor = function(at, inner){
+    const t = (at.match(/\bt="(\w+)"/) || [])[1] || 'n';
+    if(t === 'inlineStr'){ let x = ''; (inner || '').replace(/<t\b[^>]*>([\s\S]*?)<\/t>/g, function(m, y){ x += y; return m; }); return ent2(x); }
+    const v = ((inner || '').match(/<v>([\s\S]*?)<\/v>/) || [])[1]; if(v == null) return null;
+    if(t === 's') return ss[+v]; if(t === 'str') return ent2(v); if(t === 'b') return v === '1'; if(t === 'e') return null; if(t === 'd') return new Date(v);
+    const n = +v, s = (at.match(/\bs="(\d+)"/) || [])[1]; return s && esFecha[+s] ? fecha(n) : n; };
+  const leerHoja = async function(nombre){
+    const r = flujo(hojas[nombre]); if(!r) return null;
+    let resto = '', cols = null, iS = -1, iM = -1; const aoa = [], mot = new Set(ALM_MOTIVOS[/ingres/i.test(nombre) ? 'ing' : 'sal']);
+    const fila = function(xml){
+      const celdas = {}; xml.replace(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, function(m, at, inner){
+        const ref = (at.match(/\br="([A-Z]+)\d+"/) || [])[1]; if(!ref) return m; const i = colN(ref);
+        if(cols && cols.idx[i] === undefined) return m; celdas[i] = valor(at, inner); return m; });
+      if(!cols){
+        const h = {}; Object.keys(celdas).forEach(function(i){ h[i] = sinAcentos(String(celdas[i] == null ? '' : celdas[i]).trim().toUpperCase()); });
+        const nomb = Object.values(h); if(!(nomb.indexOf('CANTIDAD') !== -1 && nomb.indexOf('SUCURSAL') !== -1)) return;
+        const idx = {}, hdr = []; Object.keys(h).map(Number).sort(function(a, b){ return a - b; }).forEach(function(i){ if(ALM_COLS.has(h[i])){ idx[i] = hdr.length; hdr.push(celdas[i]); } });
+        cols = { idx:idx }; iS = Object.keys(idx).find(function(i){ return h[i] === 'SUCURSAL'; }); iM = Object.keys(idx).find(function(i){ return h[i] === 'IDMOTIVO'; });
+        aoa.push(hdr); return; }
+      if(iS !== undefined && !sedeInternaKardex(celdas[iS])) return;
+      if(iM !== undefined && !mot.has(String(celdas[iM] == null ? '' : celdas[iM]).replace(/\s+/g, '').toUpperCase())) return;
+      const out = new Array(aoa[0].length).fill(null); Object.keys(celdas).forEach(function(i){ out[cols.idx[i]] = celdas[i]; }); aoa.push(out); };
+    for(;;){ const x = await r.read(); if(x.done) break; resto += x.value;
+      let fin = resto.lastIndexOf('</row>'); if(fin === -1) continue; fin += 6;
+      resto.slice(0, fin).replace(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g, function(m, inner){ if(inner) fila(inner); return ''; });
+      resto = resto.slice(fin); }
+    return aoa.length ? XLSX.utils.aoa_to_sheet(aoa, {cellDates:true}) : null; };
+  const grandes = [nI, nM].filter(Boolean);
+  const wb = XLSX.read(buf, {type:'array', cellDates:true, sheets:Object.keys(hojas).filter(function(n){ return grandes.indexOf(n) === -1 && !/^_temp/i.test(n); })});
+  for(const n of grandes){ const sh = await leerHoja(n); if(!sh) return null; wb.Sheets[n] = sh; if(wb.SheetNames.indexOf(n) === -1) wb.SheetNames.push(n); }
+  return wb;
 }
 function processAlmacen(wb, filename){
   almFiltrarSedesMotivos(wb);
