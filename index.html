@@ -2263,6 +2263,8 @@
     .td-st.ok{background:#cdeedb;color:#2f7a55;} .td-st.otra{background:#ffe6b3;color:#8a5a06;} .td-st.cam{background:#e6eef9;color:#2f5f95;} .td-st.sin{background:#e6eef9;color:#a84444;}
     .td-otras{margin-top:3px;} .td-dif{margin-top:6px;font-size:12px;line-height:1.4;color:#8a5a06;background:#ffe6b3;border-radius:8px;padding:5px 8px;}
     .td-cab small{display:block;font-size:11px;font-weight:800;letter-spacing:.12em;opacity:.8;} .td-cab h2{margin:2px 0 4px;font-size:clamp(20px,5vw,28px);font-weight:900;color:#fff;} .td-cab p{margin:0 0 10px;font-size:13px;opacity:.85;}
+    .td-pdf-btn{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;background:rgba(255,255,255,.14);border:1px dashed rgba(255,255,255,.55);border-radius:12px;padding:10px 12px;font-weight:800;font-size:14px;color:#fff;cursor:pointer;} .td-cab .td-pdf-btn small{display:inline;font-weight:600;opacity:.85;font-size:12px;letter-spacing:0;text-transform:none;}
+    .td-pdf-cab{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0 8px;font-size:14px;} .td-pdf-cab .lnk{margin-left:auto;border:0;background:none;color:#2f5f95;font:inherit;font-weight:700;cursor:pointer;} .td-no{border-left:4px solid var(--red);}
     .td-cab .m-buscar{margin:0;} .td-cab .m-buscar input{background:#fff;color:#1c2733;border:0;}
     .td-info{grid-template-columns:repeat(3,minmax(0,1fr));} .td-info b{font-size:16px;}
     .td-c .rqm-top .td-st{margin-top:0;} .td-c .rqm-cants > div.ok b{color:#2f7a55;} .td-c .rqm-cants > div.cam b{color:#2f5f95;}
@@ -12834,7 +12836,10 @@ function rqEstadoReal(r){
   if(r.fSalida) return 'Enviado a Obra';
   if(r.codOrden){
     const recibido = (r.cantRecep != null && r.cantRecep > 0) || !!r.fRecep || !!r.guia;
-    return recibido ? 'Recibido en Almacén' : 'Enviado a pedido — cuenta con OC';
+    // OC en "OC Finalizadas.xlsx" sin haber llegado (26.10.2026, Piero: "considera las OC finalizadas como tal también para lo de
+    // supervisor"): se cerró, ya no viene → cuenta como archivado (cerrado sin atender), no como OC en camino.
+    r.ocFin = !recibido && ocFinalizada(r.codOrden);
+    return recibido ? 'Recibido en Almacén' : r.ocFin ? 'Archivado' : 'Enviado a pedido — cuenta con OC';
   }
   if(r.codPedido) return (arch(r.estadoPedido) || arch(r.estado)) ? 'Archivado' : 'Pedido pendiente';
   if(arch(r.estado)) return 'Archivado';
@@ -13122,6 +13127,8 @@ function rqSituacion(r){
     const lm = rqLimaLibre(r), st = lm && lm.libre > 0 ? { q:lm.libre, um:lm.um, alc:lm.libre >= lm.falta - 0.001 } : null;
     return { ico:'📝', cls:st ? 'espera constock' : 'espera', titulo:'En revisión de almacén', detalle:(r.fReq ? 'Pedido el ' + rqFecha(r.fReq) + ' (' + rqHace(r.fReq) + '), todavía sin atender' : ''), stock:st };
   }
+  if(e === 'Archivado' && r.ocFin){ const x = OC_FIN[r.codOrden] || {};
+    return { ico:'🗄️', cls:'fuera', titulo:'OC finalizada sin llegar', detalle:'La OC ' + r.codOrden + ' se dio por finalizada' + (x.motivo ? ': ' + x.motivo : '') + (x.f ? ' (' + x.f + ')' : '') + '. Este ítem ya no viene por esa OC.' }; }
   if(e === 'Archivado') return { ico:'🗄️', cls:'fuera', titulo:'Archivado', detalle:'Se anuló o se cerró sin atender' };
   return { ico:'•', cls:'', titulo:e || '—', detalle:'' };
 }
@@ -13152,8 +13159,8 @@ function rqPasoDetalle(r, j){
   if(j === 2){
     if(directo) return { ico:'🧾', cls:'', titulo:'No necesitó orden de compra', lineas:['Se atendió directo del stock del almacén.'] };
     if(!r.codOrden) return { ico:'🧾', cls:'espera', titulo:'Todavía sin orden de compra', lineas: lin(r.codPedido ? 'Compras está cotizando el pedido ' + r.codPedido + (r.fPedido ? ' (' + rqHace(r.fPedido) + ')' : '') : '') };
-    return { ico:'🧾', cls:'ok', titulo:'OC ' + r.codOrden + (r.ocsExtra ? ' · ' + r.ocsExtra.join(' · ') : ''),
-      lineas: lin(r.proveedor ? 'Proveedor: ' + r.proveedor + (r.origen === 'importado' ? ' (importación)' : '') : '',
+    return { ico:'🧾', cls:r.ocFin ? 'fuera' : 'ok', titulo:'OC ' + r.codOrden + (r.ocsExtra ? ' · ' + r.ocsExtra.join(' · ') : '') + (r.ocFin ? ' · finalizada' : ''),
+      lineas: lin(r.ocFin ? '✔ OC finalizada (OC Finalizadas.xlsx)' + ((OC_FIN[r.codOrden] || {}).motivo ? ': ' + OC_FIN[r.codOrden].motivo : '') + '. Este ítem ya no llega por esta OC.' : '', r.proveedor ? 'Proveedor: ' + r.proveedor + (r.origen === 'importado' ? ' (importación)' : '') : '',
         r.fOrden ? 'Emitida el ' + rqFecha(r.fOrden) + (r.usuarioCompras ? ' por ' + (PD_PERSONAS[r.usuarioCompras] || r.usuarioCompras) : '') : '', r.fAprob ? 'Aprobada el ' + rqFecha(r.fAprob) : 'Pendiente de aprobación',
         r.fCompromiso ? 'Entrega pactada: ' + rqFecha(r.fCompromiso) : '', r.cantOrden != null ? 'Cantidad en la OC: ' + n(r.cantOrden) + um : '',
         // Precio unitario (2 decimales) y condición de pago con el proveedor (26.10.2026, Piero); como en la vista de la OC, no se muestran a supervisores.
@@ -14161,6 +14168,7 @@ function pdOcAbierta(r){
 let OC_FIN = {};
 function ocFinalizada(cod){ return !!(cod && OC_FIN[cod]); }
 function ocFinRepintar(){
+  RQ.preparado = null; try{ APP_SUP._g = null; }catch(err){}   // el estado de los ítems depende de las OC finalizadas
   try{ if(document.getElementById('section-pendientes').classList.contains('active')) drawPendientes(); }catch(err){}
   try{ if(APP.enInicio) appRenderInicio(); }catch(err){}
 }
@@ -14933,6 +14941,7 @@ function appConstruir(){
   });
   document.addEventListener('click', function(e){ if(!e.target.closest('.sup-ac')) document.querySelectorAll('.sup-sug.ver').forEach(function(x){ x.classList.remove('ver'); }); });
   let appBuscaEspera = null;
+  document.getElementById('section-inicio').addEventListener('change', function(e){ if(e.target.id === 'tdPdf') tdPdfCargar(e.target.files && e.target.files[0]); });
   document.getElementById('section-inicio').addEventListener('input', function(e){
     const id = e.target.id, v = e.target.value;
     if(id === 'prBusca'){ clearTimeout(appBuscaEspera); appBuscaEspera = setTimeout(function(){ APP_PR.q = v; const l = document.getElementById('prLista'); if(l) l.innerHTML = appPresuLista(); }, 250); return; }
@@ -14944,7 +14953,7 @@ function appConstruir(){
         if(id === 'supBusca'){ APP_SUP.q = v; t.innerHTML = appSupReqHtml();   // el resumen de arriba también sigue a la búsqueda (20.10.2026, Piero)
           const ra = document.querySelector('#section-inicio .sup-res'), rb = t.querySelector('.sup-res'); if(ra && rb) ra.outerHTML = rb.outerHTML;
           ['#supLista'].forEach(function(sel){ const a = document.querySelector('#section-inicio ' + sel), b = t.querySelector(sel); if(a && b) a.innerHTML = b.innerHTML; }); }
-        else { APP_TIENDA.q = v; if(v) APP_TIENDA.fam = ''; t.innerHTML = appTiendaHtml(); const a = document.getElementById('tdLista'), b = t.querySelector('#tdLista'); if(a && b) a.innerHTML = b.innerHTML; }
+        else { APP_TIENDA.q = v; if(v){ APP_TIENDA.fam = ''; APP_TIENDA.pdf = null; } t.innerHTML = appTiendaHtml(); const a = document.getElementById('tdLista'), b = t.querySelector('#tdLista'); if(a && b) a.innerHTML = b.innerHTML; }
       }, 250);
       return;
     }
@@ -15810,7 +15819,7 @@ const APP_PANT_FN = { almrep:function(){ return appAlmRepHtml(); }, gastopresu:f
   pendlog:function(){ return appPendLogHtml() + (APP.vista === 'compras' && gerAbierto ? `<div class="cmp-sec"><b>🌎 Comex</b><small>Camila Mora</small></div>${appFBarra('indicadores', { pry:1 })}${appComexHtml(APP_F.indicadores)}` : ''); }, daily:function(){ return appDailyModHtml(); }, supreq:function(){ return appSupReqHtml(); }, equipo:function(){ return appGerEquipoHtml(); }, tienda:function(){ return appTiendaHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
   const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam, APP_INV.kdx, invParetoSub], pendcompras:[APP_PC, APP_PL, APP_CORREO.v, APP_F.indicadores, APP_REP.sec], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
-    indicadores:[APP_F.indicadores, APP_REP.sec], otif:[APP_F.otif] }[p];
+    indicadores:[APP_F.indicadores, APP_REP.sec], otif:[APP_F.otif], tienda:[APP_TIENDA.q, APP_TIENDA.fam, APP_TIENDA.pdf ? APP_TIENDA.pdf.t : 0] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (APP.vista || '');
 }
 function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_PANT_FN[p]); }
@@ -16735,7 +16744,7 @@ function appSupReqHtml(){
 // stock en base a sus descripciones... no necesariamente va a ser igual lo que escriban y lo que se recomiende; analiza
 // qué se puede ofrecer como reemplazo o como literal lo que necesiten"). Se entiende la descripción con sinónimos,
 // medidas y errores de tipeo; se separa "lo que buscas" de "podría reemplazarlo" y se explica la diferencia.
-const APP_TIENDA = { q:'', fam:'' };
+const APP_TIENDA = { q:'', fam:'', pdf:null };
 const TD_STOP = new Set('de del la el los las para con sin por en y o a al tipo marca modelo und unid unidad c p s n x mm mm2 cm mts mt m v vac vdc kw hp w kv lb lbs psi bar hz ph ml lt kg gr'.split(' '));
 const TD_SIN = (function(){ const g = [
   ['tubo', 'tuberia', 'caneria', 'cano', 'tub'], ['cable', 'conductor', 'cab'], ['valvula', 'valv', 'llave de paso'], ['termomagnetico', 'termomagnetica', 'breaker', 'interruptor termomagnetico', 'llave termica', 'itm'],
@@ -16867,6 +16876,79 @@ function tdCard(y){
     <div class="rqm-cants">${casilla('Lurín', x.l, 'ok')}${casilla('Trujillo', x.t)}${casilla('Ica', x.i)}${casilla('En camino', x.cam, 'cam')}</div>
     ${dif.length ? `<div class="td-dif">🔁 ${dif.map(e).join('<br>')}</div>` : ''}</div>`;
 }
+// ---------- Ficha técnica (PDF) → código Nisira (26.10.2026, Piero: "que el supervisor suba un PDF de una ficha técnica y el app le
+// arroje el código de Nisira que corresponda, o si no existe que figure que no existe") ----------
+// Se lee el texto del PDF en el mismo navegador (pdf.js, gratis) y se cruza con el catálogo del almacén:
+//  1) códigos del fabricante que vienen en la ficha (018F6714, 148B5220…) y que Nisira suele tener en la descripción → coincidencia segura;
+//  2) si no, cuánto de la descripción de cada código de Nisira aparece en la ficha (palabras pesadas por lo raras que son + medidas).
+let TD_PDFJS = null;
+function tdPdfLib(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if(TD_PDFJS) return TD_PDFJS;
+  TD_PDFJS = new Promise(function(ok, no){ const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = function(){ const L = window.pdfjsLib || window['pdfjs-dist/build/pdf']; if(!L){ TD_PDFJS = null; return no(new Error('no cargó el lector de PDF')); }
+      L.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; ok(L); };
+    s.onerror = function(){ TD_PDFJS = null; no(new Error('no se pudo descargar el lector de PDF; revisa tu conexión')); };
+    document.head.appendChild(s); });
+  return TD_PDFJS;
+}
+async function tdPdfTexto(file){
+  const L = await tdPdfLib(), pdf = await L.getDocument({ data:new Uint8Array(await file.arrayBuffer()) }).promise, n = Math.min(pdf.numPages, 10), out = [];
+  for(let i = 1; i <= n; i++){ const tc = await (await pdf.getPage(i)).getTextContent(); let linea = '', y = null;
+    tc.items.forEach(function(it){ const yy = it.transform ? Math.round(it.transform[5]) : y; if(y !== null && Math.abs(yy - y) > 2){ out.push(linea); linea = ''; }
+      linea += (linea && !/\s$/.test(linea) && it.str && !/^\s/.test(it.str) ? ' ' : '') + it.str; y = yy; });
+    out.push(linea); }
+  return { lineas:out.map(function(s){ return String(s || '').replace(/\s+/g, ' ').trim(); }).filter(Boolean), paginas:pdf.numPages };
+}
+function tdPdfAnalizar(T){
+  const all = tdItems(), texto = T.lineas.join('\n'), up = sinAcentos(texto.toUpperCase());
+  const plano = function(s){ return polarNorm(s).replace(/[^a-z0-9]/g, ''); };
+  // 1) Códigos del fabricante: letras y números juntos (≥4 dígitos y alguna letra, como 018F6714); no normas (ISO 9001, EN 10204…) ni refrigerantes (R404A).
+  const toks = [];
+  (up.match(/[A-Z0-9][A-Z0-9\-.\/+]{3,}[A-Z0-9]/g) || []).forEach(function(t){ const c = t.replace(/[\-.\/+]/g, '');
+    if(c.length >= 6 && c.length <= 14 && /[A-Z]/.test(c) && (c.match(/\d/g) || []).length >= 4 && !/^R\d{2,4}[A-Z]?$/.test(c) && !/^(ISO|EN|DIN|ASTM|ASME|IEC|UL|CE|PED|ATEX|IP|NFPA|API|ANSI|AISI|SAE|NTP|DN|PN|SCH)\d/.test(c) && toks.indexOf(c) === -1) toks.push(c); });
+  const planos = all.map(function(x){ return plano(x.d); }), porCodigo = [], usados = [];
+  toks.forEach(function(t){ const tl = t.toLowerCase(), hit = []; planos.forEach(function(p, i){ if(p.indexOf(tl) !== -1) hit.push(all[i]); });
+    if(hit.length && hit.length <= 12){ usados.push(t); hit.forEach(function(x){ if(!porCodigo.some(function(y){ return y.x === x; })) porCodigo.push({ x:x, dif:['Código del fabricante en la ficha: ' + t] }); }); } });
+  // 2) Parecido: qué parte de la descripción de Nisira (pesada por rareza) aparece en la ficha; lo que el producto ES tiene que estar.
+  const F = tdFichas(texto), W = new Set(F.filter(function(y){ return !y.n; }).map(function(y){ return y.t; })), M = new Set(F.filter(function(y){ return y.n; }).map(function(y){ return y.t; }));
+  const N = all.length, idf = function(w){ return Math.log(1 + N / (all.voc.get(w) || 1)); }, par = [];
+  all.forEach(function(x){ if(!x.h || !W.has(x.h)) return;
+    let tot = 0, got = 0; const falta = [];
+    x.w.forEach(function(w){ const p = idf(w); tot += p; if(W.has(w)) got += p; else falta.push(w); });
+    let nOk = 0; x.w.forEach(function(w){ if(W.has(w)) nOk++; });
+    // Medidas (peso 2) y modelos del producto (ZM3, 3M65-160: peso 3; si la ficha no los trae, no es ese).
+    let mFalta = 0; x.m.forEach(function(m){ const p = 3; tot += p; if(M.has(m)){ got += p; nOk++; } else { falta.push(m); mFalta++; } });
+    const s = tot ? got / tot : 0; if(s >= .6) par.push({ x:x, s:s, falta:falta, nOk:nOk, mFalta:mFalta }); });
+  par.sort(function(a, b){ return (a.mFalta ? 1 : 0) - (b.mFalta ? 1 : 0) || b.s - a.s || b.x.rot - a.x.rot; });
+  const parecidos = par.filter(function(y){ return !porCodigo.some(function(z){ return z.x === y.x; }); }).slice(0, 8)
+    .map(function(y){ return { x:y.x, s:y.s, nOk:y.nOk, mFalta:y.mFalta, dif:['Calza el ' + Math.round(y.s * 100) + ' % de su descripción con la ficha' + (y.falta.length ? ' · la ficha no dice: ' + y.falta.slice(0, 5).join(', ') : '')] }; });
+  return { titulo:T.lineas.slice(0, 2).join(' · ').slice(0, 140), codigos:toks.slice(0, 12), usados:usados, porCodigo:porCodigo, parecidos:parecidos, paginas:T.paginas, vacio:!T.lineas.length };
+}
+async function tdPdfCargar(file){
+  if(!file) return;
+  APP_TIENDA.q = ''; APP_TIENDA.pdf = { n:file.name, est:'leyendo', t:Date.now() }; tdPintar();
+  try{ const T = await tdPdfTexto(file); APP_TIENDA.pdf = { n:file.name, est:'listo', t:Date.now(), r:tdPdfAnalizar(T) }; }
+  catch(err){ APP_TIENDA.pdf = { n:file.name, est:'error', t:Date.now(), msg:(err && err.message) || String(err) }; }
+  tdPintar();
+}
+function tdPintar(){ const a = document.getElementById('tdLista'); if(!a) return; const t = document.createElement('div'); t.innerHTML = appTiendaHtml(); const b = t.querySelector('#tdLista'); if(b) a.innerHTML = b.innerHTML;
+  const i = document.getElementById('tdBusca'); if(i && APP_TIENDA.pdf) i.value = ''; }
+function tdPdfHtml(){
+  const e = escapeHtml, P = APP_TIENDA.pdf, cab = `<div class="td-pdf-cab">📄 <b>${e(P.n)}</b><button type="button" class="lnk" data-tdpdfx="1">✕ Quitar ficha</button></div>`;
+  if(P.est === 'leyendo') return cab + '<div class="td-aviso">⏳ Leyendo la ficha técnica y buscando en el catálogo de Nisira…</div>';
+  if(P.est === 'error') return cab + `<div class="td-aviso">⚠️ No pude leer el PDF (${e(P.msg)}).</div>`;
+  const R = P.r;
+  if(R.vacio) return cab + '<div class="td-aviso">⚠️ Este PDF es una imagen escaneada: no trae texto que se pueda leer. Pide la ficha en PDF digital (la del fabricante) o escribe el producto en el buscador.</div>';
+  const leido = `<div class="td-res">Leí: <b>${e(R.titulo || '—')}</b>${R.codigos.length ? '<br>Códigos en la ficha: ' + R.codigos.map(function(c){ return '<span class="mono">' + e(c) + '</span>'; }).join(' · ') : ''}</div>`;
+  if(R.porCodigo.length) return cab + leido + `<div class="td-sec">✅ Existe en Nisira · ${R.porCodigo.length} código${R.porCodigo.length === 1 ? '' : 's'}</div>${R.porCodigo.map(tdCard).join('')}`
+    + (R.parecidos.length ? `<div class="td-sec">🔎 También se parecen</div>${R.parecidos.slice(0, 4).map(tdCard).join('')}` : '');
+  // Muy probable: calza casi toda la descripción y están en la ficha todas sus medidas y modelos.
+  const muy = R.parecidos.filter(function(y){ return y.s >= .85 && y.nOk >= 3 && !y.mFalta; }), otros = R.parecidos.filter(function(y){ return muy.indexOf(y) === -1; });
+  if(muy.length) return cab + leido + `<div class="td-sec">🟡 Muy probablemente es · revisa que coincida</div>${muy.map(tdCard).join('')}` + (otros.length ? `<div class="td-sec">🔎 Otros parecidos</div>${otros.map(tdCard).join('')}` : '');
+  if(otros.length) return cab + leido + `<div class="td-aviso td-no">❌ <b>No encontré este producto exacto en Nisira.</b> Lo más parecido del catálogo (revisa la descripción; si no es igual, hay que crear el código):</div>${otros.map(tdCard).join('')}`;
+  return cab + leido + '<div class="td-aviso td-no">❌ <b>No existe en Nisira.</b> No encontré ningún código del catálogo que corresponda a esta ficha. Pídele a Almacén / Logística que cree el código.</div>';
+}
 function appTiendaHtml(){
   const e = escapeHtml, all = tdItems();
   if(!all.length) return '<div class="ini-card"><div class="ini-vacio">⏳ Cargando el catálogo del almacén…</div></div>';
@@ -16882,7 +16964,8 @@ function appTiendaHtml(){
       + (sin.length ? `<div class="td-sub sin">💤 Sin rotación · ${appN(sin.length)} <small>no salen hace 6 meses o más</small></div>${sin.slice(0, ms).map(tdCard).join('')}` : '')
       + (con.length > mc || sin.length > ms ? `<div class="td-res">Mostrando ${mc + Math.min(sin.length, ms)} de ${appN(l.length)}: agrega la medida o el material para afinar.</div>` : ''); };
   let cuerpo;
-  if(R){
+  if(APP_TIENDA.pdf && !q) cuerpo = tdPdfHtml();
+  else if(R){
     const ex = R.exactos, re = R.reemp, dispEx = ex.filter(function(y){ return y.x.l > 0; }).length;
     const titEx = ex.length ? `<div class="td-sec">✅ Lo que buscas · ${appN(ex.length)} código${ex.length === 1 ? '' : 's'}${dispEx ? ' · ' + dispEx + ' con stock en Lurín' : ''}</div>` : '';
     const msg = !ex.length && re.length ? '<div class="td-aviso">No encontré exactamente eso, pero hay productos parecidos con stock que podrían reemplazarlo:</div>'
@@ -16897,6 +16980,7 @@ function appTiendaHtml(){
   return `<div class="td rqm">
     <div class="rqm-cab td-cab"><small>🔎 CONSULTA DE STOCK</small><h2>¿Qué producto buscas?</h2><p>Escríbelo como lo conoces: te digo si está en el almacén, cuánto rota o qué podría reemplazarlo.</p>
       <div class="m-buscar"><input type="search" id="tdBusca" placeholder="🔍 Ej. codo galvanizado 1/2" value="${e(APP_TIENDA.q)}"></div>
+      <label class="td-pdf-btn">📎 Subir ficha técnica (PDF)<input type="file" id="tdPdf" accept="application/pdf,.pdf" hidden><small>te digo qué código de Nisira le corresponde</small></label>
       <div class="rqm-info td-info"><div><span>📦 Códigos</span><b>${appN(all.length)}</b></div><div><span>✅ Con stock en Lurín</span><b>${appN(conL)}</b></div><div><span>🔥 Con rotación</span><b>${appN(rotN)}</b></div></div></div>
     <div id="tdLista" class="rqm">${cuerpo}</div></div>`;
 }
@@ -20238,6 +20322,7 @@ function appClickInicio(e){
   if(b.dataset.gorig !== undefined){ APP_G.orig = b.dataset.gorig; return appRenderInicio(); }
   if(b.dataset.gfam !== undefined){ APP_G.fam = b.dataset.gfam; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invf !== undefined){ APP_INV.f = b.dataset.invf; APP_INV.q = ''; APP_INV.tope = 30; APP_INV.sel = ''; return appRenderInicio(); }
+  if(b.dataset.tdpdfx !== undefined){ APP_TIENDA.pdf = null; const f = document.getElementById('tdPdf'); if(f) f.value = ''; return tdPintar(); }
   if(b.dataset.parsub !== undefined && (b.closest('.par-box.app') || b.closest('#invLista'))){ invParetoSub = { fam:APP_INV.fam, sub:b.dataset.parsub }; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invfam !== undefined){ invParetoSub = { fam:'', sub:'' }; APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; APP_INV.kdx = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invkdx){ if(APP_INV.kdx !== b.dataset.invkdx){ kardexOrigen = null; kdxRango = null; } APP_INV.kdx = b.dataset.invkdx; APP_INV.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
