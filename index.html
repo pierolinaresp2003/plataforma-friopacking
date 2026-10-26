@@ -463,7 +463,7 @@
   .ks-bar .lbl{font-size:12px;color:var(--ink-soft);font-weight:700;margin-right:2px;} .ks-bar .sep{width:12px;}
   .ks-bar button{border:1px solid var(--border);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer;}
   .ks-bar button.on{background:var(--brand);border-color:var(--brand);color:#fff;}
-  .par-sub{margin:4px 0 12px;} .par-subt{margin:16px 0 8px;font-size:14px;font-weight:800;color:var(--ink);} .par-subt small{font-size:12px;color:var(--ink-soft);font-weight:600;margin-left:4px;} .par-box .m-fams{margin-bottom:4px;} @media (max-width:640px){ .par-sub{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;} .par-sub button{white-space:nowrap;flex:none;} } .par-sub .lbl{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-right:2px;}
+  .par-sub{margin:4px 0 12px;} .par-subs-t{margin:2px 0 12px;font-size:17px;font-weight:800;color:var(--ink);} .par-subt{margin:16px 0 8px;font-size:14px;font-weight:800;color:var(--ink);} .par-subt small{font-size:12px;color:var(--ink-soft);font-weight:600;margin-left:4px;} .par-box .m-fams{margin-bottom:4px;} @media (max-width:640px){ .par-sub{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;} .par-sub button{white-space:nowrap;flex:none;} } .par-sub .lbl{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-right:2px;}
   .ks-chart{position:relative;}
   .ks-svg{width:100%;height:auto;display:block;} .ks-svg text{font-size:11px;fill:var(--ink-soft);}
   .ks-svg .grid{stroke:var(--border);} .ks-svg .in{fill:var(--green);} .ks-svg .out{fill:var(--seg-a);}
@@ -8787,27 +8787,29 @@ document.addEventListener('click', function(ev){
   if(a){ ev.stopPropagation(); ev.preventDefault(); const k = a.dataset.kxmov.split('|'); return kxDetalleAnio(k[0], k[1], k[2]); }
   if(t){ ev.stopPropagation(); ev.preventDefault(); return kxDetalleTransito(t.dataset.kxtr); }
 }, true);
-function invSubgruposHtml(g, keyOf, cnt, app){
-  const e = escapeHtml, P = invParetoFilas(g), info = new Map();
-  const usdK = function(v){ return !v ? '' : v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3) + ' mil' : 'US$ ' + Math.round(v); };
-  P.l.forEach(function(x){ const k = keyOf.get(x.r); if(k == null) return; const y = info.get(k) || { al:0, usd:0 }; if(x.alerta) y.al++; y.usd += x.usd || 0; info.set(k, y); });
-  const pie = function(k, n){ const y = info.get(k) || { al:0, usd:0 }; return `${n} producto${n === 1 ? '' : 's'}${y.al ? ` · <em class="ambar">⚠ ${y.al} bajo ROP</em>` : ''}${y.usd ? ' · ' + usdK(y.usd) : ''}`; };
-  const card = function(k, ic, tit){ return `<button type="button" class="ini-card m-fam" data-parsub="${e(k)}"><span class="m-fam-ic">${ic}</span><span class="m-fam-tx"><b>${e(tit)}</b><small>${pie(k, cnt.get(k))}</small></span></button>`; };
-  const totAl = P.l.filter(function(x){ return x.alerta; }).length;
-  let html = `<div class="m-fams"><button type="button" class="ini-card m-fam" data-parsub="*"><span class="m-fam-ic">📋</span><span class="m-fam-tx"><b>Ver todos</b><small>${g.rows.length} productos${totAl ? ` · <em class="ambar">⚠ ${totAl} bajo ROP</em>` : ''}</small></span></button></div>`, sueltas = [];
-  let secciones = 0;   // grupos sin división (Tees, Caps…): juntos; con título si ya hubo grupos arriba, para que no parezcan parte del anterior
-  const vaciar = function(){ if(sueltas.length) html += (secciones ? '<h4 class="par-subt">Otros grupos</h4>' : '') + `<div class="m-fams">${sueltas.join('')}</div>`; sueltas = []; };
-  INV_SUBFAM[g.label].forEach(function(G){
-    const ks = [...cnt.keys()].filter(function(k){ return k === G[0] || k.indexOf(G[0] + ' › ') === 0; }); if(!ks.length) return;
-    const orden = G[3].map(function(s){ return G[0] + ' › ' + s[0]; });
-    ks.sort(function(a, b){ return orden.indexOf(a) - orden.indexOf(b); });
-    if(ks.length === 1){ sueltas.push(card(ks[0], G[1], G[0])); return; }
-    vaciar(); secciones++; const n = ks.reduce(function(a, k){ return a + cnt.get(k); }, 0);
-    html += `<h4 class="par-subt">${G[1]} ${e(G[0])} <small>${n} productos</small></h4><div class="m-fams">${ks.map(function(k){ return card(k, G[1], k.slice(G[0].length + 3)); }).join('')}</div>`; });
-  vaciar();
-  if(cnt.has('Otros')) html += `<div class="m-fams">${card('Otros', '📦', 'Otros')}</div>`;
-  return `${app ? '' : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'}
-  <div class="par-box${app ? ' app' : ''}"><div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${g.rows.length} productos · elige un subgrupo</small></h3></div>${html}</div>`;
+// Nivel dentro de una familia con subgrupos (invParetoSub.sub): '' = tarjetas de grupos · 'G:grupo' = tarjetas de sus subgrupos ·
+// 'T:grupo' = Pareto del grupo entero · 'grupo › sub' (o 'grupo') = Pareto de ese subgrupo · '*' = Pareto de toda la familia.
+function invSubPadre(sub){ if(!sub) return null; if(sub === '*' || sub.indexOf('G:') === 0) return ''; if(sub.indexOf('T:') === 0) return 'G:' + sub.slice(2);
+  return sub.indexOf(' › ') > 0 ? 'G:' + sub.split(' › ')[0] : ''; }
+// Tarjetas con el mismo formato de la pantalla principal de Inventario (26.10.2026, Piero: "es confuso… que sea en viñetas con el mismo
+// formato de la pantalla principal"): primero los grupos (Bridas, Codos…); si un grupo se divide, al tocarlo salen sus subgrupos.
+function invSubgruposHtml(g, keyOf, cnt, app, nivel){
+  const e = escapeHtml, est = new Map(); try{ appInvIndice().items.forEach(function(x){ est.set(x.r.codigo, x.e); }); }catch(err){}
+  const tarjeta = function(dato, ic, tit, rows){ let sin = 0, rep = 0; rows.forEach(function(r){ const s = est.get(r.codigo); if(s === 'sin') sin++; else if(s === 'reponer') rep++; });
+    return `<button type="button" class="ini-card m-fam" data-parsub="${e(dato)}"><span class="m-fam-ic">${ic}</span>
+      <span class="m-fam-tx"><b>${e(tit)}</b><small>${appN(rows.length)} producto${rows.length === 1 ? '' : 's'}${sin ? ` · <em class="rojo">${appN(sin)} sin stock</em>` : ''}${rep ? ` · <em class="ambar">${appN(rep)} por reponer</em>` : ''}</small></span></button>`; };
+  const grupoDe = function(k){ return k.split(' › ')[0]; }, G = INV_SUBFAM[g.label], icono = function(gr){ const x = G.find(function(y){ return y[0] === gr; }); return x ? x[1] : '📦'; };
+  let tit = g.label, cards = [];
+  if(nivel && nivel.indexOf('G:') === 0){ const gr = nivel.slice(2), rows = g.rows.filter(function(r){ return grupoDe(keyOf.get(r)) === gr; });
+    tit = g.label + ' › ' + gr; cards.push(tarjeta('T:' + gr, '📋', 'Ver todos (' + gr + ')', rows));
+    [...cnt.keys()].filter(function(k){ return grupoDe(k) === gr; }).sort(function(a, b){ return a.localeCompare(b, 'es'); })
+      .forEach(function(k){ cards.push(tarjeta(k, icono(gr), k.slice(gr.length + 3) || gr, g.rows.filter(function(r){ return keyOf.get(r) === k; }))); }); }
+  else { cards.push(tarjeta('*', '📋', 'Ver todos', g.rows));
+    const grupos = new Map(); cnt.forEach(function(n, k){ const gr = grupoDe(k); (grupos.get(gr) || grupos.set(gr, []).get(gr)).push(k); });
+    [...grupos.keys()].sort(function(a, b){ return a.localeCompare(b, 'es'); }).forEach(function(gr){ const ks = grupos.get(gr);
+      cards.push(tarjeta(ks.length > 1 ? 'G:' + gr : ks[0], icono(gr), gr, g.rows.filter(function(r){ return grupoDe(keyOf.get(r)) === gr; }))); }); }
+  const volver = app ? '' : (nivel ? `<div class="ks-bar par-sub"><button type="button" data-parsub="${e(invSubPadre(nivel))}">‹ Volver</button></div>` : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>');
+  return `${volver}<div class="par-subs"><h3 class="par-subs-t">${iconForFamilia(sinAcentos(g.label))} ${e(tit)}</h3><div class="m-fams">${cards.join('')}</div></div>`;
 }
 function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, TODOS los códigos y botón "Ver detalle" en cada fila
   // Subgrupos (26.10.2026, Piero: "la forma de ponerlo así en texto no es cómoda, deben estar también en viñetas como subgrupo"): una
@@ -8815,9 +8817,11 @@ function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, 
   let subBar = ''; if(INV_SUBFAM[g.label]){
     const keyOf = new Map(), cnt = new Map(); g.rows.forEach(function(r){ const k = invSubfamDe(g.label, r); keyOf.set(r, k); cnt.set(k, (cnt.get(k) || 0) + 1); });
     const sub = invParetoSub.fam === g.label ? invParetoSub.sub : '';
-    if(!sub || (sub !== '*' && !cnt.has(sub))) return invSubgruposHtml(g, keyOf, cnt, app);
-    if(sub !== '*') g = Object.assign({}, g, { rows:g.rows.filter(function(r){ return keyOf.get(r) === sub; }), subLbl:sub });
-    if(!app) subBar = `<div class="ks-bar par-sub"><button type="button" data-parsub="">‹ Subgrupos</button></div>`; }
+    const esT = sub.indexOf('T:') === 0;
+    if(!sub || sub.indexOf('G:') === 0 || (sub !== '*' && !esT && !cnt.has(sub))) return invSubgruposHtml(g, keyOf, cnt, app, sub && sub.indexOf('G:') === 0 ? sub : '');
+    if(esT) g = Object.assign({}, g, { rows:g.rows.filter(function(r){ return keyOf.get(r).split(' › ')[0] === sub.slice(2); }), subLbl:sub.slice(2) });
+    else if(sub !== '*') g = Object.assign({}, g, { rows:g.rows.filter(function(r){ return keyOf.get(r) === sub; }), subLbl:sub });
+    if(!app) subBar = `<div class="ks-bar par-sub"><button type="button" data-parsub="${escapeHtml(invSubPadre(sub))}">‹ Volver</button></div>`; }
   const P = invParetoFilas(g), e = escapeHtml, n = function(v, d){ return v ? Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }) : '—'; };
   const usd = function(v){ return v ? 'US$ ' + Number(v).toLocaleString('es-PE', { maximumFractionDigits:0 }) : '—'; };
   const usdK = function(v){ return !v ? '—' : v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3) + ' mil' : usd(v); };
@@ -15015,7 +15019,7 @@ function appAtrasInv(){
   if(!APP.enInicio || APP.pantalla !== 'inventario' || APP_INV.q) return false;
   if(APP_INV.kdx){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
     const f = document.querySelector('#invLista [data-invkdx="' + CSS.escape(c) + '"]'); if(f) f.closest('.par-fila').scrollIntoView({ block:'center' }); else window.scrollTo(0, 0); return true; }
-  if(APP_INV.fam && INV_SUBFAM[APP_INV.fam] && invParetoSub.fam === APP_INV.fam && invParetoSub.sub){ invParetoSub = { fam:APP_INV.fam, sub:'' }; appRenderInicio(); window.scrollTo(0, 0); return true; }   // del Pareto del subgrupo vuelve a las tarjetas
+  if(APP_INV.fam && INV_SUBFAM[APP_INV.fam] && invParetoSub.fam === APP_INV.fam && invParetoSub.sub){ invParetoSub = { fam:APP_INV.fam, sub:invSubPadre(invParetoSub.sub) || '' }; appRenderInicio(); window.scrollTo(0, 0); return true; }   // del Pareto del subgrupo vuelve a las tarjetas
   if(APP_INV.fam){ APP_INV.fam = ''; appRenderInicio(); window.scrollTo(0, 0); return true; }
   return false;
 }
@@ -20207,7 +20211,7 @@ function appClickInicio(e){
   if(b.dataset.gorig !== undefined){ APP_G.orig = b.dataset.gorig; return appRenderInicio(); }
   if(b.dataset.gfam !== undefined){ APP_G.fam = b.dataset.gfam; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invf !== undefined){ APP_INV.f = b.dataset.invf; APP_INV.q = ''; APP_INV.tope = 30; APP_INV.sel = ''; return appRenderInicio(); }
-  if(b.dataset.parsub !== undefined && b.closest('.par-box.app')){ invParetoSub = { fam:APP_INV.fam, sub:b.dataset.parsub }; appRenderInicio(); return window.scrollTo(0, 0); }
+  if(b.dataset.parsub !== undefined && (b.closest('.par-box.app') || b.closest('#invLista'))){ invParetoSub = { fam:APP_INV.fam, sub:b.dataset.parsub }; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invfam !== undefined){ invParetoSub = { fam:'', sub:'' }; APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; APP_INV.kdx = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invkdx){ if(APP_INV.kdx !== b.dataset.invkdx){ kardexOrigen = null; kdxRango = null; } APP_INV.kdx = b.dataset.invkdx; APP_INV.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invkdxvolver){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
