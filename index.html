@@ -771,6 +771,7 @@
   .rqm-volver{display:none;flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;}
   .rqm-volver svg{width:18px;height:18px;} .rqm-volver:hover{background:rgba(255,255,255,.26);} .rqm-volver:active{transform:scale(.92);}
   .rqm-exp{display:flex;gap:6px;} .rqm-ico{width:36px;height:36px;border:0;border-radius:10px;background:rgba(255,255,255,.16);padding:5px;cursor:pointer;-webkit-tap-highlight-color:transparent;} .rqm-ico svg{display:block;width:100%;height:100%;} .rqm-ico:active{transform:scale(.94);}
+  .rqm-obs{background:rgba(255,255,255,.12);border-radius:10px;padding:8px 10px;margin-top:6px;} .rqm-obs span{display:block;font-size:10.5px;font-weight:700;opacity:.78;text-transform:uppercase;letter-spacing:.03em;} .rqm-obs p{margin:3px 0 0;font-size:13px;font-weight:600;line-height:1.35;white-space:pre-line;word-break:break-word;}
   .rqm-info{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,.6fr);gap:6px;margin-top:10px;}
   .rqm-info > div{background:rgba(255,255,255,.12);border-radius:10px;padding:7px 9px;min-width:0;} .rqm-info span{display:block;font-size:10.5px;font-weight:700;opacity:.78;text-transform:uppercase;letter-spacing:.03em;} .rqm-info b{display:block;font-size:13px;font-weight:800;margin-top:2px;overflow-wrap:anywhere;}
   .rqm-prog{margin-top:10px;background:rgba(255,255,255,.1);border-radius:12px;padding:10px 10px 8px;}
@@ -13236,6 +13237,8 @@ function rqVistaTarjetas(cont, filas){
         <button type="button" class="rqm-ico xls" data-reqxls="${escapeHtml(r0.codRequerimiento)}" title="Exportar a Excel" aria-label="Exportar a Excel"><svg viewBox="0 0 24 24"><path d="M6 2h8l5 5v15H6z" fill="#fff"/><path d="M14 2v5h5" fill="#dbe4f3"/><rect x="3" y="12" width="14" height="7" rx="1.5" fill="#1f8a4c"/><text x="10" y="17.6" font-size="5.6" font-weight="900" text-anchor="middle" fill="#fff" font-family="Arial">XLS</text></svg></button></span></div>
       <div class="rqm-pry">${pryCelda(r0.proyecto, r0.idProyecto)}</div>
       <div class="rqm-info"><div><span>👷 Pidió · Supervisor</span><b>${rqTxt(r0.responsable)}</b></div><div><span>📅 Fecha</span><b>${rqFecha(r0.fReq)}</b></div><div><span>📦 Ítems</span><b>${todo.length}</b></div></div>
+      ${(function(){ const ob = [...new Set(todo.map(function(r){ return String(r.obs || '').trim(); }).filter(Boolean))];   // observación que escribió el supervisor (26.10.2026, Piero)
+        return ob.length ? `<div class="rqm-obs"><span>📝 Observación del requerimiento</span><p>${ob.map(escapeHtml).join('<br>')}</p></div>` : ''; })()}
       <div class="rqm-prog"><div class="rqm-prog-top"><b>${pctObra}%</b><span>en obra</span><i><em style="width:${pctObra}%"></em></i></div>
         <div class="rqm-steps">${SUP_PASOS.map(function(p, k){ const llego = activos.filter(function(r){ return pasoI(r) >= k; }).length;
           const est = supPasoEstado(activos, k);
