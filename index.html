@@ -469,7 +469,8 @@
   .ks-svg .stk{fill:none;stroke:var(--ink);stroke-width:2.2;} .ks-svg .dot{fill:var(--card);stroke:var(--ink);stroke-width:2;}
   .ks-svg .kband{fill:var(--ink);opacity:.045;} .ks-svg .kyear{stroke:var(--ink-soft);stroke-dasharray:2 4;} .ks-svg text.kylbl{font-size:12px;font-weight:800;}
   .ks-svg .rop{stroke:var(--amber);stroke-width:1.5;stroke-dasharray:6 4;} .ks-svg text.roplbl{fill:var(--amber);font-weight:700;} .ks-svg .dot.in{stroke:var(--green);} .ks-svg .dot.out{stroke:var(--seg-a);}
-  .ks-svg .area{stroke:none;} .ks-svg .stk{stroke:var(--teal) !important;stroke-width:2.4 !important;stroke-linejoin:round;} .ks-svg .tick{stroke:var(--ink-soft);}
+  .ks-svg .proy{fill:none;stroke:var(--green);stroke-width:2.2;stroke-dasharray:6 4;} .ks-svg .proyp{fill:var(--card);stroke:var(--green);stroke-width:2;} .ks-svg text.proylbl{fill:var(--green);font-weight:800;font-size:11px;}
+  .ks-svg .hoy{stroke:var(--ink-soft);stroke-width:1;stroke-dasharray:2 3;} .ks-svg text.hoylbl{fill:var(--ink-soft);font-size:10px;font-weight:700;} .ks-svg .area{stroke:none;} .ks-svg .stk{stroke:var(--teal) !important;stroke-width:2.4 !important;stroke-linejoin:round;} .ks-svg .tick{stroke:var(--ink-soft);}
   .ks-svg .guia{stroke:var(--ink-soft);stroke-width:1;stroke-dasharray:3 3;pointer-events:none;} .ks-svg .foco{fill:var(--card);stroke:var(--teal);stroke-width:2.5;pointer-events:none;}
   .ks-svg .sel{fill:rgba(26,156,134,.12);stroke:var(--teal);stroke-width:1;pointer-events:none;} .ks-svg .capa{fill:transparent;cursor:crosshair;} .ks-svg text.sub{font-size:10.5px;font-weight:700;}
   .ks-hint{margin-left:auto;font-size:11.5px;color:var(--ink-soft);}
@@ -8804,7 +8805,16 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
   dias.forEach(function(v){ let c = v.ant; v.pasos = v.qs.map(function(q){ c += q; return Math.max(0, c); }); v.pk = Math.max.apply(null, v.pasos.concat([v.des])); });   // stock nunca negativo (22.10.2026, Piero: "si no hay no hay")
   const corte = appIndCorte(), yC = corte.getUTCFullYear(), y0 = dias.length ? Math.min(new Date(dias[0].t).getUTCFullYear(), yC) : yC;
   const anios = []; for(let y = y0; y <= yC; y++) anios.push(y);
-  const T0 = Date.UTC(y0, 0, 1), T1 = +corte + DIA;
+  // Lo que está en tránsito en el gráfico (26.10.2026, Piero: "no se considera en el gráfico el pedido que está en tránsito"):
+  // después de hoy, línea punteada con el stock de Lurín + cada OC pendiente en su fecha de llegada (ETA del seguimiento de
+  // importaciones, o la entrega comprometida). Si esa fecha ya pasó o no hay, se dibuja como "por llegar" mañana.
+  const hoyT = +corte + DIA, stockHoy = +p[suc] || 0, llegan = [];
+  if(suc === 'lima' && +p.transito > 0){ let l = []; try{ l = trTransitoDe(p.codigo, p.codigos) || []; }catch(err){}
+    l.forEach(function(o){ let imp = null; try{ imp = ocImportInfo(o.oc); }catch(err){} const f = (imp && imp.eta) || o.fCompromiso || o.fEntregaRef;
+      const tf = f ? Math.floor(+f / DIA) * DIA : null, atr = !tf || tf < hoyT; if(+o.cant > 0) llegan.push({ t:atr ? hoyT : Math.min(tf, hoyT + 400 * DIA), q:+o.cant, oc:o.oc, f:tf, atr:atr }); });
+    if(!llegan.length) llegan.push({ t:hoyT, q:+p.transito, oc:'', f:null, atr:true });
+    llegan.sort(function(a, b){ return a.t - b.t; }); let c = stockHoy; llegan.forEach(function(a){ c += a.q; a.st = c; }); }
+  const T0 = Date.UTC(y0, 0, 1), T1 = llegan.length ? Math.max(hoyT, llegan[llegan.length - 1].t + 20 * DIA) : hoyT;
   if(kdxRango && (kdxRango.t1 - kdxRango.t0 < 7 * DIA || kdxRango.t0 < T0 - DIA || kdxRango.t1 > T1 + DIA)) kdxRango = null;
   const t0 = kdxRango ? kdxRango.t0 : T0, t1 = kdxRango ? kdxRango.t1 : T1;
   const stockEn = function(t){ let v = dias.length ? dias[0].ant : (+p[suc] || 0); for(let i = 0; i < dias.length && dias[i].t <= t; i++) v = dias[i].des; return v; };
@@ -8830,7 +8840,8 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
   // Escalas
   const W = 1000, pl = 50, pr2 = 14, top = 10, Ht = 260, gap = 0, Hb = 0, pb = 24, H = top + Ht + gap + Hb + pb, plotW = W - pl - pr2;
   const x = function(t){ return pl + (t - t0) / ((t1 - t0) || 1) * plotW; }, tDe = function(px){ return t0 + (px - pl) / plotW * (t1 - t0); };
-  const ax = niceAxisRange(vis.reduce(function(a, d){ return a.concat([d.des, d.ant, d.pk]); }, [ini, rop || 0, 1]), 5), sMin = 0, sMax = ax.niceMax;
+  const llV = llegan.filter(function(a){ return a.t >= t0 && a.t < t1; });
+  const ax = niceAxisRange(vis.reduce(function(a, d){ return a.concat([d.des, d.ant, d.pk]); }, [ini, rop || 0, 1].concat(llV.map(function(a){ return a.st; }))), 5), sMin = 0, sMax = ax.niceMax;
   const ys = function(v){ return top + Ht * (sMax - v) / ((sMax - sMin) || 1); };
   const qMax = Math.max.apply(null, vis.map(function(d){ return Math.max(d.inn, d.out); }).concat([1])), yb0 = top + Ht + gap + Hb / 2;
   const yq = function(q){ return yb0 - q / qMax * (Hb / 2 - 2); };
@@ -8844,7 +8855,11 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
     else for(let mo = 0; mo < 12; mo++){ const tm = Date.UTC(y, mo, 1); if(tm < t0 || tm >= t1) continue; if(meses2 > 8 && mo % 2) continue;
       g += `<line class="tick" x1="${x(tm).toFixed(1)}" x2="${x(tm).toFixed(1)}" y1="${top + Ht}" y2="${top + Ht + 4}"/><text x="${x(tm).toFixed(1)}" y="${H - 6}" text-anchor="middle">${MES[mo]}${mo === 0 || tm === Math.max(t0, tm) && x(tm) - pl < 30 ? ' ’' + String(y).slice(2) : ''}</text>`; } }
   // Stock: área + línea en escalones (sin puntos: los detalles salen con la guía).
-  let d = `M${pl},${ys(ini).toFixed(1)}`; vis.forEach(function(v){ d += ` H${x(v.t).toFixed(1)}` + v.pasos.map(function(c){ return ` V${ys(c).toFixed(1)}`; }).join('') + ` V${ys(v.des).toFixed(1)}`; }); d += ` H${W - pr2}`;
+  let d = `M${pl},${ys(ini).toFixed(1)}`; vis.forEach(function(v){ d += ` H${x(v.t).toFixed(1)}` + v.pasos.map(function(c){ return ` V${ys(c).toFixed(1)}`; }).join('') + ` V${ys(v.des).toFixed(1)}`; }); d += ` H${t1 > hoyT ? x(hoyT).toFixed(1) : W - pr2}`;
+  let proy = ''; if(llV.length && t1 > hoyT){ const xh = Math.max(pl, x(hoyT)); let pp = `M${xh.toFixed(1)},${ys(stockHoy).toFixed(1)}`;
+    llV.forEach(function(a){ pp += ` H${x(a.t).toFixed(1)} V${ys(a.st).toFixed(1)}`; }); pp += ` H${W - pr2}`;
+    proy = `<line class="hoy" x1="${xh.toFixed(1)}" x2="${xh.toFixed(1)}" y1="${top}" y2="${top + Ht}"/><text class="hoylbl" x="${(xh + 4).toFixed(1)}" y="${top + 11}">Hoy</text><path class="proy" d="${pp}"/>`
+      + llV.map(function(a){ const xx = x(a.t), yy = ys(a.st); return `<circle class="proyp" cx="${xx.toFixed(1)}" cy="${yy.toFixed(1)}" r="4"/><text class="proylbl" x="${xx.toFixed(1)}" y="${(yy - 8).toFixed(1)}" text-anchor="middle">+${n(a.q)}</text>`; }).join(''); }
   const area = d + ` V${ys(Math.max(0, sMin)).toFixed(1)} H${pl} Z`;
   const ropL = rop ? `<line class="rop" x1="${pl}" x2="${W - pr2}" y1="${ys(rop).toFixed(1)}" y2="${ys(rop).toFixed(1)}"/><text class="roplbl" x="${pl + 6}" y="${(ys(rop) - 5).toFixed(1)}">Punto de reorden ${n(rop)}</text>` : '';
   const bw = Math.max(2.5, Math.min(8, plotW / Math.max(1, (t1 - t0) / DIA) * 0.8));
@@ -8852,7 +8867,7 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
     return (v.inn ? `<rect class="in" x="${(xx - bw / 2).toFixed(1)}" y="${yq(v.inn).toFixed(1)}" width="${bw.toFixed(1)}" height="${(yb0 - yq(v.inn)).toFixed(1)}" rx="1"/>` : '')
       + (v.out ? `<rect class="out" x="${(xx - bw / 2).toFixed(1)}" y="${yb0.toFixed(1)}" width="${bw.toFixed(1)}" height="${(yq(-v.out) - yb0).toFixed(1)}" rx="1"/>` : ''); }).join('');
   const svg = `<svg class="ks-svg" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="ksGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--teal)" stop-opacity=".32"/><stop offset="1" stop-color="var(--teal)" stop-opacity=".03"/></linearGradient></defs>
-    ${g}<path class="area" d="${area}" fill="url(#ksGrad)"/>${ropL}<path class="stk" d="${d}"/>
+    ${g}<path class="area" d="${area}" fill="url(#ksGrad)"/>${ropL}<path class="stk" d="${d}"/>${proy}
     <line class="guia" id="ksGuia" x1="0" x2="0" y1="${top}" y2="${top + Ht + gap + Hb}" style="display:none"/><circle class="foco" id="ksFoco" r="5" style="display:none"/>
     <rect class="sel" id="ksSel" y="${top}" height="${Ht + gap + Hb}" width="0" style="display:none"/>
     <rect class="capa" id="ksCapa" x="${pl}" y="${top}" width="${plotW}" height="${Ht + gap + Hb}"/></svg>`;
@@ -8885,7 +8900,7 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
     </tbody><tfoot><tr><td colspan="4">Totales</td><td class="num">${n(totI)}</td><td class="num">${n(totS)}</td><td colspan="3"></td></tr></tfoot></table></div></div>`;
   if(!cont){ const bI = document.getElementById('btnImgKardex'), mv = document.getElementById('kardexMovs'); if(bI) bI.style.display = 'none'; if(mv) mv.innerHTML = ''; }   // sin foto ni detalle (22.10.2026)
   box.innerHTML = tiles + bar + `<div class="ks-chart">${svg}<div class="ks-tip" id="ksTip"></div></div>`
-    + `<div class="ks-ley"><span><i style="background:var(--teal);height:3px"></i>Stock</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}<span>· ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}</span></div>` + detalle;   // sin la tabla por año (22.10.2026, Piero)
+    + `<div class="ks-ley"><span><i style="background:var(--teal);height:3px"></i>Stock</span>${rop ? '<span><i style="background:var(--amber);height:2px"></i>Punto de reorden</span>' : ''}${llV.length && t1 > hoyT ? '<span><i style="background:var(--green);height:2px"></i>Con lo que está en tránsito (llegada estimada)</span>' : ''}<span>· ${fTxt(t0)} – ${fTxt(Math.min(t1, +corte))}</span></div>` + detalle;   // sin la tabla por año (22.10.2026, Piero)
   const redibujar = function(){ drawKardexSimple(p, cont); };
   box.querySelectorAll('[data-ksuc]').forEach(function(b){ b.addEventListener('click', function(){ kardexSucursal = b.dataset.ksuc; redibujar(); }); });
   box.querySelectorAll('[data-korg]').forEach(function(b){ b.addEventListener('click', function(){ kardexOrigen = (b.dataset.korg === 'importado') === impAuto ? null : b.dataset.korg; redibujar(); }); });
@@ -8900,6 +8915,12 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
     if(arr != null){ sel.style.display = ''; sel.setAttribute('x', Math.min(arr, px)); sel.setAttribute('width', Math.abs(px - arr)); tip.style.display = 'none'; return; }
     // el día con movimiento más cercano (a menos de 8 px); si no, el stock de la fecha del mouse
     let best = null, bd = 8; vis.forEach(function(v){ const dd = Math.abs(x(v.t) - px); if(dd < bd){ bd = dd; best = v; } });
+    let lle = null; if(!best && llV.length && tDe(px) >= hoyT){ let bd2 = 8; llV.forEach(function(a){ const dd = Math.abs(x(a.t) - px); if(dd < bd2){ bd2 = dd; lle = a; } }); }
+    if(!best && llV.length && tDe(px) >= hoyT){   // después de hoy: stock + lo que va llegando
+      const t = lle ? lle.t : tDe(px); let stk = stockHoy; llV.forEach(function(a){ if(a.t <= t) stk = a.st; }); const xx = lle ? x(lle.t) : px;
+      guia.setAttribute('x1', xx); guia.setAttribute('x2', xx); guia.style.display = ''; foco.setAttribute('cx', xx); foco.setAttribute('cy', ys(stk)); foco.style.display = '';
+      tip.innerHTML = `<b>${fTxt(t)}</b><br>Con lo que llega: <b>${n(stk)}</b> ${um}` + (lle ? `<br><span style="color:var(--green)">🚚 Llega +${n(lle.q)}</span>${lle.oc ? ' · OC ' + e(lle.oc) : ''}<br><small>${lle.atr ? (lle.f ? 'Debió llegar el ' + fTxt(lle.f) : 'Sin fecha de llegada') : 'Llegada estimada'}</small>` : '');
+      const r = ch.getBoundingClientRect(); let lx = ev.clientX - r.left + 16; if(lx + 190 > r.width) lx -= 210; tip.style.left = lx + 'px'; tip.style.top = Math.max(0, ev.clientY - r.top - 50) + 'px'; tip.style.display = 'block'; return; }
     const t = best ? best.t : tDe(px), stk = best ? best.des : stockEn(t), xx = best ? x(best.t) : px;
     guia.setAttribute('x1', xx); guia.setAttribute('x2', xx); guia.style.display = ''; foco.setAttribute('cx', xx); foco.setAttribute('cy', ys(stk)); foco.style.display = '';
     tip.innerHTML = `<b>${fTxt(t)}</b><br>Stock: <b>${n(stk)}</b> ${um}` + (best ? `<br>${best.inn ? '<span style="color:var(--green)">Entró +' + n(best.inn) + '</span>' + (best.ni > 1 ? ' (' + best.ni + ')' : '') : ''}${best.inn && best.out ? ' · ' : ''}${best.out ? '<span style="color:var(--seg-a)">Salió −' + n(best.out) + '</span>' + (best.no > 1 ? ' (' + best.no + ')' : '') : ''}<br><small>Antes ${n(best.ant)} → después ${n(best.des)}</small>` : '');
