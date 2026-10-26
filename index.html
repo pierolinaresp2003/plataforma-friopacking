@@ -463,7 +463,7 @@
   .ks-bar .lbl{font-size:12px;color:var(--ink-soft);font-weight:700;margin-right:2px;} .ks-bar .sep{width:12px;}
   .ks-bar button{border:1px solid var(--border);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer;}
   .ks-bar button.on{background:var(--brand);border-color:var(--brand);color:#fff;}
-  .par-sub{margin:4px 0 12px;} @media (max-width:640px){ .par-sub{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;} .par-sub button{white-space:nowrap;flex:none;} } .par-sub .lbl{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-right:2px;}
+  .par-sub{margin:4px 0 12px;} .par-subt{margin:16px 0 8px;font-size:14px;font-weight:800;color:var(--ink);} .par-subt small{font-size:12px;color:var(--ink-soft);font-weight:600;margin-left:4px;} .par-box .m-fams{margin-bottom:4px;} @media (max-width:640px){ .par-sub{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;} .par-sub button{white-space:nowrap;flex:none;} } .par-sub .lbl{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-right:2px;}
   .ks-chart{position:relative;}
   .ks-svg{width:100%;height:auto;display:block;} .ks-svg text{font-size:11px;fill:var(--ink-soft);}
   .ks-svg .grid{stroke:var(--border);} .ks-svg .in{fill:var(--green);} .ks-svg .out{fill:var(--seg-a);}
@@ -8589,30 +8589,66 @@ function invEsPpr(r){ return /\bPPR\b/i.test(r.descripcion || ''); }
 // PPR: tubería = lo que es tubo (se vende por metro); todo lo demás (coplas, uniones, caps, reducciones, adaptadores brida, carretes,
 // válvulas PPR) es accesorio. DANFOSS: kits/repuestos primero (un "repair kit EVR" es repuesto, no válvula); luego equipos y drives, y
 // las válvulas por función (solenoide, expansión, cierre, retención, seguridad, reguladora, motorizada, estación ICF).
-const INV_SUBFAM = {
-  'PPR':[['Tuberías', /^(TUBERIA|TUBO)\b/], ['Accesorios', /./]],
+const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrupo, regla], …]], …] } — se prueba en orden; gana la primera que calza
+  'PPR':[
+    ['Tuberías', '📏', /^(TUBERIA|TUBO)\b/, [['Tuberías PPR', /./]]],
+    ['Accesorios', '🔧', /./, [['Reducciones y bujes', /REDUCCION|BUJE/], ['Coplas NPT (macho / hembra)', /COPLA/], ['Uniones (universal / americana)', /UNION/],
+      ['Válvulas PPR (bola / esférica)', /VALV/], ['Adaptadores brida y carretes', /BRIDA|CARRETE/], ['Conectores y adaptadores a rosca', /CONECTOR|ADAPTADOR/], ['Caps', /^CAP\b/], ['Otros accesorios', /./]]]
+  ],
+  'ACCESORIOS INOX':[
+    ['Bridas', '⭕', /^BRIDA/, [['Bridas slip on', /SLIP ON/], ['Bridas welding neck (cuello)', /CUELLO|WELDING NECK/], ['Bridas lap joint', /LAP JOINT/], ['Otras bridas', /./]]],
+    ['Codos', '↪️', /^CODO/, [['Codos 90°', /\b90\b|90°|X ?90/], ['Codos 45°', /\b45\b|45°/], ['Otros codos', /./]]],
+    ['Reducciones', '🔻', /^REDUCCION/, [['Reducciones concéntricas', /CONCENT/], ['Reducciones excéntricas', /EXCENT/], ['Reducciones campana', /CAMPANA/], ['Reducciones bushing', /BUSHING/], ['Otras reducciones', /./]]],
+    ['Tees', '🔀', /^TEE/, [['Tees', /./]]],
+    ['Caps', '🧢', /^CAP/, [['Caps', /./]]],
+    ['Niples', '🔩', /^NIPLE/, [['Niples', /./]]],
+    ['Coplas y uniones', '🔗', /^(COPLA|UNION)/, [['Coplas roscadas', /COPLA/], ['Uniones universales', /UNIVERSAL/], ['Otras uniones', /./]]],
+    ['Otros accesorios', '🔧', /./, [['Otros accesorios', /./]]]
+  ],
   'DANFOSS':[
-    ['Kits y repuestos', /\b(REPAIR|OVERHAUL|INSPECTION|SPARE|REPUESTO|RESPUESTO|KIT DE (REPAR|SERVIC|REPUESTO)|SET DE EMPAQUES|SET NIPLE|KIT FLOTADOR|ASIENTO DE VALV|CUBIERTA SUPERIO|MAINTENANCE SET|DISMOUNTING)/],
-    ['Variadores y arrancadores', /\b(VARIADOR|ARRANCADOR|SOFT STARTER|VLT|FC-? ?10[12]|MCD ?[26]|MCD6|MCA ?12|MCB ?1|IGBT|TARJETA|FUSIBLE|DESCONEXION|PEDESTAL|VENTILADOR DE PUERTA|FILTRO DE VENTILACION|PANEL (DE CONTROL|EN PUERTA)|VACON|HMI EN PUERTA)/],
-    ['HVAC / agua (AB-QM, 3 vías)', /\b(AB-?QM|PICV|NOVOCON|VF3|VRB ?3|AME ?\d|AMV ?\d|CALEFACTOR DE VASTAGO|IMMERSION|PIEZA TRASERA|[23] ?-?VIAS|VL[23]\b|WAFER)/],
-    ['Compresores y equipos', /\b(COMPRESOR|UNIDAD CONDENSADORA|INTERCAMBIADOR|TABLERO|PURGADOR|RESISTENCIA CALEFACTORA)/],
-    ['Estaciones ICF', /\b(ICF[CDEFNRS]? ?\(?\d|ICF-|ICFF|ICFE|ICFC|ICFN|ICFR|ICFS|CFF|CFR|VALVE STATION|VALVULA (ESTACION|STATION)|STOP VALVE MODULE)/],
-    ['Controladores', /\b(AK-|EKC|EKE|ERC|MCX|CONTROLADOR|TRANSFORMADOR|I\/O MODULE|UK-UI|ACCCBI)/],
-    ['Filtros y secadores', /^(FILTRO|FIA|FA ?\d|DML|ELEM\.? FILTRO|MALLA|NUCLEO)|\b(DCR|48-D|BRIQUETA)/],
-    ['Bridas, conexiones y visores', /^(BRIDA|GRUPO|CONECTOR \d|CONECTOR DE MANOMETRO|WELD|TAPON|JUEGO DE ADAPT|VISOR)|\b(LLG|LG ?\d)/],
-    ['Válv. de seguridad', /\b(SFA|SFV|BSV|DSV|SEGURIDAD|SAFETY)/],
-    ['Válv. de retención', /\b(CHV|NRVA?|NVR|SCA|RETENCION)/],
-    ['Expansión termostática', /\b(TE[ANSX]? ?\d|ORIFICIO|EXPANSION|ELEM(ENTO)?\.? ?TERMOSTATIC|CUERPO VAL\w*\.? TE)/],
-    ['Solenoides y bobinas', /\b(EVRA?T?\b|EVRA?T? ?\d|EVRA-|EVM|EV2[25]0|BOBINA|SOLENOID|ELECTROVALVULA|IMAN PERMANENTE)/],
-    ['Válv. de cierre (SVA, bola, aguja)', /\b(SVA|SVL|GBC|VALVULA DE BOLA|VALVULA DE CIERRE|AGUJA|SNV|QDV|ROTALOCK)/],
-    ['Motorizadas (ICM, ICAD, CCMT)', /\b(ICM|ICAD|CCMT|CABLE ETS)/],
-    ['Reguladoras (ICS, REG, pilotos)', /\b(I?CS ?\d|ICS|ICV|ICLX|REG\b|REG-|CV[CEPHM]|PMFL|PILOT|CONO DE REGULACION|MODULO DE FUNCION|SERVOVALVULA|EVRF|OFV)/],
-    ['Presostatos y termostatos', /\b(PRESOSTATO|PRESSURE SWITCH|KPU?\d|KP ?\d|MP ?55|TERMOSTATO)/],
-    ['Sensores y detectores de gas', /\b(AKS|SENSOR|SONDA|TRANSMISOR|EKS|LLS|DETECTOR|DGS|GDA|TERMOPOZO|LUZ ESTROBOSCOPICA|M12 HEMBRA|MBT)/]
+    ['Kits y repuestos', '🧰', /\b(REPAIR|OVERHAUL|INSPECTION|SPARE|REPUESTO|RESPUESTO|KIT DE (REPAR|SERVIC|REPUESTO)|SET DE EMPAQUES|SET NIPLE|KIT FLOTADOR|ASIENTO DE VALV|CUBIERTA SUPERIO|MAINTENANCE SET|DISMOUNTING)/,
+      [['Kits ICS / ICM / ICLX', /ICS|ICM|ICLX/], ['Kits SVA / REG / SCA / CHV', /SVA|REG|SCA|CHV|NRVA/], ['Kits EVR / EVRA / EVM', /EVR|EVM/], ['Kits y empaques ICF', /ICF/], ['Otros kits (seguridad, LLG, FA, AKS, QDV)', /./]]],
+    ['Variadores y arrancadores', '⚡', /\b(VARIADOR|ARRANCADOR|SOFT STARTER|VLT|FC-? ?10[12]|MCD ?[26]|MCD6|MCA ?12|MCB ?1|IGBT|TARJETA|FUSIBLE|DESCONEXION|PEDESTAL|VENTILADOR DE PUERTA|FILTRO DE VENTILACION|PANEL (DE CONTROL|EN PUERTA)|VACON|HMI EN PUERTA|PAQUETE DE MANTENIMIENTO)/,
+      [['Variadores VLT (FC-101 / FC-102)', /^VARIADOR/], ['Arrancadores suaves (MCD)', /ARRANCADOR|SOFT STARTER/], ['Tarjetas, paneles y repuestos de drive', /./]]],
+    ['HVAC / agua', '💧', /\b(AB-?QM|PICV|NOVOCON|VF3|VRB ?3|AME ?\d|AMV ?\d|CALEFACTOR DE VASTAGO|IMMERSION|PIEZA TRASERA|[23] ?-?VIAS|VL[23]\b|WAFER)/,
+      [['Actuadores (AME, AMV, NovoCon)', /ACTUADOR|NOVOCON/], ['Válvulas AB-QM (PIBCV)', /^(VALVULA )?(AB-?QM|PICV)|PIBCV|AB-QM NOVOCON/], ['Válvulas de 2 y 3 vías (VF3, VRB, VL, wafer)', /VIAS|VF3|VRB|VL[23]|WAFER/], ['Accesorios AB-QM (tuercas, calefactores, vainas)', /./]]],
+    ['Compresores y equipos', '🏭', /\b(COMPRESOR|UNIDAD CONDENSADORA|INTERCAMBIADOR|TABLERO|PURGADOR|RESISTENCIA CALEFACTORA|RACK DE COMPRESORES)/,
+      [['Unidades condensadoras', /UNIDAD CONDENSADORA/], ['Compresores y racks', /COMPRESOR|RESISTENCIA CALEFACTORA/], ['Purgadores de aire (IPS)', /PURGADOR/], ['Intercambiadores y tableros', /./]]],
+    ['Estaciones ICF', '🧩', /\b(ICF[CDEFNRS]? ?\(?\d|ICF-|ICFF|ICFE|ICFC|ICFN|ICFR|ICFS|CFF|CFR|VALVE STATION|VALVULA (ESTACION|STATION)|STOP VALVE MODULE)/,
+      [['Estaciones ICF completas', /^(ICF ?\d|ICF-\d|ICF\d|VAL\w* (ESTACION|STATION)|VALVE STATION|VALVULA SOLENOIDE ICF)/], ['Módulos ICF (ICFE, ICFF, ICFS, ICFC…)', /./]]],
+    ['Controladores', '🎛️', /\b(AK-|EKC|EKE|ERC|MCX|CONTROLADOR|TRANSFORMADOR|I\/O MODULE|UK-UI|ACCCBI)/,
+      [['Controladores de cámara y sistema (AK-CC, EKC, EKE, ERC, AK-SM)', /AK-CC|AK-SM|EKC|EKE ?(347|400)|ERC|CONTROLADOR/], ['Módulos, displays, cables y fuentes', /./]]],
+    ['Filtros y secadores', '🧪', /^(FILTRO|FIA|FA ?\d|DML|ELEM\.? FILTRO|MALLA|NUCLEO)|\b(DCR|48-D|BRIQUETA)/,
+      [['Filtros FIA', /^FIA/], ['Mallas y elementos para FIA', /MALLA|ELEM|TRAMA/], ['Filtros secadores (DML, 48-D, DCR)', /DML|48-D|DCR|SECADO|NUCLEO|BRIQUETA|H48F/], ['Filtros FA y otros', /./]]],
+    ['Bridas, conexiones y visores', '🔗', /^(BRIDA|GRUPO|CONECTOR \d|CONECTOR DE MANOMETRO|WELD|TAPON|JUEGO DE ADAPT|VISOR)|\b(LLG|LG ?\d)/,
+      [['Bridas', /BRIDA|GRUPO|FLANGE/], ['Visores de nivel y de líquido (LLG, LG)', /LLG|VISOR|\bLG ?\d/], ['Conectores y adaptadores', /./]]],
+    ['Válv. de seguridad', '🛡️', /\b(SFA|SFV|BSV|DSV|SEGURIDAD|SAFETY)/,
+      [['Dobles DSV', /DSV|DOBLE ASIENTO/], ['SFA', /SFA/], ['SFV', /SFV/], ['BSV y otras', /./]]],
+    ['Válv. de retención', '↩️', /\b(CHV|NRVA?|NVR|SCA|RETENCION)/,
+      [['CHV-X', /CHV/], ['NRVA (bridadas)', /NRVA/], ['NRV / NVR (soldar ODF)', /NRV|NVR/], ['SCA (stop-check)', /./]]],
+    ['Expansión termostática', '🌡️', /\b(TE[ANSX]? ?\d|ORIFICIO|EXPANSION|ELEM(ENTO)?\.? ?TERMOSTATIC|CUERPO VAL\w*\.? TE)/,
+      [['Elementos termostáticos (TE, TEX, TES, TEN)', /ELEM/], ['Cuerpos de válvula TE', /CUERPO/], ['Orificios', /ORIFICIO/], ['Válvulas completas', /./]]],
+    ['Solenoides y bobinas', '🔌', /\b(EVRA?T?\b|EVRA?T? ?\d|EVRA-|EVM|EV2[25]0|BOBINA|SOLENOID|ELECTROVALVULA|IMAN PERMANENTE)/,
+      [['EVM (pilotos y cuerpos)', /EVM/], ['Bobinas', /BOBINA|IMAN PERMANENTE/], ['EVR (halogenados)', /\bEVR\b/], ['EVRA / EVRAT (amoníaco)', /EVRA/], ['EV220B / EV250B (agua)', /EV2[25]0/], ['Otras solenoides', /./]]],
+    ['Válv. de cierre', '🔒', /\b(SVA|SVL|GBC|VALVULA DE BOLA|VALVULA DE CIERRE|AGUJA|SNV|QDV|ROTALOCK)/,
+      [['SVA – de paso (ángulo / recta)', /SVA|SVL/], ['GBC – de bola', /GBC|BOLA/], ['SNV – de aguja', /SNV|AGUJA/], ['QDV, Rotalock y otras', /./]]],
+    ['Motorizadas', '⚙️', /\b(ICM|ICAD|CCMT|CABLE ETS)/,
+      [['Válvulas ICM', /^(VAL\w* )?ICM/], ['Actuadores ICAD y cables', /ICAD|CABLE/], ['CCMT (electrónicas)', /CCMT/], ['Herramientas y módulos ICM', /./]]],
+    ['Reguladoras', '🎚️', /\b(I?CS ?\d|ICS|ICV|ICLX|REG\b|REG-|CV[CEPHM]|PMFL|PILOT|CONO DE REGULACION|MODULO DE FUNCION|SERVOVALVULA|EVRF|OFV)/,
+      [['Módulos de función y conos (ICS, ICLX)', /MODULO DE FUNCION|CONO/], ['ICS – servoválvulas', /\bI?CS|SERVOVALVULA/], ['REG – reguladoras manuales', /\bREG\b|REG-/], ['Pilotos (CVP, CVC, CVE, CVH)', /CV[CEPHM]|PILOT/], ['Cuerpos ICV', /ICV/], ['OFV, PMFL, EVRF', /./]]],
+    ['Presostatos', '📟', /\b(PRESOSTATO|PRESSURE SWITCH|KPU?\d|KP ?\d|MP ?55|TERMOSTATO)/,
+      [['KP (alta / baja / dual)', /\bKP/], ['MP55 (presión de aceite)', /MP ?55/], ['Otros presostatos', /./]]],
+    ['Sensores', '📡', /\b(AKS|SENSOR|SONDA|TRANSMISOR|EKS|LLS|DETECTOR|DGS|GDA|TERMOPOZO|LUZ ESTROBOSCOPICA|M12 HEMBRA|MBT|PROTECTOR CONTRA)/,
+      [['Presión (AKS 32/33, AKS 2050/3000)', /AKS ?(3[23]|2050|3000)|PRESION/], ['Temperatura (AKS 11/12/21, EKS, PT1000, MBT)', /TEMPERATURA|AKS ?(1[12]|21)|EKS|PT ?1000|MBT|TERMOPOZO|SONDA/],
+       ['Nivel (AKS 38, AKS 4100, LLS)', /AKS ?(38|41)|AKS38|LLS|NIVEL|FLOTADOR|CAJA ELECTRICA/], ['Detectores de gas (DGS, GDA)', /GAS|DGS|GDA|GDC|ESTROBOSC|SALPICADURA/], ['Conectores y otros', /./]]],
+    ['Otros DANFOSS', '📦', /./, [['Otros DANFOSS', /./]]]
   ]
 };
+// Clave del subgrupo de un producto: "grupo › subgrupo" (o solo el grupo si ese grupo no se divide).
 function invSubfamDe(fam, r){ const L = INV_SUBFAM[fam]; if(!L) return ''; const d = sinAcentos(String(r.descripcion || '').toUpperCase()).trim();
-  for(let i = 0; i < L.length; i++) if(L[i][1].test(d)) return L[i][0]; return 'Otros'; }
+  for(let i = 0; i < L.length; i++){ if(!L[i][2].test(d)) continue; const S = L[i][3]; if(S.length < 2) return L[i][0];
+    for(let j = 0; j < S.length; j++) if(S[j][1].test(d)) return L[i][0] + ' › ' + S[j][0]; return L[i][0]; }
+  return 'Otros'; }
 let invParetoSub = { fam:'', sub:'' };   // subfamilia elegida dentro de una familia ('' = todas)
 function invEsDanfoss(r){ const c = invDanfossCods(); return /danfoss/i.test(r.descripcion || '') || ((r.codigos && r.codigos.length) ? r.codigos : [r.codigo]).some(function(x){ return c.has(x); }); }
 function invParetoFilas(g){
@@ -8751,14 +8787,37 @@ document.addEventListener('click', function(ev){
   if(a){ ev.stopPropagation(); ev.preventDefault(); const k = a.dataset.kxmov.split('|'); return kxDetalleAnio(k[0], k[1], k[2]); }
   if(t){ ev.stopPropagation(); ev.preventDefault(); return kxDetalleTransito(t.dataset.kxtr); }
 }, true);
+function invSubgruposHtml(g, keyOf, cnt, app){
+  const e = escapeHtml, P = invParetoFilas(g), info = new Map();
+  const usdK = function(v){ return !v ? '' : v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3) + ' mil' : 'US$ ' + Math.round(v); };
+  P.l.forEach(function(x){ const k = keyOf.get(x.r); if(k == null) return; const y = info.get(k) || { al:0, usd:0 }; if(x.alerta) y.al++; y.usd += x.usd || 0; info.set(k, y); });
+  const pie = function(k, n){ const y = info.get(k) || { al:0, usd:0 }; return `${n} producto${n === 1 ? '' : 's'}${y.al ? ` · <em class="ambar">⚠ ${y.al} bajo ROP</em>` : ''}${y.usd ? ' · ' + usdK(y.usd) : ''}`; };
+  const card = function(k, ic, tit){ return `<button type="button" class="ini-card m-fam" data-parsub="${e(k)}"><span class="m-fam-ic">${ic}</span><span class="m-fam-tx"><b>${e(tit)}</b><small>${pie(k, cnt.get(k))}</small></span></button>`; };
+  const totAl = P.l.filter(function(x){ return x.alerta; }).length;
+  let html = `<div class="m-fams"><button type="button" class="ini-card m-fam" data-parsub="*"><span class="m-fam-ic">📋</span><span class="m-fam-tx"><b>Ver todos</b><small>${g.rows.length} productos${totAl ? ` · <em class="ambar">⚠ ${totAl} bajo ROP</em>` : ''}</small></span></button></div>`, sueltas = [];
+  let secciones = 0;   // grupos sin división (Tees, Caps…): juntos; con título si ya hubo grupos arriba, para que no parezcan parte del anterior
+  const vaciar = function(){ if(sueltas.length) html += (secciones ? '<h4 class="par-subt">Otros grupos</h4>' : '') + `<div class="m-fams">${sueltas.join('')}</div>`; sueltas = []; };
+  INV_SUBFAM[g.label].forEach(function(G){
+    const ks = [...cnt.keys()].filter(function(k){ return k === G[0] || k.indexOf(G[0] + ' › ') === 0; }); if(!ks.length) return;
+    const orden = G[3].map(function(s){ return G[0] + ' › ' + s[0]; });
+    ks.sort(function(a, b){ return orden.indexOf(a) - orden.indexOf(b); });
+    if(ks.length === 1){ sueltas.push(card(ks[0], G[1], G[0])); return; }
+    vaciar(); secciones++; const n = ks.reduce(function(a, k){ return a + cnt.get(k); }, 0);
+    html += `<h4 class="par-subt">${G[1]} ${e(G[0])} <small>${n} productos</small></h4><div class="m-fams">${ks.map(function(k){ return card(k, G[1], k.slice(G[0].length + 3)); }).join('')}</div>`; });
+  vaciar();
+  if(cnt.has('Otros')) html += `<div class="m-fams">${card('Otros', '📦', 'Otros')}</div>`;
+  return `${app ? '' : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'}
+  <div class="par-box${app ? ' app' : ''}"><div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${g.rows.length} productos · elige un subgrupo</small></h3></div>${html}</div>`;
+}
 function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, TODOS los códigos y botón "Ver detalle" en cada fila
-  let subBar = ''; if(INV_SUBFAM[g.label]){   // subfamilias: botones arriba; el Pareto y la lista se recalculan con la elegida
-    const cnt = new Map(); g.rows.forEach(function(r){ const k = invSubfamDe(g.label, r); cnt.set(k, (cnt.get(k) || 0) + 1); });
-    const sub = invParetoSub.fam === g.label && cnt.has(invParetoSub.sub) ? invParetoSub.sub : '';
-    const orden = [...cnt.keys()].sort(function(a, b){ return (a === 'Otros') - (b === 'Otros') || cnt.get(b) - cnt.get(a); });   // las más grandes primero
-    subBar = `<div class="ks-bar par-sub"><span class="lbl">Subfamilia</span><button type="button" data-parsub="" class="${sub ? '' : 'on'}">Todas (${g.rows.length})</button>${orden.map(function(k){ return `<button type="button" data-parsub="${escapeHtml(k)}" class="${sub === k ? 'on' : ''}">${escapeHtml(k)} (${cnt.get(k)})</button>`; }).join('')}</div>`;
-    if(sub){ g = Object.assign({}, g, { rows:g.rows.filter(function(r){ return invSubfamDe(g.label, r) === sub; }), subLbl:sub });
-      setTimeout(function(){ document.querySelectorAll('.par-sub').forEach(function(w){ const o = w.querySelector('button.on'); if(o) w.scrollLeft = Math.max(0, o.offsetLeft - w.offsetLeft - 80); }); }, 0); } }
+  // Subgrupos (26.10.2026, Piero: "la forma de ponerlo así en texto no es cómoda, deben estar también en viñetas como subgrupo"): una
+  // familia con subgrupos abre primero sus tarjetas (por grupo, como las familias); al tocar una se ve su Pareto. "Ver todos" = la familia entera.
+  let subBar = ''; if(INV_SUBFAM[g.label]){
+    const keyOf = new Map(), cnt = new Map(); g.rows.forEach(function(r){ const k = invSubfamDe(g.label, r); keyOf.set(r, k); cnt.set(k, (cnt.get(k) || 0) + 1); });
+    const sub = invParetoSub.fam === g.label ? invParetoSub.sub : '';
+    if(!sub || (sub !== '*' && !cnt.has(sub))) return invSubgruposHtml(g, keyOf, cnt, app);
+    if(sub !== '*') g = Object.assign({}, g, { rows:g.rows.filter(function(r){ return keyOf.get(r) === sub; }), subLbl:sub });
+    if(!app) subBar = `<div class="ks-bar par-sub"><button type="button" data-parsub="">‹ Subgrupos</button></div>`; }
   const P = invParetoFilas(g), e = escapeHtml, n = function(v, d){ return v ? Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }) : '—'; };
   const usd = function(v){ return v ? 'US$ ' + Number(v).toLocaleString('es-PE', { maximumFractionDigits:0 }) : '—'; };
   const usdK = function(v){ return !v ? '—' : v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3) + ' mil' : usd(v); };
@@ -14956,6 +15015,7 @@ function appAtrasInv(){
   if(!APP.enInicio || APP.pantalla !== 'inventario' || APP_INV.q) return false;
   if(APP_INV.kdx){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
     const f = document.querySelector('#invLista [data-invkdx="' + CSS.escape(c) + '"]'); if(f) f.closest('.par-fila').scrollIntoView({ block:'center' }); else window.scrollTo(0, 0); return true; }
+  if(APP_INV.fam && INV_SUBFAM[APP_INV.fam] && invParetoSub.fam === APP_INV.fam && invParetoSub.sub){ invParetoSub = { fam:APP_INV.fam, sub:'' }; appRenderInicio(); window.scrollTo(0, 0); return true; }   // del Pareto del subgrupo vuelve a las tarjetas
   if(APP_INV.fam){ APP_INV.fam = ''; appRenderInicio(); window.scrollTo(0, 0); return true; }
   return false;
 }
@@ -20147,7 +20207,7 @@ function appClickInicio(e){
   if(b.dataset.gorig !== undefined){ APP_G.orig = b.dataset.gorig; return appRenderInicio(); }
   if(b.dataset.gfam !== undefined){ APP_G.fam = b.dataset.gfam; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invf !== undefined){ APP_INV.f = b.dataset.invf; APP_INV.q = ''; APP_INV.tope = 30; APP_INV.sel = ''; return appRenderInicio(); }
-  if(b.dataset.parsub !== undefined && b.closest('.par-box.app')){ invParetoSub = { fam:APP_INV.fam, sub:b.dataset.parsub }; return appRenderInicio(); }
+  if(b.dataset.parsub !== undefined && b.closest('.par-box.app')){ invParetoSub = { fam:APP_INV.fam, sub:b.dataset.parsub }; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invfam !== undefined){ invParetoSub = { fam:'', sub:'' }; APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; APP_INV.kdx = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invkdx){ if(APP_INV.kdx !== b.dataset.invkdx){ kardexOrigen = null; kdxRango = null; } APP_INV.kdx = b.dataset.invkdx; APP_INV.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invkdxvolver){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
