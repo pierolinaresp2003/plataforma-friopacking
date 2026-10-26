@@ -16006,7 +16006,7 @@ function appOtifPct(l){ return l.length ? l.filter(function(x){ return !x.tipo; 
 const APP_DAILY = { dia:'', anio:null, mes:null };
 // Quiénes se evalúan en el daily (12.10.2026, Piero): Compras (con Comex dentro) y Almacén por separado.
 const APP_DAILY_COMPRAS = ['PLINARES', 'CCHECA', 'MSIHUAIRO', 'JALTAMIRANO', 'JPOMEZ'];
-const APP_DAILY_COMEX = ['CMORA', 'JCASARINO'];
+const APP_DAILY_COMEX = ['CMORA'];   // José Casarino salió del equipo; Camila ve lo que veía él (26.10.2026, Piero)
 const APP_DAILY_ALMACEN = ['JCENTENO', 'KALBUJAR', 'MCONDORI'];
 const APP_DAILY_EQUIPO = APP_DAILY_COMPRAS.concat(APP_DAILY_COMEX);          // el daily de Compras (y Gerencia)
 const APP_DAILY_TODOS = APP_DAILY_EQUIPO.concat(APP_DAILY_ALMACEN);
@@ -16178,7 +16178,7 @@ function appDailyDetHtml(dia){
     return `<button type="button" class="m-rk" data-dailyper="${escapeHtml(x.cod)}"><span class="m-rk-pos">${medalla[i] || (i + 1)}</span>${appDailyAvatar(x)}
       <span class="m-rk-tx"><b>${escapeHtml(PD_PERSONAS[x.cod])}</b><small>${det}${x.montoPEN ? ' · ' + appDailyMonto(x.monto) : ''}</small><i><em style="width:${Math.max(4, x.pts / max * 100).toFixed(0)}%;background:${APP_DAILY_COLORES[APP_DAILY_TODOS.indexOf(x.cod) % APP_DAILY_COLORES.length]}"></em></i></span>
       <span class="m-rk-pts"><b>${x.pts}</b><small>pts</small></span><span class="m-rk-ir">›</span></button>`; };
-  // Comex (Camila Mora y José Casarino) va dentro de Compras, en su propio bloque (12.10.2026, Piero).
+  // Comex (Camila Mora) va dentro de Compras, en su propio bloque (12.10.2026, Piero).
   const lc = l.filter(function(x){ return APP_DAILY_COMEX.indexOf(x.cod) === -1; }), lx = l.filter(function(x){ return APP_DAILY_COMEX.indexOf(x.cod) !== -1; });
   return hero + `<div class="ini-card"><div class="ini-card-tit">🏆 Quién hizo más ese día · Compras</div>${lc.length ? lc.map(fila).join('') : '<div class="ini-vacio">Sin movimientos ese día.</div>'}
     <div class="ini-card-tit m-rk-sub">🌎 Comex</div>${lx.length ? lx.map(fila).join('') : '<div class="ini-vacio">Sin movimientos de Comex ese día.</div>'}
@@ -20119,9 +20119,6 @@ function geDatos(){
       k:[[N(x.oc.size), 'OC emitidas'], [N(x.sku.size), 'SKU en OC'], [N(p.venc.length), 'OC vencidas', p.venc.length ? 'mal' : 'bien'], [N(p.sin), 'SKU sin OC', p.sin ? 'ojo' : '']],
       st:p.venc.length ? ['mal', '⛔ ' + p.venc.length + ' OC vencida' + (p.venc.length === 1 ? '' : 's')] : ['bien', '✅ Sin OC vencidas'], venc:p.venc, n:{ oc:x.oc.size, sku:x.sku.size, venc:p.venc.length }, rep:1 }); });
   APP_DAILY_COMEX.forEach(function(c){
-    if(c === 'CMORA') return P.push({ cod:c, area:'Comex', rol:'Seguimiento de embarques',
-      k:[[N(emb.tr), 'En tránsito'], [N(emb.zar), 'Por zarpar'], [N(emb.venc), 'ETA vencida', emb.venc ? 'ojo' : 'bien'], [N(emb.arr), 'Arribados']],
-      st:!emb.n ? ['', 'Sin el Excel de embarques'] : emb.venc ? ['ojo', '⏳ ' + emb.venc + ' con ETA vencida'] : ['bien', '✅ Embarques al día'], n:{} });
     const x = cmp(c), im = geImp(), p = pend[c] || { venc:[], sin:0 };
     P.push({ cod:c, area:'Comex', rol:'Importaciones: OC importadas abiertas',
       k:[[N(im.tr), 'OC en tránsito'], [N(im.em), 'Por embarcar'], [N(im.bk), 'En fabricación'], [N(im.venc), 'ETA pasada', im.venc ? 'ojo' : 'bien']],
@@ -20153,14 +20150,13 @@ function appGerPersonaHtml(cod){
   const btn = function(attr){ return `<button type="button" class="pc-img-btn cmp-baja" ${attr} title="Descargar el reporte de ${e(nom)} (según el período elegido)" aria-label="Descargar reporte">${APP_ICO_BAJA}</button>`; };
   let baja = '', cuerpo = '', area = '';
   if(esCmp){ area = 'Compras'; st.persona = appFPersonas().find(function(v){ return pdPersona(v) === cod; }) || ''; baja = btn('data-cmpimg="' + e(cod) + '"'); cuerpo = appFotoPersonaHtml(cod, st); }
-  else if(cod === 'CMORA'){ area = 'Comex · seguimiento de contenedores'; st.persona = ''; cuerpo = appComexHtml(st); }
-  else if(cod === 'JCASARINO'){ area = 'Comex · importaciones'; st.persona = ''; cuerpo = appPendLogHtml(); }
+  else if(cod === 'CMORA'){ area = 'Comex · importaciones'; st.persona = ''; cuerpo = appPendLogHtml() + `<div class="cmp-sec"><b>🌎 Seguimiento de contenedores</b></div>${appFBarra('indicadores', { pry:1 })}${appComexHtml(st)}`; }
   else if(esAlm){ st.persona = ''; const r = appFRango(st), corte = isoDay(appIndCorte()), jav = cod === 'JCENTENO', pedAlm = jav || cod === 'MCONDORI', hayMov = almMovRows().length > 0;
     area = 'Almacén'; APP_AR.per = 'custom'; APP_AR.desde = r ? appIndIso(r.desde) : '2020-01-01'; APP_AR.hasta = r && appIndIso(r.hasta) < corte ? appIndIso(r.hasta) : corte; APP_AR.sub = jav ? 'jav' : 'kat';
     if(hayMov || pedAlm) baja = btn(pedAlm ? 'data-almimg="' + cod + '"' : 'data-' + (jav ? 'anaimg' : 'arimg') + '="1"');
     cuerpo = (pedAlm ? almHojasHtml(cod) : '') + (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` + appAlmRepCuerpo() : ''); }
   return `<div class="ge rqm"><div class="ge-ph">${dciFoto(cod, 'ge-av')}<div><b>${e(nom)}</b><small>${e(area)}</small></div></div>
-    <div class="cmp-top">${caras}${cod === 'JCASARINO' ? '' : appFBarra('indicadores', { pry:1 })}${baja}</div>${cuerpo || '<div class="ini-card"><div class="ini-vacio">Sin datos de esta persona en el período.</div></div>'}</div>`;
+    <div class="cmp-top">${caras}${cod === 'CMORA' ? '' : appFBarra('indicadores', { pry:1 })}${baja}</div>${cuerpo || '<div class="ini-card"><div class="ini-vacio">Sin datos de esta persona en el período.</div></div>'}</div>`;
 }
 function appGerEquipoHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
