@@ -8508,7 +8508,8 @@ function drawPedirPorCategoria(){
   // marca Danfoss de cualquier familia (comprados a Danfoss o con "DANFOSS" en la descripción). Siguen apareciendo también en su familia.
   if(INV_SIMPLE){ const danf = rows.filter(invEsDanfoss); if(danf.length) byCat['DANFOSS'] = { label:'DANFOSS', n:danf.length, porUm:{}, rows:danf, primero:true };
     const inx = rows.filter(invEsInox); if(inx.length) byCat['ACCESORIOS INOX'] = { label:'ACCESORIOS INOX', n:inx.length, porUm:{}, rows:inx, primero:true };
-    const ppr = rows.filter(invEsPpr); if(ppr.length) byCat['PPR'] = { label:'PPR', n:ppr.length, porUm:{}, rows:ppr, primero:true }; }
+    const ppr = rows.filter(invEsPpr); if(ppr.length) byCat['PPR'] = { label:'PPR', n:ppr.length, porUm:{}, rows:ppr, primero:true };
+    const tsc = rows.filter(invEsTubSch); if(tsc.length) byCat['TUBERÍAS SCH'] = { label:'TUBERÍAS SCH', n:tsc.length, porUm:{}, rows:tsc, primero:true }; }
   const grupos = Object.keys(byCat).map(k=>byCat[k]).sort((a,b)=> (b.primero ? 1 : 0) - (a.primero ? 1 : 0) || b.n-a.n || a.label.localeCompare(b.label));
 
   document.getElementById('pedirResumen').innerHTML = meses > 0
@@ -8584,6 +8585,12 @@ function invEsInox(r){ const d = sinAcentos(String(r.descripcion || '').toUpperC
 // Familia PPR (22.10.2026, Piero: "una familia de ppr, solo ppr"): todo lo que dice PPR en la descripción (tubería, codos, coplas,
 // uniones, válvulas…); no entran los transductores "PPR35/PPR15" ni lo de polipropileno que no dice PPR.
 function invEsPpr(r){ return /\bPPR\b/i.test(r.descripcion || ''); }
+// Familia TUBERÍAS SCH (26.10.2026, Piero: "una de tuberías SCH40 de ese tipo… quiero saber qué compramos para ver qué podemos comprarle a
+// Tenaris"): tubo/tubería de acero con cédula (SCH 10/40/80, STD) o norma de tubo (A-53, A-106, A-312, API 5L), con o sin costura.
+// No entran PVC, PPR, cobre, capilares, tubos estructurales (rectangulares, A-500, A-554 decorativos) ni niples (son accesorios).
+function invEsTubSch(r){ const d = sinAcentos(String(r.descripcion || '').toUpperCase()).trim();
+  return /^(TUBO|TUBERIA)\b/.test(d) && !/PVC|PPR|HDPE|COBRE|\bCU\b|CAPILAR|THERMOPLAST|POLIETILENO|RECTANGULAR|CUADRADO|A-?500|A-?554|HAIR ?LINE/.test(d)
+    && /\b(SCH|SHC|SCHA|CEDULA|STD)\b|SCH ?-?\d|S\/C|SIN COSTURA|C\/ ?C\b|CON COSTURA|A-?53|A-?106|A-?312|API ?5L/.test(d); }
 // Subfamilias (26.10.2026, Piero: "divide la familia de PPR en accesorios y tuberías… y para Danfoss crea las subfamilias necesarias").
 // Se asigna por la descripción, en este orden (la primera regla que calza gana; lo que no calza queda en "Otros"):
 // PPR: tubería = lo que es tubo (se vende por metro); todo lo demás (coplas, uniones, caps, reducciones, adaptadores brida, carretes,
@@ -8594,6 +8601,11 @@ const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrup
     ['Tuberías', '📏', /^(TUBERIA|TUBO)\b/, [['Tuberías PPR', /./]]],
     ['Accesorios', '🔧', /./, [['Reducciones y bujes', /REDUCCION|BUJE/], ['Coplas NPT (macho / hembra)', /COPLA/], ['Uniones (universal / americana)', /UNION/],
       ['Válvulas PPR (bola / esférica)', /VALV/], ['Adaptadores brida y carretes', /BRIDA|CARRETE/], ['Conectores y adaptadores a rosca', /CONECTOR|ADAPTADOR/], ['Caps', /^CAP\b/], ['Otros accesorios', /./]]]
+  ],
+  'TUBERÍAS SCH':[   // acero al carbono = lo que fabrica Tenaris (sin costura A-53/A-106); inoxidable aparte
+    ['Acero al carbono', '⚫', /^(?!.*(INOX|SS ?3|C-? ?3[01]\d|A-?312|A-?269)).*/, [['SCH 40 sin costura (S/C)', /(SCH|SHC) ?-?40.*(S\/C|SIN COSTURA)|(S\/C|SIN COSTURA).*SCH ?-?40/],
+      ['SCH 40 con costura', /(SCH|SHC) ?-?40.*(C\/ ?C\b|CON COSTURA)|(C\/ ?C\b|CON COSTURA).*SCH ?-?40/], ['SCH 40 (sin dato de costura)', /SCH ?-?40/], ['SCH 80', /SCH ?-?80/], ['STD / galvanizado y otros', /./]]],
+    ['Acero inoxidable', '⚪', /./, [['Inox SCH 10', /SCH ?-?10/], ['Inox SCH 40', /(SCH|SHC|SCHA) ?-?40/], ['Inox SCH 80', /SCH ?-?80/], ['Inox otros (OD, A-269)', /./]]]
   ],
   'ACCESORIOS INOX':[
     ['Bridas', '⭕', /^BRIDA/, [['Bridas slip on', /SLIP ON/], ['Bridas welding neck (cuello)', /CUELLO|WELDING NECK/], ['Bridas lap joint', /LAP JOINT/], ['Otras bridas', /./]]],
@@ -10498,6 +10510,7 @@ function iconForFamilia(nombre){
   if(n === 'DANFOSS') return '🅳';
   if(n === 'ACCESORIOS INOX') return '🔩';
   if(n === 'PPR') return '🟢';
+  if(n === 'TUBERIAS SCH') return '🛢️';
   if(n.includes('VALVULA')) return '🚰';
   if(n.includes('TUBERIA') || n.includes('TUBO') || n.includes('ACCESORIO')) return '🔩';
   if(n.includes('FILTRO') || n.includes('SECADOR')) return '🛢️';
@@ -17610,7 +17623,7 @@ function appInvIndice(){
   });
   // Familia de cada código: la misma categoría de "Cuánto pedir por categoría" (07.10.2026, Piero:
   // "la parte de inventario la puedes colocar como antes agrupada por familia").
-  items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; x.dnf = invEsDanfoss(x.r); x.inx = invEsInox(x.r); x.ppr = invEsPpr(x.r); });   // + DANFOSS y ACCESORIOS INOX (22.10.2026)
+  items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; x.dnf = invEsDanfoss(x.r); x.inx = invEsInox(x.r); x.ppr = invEsPpr(x.r); x.tsc = invEsTubSch(x.r); });   // + DANFOSS y ACCESORIOS INOX (22.10.2026)
   APP_INV.cache = { firma:firma, items:items };
   return APP_INV.cache;
 }
@@ -17624,7 +17637,7 @@ function appInvFiltrada(){
       .sort(function(a,b){ return b.cons - a.cons || b.tot - a.tot; });
   } else {
     const orden = { sin:0, reponer:1, ok:2, sinmov:3, sinrop:4, nada:5 };
-    l = idx.filter(function(x){ return (APP_INV.fam === 'DANFOSS' ? x.dnf : APP_INV.fam === 'ACCESORIOS INOX' ? x.inx : APP_INV.fam === 'PPR' ? x.ppr : x.fam === APP_INV.fam) && x.e !== 'nada'; })
+    l = idx.filter(function(x){ return (APP_INV.fam === 'DANFOSS' ? x.dnf : APP_INV.fam === 'ACCESORIOS INOX' ? x.inx : APP_INV.fam === 'PPR' ? x.ppr : APP_INV.fam === 'TUBERÍAS SCH' ? x.tsc : x.fam === APP_INV.fam) && (x.e !== 'nada' || (APP_INV.fam === 'TUBERÍAS SCH' && x.tsc)); })
       .sort(function(a,b){ return orden[a.e] - orden[b.e] || b.cons - a.cons || b.tot - a.tot; });
   }
   return l;
@@ -17640,14 +17653,15 @@ function appInvFamilias(){
   const dn = { fam:'DANFOSS', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.dnf) return; dn.n++; if(x.e === 'sin') dn.sin++; if(x.e === 'reponer') dn.rep++; });
   const ix = { fam:'ACCESORIOS INOX', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.inx) return; ix.n++; if(x.e === 'sin') ix.sin++; if(x.e === 'reponer') ix.rep++; });
   const pp = { fam:'PPR', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.ppr) return; pp.n++; if(x.e === 'sin') pp.sin++; if(x.e === 'reponer') pp.rep++; });
+  const ts = { fam:'TUBERÍAS SCH', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(!x.tsc) return; ts.n++; if(x.e === 'sin') ts.sin++; if(x.e === 'reponer') ts.rep++; });
   // Orden alfabético (22.10.2026, Piero: "grupo de familias en tarjetas que deben estar ordenadas alfabéticamente").
-  return `<div class="m-fams">${(dn.n ? [dn] : []).concat(ix.n ? [ix] : [], pp.n ? [pp] : []).concat([...g.values()]).sort(function(a,b){ return a.fam.localeCompare(b.fam, 'es'); }).map(function(y){
+  return `<div class="m-fams">${(dn.n ? [dn] : []).concat(ix.n ? [ix] : [], pp.n ? [pp] : [], ts.n ? [ts] : []).concat([...g.values()]).sort(function(a,b){ return a.fam.localeCompare(b.fam, 'es'); }).map(function(y){
     return `<button type="button" class="ini-card m-fam" data-invfam="${escapeHtml(y.fam)}"><span class="m-fam-ic">${iconForFamilia(sinAcentos(y.fam))}</span>
       <span class="m-fam-tx"><b>${escapeHtml(y.fam)}</b><small>${appN(y.n)} producto${y.n === 1 ? '' : 's'}${y.sin ? ` · <em class="rojo">${appN(y.sin)} sin stock</em>` : ''}${y.rep ? ` · <em class="ambar">${appN(y.rep)} por reponer</em>` : ''}</small></span></button>`; }).join('')}</div>`;
 }
 // Una familia (22.10.2026, Piero): primero el Pareto y debajo TODOS sus códigos con el detalle por año; cada fila tiene
 // "Ver detalle ›" que abre el kardex del producto. Botones para volver: producto → familia → todas las familias.
-function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return x.e !== 'nada' && (fam === 'DANFOSS' ? x.dnf : fam === 'ACCESORIOS INOX' ? x.inx : fam === 'PPR' ? x.ppr : x.fam === fam); }).map(function(x){ return x.r; }); }
+function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return (x.e !== 'nada' || fam === 'TUBERÍAS SCH') && (fam === 'DANFOSS' ? x.dnf : fam === 'ACCESORIOS INOX' ? x.inx : fam === 'PPR' ? x.ppr : fam === 'TUBERÍAS SCH' ? x.tsc : x.fam === fam); }).map(function(x){ return x.r; }); }
 function appInvFamiliaHtml(){
   return invParetoHtml({ label:APP_INV.fam, rows:appInvFamRows(APP_INV.fam) }, true);
 }
