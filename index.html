@@ -771,6 +771,7 @@
   .rqm-volver{display:none;flex:0 0 auto;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;}
   .rqm-volver svg{width:18px;height:18px;} .rqm-volver:hover{background:rgba(255,255,255,.26);} .rqm-volver:active{transform:scale(.92);}
   .rqm-exp{display:flex;gap:6px;} .rqm-ico{width:36px;height:36px;border:0;border-radius:10px;background:rgba(255,255,255,.16);padding:5px;cursor:pointer;-webkit-tap-highlight-color:transparent;} .rqm-ico svg{display:block;width:100%;height:100%;} .rqm-ico:active{transform:scale(.94);}
+  .ge-ph{display:flex;align-items:center;gap:12px;margin:2px 0 10px;} .ge-ph b{display:block;font-size:18px;font-weight:900;color:var(--ink);} .ge-ph small{color:var(--ink-soft);font-weight:700;font-size:12.5px;}
   .rqm-obs{background:rgba(255,255,255,.12);border-radius:10px;padding:8px 10px;margin-top:6px;} .rqm-obs span{display:block;font-size:10.5px;font-weight:700;opacity:.78;text-transform:uppercase;letter-spacing:.03em;} .rqm-obs p{margin:3px 0 0;font-size:13px;font-weight:600;line-height:1.35;white-space:pre-line;word-break:break-word;}
   .rqm-info{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr) minmax(0,.6fr);gap:6px;margin-top:10px;}
   .rqm-info > div{background:rgba(255,255,255,.12);border-radius:10px;padding:7px 9px;min-width:0;} .rqm-info span{display:block;font-size:10.5px;font-weight:700;opacity:.78;text-transform:uppercase;letter-spacing:.03em;} .rqm-info b{display:block;font-size:13px;font-weight:800;margin-top:2px;overflow-wrap:anywhere;}
@@ -14705,7 +14706,8 @@ const APP_VISTAS = {
   // Gerencial (15.10.2026, Piero: "kalegria, mlujan y apl no deben tener Compras ni Almacén sino un módulo gerencial con
   // el resumen de todo Logística, con las fotos, para ver en un pantallazo lo que hace cada uno y darle seguimiento").
   gerencial:  { nombre:'Gerencial',  ico:'📈', desc:'Resumen de todo Logística: qué hace cada uno en Compras, Comex y Almacén.',
-    tabs:[['equipo','👥','Equipo'], ['indicadores','📊','Reportes'], ['daily','🗓️','Daily'], ['polar'], ['gastopresu','💰','Gasto y presupuesto'], ['otif','🎯','OTIF']] },
+    // Solo el resumen de cada persona (26.10.2026, Piero: "que en gerencial se vea el resumen de cada persona, nada más eso").
+    tabs:[['equipo','👥','Equipo']] },
 };
 // El acceso "Logística" de antes es ahora Compras.
 function appTipoNorm(t){ return t === 'logistica' ? 'compras' : t; }
@@ -14863,7 +14865,7 @@ function appVolverAlInicioModulo(t){
   try{ appOCCerrar(); }catch(err){}
   const m = document.getElementById('kxModal'); if(m) m.classList.remove('abierto');
   const R = { inventario:[APP_INV, { q:'', sel:'', tope:30, fam:'', kdx:'' }], tienda:[APP_TIENDA, { q:'', fam:'' }], pendcompras:[APP_PC, { q:'', fam:'', tope:20, entTope:60 }],
-    pendlog:[APP_PL, { q:'', tope:15 }], presu:[APP_PR, { q:'' }], gastopresu:[APP_PR, { q:'' }], supreq:[APP_SUP, { q:'' }], almseg:[APP_AS, { det:false }] }[t];
+    pendlog:[APP_PL, { q:'', tope:15 }], presu:[APP_PR, { q:'' }], gastopresu:[APP_PR, { q:'' }], supreq:[APP_SUP, { q:'' }], almseg:[APP_AS, { det:false }], equipo:[APP_GE, { cod:'' }] }[t];
   if(R) Object.assign(R[0], R[1]);
   if(t === 'inventario'){ kardexOrigen = null; kdxRango = null; }
   if(APP_PANTALLAS[t]) appRenderInicio();
@@ -15058,6 +15060,7 @@ function appAtrasInv(){
 }
 function appAtras(){
   if(appAtrasInv()) return true;
+  if(APP.enInicio && APP.pantalla === 'equipo' && APP_GE.cod){ APP_GE.cod = ''; appRenderInicio(); window.scrollTo(0, 0); return true; }   // del resumen de una persona al equipo
   if(!RQ_MOVIL.matches) return false;
   const sheet = document.getElementById('appSheet'), asis = document.getElementById('asis'), bienv = document.getElementById('appBienv');
   if(sheet && sheet.classList.contains('abierto')){ appCerrarSheet(); return true; }
@@ -19939,7 +19942,7 @@ function appFotoAlmDatos(desde, hasta){ return appMemo('fotoAlm:' + desde + hast
 // un pantallazo lo que hace cada uno y darle seguimiento"). Cada persona con lo que le toca según su función en los módulos:
 // compradores (OC y SKU del período, OC vencidas y SKU sin OC hoy), Comex (embarques e importaciones), Almacén (pedidos
 // generados, guías de recepción y salida, y lo que espera en su cola) y, para todos, su Daily Call In. ----------
-const APP_GE = { per:'mes' };
+const APP_GE = { per:'mes', cod:'' };   // cod: persona abierta (su resumen)
 const GE_PER = [['hoy', 'Hoy'], ['semana', 'Semana'], ['mes', 'Mes'], ['anio', 'Año']];
 function geRango(){
   const c = appIndCorte(), d = new Date(c);
@@ -20014,9 +20017,28 @@ function geCard(p){
     <span class="ge-k k${p.k.length}">${p.k.map(function(k){ return `<span class="${k[2] || ''}"><b>${k[0]}</b><small>${k[1]}</small></span>`; }).join('')}</span>
     <span class="ge-d"><em>🗓️ Daily</em><span>⏳ ${d.pen}</span><span>🔄 ${d.pro}</span><span>✅ ${d.fin}</span>${d.bl ? `<span class="bl">⛔ ${d.bl}</span>` : ''}</span></button>`;
 }
+// Resumen de UNA persona en Gerencial (26.10.2026, Piero: "considera los cambios que hice en Compras y Almacén"): lo mismo que
+// "Ver detalle completo" de esos módulos, con las caras para pasar de una persona a otra y el período de la barra.
+function appGerPersonaHtml(cod){
+  const e = escapeHtml, st = APP_F.indicadores, nom = PD_PERSONAS[cod] || cod;
+  const esCmp = APP_DAILY_COMPRAS.indexOf(cod) !== -1, esAlm = APP_DAILY_ALMACEN.indexOf(cod) !== -1;
+  const caras = `<div class="m-filtros pc-per">${appCarasHtml('geres', cod, APP_DAILY_COMPRAS.concat(APP_DAILY_COMEX, APP_DAILY_ALMACEN).map(function(c){ return [c, c]; }))}</div>`;
+  const btn = function(attr){ return `<button type="button" class="pc-img-btn cmp-baja" ${attr} title="Descargar el reporte de ${e(nom)} (según el período elegido)" aria-label="Descargar reporte">${APP_ICO_BAJA}</button>`; };
+  let baja = '', cuerpo = '', area = '';
+  if(esCmp){ area = 'Compras'; st.persona = appFPersonas().find(function(v){ return pdPersona(v) === cod; }) || ''; baja = btn('data-cmpimg="' + e(cod) + '"'); cuerpo = appFotoPersonaHtml(cod, st); }
+  else if(cod === 'CMORA'){ area = 'Comex · seguimiento de contenedores'; st.persona = ''; cuerpo = appComexHtml(st); }
+  else if(cod === 'JCASARINO'){ area = 'Comex · importaciones'; st.persona = ''; cuerpo = appPendLogHtml(); }
+  else if(esAlm){ st.persona = ''; const r = appFRango(st), corte = isoDay(appIndCorte()), jav = cod === 'JCENTENO', pedAlm = jav || cod === 'MCONDORI', hayMov = almMovRows().length > 0;
+    area = 'Almacén'; APP_AR.per = 'custom'; APP_AR.desde = r ? appIndIso(r.desde) : '2020-01-01'; APP_AR.hasta = r && appIndIso(r.hasta) < corte ? appIndIso(r.hasta) : corte; APP_AR.sub = jav ? 'jav' : 'kat';
+    if(hayMov || pedAlm) baja = btn(pedAlm ? 'data-almimg="' + cod + '"' : 'data-' + (jav ? 'anaimg' : 'arimg') + '="1"');
+    cuerpo = (pedAlm ? almHojasHtml(cod) : '') + (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` + appAlmRepCuerpo() : ''); }
+  return `<div class="ge rqm"><div class="ge-ph">${dciFoto(cod, 'ge-av')}<div><b>${e(nom)}</b><small>${e(area)}</small></div></div>
+    <div class="cmp-top">${caras}${cod === 'JCASARINO' ? '' : appFBarra('indicadores', { pry:1 })}${baja}</div>${cuerpo || '<div class="ini-card"><div class="ini-vacio">Sin datos de esta persona en el período.</div></div>'}</div>`;
+}
 function appGerEquipoHtml(){
   if(!gerAbierto) return APP_GER_LOCK;
   appDciCargar(false);
+  if(APP_GE.cod) return appGerPersonaHtml(APP_GE.cod);
   const e = escapeHtml, G = geDatos(), P = G.P, sum = function(f){ return P.reduce(function(a, p){ return a + (f(p) || 0); }, 0); };
   const dd = P.reduce(function(a, p){ a.t += p.d.pen + p.d.pro + p.d.fin; a.f += p.d.fin; return a; }, { t:0, f:0 });
   const tile = function(i, t, v){ return `<div><span>${i} ${t}</span><b>${v}</b></div>`; };
@@ -20024,7 +20046,7 @@ function appGerEquipoHtml(){
     return `<div class="ge-sec"><b>${ico} ${a}</b><small>${l.length} persona${l.length === 1 ? '' : 's'}</small></div><div class="ge-grid">${l.map(geCard).join('')}</div>`; };
   return `<div class="ge rqm">
     <div class="rqm-cab ge-cab"><small>RESUMEN GERENCIAL · LOGÍSTICA</small><h2>Equipo Logística</h2>
-      <p>Qué hizo cada uno ${e(G.R.label)} y qué tiene pendiente hoy. Toca a una persona para ver su detalle.</p>
+      <p>Qué hizo cada uno ${e(G.R.label)} y qué tiene pendiente hoy. Toca a una persona para ver su resumen.</p>
       <div class="ge-per">${GE_PER.map(function(x){ return `<button type="button" data-geperiodo="${x[0]}" class="${APP_GE.per === x[0] ? 'on' : ''}">${x[1]}</button>`; }).join('')}<button type="button" class="ge-ing" data-geingresos="1">🔐 Ingresos al app</button></div>
       <div class="rqm-info ge-info">${tile('🧾', 'OC emitidas', appN(sum(function(p){ return p.n.oc; }))) + tile('📦', 'SKU en OC', appN(sum(function(p){ return p.n.sku; })))
         + tile('📥', 'Guías de almacén', appN(sum(function(p){ return (p.n.grc || 0) + (p.n.grr || 0); }))) + tile('⛔', 'OC vencidas hoy', appN(sum(function(p){ return p.n.venc; })))
@@ -20282,7 +20304,8 @@ function appClickInicio(e){
   // La cara elegida queda a la vista en su fila (si estaba al final, se desliza hasta ella).
   if(b.classList.contains('cara') || b.classList.contains('rk-r')) setTimeout(function(){ document.querySelectorAll('.caras').forEach(function(f){ const c = f.querySelector('.cara.on'); if(c) f.scrollLeft = c.offsetLeft - f.clientWidth / 2 + c.offsetWidth / 2; }); }, 30);
   if(b.dataset.inddet) return appIndDetalle(b.dataset.inddet);
-  if(b.dataset.geper) return appGePersona(b.dataset.geper);
+  if(b.dataset.geper){ APP_GE.cod = b.dataset.geper; appRenderInicio(); return window.scrollTo(0, 0); }   // su resumen (26.10.2026)
+  if(b.dataset.geres !== undefined){ APP_GE.cod = b.dataset.geres; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.geperiodo){ APP_GE.per = b.dataset.geperiodo; return appRenderInicio(); }
   if(b.dataset.geingresos) return appIngresosAbrir();
   if(b.dataset.fcara != null){ const w = b.closest('[data-fbar]'); if(w){ APP_F[w.dataset.fbar].persona = b.dataset.fcara; return appRenderInicio(); } }
