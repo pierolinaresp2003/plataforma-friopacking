@@ -13127,6 +13127,9 @@ function rqSituacion(r){
 // Resumen de lo que pasó en UN paso, al tocar su ícono (29.09.2026, Piero: "si le doy click al ícono
 // de req, compras, oc, almacén o salida, que salga el detalle aunque ya haya pasado"). Por defecto
 // la tarjeta sigue mostrando el estado actual (rqSituacion); esto solo se ve al tocar un paso.
+// Condición de pago de una OC (columna "Condiciones" del Reporte Maestro / PedidoSinReq).
+function ocCondDe(oc){ if(!oc) return ''; return appMemo('ocCond', function(){ const m = new Map();
+  ((DATA && DATA.procesoRows) || []).concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(r.codOrden && r.condiciones && !m.has(r.codOrden)) m.set(r.codOrden, r.condiciones); }); return m; }).get(oc) || ''; }
 function rqPasoDetalle(r, j){
   const n = (v)=> v == null ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:2 });
   const um = r.unidad ? ' ' + r.unidad : '';
@@ -13151,7 +13154,11 @@ function rqPasoDetalle(r, j){
     return { ico:'🧾', cls:'ok', titulo:'OC ' + r.codOrden + (r.ocsExtra ? ' · ' + r.ocsExtra.join(' · ') : ''),
       lineas: lin(r.proveedor ? 'Proveedor: ' + r.proveedor + (r.origen === 'importado' ? ' (importación)' : '') : '',
         r.fOrden ? 'Emitida el ' + rqFecha(r.fOrden) + (r.usuarioCompras ? ' por ' + (PD_PERSONAS[r.usuarioCompras] || r.usuarioCompras) : '') : '', r.fAprob ? 'Aprobada el ' + rqFecha(r.fAprob) : 'Pendiente de aprobación',
-        r.fCompromiso ? 'Entrega pactada: ' + rqFecha(r.fCompromiso) : '', r.cantOrden != null ? 'Cantidad en la OC: ' + n(r.cantOrden) + um : '') };
+        r.fCompromiso ? 'Entrega pactada: ' + rqFecha(r.fCompromiso) : '', r.cantOrden != null ? 'Cantidad en la OC: ' + n(r.cantOrden) + um : '',
+        // Precio unitario (2 decimales) y condición de pago con el proveedor (26.10.2026, Piero); como en la vista de la OC, no se muestran a supervisores.
+        !polarSinPrecios() && r.precioUnit != null ? 'Precio unitario: ' + (r.moneda ? r.moneda + ' ' : '') + Number(r.precioUnit).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 }) + (um ? ' por' + um : '') + ' (sin IGV)' : '',
+        !polarSinPrecios() && ocCondDe(r.codOrden) ? 'Condición de pago: ' + ocCondDe(r.codOrden) : '',
+        r.obs ? 'Observación del requerimiento: ' + r.obs : '') };
   }
   if(j === 3){
     if(directo) return { ico:'🏬', cls:'ok', titulo:'Salió del stock del almacén', lineas: lin(r.fSalida ? 'Se despachó el ' + rqFecha(r.fSalida) : '') };
