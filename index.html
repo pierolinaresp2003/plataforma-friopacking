@@ -463,6 +463,7 @@
   .ks-bar .lbl{font-size:12px;color:var(--ink-soft);font-weight:700;margin-right:2px;} .ks-bar .sep{width:12px;}
   .ks-bar button{border:1px solid var(--border);background:var(--card);color:var(--ink);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer;}
   .ks-bar button.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .par-sub{margin:4px 0 12px;} @media (max-width:640px){ .par-sub{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;} .par-sub button{white-space:nowrap;flex:none;} } .par-sub .lbl{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-right:2px;}
   .ks-chart{position:relative;}
   .ks-svg{width:100%;height:auto;display:block;} .ks-svg text{font-size:11px;fill:var(--ink-soft);}
   .ks-svg .grid{stroke:var(--border);} .ks-svg .in{fill:var(--green);} .ks-svg .out{fill:var(--seg-a);}
@@ -8583,6 +8584,36 @@ function invEsInox(r){ const d = sinAcentos(String(r.descripcion || '').toUpperC
 // Familia PPR (22.10.2026, Piero: "una familia de ppr, solo ppr"): todo lo que dice PPR en la descripción (tubería, codos, coplas,
 // uniones, válvulas…); no entran los transductores "PPR35/PPR15" ni lo de polipropileno que no dice PPR.
 function invEsPpr(r){ return /\bPPR\b/i.test(r.descripcion || ''); }
+// Subfamilias (26.10.2026, Piero: "divide la familia de PPR en accesorios y tuberías… y para Danfoss crea las subfamilias necesarias").
+// Se asigna por la descripción, en este orden (la primera regla que calza gana; lo que no calza queda en "Otros"):
+// PPR: tubería = lo que es tubo (se vende por metro); todo lo demás (coplas, uniones, caps, reducciones, adaptadores brida, carretes,
+// válvulas PPR) es accesorio. DANFOSS: kits/repuestos primero (un "repair kit EVR" es repuesto, no válvula); luego equipos y drives, y
+// las válvulas por función (solenoide, expansión, cierre, retención, seguridad, reguladora, motorizada, estación ICF).
+const INV_SUBFAM = {
+  'PPR':[['Tuberías', /^(TUBERIA|TUBO)\b/], ['Accesorios', /./]],
+  'DANFOSS':[
+    ['Kits y repuestos', /\b(REPAIR|OVERHAUL|INSPECTION|SPARE|REPUESTO|RESPUESTO|KIT DE (REPAR|SERVIC|REPUESTO)|SET DE EMPAQUES|SET NIPLE|KIT FLOTADOR|ASIENTO DE VALV|CUBIERTA SUPERIO|MAINTENANCE SET|DISMOUNTING)/],
+    ['Variadores y arrancadores', /\b(VARIADOR|ARRANCADOR|SOFT STARTER|VLT|FC-? ?10[12]|MCD ?[26]|MCD6|MCA ?12|MCB ?1|IGBT|TARJETA|FUSIBLE|DESCONEXION|PEDESTAL|VENTILADOR DE PUERTA|FILTRO DE VENTILACION|PANEL (DE CONTROL|EN PUERTA)|VACON|HMI EN PUERTA)/],
+    ['HVAC / agua (AB-QM, 3 vías)', /\b(AB-?QM|PICV|NOVOCON|VF3|VRB ?3|AME ?\d|AMV ?\d|CALEFACTOR DE VASTAGO|IMMERSION|PIEZA TRASERA|[23] ?-?VIAS|VL[23]\b|WAFER)/],
+    ['Compresores y equipos', /\b(COMPRESOR|UNIDAD CONDENSADORA|INTERCAMBIADOR|TABLERO|PURGADOR|RESISTENCIA CALEFACTORA)/],
+    ['Estaciones ICF', /\b(ICF[CDEFNRS]? ?\(?\d|ICF-|ICFF|ICFE|ICFC|ICFN|ICFR|ICFS|CFF|CFR|VALVE STATION|VALVULA (ESTACION|STATION)|STOP VALVE MODULE)/],
+    ['Controladores', /\b(AK-|EKC|EKE|ERC|MCX|CONTROLADOR|TRANSFORMADOR|I\/O MODULE|UK-UI|ACCCBI)/],
+    ['Filtros y secadores', /^(FILTRO|FIA|FA ?\d|DML|ELEM\.? FILTRO|MALLA|NUCLEO)|\b(DCR|48-D|BRIQUETA)/],
+    ['Bridas, conexiones y visores', /^(BRIDA|GRUPO|CONECTOR \d|CONECTOR DE MANOMETRO|WELD|TAPON|JUEGO DE ADAPT|VISOR)|\b(LLG|LG ?\d)/],
+    ['Válv. de seguridad', /\b(SFA|SFV|BSV|DSV|SEGURIDAD|SAFETY)/],
+    ['Válv. de retención', /\b(CHV|NRVA?|NVR|SCA|RETENCION)/],
+    ['Expansión termostática', /\b(TE[ANSX]? ?\d|ORIFICIO|EXPANSION|ELEM(ENTO)?\.? ?TERMOSTATIC|CUERPO VAL\w*\.? TE)/],
+    ['Solenoides y bobinas', /\b(EVRA?T?\b|EVRA?T? ?\d|EVRA-|EVM|EV2[25]0|BOBINA|SOLENOID|ELECTROVALVULA|IMAN PERMANENTE)/],
+    ['Válv. de cierre (SVA, bola, aguja)', /\b(SVA|SVL|GBC|VALVULA DE BOLA|VALVULA DE CIERRE|AGUJA|SNV|QDV|ROTALOCK)/],
+    ['Motorizadas (ICM, ICAD, CCMT)', /\b(ICM|ICAD|CCMT|CABLE ETS)/],
+    ['Reguladoras (ICS, REG, pilotos)', /\b(I?CS ?\d|ICS|ICV|ICLX|REG\b|REG-|CV[CEPHM]|PMFL|PILOT|CONO DE REGULACION|MODULO DE FUNCION|SERVOVALVULA|EVRF|OFV)/],
+    ['Presostatos y termostatos', /\b(PRESOSTATO|PRESSURE SWITCH|KPU?\d|KP ?\d|MP ?55|TERMOSTATO)/],
+    ['Sensores y detectores de gas', /\b(AKS|SENSOR|SONDA|TRANSMISOR|EKS|LLS|DETECTOR|DGS|GDA|TERMOPOZO|LUZ ESTROBOSCOPICA|M12 HEMBRA|MBT)/]
+  ]
+};
+function invSubfamDe(fam, r){ const L = INV_SUBFAM[fam]; if(!L) return ''; const d = sinAcentos(String(r.descripcion || '').toUpperCase()).trim();
+  for(let i = 0; i < L.length; i++) if(L[i][1].test(d)) return L[i][0]; return 'Otros'; }
+let invParetoSub = { fam:'', sub:'' };   // subfamilia elegida dentro de una familia ('' = todas)
 function invEsDanfoss(r){ const c = invDanfossCods(); return /danfoss/i.test(r.descripcion || '') || ((r.codigos && r.codigos.length) ? r.codigos : [r.codigo]).some(function(x){ return c.has(x); }); }
 function invParetoFilas(g){
   const C = invComprasPorCodigo(), yF = appIndCorte().getUTCFullYear(), anios = []; for(let y = 2023; y <= yF; y++) anios.push(y);
@@ -8721,6 +8752,13 @@ document.addEventListener('click', function(ev){
   if(t){ ev.stopPropagation(); ev.preventDefault(); return kxDetalleTransito(t.dataset.kxtr); }
 }, true);
 function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, TODOS los códigos y botón "Ver detalle" en cada fila
+  let subBar = ''; if(INV_SUBFAM[g.label]){   // subfamilias: botones arriba; el Pareto y la lista se recalculan con la elegida
+    const cnt = new Map(); g.rows.forEach(function(r){ const k = invSubfamDe(g.label, r); cnt.set(k, (cnt.get(k) || 0) + 1); });
+    const sub = invParetoSub.fam === g.label && cnt.has(invParetoSub.sub) ? invParetoSub.sub : '';
+    const orden = [...cnt.keys()].sort(function(a, b){ return (a === 'Otros') - (b === 'Otros') || cnt.get(b) - cnt.get(a); });   // las más grandes primero
+    subBar = `<div class="ks-bar par-sub"><span class="lbl">Subfamilia</span><button type="button" data-parsub="" class="${sub ? '' : 'on'}">Todas (${g.rows.length})</button>${orden.map(function(k){ return `<button type="button" data-parsub="${escapeHtml(k)}" class="${sub === k ? 'on' : ''}">${escapeHtml(k)} (${cnt.get(k)})</button>`; }).join('')}</div>`;
+    if(sub){ g = Object.assign({}, g, { rows:g.rows.filter(function(r){ return invSubfamDe(g.label, r) === sub; }), subLbl:sub });
+      setTimeout(function(){ document.querySelectorAll('.par-sub').forEach(function(w){ const o = w.querySelector('button.on'); if(o) w.scrollLeft = Math.max(0, o.offsetLeft - w.offsetLeft - 80); }); }, 0); } }
   const P = invParetoFilas(g), e = escapeHtml, n = function(v, d){ return v ? Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }) : '—'; };
   const usd = function(v){ return v ? 'US$ ' + Number(v).toLocaleString('es-PE', { maximumFractionDigits:0 }) : '—'; };
   const usdK = function(v){ return !v ? '—' : v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3) + ' mil' : usd(v); };
@@ -8750,9 +8788,9 @@ function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, 
   }
   return `${app ? '' : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'}
   <div class="par-box${app ? ' app' : ''}"${app ? '' : ' id="pedirParetoFoto"'}>
-    <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)} <small>${n(P.l.length, 0)} productos · ${n(P.totC, 0)} unid. salieron de Lurín ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del consumo) · ${usd(P.tot)} comprados${P.l.some(function(x){ return x.alerta; }) ? ` · <b class="par-al">⚠ ${n(P.l.filter(function(x){ return x.alerta; }).length, 0)} bajo el punto de reorden</b>` : ''}</small></h3>
+    <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)}${g.subLbl ? ' · ' + e(g.subLbl) : ''} <small>${n(P.l.length, 0)} productos · ${n(P.totC, 0)} unid. salieron de Lurín ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del consumo) · ${usd(P.tot)} comprados${P.l.some(function(x){ return x.alerta; }) ? ` · <b class="par-al">⚠ ${n(P.l.filter(function(x){ return x.alerta; }).length, 0)} bajo el punto de reorden</b>` : ''}</small></h3>
 </div>
-    ${svg}
+    ${subBar}${svg}
     <div class="ks-bar" style="margin-top:8px;">${app ? '' : `<span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}`}
       <span class="ks-hint">Por año: <i class="lg c"></i>entró (arriba) <i class="lg s"></i>salió (abajo) · almacén Lurín</span></div>
     <div class="par-lista">${ver.map(function(x, i){ const r = x.r;
@@ -8767,6 +8805,7 @@ function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, 
   </div>`;
 }
 function invParetoBind(box, g){
+  box.querySelectorAll('[data-parsub]').forEach(function(b){ b.addEventListener('click', function(){ invParetoSub = { fam:g.label, sub:b.dataset.parsub }; box.innerHTML = invParetoHtml(g); invParetoBind(box, g); }); });
   box.querySelectorAll('[data-parver]').forEach(function(b){ b.addEventListener('click', function(){ invParetoVer = b.dataset.parver; box.innerHTML = invParetoHtml(g); invParetoBind(box, g); }); });
   const volver = box.querySelector('#pedirVolver'); if(volver) volver.addEventListener('click', function(){ pedirCatSel = null; invParetoVer = 'A'; drawPedirPorCategoria(); });
   box.querySelectorAll('.par-abre').forEach(function(btn){ btn.addEventListener('click', function(){ kardexCodigoDirecto = btn.dataset.cod; drawKardex(); const card = document.getElementById('kardexCard'); if(card) card.scrollIntoView({ behavior:'smooth', block:'start' }); }); });
@@ -15682,7 +15721,7 @@ function almPedRegHtml(cod, st){
 const APP_PANT_FN = { almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appComprasHtml(); }, almseg:function(){ return appAlmSegHtml(); },
   pendlog:function(){ return appPendLogHtml() + (APP.vista === 'compras' && gerAbierto ? `<div class="cmp-sec"><b>🌎 Comex</b><small>Camila Mora</small></div>${appFBarra('indicadores', { pry:1 })}${appComexHtml(APP_F.indicadores)}` : ''); }, daily:function(){ return appDailyModHtml(); }, supreq:function(){ return appSupReqHtml(); }, equipo:function(){ return appGerEquipoHtml(); }, tienda:function(){ return appTiendaHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
-  const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam, APP_INV.kdx], pendcompras:[APP_PC, APP_PL, APP_CORREO.v, APP_F.indicadores, APP_REP.sec], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
+  const e = { almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam, APP_INV.kdx, invParetoSub], pendcompras:[APP_PC, APP_PL, APP_CORREO.v, APP_F.indicadores, APP_REP.sec], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
     indicadores:[APP_F.indicadores, APP_REP.sec], otif:[APP_F.otif] }[p];
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (APP.vista || '');
 }
@@ -20108,7 +20147,8 @@ function appClickInicio(e){
   if(b.dataset.gorig !== undefined){ APP_G.orig = b.dataset.gorig; return appRenderInicio(); }
   if(b.dataset.gfam !== undefined){ APP_G.fam = b.dataset.gfam; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invf !== undefined){ APP_INV.f = b.dataset.invf; APP_INV.q = ''; APP_INV.tope = 30; APP_INV.sel = ''; return appRenderInicio(); }
-  if(b.dataset.invfam !== undefined){ APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; APP_INV.kdx = ''; appRenderInicio(); return window.scrollTo(0, 0); }
+  if(b.dataset.parsub !== undefined && b.closest('.par-box.app')){ invParetoSub = { fam:APP_INV.fam, sub:b.dataset.parsub }; return appRenderInicio(); }
+  if(b.dataset.invfam !== undefined){ invParetoSub = { fam:'', sub:'' }; APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; APP_INV.kdx = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invkdx){ if(APP_INV.kdx !== b.dataset.invkdx){ kardexOrigen = null; kdxRango = null; } APP_INV.kdx = b.dataset.invkdx; APP_INV.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invkdxvolver){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
     const f = c && document.querySelector('#invLista [data-invkdx="' + CSS.escape(c) + '"]'); if(f) f.closest('.par-fila').scrollIntoView({ block:'center' }); else window.scrollTo(0, 0); return; }
