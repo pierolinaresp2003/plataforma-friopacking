@@ -2024,7 +2024,7 @@
   .asis-pie button{border:0;background:var(--brand-2);color:#1c2733;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;}
     /* PDF "Estatus de embarques" (07.10.2026): fuera de los @media para que se vea igual en PC y celular */
     .pc-buscar-gen{display:flex;gap:8px;align-items:flex-start;} .pc-buscar-gen input{flex:1;min-width:0;}
-    .pc-img-btn{flex:0 0 auto;width:50px;height:50px;border-radius:14px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;} .pc-img-btn svg{width:30px;height:30px;} .pc-img-btn:active{transform:scale(.94);}
+    .pc-img-btn{flex:0 0 auto;width:50px;height:50px;border-radius:14px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;} .pc-img-btn svg{width:30px;height:30px;} .pc-img-btn:active{transform:scale(.94);} .inv-xls{width:44px;height:44px;margin-left:auto;} .inv-xls svg{width:28px;height:28px;}
     .pci-caja{position:absolute;left:-12000px;top:0;width:720px;} .pci-caja .imp-card,.pci-caja .sku-grupo,.pci-caja .m-fila{content-visibility:visible;}
     .pci-hoja{width:720px;box-sizing:border-box;padding:22px 24px 16px;background:var(--bg);color:var(--ink);}
     .pci-cab{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#0a1e64,#123a9e);color:#fff;border-radius:18px;padding:14px 16px;margin-bottom:12px;} .pci-cab > div{flex:1;}
@@ -8652,6 +8652,7 @@ function invEsTubSch(r){ const d = sinAcentos(String(r.descripcion || '').toUppe
 // PPR: tubería = lo que es tubo (se vende por metro); todo lo demás (coplas, uniones, caps, reducciones, adaptadores brida, carretes,
 // válvulas PPR) es accesorio. DANFOSS: kits/repuestos primero (un "repair kit EVR" es repuesto, no válvula); luego equipos y drives, y
 // las válvulas por función (solenoide, expansión, cierre, retención, seguridad, reguladora, motorizada, estación ICF).
+const INV_KIT = /\b(REPAIR|OVERHAUL|INSPECTION|SPARE|REPUESTO|RESPUESTO|KIT DE (REPAR|SERVIC|REPUESTO)|SET DE EMPAQUES|SET NIPLE|KIT FLOTADOR|ASIENTO DE VALV|CUBIERTA SUPERIO|MAINTENANCE SET|DISMOUNTING)/;   // kits / repuestos Danfoss
 const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrupo, regla], …]], …] } — se prueba en orden; gana la primera que calza
   'PPR':[
     ['Tuberías', '📏', /^(TUBERIA|TUBO)\b/, [['Tuberías PPR', /./]]],
@@ -8673,37 +8674,48 @@ const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrup
     ['Coplas y uniones', '🔗', /^(COPLA|UNION)/, [['Coplas roscadas', /COPLA/], ['Uniones universales', /UNIVERSAL/], ['Otras uniones', /./]]],
     ['Otros accesorios', '🔧', /./, [['Otros accesorios', /./]]]
   ],
+  // DANFOSS por modelo (27.10.2026, Piero: "clasificada de esta forma: ICM, ICS, ICF, REG, SVA, SFA, DSV, FIA, EVRA, check o retención
+  // (NRVA, SCA, CHV, NRV)… si ya colocas algo en una familia ya no lo puedes repetir en otra"): esas 10 van primero y en ese orden; cada
+  // producto va a UNA sola: si nombra varios modelos, al que aparece primero en la descripción ("DSV 2 … (SFA15)" es DSV; un kit
+  // "SVA-S/L … REG/SA … SCA" va a SVA); su kit o repuesto va con su modelo. El 5.º dato marca el grupo por modelo (o lo que excluye). Lo que no es de esos modelos sigue en los grupos de abajo.
   'DANFOSS':[
-    ['Kits y repuestos', '🧰', /\b(REPAIR|OVERHAUL|INSPECTION|SPARE|REPUESTO|RESPUESTO|KIT DE (REPAR|SERVIC|REPUESTO)|SET DE EMPAQUES|SET NIPLE|KIT FLOTADOR|ASIENTO DE VALV|CUBIERTA SUPERIO|MAINTENANCE SET|DISMOUNTING)/,
-      [['Kits ICS / ICM / ICLX', /ICS|ICM|ICLX/], ['Kits SVA / REG / SCA / CHV', /SVA|REG|SCA|CHV|NRVA/], ['Kits EVR / EVRA / EVM', /EVR|EVM/], ['Kits y empaques ICF', /ICF/], ['Otros kits (seguridad, LLG, FA, AKS, QDV)', /./]]],
+    ['ICM', '⚙️', /\b(ICM|ICAD)/, [['Kits y repuestos ICM', INV_KIT], ['Válvulas ICM', /\bICM/], ['Actuadores ICAD y cables', /./]], true],
+    ['ICS', '🎚️', /\b(I?CS ?\d|ICS|ISC)\b|\bICS-/, [['Kits y repuestos ICS', INV_KIT], ['Módulos de función y conos', /MODULO DE FUNCION|CONO/], ['Servoválvulas ICS', /./]], /\bSNV/],
+    ['ICF', '🧩', /\b(ICF[CDEFNRS]? ?\(?\d|ICF-|ICF\b|ICFF|ICFE|ICFC|ICFN|ICFR|ICFS|CFF|CFR|VALVE STATION|VALVULA (ESTACION|STATION)|STOP VALVE MODULE)/,
+      [['Kits y empaques ICF', INV_KIT], ['Estaciones ICF completas', /^(ICF ?\d|ICF-\d|ICF\d|VAL\w* (ESTACION|STATION)|VALVE STATION|VALVULA SOLENOIDE ICF)/], ['Módulos ICF (ICFE, ICFF, ICFS, ICFC…)', /./]], true],
+    ['REG', '🔧', /\bREG\b|\bREG-|\bREG ?\d/, [['Kits y repuestos REG', INV_KIT], ['Válvulas REG', /./]], true],
+    ['SVA', '🔒', /\bSVA/, [['Kits y repuestos SVA', INV_KIT], ['Válvulas SVA', /./]], true],
+    ['SFA', '🛡️', /\bSFA/, [['Kits y repuestos SFA', INV_KIT], ['Válvulas SFA', /./]], true],
+    ['DSV', '🛡️', /\bDSV/, [['Kits y repuestos DSV', INV_KIT], ['Válvulas DSV', /./]], true],
+    ['FIA', '🧪', /\bFIA/, [['Kits y repuestos FIA', INV_KIT], ['Mallas y elementos FIA', /MALLA|ELEM|TRAMA/], ['Filtros FIA', /./]], true],
+    ['EVRA', '🔌', /\bEVRA/, [['Kits y repuestos EVRA', INV_KIT], ['Bobinas EVRA', /BOBINA/], ['Válvulas EVRA / EVRAT', /./]], true],
+    ['Check o retención (NRVA, SCA, CHV, NRV)', '↩️', /\b(CHV|NRVA?|NVR|SCA|RETENCION)/,
+      [['Kits y repuestos', INV_KIT], ['CHV-X', /CHV/], ['NRVA (bridadas)', /NRVA/], ['NRV / NVR (soldar ODF)', /NRV|NVR/], ['SCA (stop-check)', /./]], true],
+    ['Kits y repuestos', '🧰', INV_KIT, [['Kits EVR / EVM', /EVR|EVM/], ['Kits ICLX', /ICLX/], ['Otros kits (seguridad, LLG, FA, AKS, QDV)', /./]]],
     ['Variadores y arrancadores', '⚡', /\b(VARIADOR|ARRANCADOR|SOFT STARTER|VLT|FC-? ?10[12]|MCD ?[26]|MCD6|MCA ?12|MCB ?1|IGBT|TARJETA|FUSIBLE|DESCONEXION|PEDESTAL|VENTILADOR DE PUERTA|FILTRO DE VENTILACION|PANEL (DE CONTROL|EN PUERTA)|VACON|HMI EN PUERTA|PAQUETE DE MANTENIMIENTO)/,
       [['Variadores VLT (FC-101 / FC-102)', /^VARIADOR/], ['Arrancadores suaves (MCD)', /ARRANCADOR|SOFT STARTER/], ['Tarjetas, paneles y repuestos de drive', /./]]],
     ['HVAC / agua', '💧', /\b(AB-?QM|PICV|NOVOCON|VF3|VRB ?3|AME ?\d|AMV ?\d|CALEFACTOR DE VASTAGO|IMMERSION|PIEZA TRASERA|[23] ?-?VIAS|VL[23]\b|WAFER)/,
       [['Actuadores (AME, AMV, NovoCon)', /ACTUADOR|NOVOCON/], ['Válvulas AB-QM (PIBCV)', /^(VALVULA )?(AB-?QM|PICV)|PIBCV|AB-QM NOVOCON/], ['Válvulas de 2 y 3 vías (VF3, VRB, VL, wafer)', /VIAS|VF3|VRB|VL[23]|WAFER/], ['Accesorios AB-QM (tuercas, calefactores, vainas)', /./]]],
     ['Compresores y equipos', '🏭', /\b(COMPRESOR|UNIDAD CONDENSADORA|INTERCAMBIADOR|TABLERO|PURGADOR|RESISTENCIA CALEFACTORA|RACK DE COMPRESORES)/,
       [['Unidades condensadoras', /UNIDAD CONDENSADORA/], ['Compresores y racks', /COMPRESOR|RESISTENCIA CALEFACTORA/], ['Purgadores de aire (IPS)', /PURGADOR/], ['Intercambiadores y tableros', /./]]],
-    ['Estaciones ICF', '🧩', /\b(ICF[CDEFNRS]? ?\(?\d|ICF-|ICFF|ICFE|ICFC|ICFN|ICFR|ICFS|CFF|CFR|VALVE STATION|VALVULA (ESTACION|STATION)|STOP VALVE MODULE)/,
-      [['Estaciones ICF completas', /^(ICF ?\d|ICF-\d|ICF\d|VAL\w* (ESTACION|STATION)|VALVE STATION|VALVULA SOLENOIDE ICF)/], ['Módulos ICF (ICFE, ICFF, ICFS, ICFC…)', /./]]],
     ['Controladores', '🎛️', /\b(AK-|EKC|EKE|ERC|MCX|CONTROLADOR|TRANSFORMADOR|I\/O MODULE|UK-UI|ACCCBI)/,
       [['Controladores de cámara y sistema (AK-CC, EKC, EKE, ERC, AK-SM)', /AK-CC|AK-SM|EKC|EKE ?(347|400)|ERC|CONTROLADOR/], ['Módulos, displays, cables y fuentes', /./]]],
-    ['Filtros y secadores', '🧪', /^(FILTRO|FIA|FA ?\d|DML|ELEM\.? FILTRO|MALLA|NUCLEO)|\b(DCR|48-D|BRIQUETA)/,
-      [['Filtros FIA', /^FIA/], ['Mallas y elementos para FIA', /MALLA|ELEM|TRAMA/], ['Filtros secadores (DML, 48-D, DCR)', /DML|48-D|DCR|SECADO|NUCLEO|BRIQUETA|H48F/], ['Filtros FA y otros', /./]]],
+    ['Filtros y secadores', '🧪', /^(FILTRO|FA ?\d|DML|ELEM\.? FILTRO|MALLA|NUCLEO)|\b(DCR|48-D|BRIQUETA)/,
+      [['Filtros secadores (DML, 48-D, DCR)', /DML|48-D|DCR|SECADO|NUCLEO|BRIQUETA|H48F/], ['Filtros FA y otros', /./]]],
     ['Bridas, conexiones y visores', '🔗', /^(BRIDA|GRUPO|CONECTOR \d|CONECTOR DE MANOMETRO|WELD|TAPON|JUEGO DE ADAPT|VISOR)|\b(LLG|LG ?\d)/,
       [['Bridas', /BRIDA|GRUPO|FLANGE/], ['Visores de nivel y de líquido (LLG, LG)', /LLG|VISOR|\bLG ?\d/], ['Conectores y adaptadores', /./]]],
-    ['Válv. de seguridad', '🛡️', /\b(SFA|SFV|BSV|DSV|SEGURIDAD|SAFETY)/,
-      [['Dobles DSV', /DSV|DOBLE ASIENTO/], ['SFA', /SFA/], ['SFV', /SFV/], ['BSV y otras', /./]]],
-    ['Válv. de retención', '↩️', /\b(CHV|NRVA?|NVR|SCA|RETENCION)/,
-      [['CHV-X', /CHV/], ['NRVA (bridadas)', /NRVA/], ['NRV / NVR (soldar ODF)', /NRV|NVR/], ['SCA (stop-check)', /./]]],
+    ['Válv. de seguridad', '🛡️', /\b(SFV|BSV|SEGURIDAD|SAFETY)/,
+      [['SFV', /SFV/], ['BSV y otras', /./]]],
     ['Expansión termostática', '🌡️', /\b(TE[ANSX]? ?\d|ORIFICIO|EXPANSION|ELEM(ENTO)?\.? ?TERMOSTATIC|CUERPO VAL\w*\.? TE)/,
       [['Elementos termostáticos (TE, TEX, TES, TEN)', /ELEM/], ['Cuerpos de válvula TE', /CUERPO/], ['Orificios', /ORIFICIO/], ['Válvulas completas', /./]]],
     ['Solenoides y bobinas', '🔌', /\b(EVRA?T?\b|EVRA?T? ?\d|EVRA-|EVM|EV2[25]0|BOBINA|SOLENOID|ELECTROVALVULA|IMAN PERMANENTE)/,
-      [['EVM (pilotos y cuerpos)', /EVM/], ['Bobinas', /BOBINA|IMAN PERMANENTE/], ['EVR (halogenados)', /\bEVR\b/], ['EVRA / EVRAT (amoníaco)', /EVRA/], ['EV220B / EV250B (agua)', /EV2[25]0/], ['Otras solenoides', /./]]],
-    ['Válv. de cierre', '🔒', /\b(SVA|SVL|GBC|VALVULA DE BOLA|VALVULA DE CIERRE|AGUJA|SNV|QDV|ROTALOCK)/,
-      [['SVA – de paso (ángulo / recta)', /SVA|SVL/], ['GBC – de bola', /GBC|BOLA/], ['SNV – de aguja', /SNV|AGUJA/], ['QDV, Rotalock y otras', /./]]],
-    ['Motorizadas', '⚙️', /\b(ICM|ICAD|CCMT|CABLE ETS)/,
-      [['Válvulas ICM', /^(VAL\w* )?ICM/], ['Actuadores ICAD y cables', /ICAD|CABLE/], ['CCMT (electrónicas)', /CCMT/], ['Herramientas y módulos ICM', /./]]],
-    ['Reguladoras', '🎚️', /\b(I?CS ?\d|ICS|ICV|ICLX|REG\b|REG-|CV[CEPHM]|PMFL|PILOT|CONO DE REGULACION|MODULO DE FUNCION|SERVOVALVULA|EVRF|OFV)/,
-      [['Módulos de función y conos (ICS, ICLX)', /MODULO DE FUNCION|CONO/], ['ICS – servoválvulas', /\bI?CS|SERVOVALVULA/], ['REG – reguladoras manuales', /\bREG\b|REG-/], ['Pilotos (CVP, CVC, CVE, CVH)', /CV[CEPHM]|PILOT/], ['Cuerpos ICV', /ICV/], ['OFV, PMFL, EVRF', /./]]],
+      [['EVM (pilotos y cuerpos)', /EVM/], ['Bobinas', /BOBINA|IMAN PERMANENTE/], ['EVR (halogenados)', /\bEVR\b/], ['EV220B / EV250B (agua)', /EV2[25]0/], ['Otras solenoides', /./]]],
+    ['Válv. de cierre', '🔒', /\b(SVL|GBC|VALVULA DE BOLA|VALVULA DE CIERRE|AGUJA|SNV|QDV|ROTALOCK)/,
+      [['SVL – de paso', /SVL/], ['GBC – de bola', /GBC|BOLA/], ['SNV – de aguja', /SNV|AGUJA/], ['QDV, Rotalock y otras', /./]]],
+    ['Motorizadas', '⚙️', /\b(CCMT|CABLE ETS)/,
+      [['CCMT (electrónicas)', /CCMT/], ['Cables ETS', /./]]],
+    ['Reguladoras', '🎚️', /\b(ICV|ICLX|CV[CEPHM]|PMFL|PILOT|CONO DE REGULACION|MODULO DE FUNCION|SERVOVALVULA|EVRF|OFV)/,
+      [['Módulos de función y conos (ICLX)', /MODULO DE FUNCION|CONO/], ['Servoválvulas', /SERVOVALVULA/], ['Pilotos (CVP, CVC, CVE, CVH)', /CV[CEPHM]|PILOT/], ['Cuerpos ICV', /ICV/], ['OFV, PMFL, EVRF', /./]]],
     ['Presostatos', '📟', /\b(PRESOSTATO|PRESSURE SWITCH|KPU?\d|KP ?\d|MP ?55|TERMOSTATO)/,
       [['KP (alta / baja / dual)', /\bKP/], ['MP55 (presión de aceite)', /MP ?55/], ['Otros presostatos', /./]]],
     ['Sensores', '📡', /\b(AKS|SENSOR|SONDA|TRANSMISOR|EKS|LLS|DETECTOR|DGS|GDA|TERMOPOZO|LUZ ESTROBOSCOPICA|M12 HEMBRA|MBT|PROTECTOR CONTRA)/,
@@ -8714,7 +8726,8 @@ const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrup
 };
 // Clave del subgrupo de un producto: "grupo › subgrupo" (o solo el grupo si ese grupo no se divide).
 function invSubfamDe(fam, r){ const L = INV_SUBFAM[fam]; if(!L) return ''; const d = sinAcentos(String(r.descripcion || '').toUpperCase()).trim();
-  for(let i = 0; i < L.length; i++){ if(!L[i][2].test(d)) continue; const S = L[i][3]; if(S.length < 2) return L[i][0];
+  let im = -1, pm = 1e9; L.forEach(function(x, i){ if(!x[4] || (x[4] instanceof RegExp && x[4].test(d))) return; const p = d.search(x[2]); if(p !== -1 && p < pm){ pm = p; im = i; } });
+  for(let i = im === -1 ? 0 : im; i < L.length; i++){ if(L[i][4] && i !== im) continue; if(!L[i][2].test(d)) continue; const S = L[i][3]; if(S.length < 2) return L[i][0];
     for(let j = 0; j < S.length; j++) if(S[j][1].test(d)) return L[i][0] + ' › ' + S[j][0]; return L[i][0]; }
   return 'Otros'; }
 let invParetoSub = { fam:'', sub:'' };   // subfamilia elegida dentro de una familia ('' = todas)
@@ -8866,17 +8879,47 @@ function invSubgruposHtml(g, keyOf, cnt, app, nivel){
   const e = escapeHtml, tarjeta = function(dato, ic, tit){
     return `<button type="button" class="ini-card m-fam" data-parsub="${e(dato)}"><span class="m-fam-ic">${ic}</span><span class="m-fam-tx"><b>${e(tit)}</b></span></button>`; };
   const grupoDe = function(k){ return k.split(' › ')[0]; }, G = INV_SUBFAM[g.label], icono = function(gr){ const x = G.find(function(y){ return y[0] === gr; }); return x ? x[1] : '📦'; };
-  let tit = g.label, cards = [];
-  if(nivel && nivel.indexOf('G:') === 0){ const gr = nivel.slice(2), rows = g.rows.filter(function(r){ return grupoDe(keyOf.get(r)) === gr; });
-    tit = g.label + ' › ' + gr; cards.push(tarjeta('T:' + gr, '📋', 'Ver todos (' + gr + ')', rows));
-    [...cnt.keys()].filter(function(k){ return grupoDe(k) === gr; }).sort(function(a, b){ return a.localeCompare(b, 'es'); })
-      .forEach(function(k){ cards.push(tarjeta(k, icono(gr), k.slice(gr.length + 3) || gr, g.rows.filter(function(r){ return keyOf.get(r) === k; }))); }); }
-  else { cards.push(tarjeta('*', '📋', 'Ver todos', g.rows));
+  // Tarjetas en el orden en que están definidas (27.10.2026, Piero: "reordena las familias"); "Otros" al final.
+  const gi = function(gr){ const i = G.findIndex(function(y){ return y[0] === gr; }); return i < 0 ? 999 : i; };
+  const si = function(k){ const x = G[gi(grupoDe(k))], sb = k.split(' › ')[1]; const i = x ? x[3].findIndex(function(y){ return y[0] === sb; }) : -1; return i < 0 ? 999 : i; };
+  let tit = g.label, cards = [], filas = g.rows;
+  if(nivel && nivel.indexOf('G:') === 0){ const gr = nivel.slice(2); filas = g.rows.filter(function(r){ return grupoDe(keyOf.get(r)) === gr; });
+    tit = g.label + ' › ' + gr; cards.push(tarjeta('T:' + gr, '📋', 'Ver todos (' + gr + ')'));
+    [...cnt.keys()].filter(function(k){ return grupoDe(k) === gr; }).sort(function(a, b){ return si(a) - si(b); })
+      .forEach(function(k){ cards.push(tarjeta(k, icono(gr), k.slice(gr.length + 3) || gr)); }); }
+  else { cards.push(tarjeta('*', '📋', 'Ver todos'));
     const grupos = new Map(); cnt.forEach(function(n, k){ const gr = grupoDe(k); (grupos.get(gr) || grupos.set(gr, []).get(gr)).push(k); });
-    [...grupos.keys()].sort(function(a, b){ return a.localeCompare(b, 'es'); }).forEach(function(gr){ const ks = grupos.get(gr);
-      cards.push(tarjeta(ks.length > 1 ? 'G:' + gr : ks[0], icono(gr), gr, g.rows.filter(function(r){ return grupoDe(keyOf.get(r)) === gr; }))); }); }
+    [...grupos.keys()].sort(function(a, b){ return gi(a) - gi(b); }).forEach(function(gr){ const ks = grupos.get(gr);
+      cards.push(tarjeta(ks.length > 1 ? 'G:' + gr : ks[0], icono(gr), gr)); }); }
+  INV_XLS = { label:g.label, sub:nivel ? tit.slice(g.label.length + 3) : '', rows:filas, keyOf:keyOf };
   const volver = app ? '' : (nivel ? `<div class="ks-bar par-sub"><button type="button" data-parsub="${e(invSubPadre(nivel))}">‹ Volver</button></div>` : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>');
-  return `${volver}<div class="par-subs"><h3 class="par-subs-t">${iconForFamilia(sinAcentos(g.label))} ${e(tit)}</h3><div class="m-fams">${cards.join('')}</div></div>`;
+  return `${volver}<div class="par-subs"><div class="par-head"><h3 class="par-subs-t">${iconForFamilia(sinAcentos(g.label))} ${e(tit)}</h3>${app ? INV_XLS_BTN : ''}</div><div class="m-fams">${cards.join('')}</div></div>`;
+}
+// Exportar a Excel lo que se ve (27.10.2026, Piero: "la opción de exportar a Excel como ícono arriba a la derecha, en base a lo que se
+// muestra… toda la información tal cual"): los productos de la familia / subgrupo abierto con todas las columnas de la lista.
+let INV_XLS = null;
+const INV_XLS_BTN = '<button type="button" class="pc-img-btn inv-xls" data-invxls="1" title="Exportar a Excel lo que se muestra" aria-label="Exportar a Excel"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3.5" fill="#1d7a45"/><path d="M8.2 7.5l7.6 9M15.8 7.5l-7.6 9" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></button>';
+function invExcel(){
+  const X = INV_XLS; if(!X || !X.rows.length){ appToast('No hay productos en esta vista.'); return; }
+  if(typeof XLSX === 'undefined'){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
+  const P = invParetoFilas({ label:X.label, rows:X.rows }), num = function(v){ return v ? Math.round(v * 100) / 100 : 0; };
+  const ORG = { nacional:'Nacional', importado:'Importación', mixto:'Mixto' }, sub = !!(X.keyOf && INV_SUBFAM[X.label]);
+  const cab = ['N°', 'Código', 'Descripción', 'UM'].concat(sub ? ['Subfamilia', 'Subgrupo'] : [], ['Clase (consumo)', '% acumulado', 'US$ comprado', 'Origen', 'Proveedor principal']);
+  P.anios.forEach(function(y){ cab.push('Entró ' + y, 'Salió ' + y); });
+  cab.push('Salió total ' + P.anios[0] + '–' + P.anios[P.anios.length - 1], 'Consumo/mes', 'Consumo/año', 'Stock Lurín', 'En tránsito', 'Punto de reorden (ROP)', 'Bajo el ROP', 'A pedir');
+  const aoa = [cab];
+  P.l.forEach(function(x, i){ const r = x.r, k = sub ? (X.keyOf.get(r) || '').split(' › ') : [];
+    const f = [i + 1, r.codigo, r.descripcion || '', (r.unidad || '').trim()].concat(sub ? [k[0] || '', k[1] || k[0] || ''] : [],
+      [x.cls || '', x.met ? Math.round(x.acum * 1000) / 10 : '', num(x.usd), ORG[x.origen] || '', x.pv || '']);
+    P.anios.forEach(function(y){ f.push(num(x.q[y]), num(x.sal[y])); });
+    f.push(num(x.met), num(r.consumoMensual), num((+r.consumoMensual || 0) * 12), num(x.stock), num(+r.transito || 0), x.alerta ? x.alerta.rop : '', x.alerta ? 'Sí' : '', x.pedir || 0);
+    aoa.push(f); });
+  const ws = XLSX.utils.aoa_to_sheet(aoa), wb = XLSX.utils.book_new();
+  ws['!cols'] = cab.map(function(c, i){ return { wch:i === 2 ? 55 : i === 1 ? 12 : Math.max(9, Math.min(28, c.length + 2)) }; });
+  ws['!autofilter'] = { ref:XLSX.utils.encode_range({ s:{ r:0, c:0 }, e:{ r:aoa.length - 1, c:cab.length - 1 } }) };
+  const nom = sinAcentos(X.label + (X.sub ? ' - ' + X.sub : '')).replace(/[\\/:*?"<>|›]+/g, '-').replace(/\s+/g, ' ').trim();
+  XLSX.utils.book_append_sheet(wb, ws, nom.slice(0, 31));
+  XLSX.writeFile(wb, 'Inventario ' + nom + ' - Grupo Friopacking.xlsx');
 }
 function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, TODOS los códigos y botón "Ver detalle" en cada fila
   // Subgrupos (26.10.2026, Piero: "la forma de ponerlo así en texto no es cómoda, deben estar también en viñetas como subgrupo"): una
@@ -8889,6 +8932,7 @@ function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, 
     if(esT) g = Object.assign({}, g, { rows:g.rows.filter(function(r){ return keyOf.get(r).split(' › ')[0] === sub.slice(2); }), subLbl:sub.slice(2) });
     else if(sub !== '*') g = Object.assign({}, g, { rows:g.rows.filter(function(r){ return keyOf.get(r) === sub; }), subLbl:sub });
     if(!app) subBar = `<div class="ks-bar par-sub"><button type="button" data-parsub="${escapeHtml(invSubPadre(sub))}">‹ Volver</button></div>`; }
+  if(app) INV_XLS = { label:g.label, sub:g.subLbl || '', rows:g.rows, keyOf:INV_SUBFAM[g.label] ? new Map(g.rows.map(function(r){ return [r, invSubfamDe(g.label, r)]; })) : null };
   const P = invParetoFilas(g), e = escapeHtml, n = function(v, d){ return v ? Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }) : '—'; };
   const usd = function(v){ return v ? 'US$ ' + Number(v).toLocaleString('es-PE', { maximumFractionDigits:0 }) : '—'; };
   const usdK = function(v){ return !v ? '—' : v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3) + ' mil' : usd(v); };
@@ -8918,7 +8962,7 @@ function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, 
   }
   return `${app ? '' : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>'}
   <div class="par-box${app ? ' app' : ''}"${app ? '' : ' id="pedirParetoFoto"'}>
-    <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)}${g.subLbl ? ' · ' + e(g.subLbl) : ''} <small>${n(P.l.length, 0)} productos · ${n(P.totC, 0)} unid. salieron de Lurín ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del consumo) · ${usd(P.tot)} comprados${P.l.some(function(x){ return x.alerta; }) ? ` · <b class="par-al">⚠ ${n(P.l.filter(function(x){ return x.alerta; }).length, 0)} bajo el punto de reorden</b>` : ''}</small></h3>
+    <div class="par-head"><h3>${iconForFamilia(sinAcentos(g.label))} ${e(g.label)}${g.subLbl ? ' · ' + e(g.subLbl) : ''} <small>${n(P.l.length, 0)} productos · ${n(P.totC, 0)} unid. salieron de Lurín ${P.anios[0]}–${P.anios[P.anios.length - 1]} · ${n(A.length, 0)} son clase A (80 % del consumo) · ${usd(P.tot)} comprados${P.l.some(function(x){ return x.alerta; }) ? ` · <b class="par-al">⚠ ${n(P.l.filter(function(x){ return x.alerta; }).length, 0)} bajo el punto de reorden</b>` : ''}</small></h3>${app ? INV_XLS_BTN : ''}
 </div>
     ${subBar}${svg}
     <div class="ks-bar" style="margin-top:8px;">${app ? '' : `<span class="lbl">Ver</span>${chip('A', 'Clase A', A.length)}${chip('pedir', 'Por pedir', pedir)}${chip('todos', 'Todos', P.l.length)}`}
@@ -20470,6 +20514,7 @@ function appClickInicio(e){
   if(b.dataset.tdpdfx !== undefined){ APP_TIENDA.pdf = null; const f = document.getElementById('tdPdf'); if(f) f.value = ''; return tdPintar(); }
   if(b.dataset.parsub !== undefined && (b.closest('.par-box.app') || b.closest('#invLista'))){ invParetoSub = { fam:APP_INV.fam, sub:b.dataset.parsub }; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invfam !== undefined){ invParetoSub = { fam:'', sub:'' }; APP_INV.fam = b.dataset.invfam; APP_INV.q = ''; APP_INV.sel = ''; APP_INV.kdx = ''; appRenderInicio(); return window.scrollTo(0, 0); }
+  if(b.dataset.invxls) return invExcel();
   if(b.dataset.invkdx){ if(APP_INV.kdx !== b.dataset.invkdx){ kardexOrigen = null; kdxRango = null; } APP_INV.kdx = b.dataset.invkdx; APP_INV.q = ''; appRenderInicio(); return window.scrollTo(0, 0); }
   if(b.dataset.invkdxvolver){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
     const f = c && document.querySelector('#invLista [data-invkdx="' + CSS.escape(c) + '"]'); if(f) f.closest('.par-fila').scrollIntoView({ block:'center' }); else window.scrollTo(0, 0); return; }
