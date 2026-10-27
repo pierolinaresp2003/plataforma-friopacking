@@ -8862,10 +8862,9 @@ function invSubPadre(sub){ if(!sub) return null; if(sub === '*' || sub.indexOf('
 // Tarjetas con el mismo formato de la pantalla principal de Inventario (26.10.2026, Piero: "es confuso… que sea en viñetas con el mismo
 // formato de la pantalla principal"): primero los grupos (Bridas, Codos…); si un grupo se divide, al tocarlo salen sus subgrupos.
 function invSubgruposHtml(g, keyOf, cnt, app, nivel){
-  const e = escapeHtml, est = new Map(); try{ appInvIndice().items.forEach(function(x){ est.set(x.r.codigo, x.e); }); }catch(err){}
-  const tarjeta = function(dato, ic, tit, rows){ let sin = 0, rep = 0; rows.forEach(function(r){ const s = est.get(r.codigo); if(s === 'sin') sin++; else if(s === 'reponer') rep++; });
-    return `<button type="button" class="ini-card m-fam" data-parsub="${e(dato)}"><span class="m-fam-ic">${ic}</span>
-      <span class="m-fam-tx"><b>${e(tit)}</b><small>${appN(rows.length)} producto${rows.length === 1 ? '' : 's'}${sin ? ` · <em class="rojo">${appN(sin)} sin stock</em>` : ''}${rep ? ` · <em class="ambar">${appN(rep)} por reponer</em>` : ''}</small></span></button>`; };
+  // Solo el nombre del subgrupo, sin el detalle de productos/stock (27.10.2026, Piero: "se confunden, no le coloques el detalle").
+  const e = escapeHtml, tarjeta = function(dato, ic, tit){
+    return `<button type="button" class="ini-card m-fam" data-parsub="${e(dato)}"><span class="m-fam-ic">${ic}</span><span class="m-fam-tx"><b>${e(tit)}</b></span></button>`; };
   const grupoDe = function(k){ return k.split(' › ')[0]; }, G = INV_SUBFAM[g.label], icono = function(gr){ const x = G.find(function(y){ return y[0] === gr; }); return x ? x[1] : '📦'; };
   let tit = g.label, cards = [];
   if(nivel && nivel.indexOf('G:') === 0){ const gr = nivel.slice(2), rows = g.rows.filter(function(r){ return grupoDe(keyOf.get(r)) === gr; });
