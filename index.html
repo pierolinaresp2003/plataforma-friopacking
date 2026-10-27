@@ -8891,7 +8891,7 @@ function invSubgruposHtml(g, keyOf, cnt, app, nivel){
     const grupos = new Map(); cnt.forEach(function(n, k){ const gr = grupoDe(k); (grupos.get(gr) || grupos.set(gr, []).get(gr)).push(k); });
     [...grupos.keys()].sort(function(a, b){ return gi(a) - gi(b); }).forEach(function(gr){ const ks = grupos.get(gr);
       cards.push(tarjeta(ks.length > 1 ? 'G:' + gr : ks[0], icono(gr), gr)); }); }
-  INV_XLS = { label:g.label, sub:nivel ? tit.slice(g.label.length + 3) : '', rows:filas, keyOf:keyOf };
+  INV_XLS = { label:g.label, sub:nivel ? tit.slice(g.label.length + 3) : '', rows:filas, keyOf:keyOf, por:nivel ? 'sub' : 'grupo' };
   const volver = app ? '' : (nivel ? `<div class="ks-bar par-sub"><button type="button" data-parsub="${e(invSubPadre(nivel))}">‹ Volver</button></div>` : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>');
   return `${volver}<div class="par-subs"><div class="par-head"><h3 class="par-subs-t">${iconForFamilia(sinAcentos(g.label))} ${e(tit)}</h3>${app ? INV_XLS_BTN : ''}</div><div class="m-fams">${cards.join('')}</div></div>`;
 }
@@ -8899,27 +8899,72 @@ function invSubgruposHtml(g, keyOf, cnt, app, nivel){
 // muestra… toda la información tal cual"): los productos de la familia / subgrupo abierto con todas las columnas de la lista.
 let INV_XLS = null;
 const INV_XLS_BTN = '<button type="button" class="pc-img-btn inv-xls" data-invxls="1" title="Exportar a Excel lo que se muestra" aria-label="Exportar a Excel"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3.5" fill="#1d7a45"/><path d="M8.2 7.5l7.6 9M15.8 7.5l-7.6 9" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></button>';
-function invExcel(){
+// Excel amigable (27.10.2026, Piero: "¿no puedes crear hojas por cada familia? … más amigable y simple, tal cual se muestra, con esas
+// columnas principales"): una hoja por familia (o por subgrupo si estás dentro de una), con las columnas de la fila de la app:
+// N°, código, descripción, UM, clase, US$ comprado, entró / salió por año, consumo mes y año, stock Lurín y ROP. Con colores (ExcelJS).
+let APP_EXCELJS = null;
+function appCargarExcelJs(){
+  if(window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if(!APP_EXCELJS) APP_EXCELJS = new Promise(function(ok, mal){
+    const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.onload = function(){ window.ExcelJS ? ok(window.ExcelJS) : mal(new Error('ExcelJS')); };
+    s.onerror = function(){ APP_EXCELJS = null; mal(new Error('ExcelJS')); };
+    document.head.appendChild(s); });
+  return APP_EXCELJS;
+}
+async function invExcel(){
   const X = INV_XLS; if(!X || !X.rows.length){ appToast('No hay productos en esta vista.'); return; }
-  if(typeof XLSX === 'undefined'){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
-  const P = invParetoFilas({ label:X.label, rows:X.rows }), num = function(v){ return v ? Math.round(v * 100) / 100 : 0; };
-  const ORG = { nacional:'Nacional', importado:'Importación', mixto:'Mixto' }, sub = !!(X.keyOf && INV_SUBFAM[X.label]);
-  const cab = ['N°', 'Código', 'Descripción', 'UM'].concat(sub ? ['Subfamilia', 'Subgrupo'] : [], ['Clase (consumo)', '% acumulado', 'US$ comprado', 'Origen', 'Proveedor principal']);
-  P.anios.forEach(function(y){ cab.push('Entró ' + y, 'Salió ' + y); });
-  cab.push('Salió total ' + P.anios[0] + '–' + P.anios[P.anios.length - 1], 'Consumo/mes', 'Consumo/año', 'Stock Lurín', 'En tránsito', 'Punto de reorden (ROP)', 'Bajo el ROP', 'A pedir');
-  const aoa = [cab];
-  P.l.forEach(function(x, i){ const r = x.r, k = sub ? (X.keyOf.get(r) || '').split(' › ') : [];
-    const f = [i + 1, r.codigo, r.descripcion || '', (r.unidad || '').trim()].concat(sub ? [k[0] || '', k[1] || k[0] || ''] : [],
-      [x.cls || '', x.met ? Math.round(x.acum * 1000) / 10 : '', num(x.usd), ORG[x.origen] || '', x.pv || '']);
-    P.anios.forEach(function(y){ f.push(num(x.q[y]), num(x.sal[y])); });
-    f.push(num(x.met), num(r.consumoMensual), num((+r.consumoMensual || 0) * 12), num(x.stock), num(+r.transito || 0), x.alerta ? x.alerta.rop : '', x.alerta ? 'Sí' : '', x.pedir || 0);
-    aoa.push(f); });
-  const ws = XLSX.utils.aoa_to_sheet(aoa), wb = XLSX.utils.book_new();
-  ws['!cols'] = cab.map(function(c, i){ return { wch:i === 2 ? 55 : i === 1 ? 12 : Math.max(9, Math.min(28, c.length + 2)) }; });
-  ws['!autofilter'] = { ref:XLSX.utils.encode_range({ s:{ r:0, c:0 }, e:{ r:aoa.length - 1, c:cab.length - 1 } }) };
+  let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
+  appToast('Preparando el Excel…');
+  // Hojas: por familia (vista de la familia), por subgrupo (dentro de una familia) o una sola (lista de un subgrupo).
+  const G = INV_SUBFAM[X.label], hojas = [];
+  if(G && X.por){ const parte = function(r){ const k = (X.keyOf.get(r) || '').split(' › '); return X.por === 'grupo' ? k[0] : (k[1] || k[0]); };
+    const orden = function(nm){ const L = X.por === 'grupo' ? G : ((G.find(function(y){ return y[0] === X.sub; }) || [])[3] || []); const i = L.findIndex(function(y){ return y[0] === nm; }); return i < 0 ? 999 : i; };
+    const m = new Map(); X.rows.forEach(function(r){ const k = parte(r) || 'Otros'; (m.get(k) || m.set(k, []).get(k)).push(r); });
+    [...m.keys()].sort(function(a, b){ return orden(a) - orden(b); }).forEach(function(k){ hojas.push({ nom:k, rows:m.get(k) }); }); }
+  else hojas.push({ nom:X.sub ? X.sub.split(' › ').pop() : X.label, rows:X.rows });
+  const wb = new EJ.Workbook(), usados = new Set(), C = { navy:'FF0A1E64', teal:'FF1A9C86', azul:'FF2F6FD6', borde:'FFD9E2EF', alerta:'FFFFF4D1', naranja:'FFC77700', gris:'FF5B6B7A' };
+  const relleno = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, borde = { style:'thin', color:{ argb:C.borde } };
+  const fmtQ = function(v){ return Number.isInteger(v) ? '#,##0;-#,##0;"·"' : '#,##0.00;-#,##0.00;"·"'; };
+  const corte = rqFecha(appIndCorte());
+  hojas.forEach(function(H){
+    const P = invParetoFilas({ label:X.label, rows:H.rows }), nY = P.anios.length, nc = 6 + nY * 2 + 4;
+    let nm = (H.nom.length > 31 ? H.nom.replace(/\s*\(.*$/, '') : H.nom).replace(/[\\\/?*\[\]:]/g, '-').slice(0, 31).trim() || 'Hoja'; for(let k = 2; usados.has(nm.toLowerCase()); k++) nm = nm.slice(0, 27) + ' (' + k + ')'; usados.add(nm.toLowerCase());
+    const ws = wb.addWorksheet(nm, { views:[{ state:'frozen', xSplit:3, ySplit:5, showGridLines:false }], properties:{ tabColor:{ argb:C.teal } } });
+    ws.mergeCells(1, 1, 1, nc); const t = ws.getCell(1, 1); t.value = X.label + (X.por === 'grupo' || !X.sub ? '' : ' › ' + X.sub) + (X.por ? ' › ' + H.nom : '');
+    t.font = { bold:true, size:15, color:{ argb:C.navy } };
+    ws.mergeCells(2, 1, 2, nc); const st = ws.getCell(2, 1);
+    st.value = P.l.length + ' productos · clase A = suman el 80 % del consumo · por año: entró (verde) / salió (azul) · almacén Lurín · en amarillo: bajo el punto de reorden · datos al ' + corte;
+    st.font = { italic:true, size:10, color:{ argb:C.gris } };
+    // Cabecera en 2 filas: el año arriba y "Entró / Salió" abajo.
+    const cab = ['N°', 'Código', 'Descripción', 'UM', 'Clase', 'US$ comprado'], fin = ['Consumo/mes', 'Consumo/año', 'Stock Lurín', 'ROP'];
+    cab.forEach(function(h, i){ ws.mergeCells(4, i + 1, 5, i + 1); ws.getCell(4, i + 1).value = h; });
+    P.anios.forEach(function(y, i){ const c = 7 + i * 2; ws.mergeCells(4, c, 4, c + 1); ws.getCell(4, c).value = y; ws.getCell(5, c).value = 'Entró'; ws.getCell(5, c + 1).value = 'Salió'; });
+    fin.forEach(function(h, i){ const c = 7 + nY * 2 + i; ws.mergeCells(4, c, 5, c); ws.getCell(4, c).value = h; });
+    for(let r = 4; r <= 5; r++) for(let c = 1; c <= nc; c++){ const x = ws.getCell(r, c); x.fill = relleno(C.navy); x.font = { bold:true, color:{ argb:'FFFFFFFF' } };
+      x.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; x.border = { top:borde, left:borde, bottom:borde, right:borde }; }
+    P.l.forEach(function(x, i){ const r = x.r, al = x.alerta, row = ws.getRow(6 + i);
+      const v = [i + 1, r.codigo, r.descripcion || '', (r.unidad || '').trim(), x.cls || '', Math.round(x.usd || 0)];
+      P.anios.forEach(function(y){ v.push(Math.round((x.q[y] || 0) * 100) / 100, Math.round((x.sal[y] || 0) * 100) / 100); });
+      v.push(Math.round((+r.consumoMensual || 0) * 100) / 100, Math.round((+r.consumoMensual || 0) * 12), Math.round(x.stock * 100) / 100, al ? '⚠ ROP' + (al.imp ? ' imp.' : '') + ' ' + al.rop : '');
+      row.values = v;
+      row.eachCell({ includeEmpty:true }, function(c, k){ c.border = { bottom:borde }; c.alignment = { vertical:'middle', horizontal:k === 3 ? 'left' : 'center', wrapText:k === 3 };
+        if(al) c.fill = relleno(C.alerta); });
+      const q = function(k, color){ const c = row.getCell(k); c.numFmt = fmtQ(c.value || 0); if(color) c.font = { bold:true, color:{ argb:color } }; };
+      row.getCell(2).numFmt = '@'; row.getCell(6).numFmt = '"US$ "#,##0;;"—"'; row.getCell(6).font = { bold:true };
+      if(x.cls){ const c = row.getCell(5); c.fill = relleno(x.cls === 'A' ? C.teal : x.cls === 'B' ? 'FFF2B632' : 'FFB8C4D6'); c.font = { bold:true, color:{ argb:x.cls === 'C' ? C.navy : 'FFFFFFFF' } }; }
+      P.anios.forEach(function(y, j){ q(7 + j * 2, C.teal); q(8 + j * 2, C.azul); });
+      const b = 7 + nY * 2; q(b, null); row.getCell(b).numFmt = '#,##0.00;;"·"'; row.getCell(b).font = { bold:true }; q(b + 1, null); row.getCell(b + 1).font = { bold:true };
+      row.getCell(b + 2).numFmt = '#,##0.##;;"—"'; row.getCell(b + 2).numFmt = fmtQ(x.stock).replace('"·"', '"—"'); row.getCell(b + 2).font = { bold:true };
+      if(al) row.getCell(b + 3).font = { bold:true, color:{ argb:C.naranja } }; });
+    [6, 14, 52, 7, 7, 14].concat(P.anios.reduce(function(a){ return a.concat([8, 8]); }, []), [13, 13, 12, 15]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+    ws.getRow(4).height = 20; ws.getRow(5).height = 18;
+    ws.autoFilter = { from:{ row:5, column:1 }, to:{ row:5 + P.l.length, column:nc } };
+  });
   const nom = sinAcentos(X.label + (X.sub ? ' - ' + X.sub : '')).replace(/[\\/:*?"<>|›]+/g, '-').replace(/\s+/g, ' ').trim();
-  XLSX.utils.book_append_sheet(wb, ws, nom.slice(0, 31));
-  XLSX.writeFile(wb, 'Inventario ' + nom + ' - Grupo Friopacking.xlsx');
+  const buf = await wb.xlsx.writeBuffer();
+  descargarBlob(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Inventario ' + nom + ' - Grupo Friopacking.xlsx');
+  appToast('Excel listo ✔ · ' + hojas.length + ' hoja' + (hojas.length === 1 ? '' : 's'));
 }
 function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, TODOS los códigos y botón "Ver detalle" en cada fila
   // Subgrupos (26.10.2026, Piero: "la forma de ponerlo así en texto no es cómoda, deben estar también en viñetas como subgrupo"): una
@@ -17815,7 +17860,9 @@ function appInvIndice(){
   });
   // Familia de cada código: la misma categoría de "Cuánto pedir por categoría" (07.10.2026, Piero:
   // "la parte de inventario la puedes colocar como antes agrupada por familia").
-  items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; x.dnf = invEsDanfoss(x.r); x.inx = invEsInox(x.r); x.ppr = invEsPpr(x.r); x.tsc = invEsTubSch(x.r); });   // + DANFOSS y ACCESORIOS INOX (22.10.2026)
+  items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; x.dnf = invEsDanfoss(x.r); x.inx = invEsInox(x.r); x.ppr = invEsPpr(x.r); x.tsc = invEsTubSch(x.r);
+    // Una sola familia por código (27.10.2026, Piero: "que no se repitan códigos en otras familias"): DANFOSS > PPR > ACCESORIOS INOX > TUBERÍAS SCH > su familia.
+    x.famU = x.dnf ? 'DANFOSS' : x.ppr ? 'PPR' : x.inx ? 'ACCESORIOS INOX' : x.tsc ? 'TUBERÍAS SCH' : x.fam; });   // + DANFOSS y ACCESORIOS INOX (22.10.2026)
   APP_INV.cache = { firma:firma, items:items };
   return APP_INV.cache;
 }
@@ -17829,7 +17876,7 @@ function appInvFiltrada(){
       .sort(function(a,b){ return b.cons - a.cons || b.tot - a.tot; });
   } else {
     const orden = { sin:0, reponer:1, ok:2, sinmov:3, sinrop:4, nada:5 };
-    l = idx.filter(function(x){ return (APP_INV.fam === 'DANFOSS' ? x.dnf : APP_INV.fam === 'ACCESORIOS INOX' ? x.inx : APP_INV.fam === 'PPR' ? x.ppr : APP_INV.fam === 'TUBERÍAS SCH' ? x.tsc : x.fam === APP_INV.fam) && (x.e !== 'nada' || (APP_INV.fam === 'TUBERÍAS SCH' && x.tsc)); })
+    l = idx.filter(function(x){ return x.famU === APP_INV.fam && (x.e !== 'nada' || APP_INV.fam === 'TUBERÍAS SCH'); })
       .sort(function(a,b){ return orden[a.e] - orden[b.e] || b.cons - a.cons || b.tot - a.tot; });
   }
   return l;
@@ -17838,22 +17885,16 @@ function appInvFiltrada(){
 // al instante y el resto se agrega solo, por tandas, para que el celular no se congele.
 const APP_INV_PRIMEROS = 40;
 function appInvFamilias(){
-  const g = new Map();
-  appInvIndice().items.forEach(function(x){ if(x.e === 'nada') return;
-    const y = g.get(x.fam) || { fam:x.fam, n:0, sin:0, rep:0 }; y.n++; if(x.e === 'sin') y.sin++; if(x.e === 'reponer') y.rep++; g.set(x.fam, y); });
-  // Familia DANFOSS (22.10.2026, Piero: "no veo la familia danfoss"): primera, junta los productos Danfoss de todas las familias.
-  const dn = { fam:'DANFOSS', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.dnf) return; dn.n++; if(x.e === 'sin') dn.sin++; if(x.e === 'reponer') dn.rep++; });
-  const ix = { fam:'ACCESORIOS INOX', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.inx) return; ix.n++; if(x.e === 'sin') ix.sin++; if(x.e === 'reponer') ix.rep++; });
-  const pp = { fam:'PPR', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(x.e === 'nada' || !x.ppr) return; pp.n++; if(x.e === 'sin') pp.sin++; if(x.e === 'reponer') pp.rep++; });
-  const ts = { fam:'TUBERÍAS SCH', n:0, sin:0, rep:0 }; appInvIndice().items.forEach(function(x){ if(!x.tsc) return; ts.n++; if(x.e === 'sin') ts.sin++; if(x.e === 'reponer') ts.rep++; });
+  // Cada código en UNA familia (x.famU) y tarjetas solo con el nombre (27.10.2026, Piero: "las tarjetas sin el detalle, solo el nombre").
+  const g = new Set();
+  appInvIndice().items.forEach(function(x){ if(x.e !== 'nada' || x.famU === 'TUBERÍAS SCH') g.add(x.famU); });
   // Orden alfabético (22.10.2026, Piero: "grupo de familias en tarjetas que deben estar ordenadas alfabéticamente").
-  return `<div class="m-fams">${(dn.n ? [dn] : []).concat(ix.n ? [ix] : [], pp.n ? [pp] : [], ts.n ? [ts] : []).concat([...g.values()]).sort(function(a,b){ return a.fam.localeCompare(b.fam, 'es'); }).map(function(y){
-    return `<button type="button" class="ini-card m-fam" data-invfam="${escapeHtml(y.fam)}"><span class="m-fam-ic">${iconForFamilia(sinAcentos(y.fam))}</span>
-      <span class="m-fam-tx"><b>${escapeHtml(y.fam)}</b><small>${appN(y.n)} producto${y.n === 1 ? '' : 's'}${y.sin ? ` · <em class="rojo">${appN(y.sin)} sin stock</em>` : ''}${y.rep ? ` · <em class="ambar">${appN(y.rep)} por reponer</em>` : ''}</small></span></button>`; }).join('')}</div>`;
+  return `<div class="m-fams">${[...g].sort(function(a, b){ return a.localeCompare(b, 'es'); }).map(function(f){
+    return `<button type="button" class="ini-card m-fam" data-invfam="${escapeHtml(f)}"><span class="m-fam-ic">${iconForFamilia(sinAcentos(f))}</span><span class="m-fam-tx"><b>${escapeHtml(f)}</b></span></button>`; }).join('')}</div>`;
 }
 // Una familia (22.10.2026, Piero): primero el Pareto y debajo TODOS sus códigos con el detalle por año; cada fila tiene
 // "Ver detalle ›" que abre el kardex del producto. Botones para volver: producto → familia → todas las familias.
-function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return (x.e !== 'nada' || fam === 'TUBERÍAS SCH') && (fam === 'DANFOSS' ? x.dnf : fam === 'ACCESORIOS INOX' ? x.inx : fam === 'PPR' ? x.ppr : fam === 'TUBERÍAS SCH' ? x.tsc : x.fam === fam); }).map(function(x){ return x.r; }); }
+function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return (x.e !== 'nada' || fam === 'TUBERÍAS SCH') && x.famU === fam; }).map(function(x){ return x.r; }); }
 function appInvFamiliaHtml(){
   return invParetoHtml({ label:APP_INV.fam, rows:appInvFamRows(APP_INV.fam) }, true);
 }
