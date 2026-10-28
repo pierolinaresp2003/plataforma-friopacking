@@ -3155,6 +3155,9 @@ function isoDay(d){
 }
 function fromIsoDay(s){
   if(!s) return null;
+  // Camino rápido sin expresión regular (29.10.2026, velocidad: se llama decenas de miles de veces al cargar los datos).
+  if(typeof s === 'string' && s.length >= 10 && s.charCodeAt(4) === 45 && s.charCodeAt(7) === 45){ const y = +s.slice(0, 4), mo = +s.slice(5, 7), d = +s.slice(8, 10);
+    if(y === y && mo === mo && d === d) return new Date(Date.UTC(y, mo - 1, d)); }
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(!m) return null;
   return new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
@@ -8716,33 +8719,33 @@ const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrup
     ['Otros accesorios', '🔧', /./, [['Otros accesorios', /./]]]
   ],
   'SIEMENS':[
-    ['Pulsadores y señalización', '🔘', /3SU|3SB|PULSADOR|SELECTOR|PILOTO|LAMPARA|PARADA DE EMERGENCIA/, [['Pulsadores y señalización', /./]]],
-    ['Accesorios de contactor y guardamotor', '🧷', /3RV29|3RA29|3RT29|3RH29|3RA19|3RT19|CONTACTO (FRONTAL|AUXILIAR|LATERAL)|ACOPLE|BLOQUE DE CONTACTO|BARRA DE (CONEXION|ALIMENTACION)|BORNE/, [['Accesorios', /./]]],
-    ['Interruptores de caja moldeada y abiertos (3VA / 3VM / 3WL)', '🗃️', /3VA|3VM|3VL|3WL|3WA|3VW|CAJA MOLDEADA/, [['Caja moldeada', /./]]],
-    ['Diferenciales (5SV / 5SM)', '🛡️', /5SV|5SM|DIFERENCIAL/, [['Diferenciales', /./]]],
-    ['Termomagnéticos (5SY / 5SL)', '⚡', /5S[YLJTP]|TERMOMAGNETICO|\bITM\b|AUTOMATICO/, [['Termomagnéticos', /./]]],
-    ['Contactores', '🔌', /3RT|CONTACTOR/, [['Contactores', /./]]],
-    ['Guardamotores', '🧯', /3RV|GUARDAMOTOR/, [['Guardamotores', /./]]],
-    ['Relés térmicos y de control', '⏱️', /3RU|3RB|3UG|3RP|3RS|3RQ|RELE/, [['Relés', /./]]],
-    ['Medidores y analizadores (Sentron)', '📈', /7KM|SENTRON|ANALIZADOR|MEDIDOR|3KC/, [['Medidores y analizadores', /./]]],
-    ['Variadores y arrancadores (Sinamics)', '🎚️', /6SL|6SE|SINAMICS|3RW|ARRANCADOR|VARIADOR/, [['Variadores y arrancadores', /./]]],
-    ['PLC y módulos (Simatic, LOGO!)', '🖥️', /6ES7|6ES5|SIMATIC|LOGO|6ED1|CPU|MODULO|BASE PARA MODULO/, [['PLC y módulos', /./]]],
-    ['HMI, fuentes y comunicación', '📟', /6AV|6EP|6GK|6XV|FUENTE|SITOP|HMI|PANEL|SWITCH|SCALANCE/, [['HMI, fuentes y comunicación', /./]]],
+    ['Pulsadores y señalización', '🔘', /(?<![A-Z0-9-])(?:3SU|3SB)|PULSADOR|SELECTOR|PILOTO|LAMPARA|PARADA DE EMERGENCIA/, [['Pulsadores y señalización', /./]]],
+    ['Accesorios de contactor y guardamotor', '🧷', /(?<![A-Z0-9-])(?:3RV29|3RA29|3RT29|3RH29|3RA19|3RT19)|CONTACTO (FRONTAL|AUXILIAR|LATERAL)|ACOPLE|BLOQUE DE CONTACTO|BARRA DE (CONEXION|ALIMENTACION)|BORNE/, [['Accesorios', /./]]],
+    ['Interruptores de caja moldeada y abiertos (3VA / 3VM / 3WL)', '🗃️', /(?<![A-Z0-9-])(?:3VA|3VM|3VL|3WL|3WA|3VW)|CAJA MOLDEADA/, [['Caja moldeada', /./]]],
+    ['Diferenciales (5SV / 5SM)', '🛡️', /(?<![A-Z0-9-])(?:5SV|5SM)|DIFERENCIAL/, [['Diferenciales', /./]]],
+    ['Termomagnéticos (5SY / 5SL)', '⚡', /(?<![A-Z0-9-])(?:5S[YLJTP])|TERMOMAGNETICO|\bITM\b|AUTOMATICO/, [['Termomagnéticos', /./]]],
+    ['Contactores', '🔌', /(?<![A-Z0-9-])(?:3RT)|CONTACTOR/, [['Contactores', /./]]],
+    ['Guardamotores', '🧯', /(?<![A-Z0-9-])(?:3RV)|GUARDAMOTOR/, [['Guardamotores', /./]]],
+    ['Relés térmicos y de control', '⏱️', /(?<![A-Z0-9-])(?:3RU|3RB|3UG|3RP|3RS|3RQ|RELE)/, [['Relés', /./]]],
+    ['Medidores y analizadores (Sentron)', '📈', /(?<![A-Z0-9-])(?:7KM|3KC)|SENTRON|ANALIZADOR|MEDIDOR/, [['Medidores y analizadores', /./]]],
+    ['Variadores y arrancadores (Sinamics)', '🎚️', /(?<![A-Z0-9-])(?:6SL|6SE|3RW)|SINAMICS|ARRANCADOR|VARIADOR/, [['Variadores y arrancadores', /./]]],
+    ['PLC y módulos (Simatic, LOGO!)', '🖥️', /(?<![A-Z0-9-])(?:6ES7|6ES5|LOGO|6ED1|CPU)|SIMATIC|MODULO|BASE PARA MODULO/, [['PLC y módulos', /./]]],
+    ['HMI, fuentes y comunicación', '📟', /(?<![A-Z0-9-])(?:6AV|6EP|6GK|6XV|HMI)|FUENTE|SITOP|PANEL|SWITCH|SCALANCE/, [['HMI, fuentes y comunicación', /./]]],
     ['Otros Siemens', '📦', /./, [['Otros Siemens', /./]]]
   ],
   'SCHNEIDER ELECTRIC':[
-    ['Pulsadores y señalización', '🔘', /XB[457]|ZB[45]|ZBE|ZBV|ZBY|XA2|XVB|XVL|XVR|BALIZA|PULSADOR|SELECTOR|PILOTO|PARADA DE EMERGENCIA/, [['Pulsadores y señalización', /./]]],
-    ['Accesorios de contactor y guardamotor', '🧷', /GVA[EMN]|LAD|BLOQUE DE CONTACTO|CONTACTO (AUXILIAR|FRONTAL)|ACOPLE/, [['Accesorios', /./]]],
-    ['Interruptores de caja moldeada', '🗃️', /NSX|LV4|LV5|LV8|EZC|CAJA MOLDEADA/, [['Caja moldeada', /./]]],
-    ['Interruptores y diferenciales (Acti 9)', '⚡', /A9[A-Z]|IC60|ACTI ?9|EZ9|DIFERENCIAL|TERMOMAGNETICO|\bITM\b/, [['Acti 9', /./]]],
-    ['Contactores (TeSys)', '🔌', /LC1|LC2|LP1|CONTACTOR/, [['Contactores', /./]]],
-    ['Guardamotores (GV)', '🧯', /GV[2347]|GUARDAMOTOR/, [['Guardamotores', /./]]],
-    ['Relés térmicos y de control', '⏱️', /LRD|LR2|LR9|RXM|RSB|RXZ|RM[12]\d|RE17|RE22|RELE/, [['Relés', /./]]],
-    ['Variadores y arrancadores (Altivar)', '🎚️', /ATV|ATS|ALTIVAR|VARIADOR|ARRANCADOR|VW3|LXM/, [['Variadores y arrancadores', /./]]],
-    ['PLC Modicon (M221, M241, M340, M580)', '🖥️', /TM[23]\d|TMC|BME|BMX|MODICON|M2[24]1|M340|M580|PLC|CPU/, [['PLC Modicon', /./]]],
-    ['Finales de carrera y sensores', '📍', /XCK|XCM|XS[1-9]|XUB|XUK|XMLA|FIN DE CARRERA|SENSOR/, [['Finales de carrera y sensores', /./]]],
-    ['HMI, fuentes, medidores y comunicación', '📟', /HMI|ABL|METSE|MEDIDOR|FUENTE|MCSESU|SWITCH/, [['HMI, fuentes y medidores', /./]]],
-    ['Gabinetes y accesorios (Spacial)', '🗄️', /NSY|ARMARIO|PLACA|BORNERA|RIEL|AIRE ACONDICIONADO/, [['Gabinetes y accesorios', /./]]],
+    ['Pulsadores y señalización', '🔘', /(?<![A-Z0-9-])(?:XB[457]|ZB[45]|ZBE|ZBV|ZBY|XA2|XVB|XVL|XVR)|BALIZA|PULSADOR|SELECTOR|PILOTO|PARADA DE EMERGENCIA/, [['Pulsadores y señalización', /./]]],
+    ['Accesorios de contactor y guardamotor', '🧷', /(?<![A-Z0-9-])(?:LAD)|GVA[EMN]|BLOQUE DE CONTACTO|CONTACTO (AUXILIAR|FRONTAL)|ACOPLE/, [['Accesorios', /./]]],
+    ['Interruptores de caja moldeada', '🗃️', /(?<![A-Z0-9-])(?:NSX|LV4|LV5|LV8|EZC)|CAJA MOLDEADA/, [['Caja moldeada', /./]]],
+    ['Interruptores y diferenciales (Acti 9)', '⚡', /(?<![A-Z0-9-])(?:A9[A-Z]|IC60|EZ9)|ACTI ?9|DIFERENCIAL|TERMOMAGNETICO|\bITM\b/, [['Acti 9', /./]]],
+    ['Contactores (TeSys)', '🔌', /(?<![A-Z0-9-])(?:LC1|LC2|LP1)|CONTACTOR/, [['Contactores', /./]]],
+    ['Guardamotores (GV)', '🧯', /(?<![A-Z0-9-])(?:GV[2347])|GUARDAMOTOR/, [['Guardamotores', /./]]],
+    ['Relés térmicos y de control', '⏱️', /(?<![A-Z0-9-])(?:LRD|LR2|LR9|RXM|RSB|RXZ|RM[12]\d|RE17|RE22|RELE)/, [['Relés', /./]]],
+    ['Variadores y arrancadores (Altivar)', '🎚️', /(?<![A-Z0-9-])(?:ATV|ATS|VW3|LXM)|ALTIVAR|VARIADOR|ARRANCADOR/, [['Variadores y arrancadores', /./]]],
+    ['PLC Modicon (M221, M241, M340, M580)', '🖥️', /(?<![A-Z0-9-])(?:TM[23]\d|TMC|BME|BMX|M2[24]1|M340|M580|PLC|CPU)|MODICON/, [['PLC Modicon', /./]]],
+    ['Finales de carrera y sensores', '📍', /(?<![A-Z0-9-])(?:XCK|XCM|XS[1-9]|XUB|XUK|XMLA)|FIN DE CARRERA|SENSOR/, [['Finales de carrera y sensores', /./]]],
+    ['HMI, fuentes, medidores y comunicación', '📟', /(?<![A-Z0-9-])(?:HMI|ABL)|METSE|MEDIDOR|FUENTE|MCSESU|SWITCH/, [['HMI, fuentes y medidores', /./]]],
+    ['Gabinetes y accesorios (Spacial)', '🗄️', /(?<![A-Z0-9-])(?:NSY|RIEL)|ARMARIO|PLACA|BORNERA|AIRE ACONDICIONADO/, [['Gabinetes y accesorios', /./]]],
     ['Otros Schneider', '📦', /./, [['Otros Schneider', /./]]]
   ],
   'CABLES Y CONDUCTORES':[
@@ -9066,16 +9069,16 @@ async function invExcel(meses, tipo){
     [...m.keys()].sort(function(a, b){ return orden(a) - orden(b); }).forEach(function(k){ hojas.push({ nom:k, rows:m.get(k) }); }); }
   else hojas.push({ nom:X.sub ? X.sub.split(' › ').pop() : X.label, rows:X.rows });
   if(hojas.length > 1) hojas.unshift({ nom:'Todos', rows:X.rows, todos:true });   // 1.ª hoja: todo lo descargado junto (28.10.2026, Piero)
-  const wb = new EJ.Workbook(), usados = new Set(), C = { navy:'FF0A1E64', teal:'FF1A9C86', azul:'FF2F6FD6', borde:'FFD9E2EF', alerta:'FFFFF4D1', naranja:'FFC77700', gris:'FF5B6B7A', anio:'FFE6EEF9', navy2:'FF2A4A9C' };
+  const wb = new EJ.Workbook(), usados = new Set(), C = { navy:'FF25344A', teal:'FF2E7360', azul:'FF3D5C82', borde:'FFE2E6EC', alerta:'FFFDF6E0', naranja:'FF9A6B1F', gris:'FF6B7785', anio:'FFF5F7FA', navy2:'FF3A4B63', tinta:'FF2B2F36' };   // paleta sobria (28.10.2026, Piero)
   const relleno = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, borde = { style:'thin', color:{ argb:C.borde } };
   const fmtQ = function(v){ return Number.isInteger(v) ? '#,##0;-#,##0;"·"' : '#,##0.00;-#,##0.00;"·"'; };
   const corte = rqFecha(appIndCorte());
   hojas.forEach(function(H){
     const P = invParetoFilas({ label:X.label, rows:H.rows }), nY = P.anios.length, nc = 6 + nY * 2 + 6;
     let nm = (H.nom.length > 31 ? H.nom.replace(/\s*\(.*$/, '') : H.nom).replace(/[\\\/?*\[\]:]/g, '-').slice(0, 31).trim() || 'Hoja'; for(let k = 2; usados.has(nm.toLowerCase()); k++) nm = nm.slice(0, 27) + ' (' + k + ')'; usados.add(nm.toLowerCase());
-    const ws = wb.addWorksheet(nm, { views:[{ state:'frozen', xSplit:3, ySplit:5, showGridLines:false }], properties:{ tabColor:{ argb:H.todos ? C.navy : C.teal } } });
+    const ws = wb.addWorksheet(nm, { views:[{ state:'frozen', xSplit:3, ySplit:5, showGridLines:false }], properties:{ tabColor:{ argb:H.todos ? C.navy : 'FF8A9BB0' } } });
     ws.mergeCells(1, 1, 1, nc); const t = ws.getCell(1, 1); t.value = X.label + (X.por === 'grupo' || !X.sub ? '' : ' › ' + X.sub) + (X.por && !H.todos ? ' › ' + H.nom : H.todos ? ' · todos los productos' : '');
-    t.font = { bold:true, size:15, color:{ argb:C.navy } };
+    t.font = { bold:true, size:14, color:{ argb:C.navy } };
     ws.mergeCells(2, 1, 2, nc); const st = ws.getCell(2, 1);
     st.value = P.l.length + ' productos · clase A = suman el 80 % del consumo · por año: entró (verde) / salió (azul) · almacén Lurín · en amarillo: bajo el punto de reorden · ' + (tipo === 'imp' ? 'IMPORTACIÓN' : 'COMPRA NACIONAL') + ': A pedir = consumo/mes × ' + meses + ' meses − (stock Lurín + en tránsito) · datos al ' + corte;
     st.font = { italic:true, size:10, color:{ argb:C.gris } };
@@ -9084,7 +9087,7 @@ async function invExcel(meses, tipo){
     cab.forEach(function(h, i){ ws.mergeCells(4, i + 1, 5, i + 1); ws.getCell(4, i + 1).value = h; });
     P.anios.forEach(function(y, i){ const c = 7 + i * 2; ws.mergeCells(4, c, 4, c + 1); ws.getCell(4, c).value = y; ws.getCell(5, c).value = 'Entró'; ws.getCell(5, c + 1).value = 'Salió'; });
     fin.forEach(function(h, i){ const c = 7 + nY * 2 + i; ws.mergeCells(4, c, 5, c); ws.getCell(4, c).value = h; });
-    for(let r = 4; r <= 5; r++) for(let c = 1; c <= nc; c++){ const x = ws.getCell(r, c); x.fill = relleno(C.navy); x.font = { bold:true, color:{ argb:'FFFFFFFF' } };
+    for(let r = 4; r <= 5; r++) for(let c = 1; c <= nc; c++){ const x = ws.getCell(r, c); x.fill = relleno(C.navy); x.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } };
       x.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; x.border = { top:borde, left:borde, bottom:borde, right:borde };
       const j = c - 7; if(j >= 0 && j < nY * 2 && Math.floor(j / 2) % 2 === 1) x.fill = relleno(C.navy2); }   // años intercalados por color
     P.l.forEach(function(x, i){ const r = x.r, al = x.alerta, row = ws.getRow(6 + i);
@@ -9093,18 +9096,18 @@ async function invExcel(meses, tipo){
       const cm = +r.consumoMensual || 0, tr = +r.transito || 0, ul = appSkuHistorial(r.codigo).find(function(h){ return h.pu != null; }), pide = cm > 0 ? Math.max(0, Math.ceil(cm * meses - x.stock - tr)) : 0;
       v.push(Math.round(cm * 100) / 100, Math.round(cm * 12), Math.round(x.stock * 100) / 100, Math.round(tr * 100) / 100, ul ? Math.round(ul.pu * 100) / 100 : '—', pide);
       row.values = v;
-      row.eachCell({ includeEmpty:true }, function(c, k){ c.border = { bottom:borde }; c.alignment = { vertical:'middle', horizontal:k === 3 ? 'left' : 'center', wrapText:k === 3 };
+      row.eachCell({ includeEmpty:true }, function(c, k){ c.border = { bottom:borde }; c.font = { size:10, color:{ argb:C.tinta } }; c.alignment = { vertical:'middle', horizontal:k === 3 ? 'left' : 'center', wrapText:k === 3 };
         if(al && k <= 4) c.fill = relleno(C.alerta);   // el amarillo solo hasta la columna D (27.10.2026, Piero)
         const j = k - 7; if(j >= 0 && j < nY * 2 && Math.floor(j / 2) % 2 === 0) c.fill = relleno(C.anio); });
-      const q = function(k, color){ const c = row.getCell(k); c.numFmt = fmtQ(c.value || 0); if(color) c.font = { bold:true, color:{ argb:color } }; };
-      row.getCell(2).numFmt = '@'; row.getCell(6).numFmt = '"US$ "#,##0;;"—"'; row.getCell(6).font = { bold:true };
-      if(x.cls){ const c = row.getCell(5); c.fill = relleno(x.cls === 'A' ? C.teal : x.cls === 'B' ? 'FFF2B632' : 'FFB8C4D6'); c.font = { bold:true, color:{ argb:x.cls === 'C' ? C.navy : 'FFFFFFFF' } }; }
+      const q = function(k, color){ const c = row.getCell(k); c.numFmt = fmtQ(c.value || 0); if(color) c.font = { size:10, color:{ argb:color } }; };
+      row.getCell(2).numFmt = '@'; row.getCell(6).numFmt = '"US$ "#,##0;;"—"';
+      if(x.cls){ const c = row.getCell(5); c.fill = relleno(x.cls === 'A' ? 'FFE6F0EC' : x.cls === 'B' ? 'FFFBF3E2' : 'FFF0F2F5'); c.font = { bold:true, size:10, color:{ argb:x.cls === 'A' ? C.teal : x.cls === 'B' ? C.naranja : C.gris } }; }
       P.anios.forEach(function(y, j){ q(7 + j * 2, C.teal); q(8 + j * 2, C.azul); });
-      const b = 7 + nY * 2; q(b, null); row.getCell(b).numFmt = '#,##0.00;;"·"'; row.getCell(b).font = { bold:true }; q(b + 1, null); row.getCell(b + 1).font = { bold:true };
-      row.getCell(b + 2).numFmt = '#,##0.##;;"—"'; row.getCell(b + 2).numFmt = fmtQ(x.stock).replace('"·"', '"—"'); row.getCell(b + 2).font = { bold:true };
+      const b = 7 + nY * 2; q(b, null); row.getCell(b).numFmt = '#,##0.00;;"·"'; q(b + 1, null);
+      row.getCell(b + 2).numFmt = '#,##0.##;;"—"'; row.getCell(b + 2).numFmt = fmtQ(x.stock).replace('"·"', '"—"'); row.getCell(b + 2).font = { bold:true, size:10, color:{ argb:C.tinta } };
       q(b + 3, null); const mf = ul && ul.mon === 'S/' ? '"S/ "#,##0.00' : '"US$ "#,##0.00';
       row.getCell(b + 4).numFmt = mf;
-      const cp = row.getCell(b + 5); cp.numFmt = '#,##0;;"—"'; if(pide){ cp.fill = relleno('FFDDF3EC'); cp.font = { bold:true, color:{ argb:C.teal } }; } });
+      const cp = row.getCell(b + 5); cp.numFmt = '#,##0;;"—"'; if(pide){ cp.fill = relleno('FFE6F0EC'); cp.font = { bold:true, size:10, color:{ argb:C.teal } }; } });
     [6, 14, 52, 7, 7, 14].concat(P.anios.reduce(function(a){ return a.concat([8, 8]); }, []), [13, 13, 12, 12, 16, 13]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
     ws.getRow(4).height = 20; ws.getRow(5).height = 18;
     ws.autoFilter = { from:{ row:5, column:1 }, to:{ row:5 + P.l.length, column:nc } };
@@ -13201,7 +13204,7 @@ function rqPreparar(){
   // "Seguimiento de Requerimiento Interno" del 0023138: 8 ítems en Nisira = 8 filas en el Excel).
   // Por eso acá no se descarta ni se fusiona nada; solo se funden las continuaciones de OC (que no son
   // ítems), se reparte la salida y se calcula el estado.
-  RQ.filas = rqRepartirSalida(rqFundirContinuaciones(rows));
+  RQ.filas = rqRepartirSalida(rqFundirContinuaciones(rows), true);   // true: ya son copias (29.10.2026, velocidad: una sola copia de cada fila)
   const vias = {};
   RQ.filas.forEach(function(r){
     r.via = rqViaReal(r);
@@ -13257,8 +13260,8 @@ function rqFundirContinuaciones(rows){
 // cuando una parte salió de stock y otra se compró, Nisira suele despacharlas juntas en una sola
 // guía (el 0001-0021874 sacó 720 m que cubrían sus ítems de 240 y 480). Separarlos dejaba el ítem
 // con OC como "sin salida" y lo contaba como reserva fantasma (25.09.2026).
-function rqRepartirSalida(rows){
-  const copias = rows.map(function(r){ return Object.assign({}, r); });
+function rqRepartirSalida(rows, yaCopias){
+  const copias = yaCopias ? rows : rows.map(function(r){ return Object.assign({}, r); });
   const grupos = new Map();
   copias.forEach(function(r){
     const k = r.codRequerimiento + '|' + r.idProducto;
@@ -14170,7 +14173,7 @@ document.addEventListener('click', function(e){
 });
 document.addEventListener('keydown', function(e){ if(e.key === 'Escape') rqCerrarPop(); });
 window.addEventListener('resize', rqCerrarPop);
-document.addEventListener('scroll', rqCerrarPop, true);
+document.addEventListener('scroll', function(){ if(document.getElementById('rqPop')) rqCerrarPop(); }, { capture:true, passive:true });
 
 // ---------------------------------------------------------- imagen para WhatsApp (25.09.2026)
 // Resumen del requerimiento que se está consultando, en el mismo lienzo 1080x1350 y con la misma
@@ -15793,8 +15796,10 @@ function appSync(seccion, bloqueado){
 // Reproduce una animación de entrada (quita y vuelve a poner la clase) y la limpia al terminar.
 function appAnim(el, cls, ms){
   if(!el) return;
+  // Sin forzar el cálculo del diseño (void el.offsetWidth recalculaba toda la pantalla en cada cambio, 29.10.2026, velocidad):
+  // se quita la clase y se vuelve a poner en el cuadro siguiente, y la animación arranca de nuevo igual.
   ['tr-der', 'tr-izq', 'tr-sube', 'tr-entrada'].forEach(function(c){ el.classList.remove(c); });
-  void el.offsetWidth; el.classList.add(cls);
+  requestAnimationFrame(function(){ el.classList.add(cls); });
   clearTimeout(el._tr); el._tr = setTimeout(function(){ el.classList.remove(cls); }, ms || 900);
 }
 function appInicio(pantalla){
@@ -16120,7 +16125,7 @@ function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_
 // Mientras nadie toca nada, se adelanta el cálculo de las otras pestañas de a poquito (un trozo por
 // pausa), para que el primer toque también sea rápido.
 function appPrecalentar(){
-  if(!RQ_MOVIL.matches || !appHayDatos()) return;
+  if(!appHayDatos()) return;   // también en la web (29.10.2026): el primer toque de cada pestaña sale ya calculado
   rqPreparar();   // antes de la firma: si RQ.filas se armaba a mitad del adelanto, se borraba todo lo ya calculado (14.10.2026)
   if(appPrecalentar._firma === appFirmaDatos() + APP.vista + gerAbierto) return;
   appPrecalentar._firma = appFirmaDatos() + APP.vista + gerAbierto;
@@ -16282,7 +16287,20 @@ function appDailyMes(n){          // cambia de mes y selecciona su último día 
   APP_DAILY.anio = a; APP_DAILY.mes = m; APP_DAILY.dia = isoDay(d);
 }
 function appDailyTot(l, k){ const u = new Set(); l.forEach(function(x){ x[k].forEach(function(v, key){ u.add(x[k] instanceof Map ? key : v); }); }); return u.size; }   // sin contar dos veces un pedido de dos personas
-function appDailyActividad(dia){ if(appDailyEsAlm()) return appDailyAlmAct().get(dia) || 0; return appDailyDatos(dia).lista.reduce(function(a, x){ return a + x.pts; }, 0); }
+function appDailyActividad(dia){ return (appDailyEsAlm() ? appDailyAlmAct() : appDailyComAct()).get(dia) || 0; }
+// Puntos de Compras por día para el calendario en UNA pasada (29.10.2026, Piero: "optimiza todo el app"): mismo conteo que
+// appDailyDatos (1 por OC emitida + 1 por SKU de esas OC + 1 por pedido directo), sin armar el detalle completo de cada día.
+function appDailyComAct(){
+  return appMemo('dailyComAct', function(){
+    const B = appDailyBase(), D = new Map(), ped = new Set();
+    const ok = function(v){ const c = pdPersona(v); return PD_PERSONAS[c] && APP_DAILY_EQUIPO.indexOf(c) !== -1 ? c : null; };
+    const suma = function(d, n){ D.set(d, (D.get(d) || 0) + n); };
+    B.porOC.forEach(function(o){ if(o.anul || !o.fo || !ok(o.uc)) return; suma(o.fo, 1 + o.sku.size); });
+    B.filas.forEach(function(F){ const r = F.r; if(!F.fp || !r.codPedido || !r.esPedidoDirecto) return; const c = ok(r.responsablePedido); if(!c) return;
+      const k = F.fp + '|' + c + '|' + r.codPedido; if(!ped.has(k)){ ped.add(k); suma(F.fp, 1); } });
+    return D;
+  });
+}
 // Puntos de Almacén por día para el calendario en UNA pasada (22.10.2026, velocidad): mismo conteo que appDailyAlmDatos
 // (1 por pedido o guía distinta de cada persona + 1 por ítem), sin rehacer todo el detalle de cada día.
 function appDailyAlmAct(){
