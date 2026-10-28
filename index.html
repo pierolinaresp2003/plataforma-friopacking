@@ -18064,7 +18064,8 @@ function appInvFamilias(){
   const g = new Set();
   appInvIndice().items.forEach(function(x){ if(x.e !== 'nada' || x.famU === 'TUBERÍAS SCH') g.add(x.famU); });
   // Orden alfabético (22.10.2026, Piero: "grupo de familias en tarjetas que deben estar ordenadas alfabéticamente").
-  return `<div class="m-fams">${[...g].sort(function(a, b){ return a.localeCompare(b, 'es'); }).map(function(f){
+  // En lista hacia abajo, sin íconos y "OTROS" al final, igual que los subgrupos (28.10.2026, Piero).
+  return `<div class="m-fams inv-sublista">${[...g].sort(function(a, b){ return (/^otros/i.test(a) - /^otros/i.test(b)) || a.localeCompare(b, 'es'); }).map(function(f){
     return `<button type="button" class="ini-card m-fam" data-invfam="${escapeHtml(f)}"><span class="m-fam-ic">${iconForFamilia(sinAcentos(f))}</span><span class="m-fam-tx"><b>${escapeHtml(f)}</b></span></button>`; }).join('')}</div>`;
 }
 // Una familia (22.10.2026, Piero): primero el Pareto y debajo TODOS sus códigos con el detalle por año; cada fila tiene
