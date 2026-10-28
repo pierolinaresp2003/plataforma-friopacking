@@ -8663,11 +8663,36 @@ function invEsTubSch(r){ const d = sinAcentos(String(r.descripcion || '').toUppe
 // PPR: tubería = lo que es tubo (se vende por metro); todo lo demás (coplas, uniones, caps, reducciones, adaptadores brida, carretes,
 // válvulas PPR) es accesorio. DANFOSS: kits/repuestos primero (un "repair kit EVR" es repuesto, no válvula); luego equipos y drives, y
 // las válvulas por función (solenoide, expansión, cierre, retención, seguridad, reguladora, motorizada, estación ICF).
+// Familias del Inventario por tipo de producto (28.10.2026, Piero: "reestructura todo lo de familias del app siguiendo la idea de PPR
+// y Danfoss… productos Schneider, Siemens, cables, EPP, uniformes… estructúralos lo mejor posible"). Cada código va a UNA familia: la
+// primera regla que calza (marca o tipo de producto por la descripción); si ninguna, su familia de Nisira con un nombre más claro.
+const INV_FAM_REGLAS = [
+  ['SIEMENS', /\bSIEMENS\b|SIMATIC|SIRIUS|SINAMICS|SENTRON|SITOP|\bLOGO ?!|\b6ED1|\b(3R[TVAUHBWPQ]|3KC|3WA|3VW|3S[UB]|3UG|3UA|3VA|3VM|3VL|3WL|3KD|3LD|3NA|3NE|3TF|3TH|5S[YVLMJTP]|5TT|5TE|6ES[57]|6EP|6AV|6SL|6SE|6GK|6XV|7KM|7KT|8WH|8US|3ZY)\d/],
+  ['SCHNEIDER ELECTRIC', /SCHNEIDER|SCHENIDER|TELEMECANIQUE|\bTESYS\b|ACTI ?9|ALTIVAR|MODICON|HARMONY|EASY ?9|\b(LC1|LC2|LP1|LRD|LR2|LR9|GV2|GV3|GV4|GV7|GVAE|GVAN|GVAM|A9[A-Z]|IC60|EZ9|EZC|NSX|LV4|LV5|LV8|XB[457]|ZB[45]|ZBE|ZBV|ZBY|XA2|XVB|XVL|ATV|ATS|RXM|RSB|RXZ|RM[12]\d|RE17|RE22|BME|BMX|TM[23]\d|TMC|LXM|VW3|XUB|XUK|XCK|XCM|XS[1-9]|XMLA|ABL\d|LAD|NSY|METSE|HMIGXU|HMISTU|MCSESU|XPS|XVR)[A-Z0-9-]*/],
+  ['PPR', function(x, d){ return x.ppr || /\bPP-R\b/.test(d); }], ['ACCESORIOS INOX', function(x){ return x.inx; }], ['TUBERÍAS SCH', function(x){ return x.tsc; }],
+  ['UNIFORMES', /^(CAMISA|BLUSA|PANTALON|POLO\b|CASACA|CORTAVIENTO|POLERA|POLERON|CHOMPA|CHAQUETA|OVEROL|MAMELUCO|GORRA|GORRO|CHAMARRA|BUZO)/],
+  ['EPP Y SEGURIDAD', /^(?!BALIZA)(BOTA|BOTIN|ZAPATO|ZAPATILLA|PUNTERA|CASCO|BARBIQUEJO|GUANTE|LENTE|SOBRELENTE|GAFA|CARETA|VISOR DE POLICARBONATO|PROTECTOR (FACIAL|AUDITIVO|DE OIDO)|TAPON (AUDITIVO|DE OIDO)|OREJERA|RESPIRADOR|MASCARILLA|FILTRO (PARA (HUMOS|RESPIRADOR|VAPORES)|P100|2097|6003)|ARNES|LINEA DE (VIDA|ANCLAJE)|ESLINGA|BLOQUE RETRACTIL|CHALECO|TRAJE|CAPOTIN|POLAINA|EXTINTOR|BOTIQUIN|INMOVILIZADOR|CAMILLA|MALETIN DE EMERGENCIA|MOCHILA DE EMERGENCIA|CONO|CINTA DE SEGURIDAD|MALLA DE SEGURIDAD|SENAL|LETRERO|CANDADO DE BLOQUEO|TARJETA DE BLOQUEO|DUCHA|LAVAOJOS|REPELENTE|BLOQUEADOR|PROTECTOR SOLAR)/],
+  ['CABLES Y CONDUCTORES', /^(?!CABLE (DE ACERO|ACERADO|PARA))(CABLE|CONDUCTOR|NHX|N2XOH|N2XSY|THW|NLT|NMT|NYY|CORDON|CPT|GPT)\b|^C\//],
+  ['MATERIAL ELÉCTRICO', /CONDUIT|\bEMT\b|\bIMC\b|CONDULET/],
+  ['ILUMINACIÓN', /^(LUMINARIA|LUMINARA|LUMIN\b|REFLECTOR|LAMPARA|FOCO|TUBO LED|LUZ|PANEL LED|ARTEFACTO|BALIZA)/],
+  ['LIMPIEZA Y EMBALAJE', /^(BOLSA|CONTENEDOR DE BASURA|ALCOHOL|PAPEL|JABON|TRAPO|DETERGENTE|DESINFECTANTE|LEJIA|ESCOBA|RECOGEDOR|TRAPEADOR|STRETCH|FILM|ZUNCHO|FLEJE|CARTON|BURBUPACK|PLASTICO|PULVERIZADOR)/]
+];
+const INV_FAM_NOMBRE = { 'SEGURIDAD, EPP, UNIFORME Y LIMPIEZA':'EPP Y SEGURIDAD', 'MATERIAL PARA INSTALACIÓN ELÉCTRICA':'MATERIAL ELÉCTRICO', 'CONTROLADOR ELECTRÓNICO':'CONTROL E INSTRUMENTACIÓN',
+  'TUBERÍA':'TUBERÍA Y ACCESORIOS', 'INSUMO':'ACEITES, REFRIGERANTES E INSUMOS', 'SERVICIOS DE INSTALACIÓN Y FABRICACIÓN':'TABLEROS Y FABRICACIONES', 'PANEL':'PANELES Y PERFILES',
+  'LONA':'LONAS Y CORTINAS', 'PUERTA, ACCESOS Y ABERTURAS':'PUERTAS Y VENTANAS', 'EVAPORADOR':'EVAPORADORES Y ENFRIADORES', 'UNIDAD CONDENSADORA':'UNIDADES CONDENSADORAS',
+  'COMPRESOR Y MOTOR':'COMPRESORES Y MOTORES', 'BOMBA':'BOMBAS', 'VENTILADOR':'VENTILADORES', 'VÁLVULA':'VÁLVULAS', 'TANQUE':'TANQUES', 'MATERIAL PARA INSTALACIÓN DE AISLAMIENTO':'AISLAMIENTO',
+  'ÚTILES DE OFICINA Y TECNOLOGÍA':'OFICINA Y TECNOLOGÍA', 'OTROS / SERVICIOS DIVERSOS':'OTROS', 'ACTIVOS Y BIENES DIVERSOS':'OTROS', 'Sin familia':'OTROS' };
+function invFamDe(x){
+  if(x.dnf) return 'DANFOSS';
+  const d = sinAcentos(String(x.r.descripcion || '').toUpperCase()).trim();
+  for(let i = 0; i < INV_FAM_REGLAS.length; i++){ const t = INV_FAM_REGLAS[i][1]; if(typeof t === 'function' ? t(x, d) : t.test(d)) return INV_FAM_REGLAS[i][0]; }
+  return INV_FAM_NOMBRE[x.fam] || x.fam;
+}
 const INV_KIT = /\b(REPAIR|OVERHAUL|INSPECTION|SPARE|REPUESTO|RESPUESTO|KIT DE (REPAR|SERVIC|REPUESTO)|SET DE EMPAQUES|SET NIPLE|KIT FLOTADOR|ASIENTO DE VALV|CUBIERTA SUPERIO|MAINTENANCE SET|DISMOUNTING)/;   // kits / repuestos Danfoss
 const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrupo, regla], …]], …] } — se prueba en orden; gana la primera que calza
   'PPR':[
     ['Tuberías', '📏', /^(TUBERIA|TUBO)\b/, [['Tuberías PPR', /./]]],
-    ['Accesorios', '🔧', /./, [['Reducciones y bujes', /REDUCCION|BUJE/], ['Coplas NPT (macho / hembra)', /COPLA/], ['Uniones (universal / americana)', /UNION/],
+    ['Accesorios', '🔧', /./, [['Reducciones y bujes', /REDUC|BUJE/], ['Tees', /^TEE/], ['Codos', /^CODO/], ['Coplas NPT (macho / hembra)', /COPLA/], ['Uniones (universal / americana)', /UNION/],
       ['Válvulas PPR (bola / esférica)', /VALV/], ['Adaptadores brida y carretes', /BRIDA|CARRETE/], ['Conectores y adaptadores a rosca', /CONECTOR|ADAPTADOR/], ['Caps', /^CAP\b/], ['Otros accesorios', /./]]]
   ],
   'TUBERÍAS SCH':[   // acero al carbono = lo que fabrica Tenaris (sin costura A-53/A-106); inoxidable aparte
@@ -8684,6 +8709,81 @@ const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrup
     ['Niples', '🔩', /^NIPLE/, [['Niples', /./]]],
     ['Coplas y uniones', '🔗', /^(COPLA|UNION)/, [['Coplas roscadas', /COPLA/], ['Uniones universales', /UNIVERSAL/], ['Otras uniones', /./]]],
     ['Otros accesorios', '🔧', /./, [['Otros accesorios', /./]]]
+  ],
+  'SIEMENS':[
+    ['Pulsadores y señalización', '🔘', /3SU|3SB|PULSADOR|SELECTOR|PILOTO|LAMPARA|PARADA DE EMERGENCIA/, [['Pulsadores y señalización', /./]]],
+    ['Accesorios de contactor y guardamotor', '🧷', /3RV29|3RA29|3RT29|3RH29|3RA19|3RT19|CONTACTO (FRONTAL|AUXILIAR|LATERAL)|ACOPLE|BLOQUE DE CONTACTO|BARRA DE (CONEXION|ALIMENTACION)|BORNE/, [['Accesorios', /./]]],
+    ['Interruptores de caja moldeada y abiertos (3VA / 3VM / 3WL)', '🗃️', /3VA|3VM|3VL|3WL|3WA|3VW|CAJA MOLDEADA/, [['Caja moldeada', /./]]],
+    ['Diferenciales (5SV / 5SM)', '🛡️', /5SV|5SM|DIFERENCIAL/, [['Diferenciales', /./]]],
+    ['Termomagnéticos (5SY / 5SL)', '⚡', /5S[YLJTP]|TERMOMAGNETICO|\bITM\b|AUTOMATICO/, [['Termomagnéticos', /./]]],
+    ['Contactores', '🔌', /3RT|CONTACTOR/, [['Contactores', /./]]],
+    ['Guardamotores', '🧯', /3RV|GUARDAMOTOR/, [['Guardamotores', /./]]],
+    ['Relés térmicos y de control', '⏱️', /3RU|3RB|3UG|3RP|3RS|3RQ|RELE/, [['Relés', /./]]],
+    ['Medidores y analizadores (Sentron)', '📈', /7KM|SENTRON|ANALIZADOR|MEDIDOR|3KC/, [['Medidores y analizadores', /./]]],
+    ['Variadores y arrancadores (Sinamics)', '🎚️', /6SL|6SE|SINAMICS|3RW|ARRANCADOR|VARIADOR/, [['Variadores y arrancadores', /./]]],
+    ['PLC y módulos (Simatic, LOGO!)', '🖥️', /6ES7|6ES5|SIMATIC|LOGO|6ED1|CPU|MODULO|BASE PARA MODULO/, [['PLC y módulos', /./]]],
+    ['HMI, fuentes y comunicación', '📟', /6AV|6EP|6GK|6XV|FUENTE|SITOP|HMI|PANEL|SWITCH|SCALANCE/, [['HMI, fuentes y comunicación', /./]]],
+    ['Otros Siemens', '📦', /./, [['Otros Siemens', /./]]]
+  ],
+  'SCHNEIDER ELECTRIC':[
+    ['Pulsadores y señalización', '🔘', /XB[457]|ZB[45]|ZBE|ZBV|ZBY|XA2|XVB|XVL|XVR|BALIZA|PULSADOR|SELECTOR|PILOTO|PARADA DE EMERGENCIA/, [['Pulsadores y señalización', /./]]],
+    ['Accesorios de contactor y guardamotor', '🧷', /GVA[EMN]|LAD|BLOQUE DE CONTACTO|CONTACTO (AUXILIAR|FRONTAL)|ACOPLE/, [['Accesorios', /./]]],
+    ['Interruptores de caja moldeada', '🗃️', /NSX|LV4|LV5|LV8|EZC|CAJA MOLDEADA/, [['Caja moldeada', /./]]],
+    ['Interruptores y diferenciales (Acti 9)', '⚡', /A9[A-Z]|IC60|ACTI ?9|EZ9|DIFERENCIAL|TERMOMAGNETICO|\bITM\b/, [['Acti 9', /./]]],
+    ['Contactores (TeSys)', '🔌', /LC1|LC2|LP1|CONTACTOR/, [['Contactores', /./]]],
+    ['Guardamotores (GV)', '🧯', /GV[2347]|GUARDAMOTOR/, [['Guardamotores', /./]]],
+    ['Relés térmicos y de control', '⏱️', /LRD|LR2|LR9|RXM|RSB|RXZ|RM[12]\d|RE17|RE22|RELE/, [['Relés', /./]]],
+    ['Variadores y arrancadores (Altivar)', '🎚️', /ATV|ATS|ALTIVAR|VARIADOR|ARRANCADOR|VW3|LXM/, [['Variadores y arrancadores', /./]]],
+    ['PLC Modicon (M221, M241, M340, M580)', '🖥️', /TM[23]\d|TMC|BME|BMX|MODICON|M2[24]1|M340|M580|PLC|CPU/, [['PLC Modicon', /./]]],
+    ['Finales de carrera y sensores', '📍', /XCK|XCM|XS[1-9]|XUB|XUK|XMLA|FIN DE CARRERA|SENSOR/, [['Finales de carrera y sensores', /./]]],
+    ['HMI, fuentes, medidores y comunicación', '📟', /HMI|ABL|METSE|MEDIDOR|FUENTE|MCSESU|SWITCH/, [['HMI, fuentes y medidores', /./]]],
+    ['Gabinetes y accesorios (Spacial)', '🗄️', /NSY|ARMARIO|PLACA|BORNERA|RIEL|AIRE ACONDICIONADO/, [['Gabinetes y accesorios', /./]]],
+    ['Otros Schneider', '📦', /./, [['Otros Schneider', /./]]]
+  ],
+  'CABLES Y CONDUCTORES':[
+    ['Datos y comunicación', '🌐', /UTP|FTP|CAT ?[56]|ETHERNET|PROFINET|PROFIBUS|COAXIAL|FIBRA|RED\b/, [['Datos y comunicación', /./]]],
+    ['Control y apantallados', '🎛️', /APANTALLADO|YSLCY|LIYCY|RS ?485|TKF|INSTRUMENTA|PIMF|\(ST\)|JZ-?500|MULTIHILO|CONTROL/, [['Control y apantallados', /./]]],
+    ['Puesta a tierra', '⏚', /TIERRA|DESNUDO/, [['Puesta a tierra', /./]]],
+    ['Multipolares y vulcanizados', '🧶', /VULCANIZADO|NLT|NMT|NYY|\b[2-9] ?X ?\d|\b[2-9]G ?\d|MULTIPOLAR|TRIPOLAR|BIPOLAR|TETRAPOLAR|PARALELO|RV-K|VFD/, [['Multipolares', /./]]],
+    ['Unipolares de fuerza (NHX, N2XOH, RZ1-K)', '🔌', /./, [['Unipolares', /./]]]
+  ],
+  'EPP Y SEGURIDAD':[
+    ['Calzado de seguridad', '🥾', /^(BOTA|BOTIN|ZAPATO|ZAPATILLA|PUNTERA)/, [['Calzado', /./]]],
+    ['Cascos', '⛑️', /^(CASCO|BARBIQUEJO)/, [['Cascos', /./]]],
+    ['Guantes', '🧤', /^GUANTE/, [['Guantes', /./]]],
+    ['Ojos y cara', '🥽', /^(LENTE|SOBRELENTE|GAFA|CARETA|VISOR|PROTECTOR FACIAL)/, [['Ojos y cara', /./]]],
+    ['Protección respiratoria', '😷', /RESPIRADOR|MASCARILLA|FILTRO|CARTUCHO/, [['Respiratoria', /./]]],
+    ['Protección auditiva', '🎧', /TAPON|OREJERA|AUDITIV/, [['Auditiva', /./]]],
+    ['Trabajo en altura', '🧗', /ARNES|LINEA DE|ESLINGA|RETRACTIL|ANCLAJE|MOSQUETON/, [['Trabajo en altura', /./]]],
+    ['Chalecos y ropa de protección', '🦺', /CHALECO|TRAJE|CAPOTIN|POLAINA|MANDIL|IMPERMEABLE/, [['Chalecos y ropa', /./]]],
+    ['Emergencia y primeros auxilios', '🧯', /EXTINTOR|BOTIQUIN|INMOVILIZADOR|CAMILLA|MALETIN|MOCHILA|DUCHA|LAVAOJOS/, [['Emergencia', /./]]],
+    ['Señalización y bloqueo', '🚧', /CONO|CINTA|MALLA|SENAL|LETRERO|CANDADO|BLOQUE|TARJETA|CACHACO|ESTACION|BARRA/, [['Señalización y bloqueo', /./]]],
+    ['Otros de seguridad', '📦', /./, [['Otros', /./]]]
+  ],
+  'UNIFORMES':[
+    ['Camisas y blusas', '👔', /^(CAMISA|BLUSA)/, [['Camisas y blusas', /./]]],
+    ['Polos', '👕', /^POLO/, [['Polos', /./]]],
+    ['Pantalones', '👖', /^PANTALON/, [['Pantalones', /./]]],
+    ['Casacas y abrigo', '🧥', /./, [['Casacas y abrigo', /./]]]
+  ],
+  'MATERIAL ELÉCTRICO':[
+    ['Bandejas y canalización', '🛤️', /BANDEJA|CURVA|CANALETA|CANAL\b|CONDUIT|\bEMT\b|CONDULET|PRENSAESTOPA|CAJA DE PASO|RIEL|SOPORTE|ABRAZADERA|TEE\b/, [['Bandejas y canalización', /./]]],
+    ['Tableros y gabinetes', '🗄️', /TABLERO|GABINETE|AUTOPORTANTE|AUTOSOPORTADO|\bVX|ZOCALO|LATERALES|ARMARIO/, [['Tableros y gabinetes', /./]]],
+    ['Transformadores, fuentes y UPS', '🔋', /TRANSFORMADOR|TRANSF\b|FUENTE|\bUPS\b|ESTABILIZADOR|BATERIA/, [['Transformadores, fuentes y UPS', /./]]],
+    ['Protección y maniobra (otras marcas)', '⚡', /INTERRUPTOR|\bITM\b|DIFERENCIAL|CONTACTOR|GUARDAMOTOR|RELE|FUSIBLE|SECCIONADOR|SUPRESOR|PARARRAYO|CONTACTO|INT\. AUT/, [['Protección y maniobra', /./]]],
+    ['Control y automatización', '🖥️', /MODULO|PLC|CPU|SWITCH|CONVERSOR|PULSADOR|SELECTOR|PILOTO|TEMPORIZADOR|HMI|MONITOR/, [['Control y automatización', /./]]],
+    ['Conexionado (bornes, terminales, tomas)', '🔩', /BORNE|TERMINAL|TOMACORRIENTE|ENCHUFE|CLAVIJA|REPARTIDOR|BARRA|ZAPATA|EMPALME|TOPE/, [['Conexionado', /./]]],
+    ['Adicionales eléctricos de equipos', '🧩', /ADICIONALES|COMPONENTES/, [['Adicionales de equipos', /./]]],
+    ['Otros eléctricos', '📦', /./, [['Otros', /./]]]
+  ],
+  'TUBERÍA Y ACCESORIOS':[
+    ['PVC', '⚪', /PVC|CLASE ?\d/, [['PVC', /./]]],
+    ['HDPE / polietileno', '⚫', /HDPE|PE ?100|PE ?80|SDR|POLIETILENO/, [['HDPE', /./]]],
+    ['ABS / PP-V / PP-H', '🟣', /\bABS\b|PP-?[VH]\b|POLIPROPILENO|\b7[23]\d{7}\b/, [['ABS y PP', /./]]],
+    ['Cobre', '🟠', /\bOD\b|COBRE|\(W \d|\bCU\b/, [['Cobre', /./]]],
+    ['Acero, fierro y metales', '🔩', /FE\.? ?NE|FIERRO|GALV|ACERO|ANGULO|PLATINA|PLANCHA|CUADRADO|RECTANGULAR|SCH|\bLAC\b|A500|A36|VARILLA|BARRA|ALUMINIO|TUBO (CUAD|RECT|REDONDO)/, [['Acero y fierro', /./]]],
+    ['Abrazaderas y soportes', '🗜️', /ABRAZADERA|COLLARIN|SOPORTE|GRAPA/, [['Abrazaderas y soportes', /./]]],
+    ['Otros de tubería', '📦', /./, [['Otros', /./]]]
   ],
   // DANFOSS por modelo (27.10.2026, Piero: "clasificada de esta forma: ICM, ICS, ICF, REG, SVA, SFA, DSV, FIA, EVRA, check o retención
   // (NRVA, SCA, CHV, NRV)… si ya colocas algo en una familia ya no lo puedes repetir en otra"): esas 10 van primero y en ese orden; cada
@@ -10675,6 +10775,10 @@ function familiaByDescripcion(descripcion){
 function iconForFamilia(nombre){
   const n = (nombre||'').toUpperCase();
   if(n === 'DANFOSS') return '🅳';
+  const IC = { 'SIEMENS':'🔷', 'SCHNEIDER ELECTRIC':'🟩', 'CABLES Y CONDUCTORES':'🧶', 'EPP Y SEGURIDAD':'🦺', 'UNIFORMES':'👕', 'ILUMINACION':'💡', 'LIMPIEZA Y EMBALAJE':'🧴',
+    'CONTROL E INSTRUMENTACION':'🎛️', 'TABLEROS Y FABRICACIONES':'🗄️', 'OFICINA Y TECNOLOGIA':'💻', 'ACEITES, REFRIGERANTES E INSUMOS':'🛢️', 'LONAS Y CORTINAS':'🎪',
+    'VENTILADORES':'🌀', 'BOMBAS':'💧', 'OTROS':'📦', 'MATERIAL ELECTRICO':'🔌' };   // familias del Inventario (28.10.2026)
+  if(IC[sinAcentos(n)]) return IC[sinAcentos(n)];
   if(n === 'ACCESORIOS INOX') return '🔩';
   if(n === 'PPR') return '🟢';
   if(n === 'TUBERIAS SCH') return '🛢️';
@@ -17884,8 +17988,8 @@ function appInvIndice(){
   // Familia de cada código: la misma categoría de "Cuánto pedir por categoría" (07.10.2026, Piero:
   // "la parte de inventario la puedes colocar como antes agrupada por familia").
   items.forEach(function(x){ x.fam = categoriaGenericaFor('', x.r.codigo, x.r.descripcion) || 'Sin familia'; x.dnf = invEsDanfoss(x.r); x.inx = invEsInox(x.r); x.ppr = invEsPpr(x.r); x.tsc = invEsTubSch(x.r);
-    // Una sola familia por código (27.10.2026, Piero: "que no se repitan códigos en otras familias"): DANFOSS > PPR > ACCESORIOS INOX > TUBERÍAS SCH > su familia.
-    x.famU = x.dnf ? 'DANFOSS' : x.ppr ? 'PPR' : x.inx ? 'ACCESORIOS INOX' : x.tsc ? 'TUBERÍAS SCH' : x.fam; });   // + DANFOSS y ACCESORIOS INOX (22.10.2026)
+    // Una sola familia por código (27.10.2026, Piero: "que no se repitan códigos en otras familias").
+    x.famU = invFamDe(x); });   // ver INV_FAM_REGLAS (28.10.2026)   // + DANFOSS y ACCESORIOS INOX (22.10.2026)
   APP_INV.cache = { firma:firma, items:items };
   return APP_INV.cache;
 }
