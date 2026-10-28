@@ -18080,6 +18080,7 @@ function appInvKdxPintar(){
   drawKardexSimple(x.r, cont);
 }
 function appInvLista(){
+  if(APP_INV.fam && !APP_INV.kdx && !appInvFamRows(APP_INV.fam).length) APP_INV.fam = '';   // familia que ya no existe → todas las familias (28.10.2026)
   if(!APP_INV.q && APP_INV.fam && APP_INV.kdx) return appInvKdxHtml();
   if(!APP_INV.q && APP_INV.fam) return appInvFamiliaHtml();
   if(!APP_INV.q && !APP_INV.fam) return appInvFamilias();
@@ -20680,7 +20681,7 @@ function appAbrirProyecto(idPry){
 }
 function appAbrirInv(q){
   const x = appInvIndice().items.find(function(y){ return y.r.codigo === q || (y.r.codigos || []).indexOf(q) !== -1; });
-  if(x){ APP_INV.fam = x.fam; APP_INV.kdx = x.r.codigo; APP_INV.q = ''; APP_INV.sel = ''; kardexOrigen = null; kdxRango = null; return appInicio('inventario'); }   // detalle en la app (22.10.2026)
+  if(x){ APP_INV.fam = x.famU || x.fam; APP_INV.kdx = x.r.codigo; APP_INV.q = ''; APP_INV.sel = ''; kardexOrigen = null; kdxRango = null; return appInicio('inventario'); }   // detalle en la app (22.10.2026)
   irASeccion('alertas');
   const i = document.getElementById('searchReposicion'); i.value = q; i.dispatchEvent(new Event('input', { bubbles:true }));
 }
