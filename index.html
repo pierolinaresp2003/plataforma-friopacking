@@ -15913,7 +15913,8 @@ function appAlmSegHtml(){
   const pend = cod === 'JCENTENO' || cod === 'MCONDORI' ? almReqPedHtml(delAnio(P.JCENTENO).pend)
     : (cod ? [cod] : ['JCENTENO', 'KALBUJAR']).map(function(c){ return almPendCard(delAnio(P[c]), appDailyColor(c)); }).join('');
   return `<div class="cmp-top">${caras}${appFBarra('indicadores', { pry:1 })}${baja}</div>`
-    + (cod ? `<button type="button" class="cmp-det${APP_AS.det ? ' on' : ''}" data-asdet="1">${APP_AS.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom)}</button>${APP_AS.det ? (pedAlm ? almHojasHtml(cod) : '') + (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` : '') + appAlmRepCuerpo() : ''}`
+    // Javier y Marycarmen: sus fotos a la vista y debajo sus pendientes, sin el detalle largo (28.10.2026, Piero).
+    + (pedAlm ? almHojasHtml(cod) : cod ? `<button type="button" class="cmp-det${APP_AS.det ? ' on' : ''}" data-asdet="1">${APP_AS.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom)}</button>${APP_AS.det ? (pedAlm ? almHojasHtml(cod) : '') + (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` : '') + appAlmRepCuerpo() : ''}`
         : (gerAbierto ? appIndicadoresHtml(true) : ''))
     + (cod ? '' : regPed)
     + appSecHtml('⏳', 'Pendientes de Almacén', cod ? e(PD_PERSONAS[cod]) : 'Todo el equipo', pend);
@@ -16008,6 +16009,47 @@ function almHojas(cod){
       <div class="cpx-card"><div class="cpx-h"><i class="cpx-tile">${CPX_ICO.gente(CPX_C.ink, 40)}</i><h2>Clientes atendidos</h2></div>
         ${top(L, 'pry').slice(0, 7).map(function(x){ return `<div class="cpx-cli"><span>${e(polarCorta(x[0], 46))}</span><b>${x[1]} ped.</b></div>`; }).join('') || '<p class="cpx-nota">Sin pedidos en el período.</p>'}</div>
       <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>Tiempo: de la fecha del requerimiento a la del pedido, en días hábiles.<br>Meta del Indicador 1: ${meta} días hábiles. Los pedidos directos no entran.</p></div></div>`;
+  // Recepción y despacho de la persona en 2 hojas, en vez del detalle largo (28.10.2026, Piero: "que salga ese resumen en fotos"):
+  // sus guías según la columna RESPONSABLE de Reporte Almacén, en todas las sedes y en el período de la barra.
+  const MV = almMovRows().filter(function(m){ return m.f >= desde && m.f <= hasta && almPersona(m.r) === cod; });
+  const I = MV.filter(function(m){ return m.t === 'i'; }), S = MV.filter(function(m){ return m.t === 's'; });
+  const usd = function(l){ return l.reduce(function(a, m){ return a + (m.u || 0); }, 0); }, guias = function(l){ return new Set(l.map(function(m){ return m.d; })).size; };
+  const topU = function(l, k){ const m = new Map(); l.forEach(function(x){ const v = x[k] || 'Sin dato'; m.set(v, (m.get(v) || 0) + (x.u || 0)); }); return [...m.entries()].sort(function(a, b){ return b[1] - a[1]; }); };
+  const porMes = function(l, col, txt){ const m = new Map(); l.forEach(function(x){ const k = x.f.slice(0, 7); if(!m.has(k)) m.set(k, new Set()); m.get(k).add(x.d); });
+    const l2 = [...m.entries()].map(function(x){ return [x[0], x[1].size]; }).sort().slice(-6), mx = Math.max.apply(null, l2.map(function(x){ return x[1]; }).concat([1]));
+    return l2.map(function(x){ return `<div class="cpx-cp"><span>${MESES_CORTOS[+x[0].slice(5) - 1]} ${x[0].slice(0, 4)}</span><i><em style="width:${(x[1] / mx * 100).toFixed(1)}%;background:${col}"></em></i><b>${n(x[1])} <small>${txt}</small></b></div>`; }).join('') || '<p class="cpx-nota">Sin guías en el período.</p>'; };
+  const filasU = function(l){ return l.slice(0, 6).map(function(x){ return `<div class="cpx-cli"><span>${e(polarCorta(appImpNombre(x[0]) || x[0], 46))}</span><b>${almUSD(x[1])}</b></div>`; }).join('') || '<p class="cpx-nota">Sin movimientos en el período.</p>'; };
+  const ocs = new Map(); I.forEach(function(m){ if(m.oc && !ocs.has(m.oc)) ocs.set(m.oc, /^0002/.test(m.oc) ? 'imp' : 'nac'); });
+  const nImp = [...ocs.values()].filter(function(v){ return v === 'imp'; }).length, conOC = I.filter(function(m){ return m.oc; }).length;
+  const h4 = `<div class="cpx-hoja">
+      <div class="cpx-card cpx-cab">${cpxLogo()}<div class="cpx-cab-t"><h1>Recepción de<br>mercadería</h1><div class="cpx-cab-p">${pill}${fecha(per)}</div></div></div>
+      <div class="cpx-card"><h2>Actividad del período</h2>
+        <div class="cpx-act">
+          <div><div class="cpx-act-v"><i>${CPX_ICO.doc(CPX_C.teal, 46)}</i><b>${n(guias(I))}</b></div><span>Guías de recepción</span></div>
+          <div><div class="cpx-act-v"><i>${CPX_ICO.cubo(CPX_C.teal, 46)}</i><b>${n(I.length)}</b></div><span>Ítems recibidos</span></div>
+          <div><div class="cpx-act-v"><i>${CPX_ICO.almacen(CPX_C.teal, 44)}</i><b>${n(ocs.size)}</b></div><span>OC atendidas</span></div></div></div>
+      <div class="cpx-card"><h2>Origen de las OC</h2>
+        <div class="cpx-dos"><div><i>${CPX_ICO.doc(CPX_C.blue, 80)}</i><div><span>Nacional</span><b>${pc(ocs.size - nImp, ocs.size)}</b><small>${n(ocs.size - nImp)} OC</small></div></div>
+          <div><i>${CPX_ICO.globo(CPX_C.blue, 80)}</i><div><span>Importación</span><b>${pc(nImp, ocs.size)}</b><small>${n(nImp)} OC</small></div></div></div></div>
+      <div class="cpx-card"><h2>Guías por mes</h2>${porMes(I, '#55c3ab', 'guías')}</div>
+      <div class="cpx-card"><div class="cpx-h"><i class="cpx-tile">${CPX_ICO.gente(CPX_C.ink, 40)}</i><h2>Proveedores principales</h2></div>${filasU(topU(I, 'pv'))}</div>
+      <p class="cpx-pie">Valor recibido ${almUSD(usd(I))} · ${pc(conOC, I.length)} de los ítems con OC · guías con ${e(PD_PERSONAS[cod] || cod)} como responsable (Reporte Almacén).</p></div>`;
+  const SP = S.filter(function(m){ return !/^OPR/i.test(m.py || ''); }), viajes = new Map();
+  S.forEach(function(m){ if(m.tr || m.pl){ const k = m.f + '|' + m.tr + '|' + m.pl; if(!viajes.has(k)) viajes.set(k, /FRIOPACKING/i.test(m.tr)); } });
+  const vP = [...viajes.values()].filter(Boolean).length;
+  const h5 = `<div class="cpx-hoja">
+      <div class="cpx-card cpx-cab">${cpxLogo()}<div class="cpx-cab-t"><h1 class="g">Despacho<br>de almacén</h1><div class="cpx-cab-p">${pill}${fecha(per)}</div></div></div>
+      <div class="cpx-card"><h2>Actividad del período</h2>
+        <div class="cpx-act">
+          <div><div class="cpx-act-v"><i>${CPX_ICO.doc(CPX_C.teal, 46)}</i><b>${n(guias(S))}</b></div><span>Guías de salida</span></div>
+          <div><div class="cpx-act-v"><i>${CPX_ICO.cubo(CPX_C.teal, 46)}</i><b>${n(S.length)}</b></div><span>Ítems despachados</span></div>
+          <div><div class="cpx-act-v"><i>${CPX_ICO.doc(CPX_C.teal, 44)}</i><b>${n(new Set(SP.map(function(m){ return m.rq; }).filter(Boolean)).size)}</b></div><span>Requerimientos atendidos</span></div></div></div>
+      <div class="cpx-card"><h2>Transporte</h2>
+        <div class="cpx-dos"><div><i>${CPX_ICO.almacen(CPX_C.blue, 80)}</i><div><span>Propio</span><b>${pc(vP, viajes.size)}</b><small>${n(vP)} viajes</small></div></div>
+          <div><i>${CPX_ICO.globo(CPX_C.blue, 80)}</i><div><span>Privado</span><b>${pc(viajes.size - vP, viajes.size)}</b><small>${n(viajes.size - vP)} viajes</small></div></div></div></div>
+      <div class="cpx-card"><h2>Guías por mes</h2>${porMes(S, '#5f9de2', 'guías')}</div>
+      <div class="cpx-card"><div class="cpx-h"><i class="cpx-tile">${CPX_ICO.gente(CPX_C.ink, 40)}</i><h2>Clientes atendidos</h2></div>${filasU(topU(S, 'cl'))}</div>
+      <p class="cpx-pie">Valor despachado ${almUSD(usd(S))} al último precio de compra · ${n(new Set(SP.map(function(m){ return m.py; }).filter(Boolean)).size)} proyectos · un viaje = misma fecha, transportista y placa.</p></div>`;
   const P0 = (appDailyAlmDatos(corte).todos.find(function(x){ return x.cod === 'JCENTENO'; }) || { pend:[] }).pend, C = almClasifPend(P0);
   const req = function(l){ return new Set(l.map(function(p){ return p.req; })).size; }, cliT = top(P0, 'pry'), cortT = corte.slice(8) + ' ' + MESES_CORTOS[+corte.slice(5, 7) - 1].toUpperCase() + ' ' + corte.slice(0, 4);
   const G = [['Stock en Lurín', C.stock, '#55c3ab'], ['En camino a Lurín', C.camino, '#5f9de2'], ['Stock en otra sede', C.sede, '#8b98a4'], ['Para compra', C.pedido, '#e0605a']];
@@ -16022,10 +16064,10 @@ function almHojas(cod){
       <div class="cpx-card"><div class="cpx-h"><i class="cpx-tile">${CPX_ICO.gente(CPX_C.ink, 40)}</i><h2>Clientes involucrados</h2></div>
         ${cliT.slice(0, 6).map(function(x){ return `<div class="cpx-cli"><span>${e(polarCorta(x[0], 46))}</span><b>${x[1]} ítems</b></div>`; }).join('') || '<p class="cpx-nota">Sin pendientes al corte.</p>'}</div>
       <div class="cpx-card cpx-info c"><i>${CPX_ICO.info(40)}</i><p>Stock libre repartido por orden de llegada de los requerimientos.</p></div></div>`;
-  return { hojas:[h1, h2, h3], desde:desde, hasta:hasta };
+  return { hojas:[h1, h2, h4, h5, h3], desde:desde, hasta:hasta };
 }
 function almHojasHtml(cod){ appPsObservar(); return `<div class="ps-hojas">${almHojas(cod).hojas.map(function(h){ return `<div class="ps-hoja"><div class="ps-zoom">${h}</div></div>`; }).join('')}</div>`; }
-function almImagenes(cod){ const H = almHojas(cod), nom = PD_PERSONAS[cod] || cod, tit = ['Reporte de pedidos', 'Tiempo de req. a pedido', 'Requerimientos por atender'];
+function almImagenes(cod){ const H = almHojas(cod), nom = PD_PERSONAS[cod] || cod, tit = ['Reporte de pedidos', 'Tiempo de req. a pedido', 'Recepción de mercadería', 'Despacho de almacén', 'Requerimientos por atender'];
   return appGenerarImagenes(H.hojas, { caja:'arh-caja', hoja:'.cpx-hoja', ancho:768, nombre:'Resumen ' + nom + ' ' + H.desde + ' al ' + H.hasta,
     titulo:'Resumen de ' + nom, sub:almFechaCorta(H.desde) + ' – ' + almFechaCorta(H.hasta), sec:function(el, i){ return tit[i] || ''; } }); }
 // Detalle de un ítem según su tarjeta (20.10.2026, Piero): en Lurín cuánto hay y cuánto le toca; en camino qué OC y cuándo llega
