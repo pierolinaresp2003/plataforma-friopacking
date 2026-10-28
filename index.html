@@ -15907,16 +15907,14 @@ function appAlmSegHtml(){
   const D = appDailyAlmDatos(isoDay(new Date())), P = {}; D.todos.forEach(function(x){ P[x.cod] = x; });
   // Javier y Marycarmen: los req. por pasar a pedido en lista, como los pendientes de Compras (20.10.2026, Piero).
   // Con una persona, sus pedidos generados van dentro del "detalle completo" y arriba quedan sus pendientes, como en Compras (20.10.2026, Piero).
-  const regPed = appSecHtml('📝', 'Pedidos generados', 'req → pedido · ' + e(appFLabel(Object.assign({}, st, { persona:'' }))), almPedRegHtml(cod, st));
   // Solo el año elegido arriba (21.10.2026, Piero: "igual para almacén").
   const enAnio = appFEnAnios(st), delAnio = function(x){ return Object.assign({}, x, { pend:x.pend.filter(function(p){ return enAnio(p.fr || p.fc); }) }); };
-  const pend = cod === 'JCENTENO' || cod === 'MCONDORI' ? almReqPedHtml(delAnio(P.JCENTENO).pend)
+  const pend = !cod || cod === 'JCENTENO' || cod === 'MCONDORI' ? almReqPedHtml(delAnio(P.JCENTENO).pend)
     : (cod ? [cod] : ['JCENTENO', 'KALBUJAR']).map(function(c){ return almPendCard(delAnio(P[c]), appDailyColor(c)); }).join('');
   return `<div class="cmp-top">${caras}${appFBarra('indicadores', { pry:1 })}${baja}</div>`
     // Javier y Marycarmen: sus fotos a la vista y debajo sus pendientes, sin el detalle largo (28.10.2026, Piero).
     + (pedAlm ? almHojasHtml(cod) : cod ? `<button type="button" class="cmp-det${APP_AS.det ? ' on' : ''}" data-asdet="1">${APP_AS.det ? '▴ Ocultar detalle completo' : '📊 Ver detalle completo de ' + e(nom)}</button>${APP_AS.det ? (pedAlm ? almHojasHtml(cod) : '') + (hayMov ? `<div class="m-filtros">${almSedeSel()}</div>` : '') + appAlmRepCuerpo() : ''}`
-        : (gerAbierto ? appIndicadoresHtml(true) : ''))
-    + (cod ? '' : regPed)
+        : '')   // en "Todos" solo los pendientes de todo el equipo, como en Compras (28.10.2026, Piero)
     + appSecHtml('⏳', 'Pendientes de Almacén', cod ? e(PD_PERSONAS[cod]) : 'Todo el equipo', pend);
 }
 // Req. por pasar a pedido como lista general, igual que "Pedidos sin OC" de Compras (20.10.2026, Piero: "que sea lista general así
@@ -16299,7 +16297,7 @@ const APP_DAILY = { dia:'', anio:null, mes:null };
 // Quiénes se evalúan en el daily (12.10.2026, Piero): Compras (con Comex dentro) y Almacén por separado.
 const APP_DAILY_COMPRAS = ['PLINARES', 'CCHECA', 'MSIHUAIRO', 'JALTAMIRANO', 'JPOMEZ'];
 const APP_DAILY_COMEX = ['CMORA'];   // José Casarino salió del equipo; Camila ve lo que veía él (26.10.2026, Piero)
-const APP_DAILY_ALMACEN = ['JCENTENO', 'KALBUJAR', 'MCONDORI'];
+const APP_DAILY_ALMACEN = ['JCENTENO', 'MCONDORI', 'KALBUJAR'];   // orden: Javier, Marycarmen, Katherine (28.10.2026, Piero)
 const APP_DAILY_EQUIPO = APP_DAILY_COMPRAS.concat(APP_DAILY_COMEX);          // el daily de Compras (y Gerencia)
 const APP_DAILY_TODOS = APP_DAILY_EQUIPO.concat(APP_DAILY_ALMACEN);
 const APP_DAILY_COLORES = ['#3a7bd5', '#26a185', '#8166d9', '#d4891a', '#d65a7e', '#1f8fb0'];
@@ -17738,7 +17736,10 @@ function appFotoPersonaHtml(cod, st){
   return `<div class="ps-hojas">${H.map(function(h, i){ return `<div class="ps-hoja" data-clic="1" data-psver="${ver[i]}" title="Toca para ver el detalle"><div class="ps-zoom">${h}</div></div>`; }).join('')}</div>`;
 }
 // Las hojas miden 768 px: se achican al ancho de su columna (sin cortar ni deformar nada).
-function appPsAjustar(){ document.querySelectorAll('.ps-zoom').forEach(function(z){ const w = z.parentNode.clientWidth; if(w) z.style.zoom = Math.min(1, w / 768).toFixed(4); }); }
+function appPsAjustar(){ document.querySelectorAll('.ps-zoom').forEach(function(z){ const w = z.parentNode.clientWidth; if(w) z.style.zoom = Math.min(1, w / 768).toFixed(4); });
+  // Todas las fotos de un grupo con el mismo alto: el de la más alta (28.10.2026, Piero: "que tengan el mismo tamaño").
+  document.querySelectorAll('.ps-hojas').forEach(function(c){ const H = [...c.querySelectorAll('.ps-zoom > .cpx-hoja')]; if(H.length < 2) return;
+    H.forEach(function(h){ h.style.minHeight = ''; }); const mx = Math.max.apply(null, H.map(function(h){ return h.offsetHeight; })); H.forEach(function(h){ h.style.minHeight = mx + 'px'; }); }); }
 function appPsObservar(){
   if(appPsObservar._ok) return; const sec = document.getElementById('section-inicio'); if(!sec) return; appPsObservar._ok = true;
   new MutationObserver(function(){ if(sec.querySelector('.ps-zoom')) appPsAjustar(); }).observe(sec, { childList:true });
