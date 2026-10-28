@@ -9063,18 +9063,20 @@ async function invExcel(meses){
     [...m.keys()].sort(function(a, b){ return orden(a) - orden(b); }).forEach(function(k){ hojas.push({ nom:k, rows:m.get(k) }); }); }
   else hojas.push({ nom:X.sub ? X.sub.split(' › ').pop() : X.label, rows:X.rows });
   if(hojas.length > 1) hojas.unshift({ nom:'Todos', rows:X.rows, todos:true });   // 1.ª hoja: todo lo descargado junto (28.10.2026, Piero)
-  const wb = new EJ.Workbook(), usados = new Set(), C = { navy:'FF25344A', teal:'FF2E7360', azul:'FF3D5C82', borde:'FFE2E6EC', alerta:'FFFDF6E0', naranja:'FF9A6B1F', gris:'FF6B7785', anio:'FFF5F7FA', navy2:'FF3A4B63', tinta:'FF2B2F36' };   // paleta sobria (28.10.2026, Piero)
+  const wb = new EJ.Workbook(), usados = new Set(), C = { navy:'FF25344A', teal:'FF2E7360', azul:'FF3D5C82', borde:'FFE2E6EC', alerta:'FFFDF6E0', naranja:'FF9A6B1F', gris:'FF6B7785', anio:'FFEDF1F6', navy2:'FF3A4B63', tinta:'FF000000', linea:'FFD3DAE3', sep:'FF8C9BAE' };   // paleta sobria (28.10.2026, Piero)
   const relleno = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, borde = { style:'thin', color:{ argb:C.borde } };
+  const linea = function(k){ return { style:'thin', color:{ argb:(k === 7 || k === 7 + nYg * 2 || (k > 7 && k < 7 + nYg * 2 && (k - 7) % 2 === 0)) ? C.sep : C.linea } }; };   // más marcada entre años
+  let nYg = 0;
   const fmtQ = function(v){ return Number.isInteger(v) ? '#,##0;-#,##0;"·"' : '#,##0.00;-#,##0.00;"·"'; };
   const corte = rqFecha(appIndCorte());
   hojas.forEach(function(H){
-    const P = invParetoFilas({ label:X.label, rows:H.rows }), nY = P.anios.length, nc = 6 + nY * 2 + 6;
+    const P = invParetoFilas({ label:X.label, rows:H.rows }), nY = P.anios.length, nc = 6 + nY * 2 + 6; nYg = nY;
     let nm = (H.nom.length > 31 ? H.nom.replace(/\s*\(.*$/, '') : H.nom).replace(/[\\\/?*\[\]:]/g, '-').slice(0, 31).trim() || 'Hoja'; for(let k = 2; usados.has(nm.toLowerCase()); k++) nm = nm.slice(0, 27) + ' (' + k + ')'; usados.add(nm.toLowerCase());
     const ws = wb.addWorksheet(nm, { views:[{ state:'frozen', xSplit:3, ySplit:5, showGridLines:false }], properties:{ tabColor:{ argb:H.todos ? C.navy : 'FF8A9BB0' } } });
     ws.mergeCells(1, 1, 1, nc); const t = ws.getCell(1, 1); t.value = X.label + (X.por === 'grupo' || !X.sub ? '' : ' › ' + X.sub) + (X.por && !H.todos ? ' › ' + H.nom : H.todos ? ' · todos los productos' : '');
     t.font = { bold:true, size:14, color:{ argb:C.navy } };
     ws.mergeCells(2, 1, 2, nc); const st = ws.getCell(2, 1);
-    st.value = P.l.length + ' productos · clase A = suman el 80 % del consumo · por año: entró (verde) / salió (azul) · almacén Lurín · en amarillo: bajo el punto de reorden · A pedir = consumo/mes × ' + meses + ' meses − (stock Lurín + en tránsito) · datos al ' + corte;
+    st.value = P.l.length + ' productos · clase A = suman el 80 % del consumo · por año: entró / salió · almacén Lurín · en amarillo: bajo el punto de reorden · A pedir = consumo/mes × ' + meses + ' meses − (stock Lurín + en tránsito) · datos al ' + corte;
     st.font = { italic:true, size:10, color:{ argb:C.gris } };
     // Cabecera en 2 filas: el año arriba y "Entró / Salió" abajo.
     const cab = ['N°', 'Código', 'Descripción', 'UM', 'Clase', 'US$ comprado'], fin = ['Consumo/mes', 'Consumo/año', 'Stock Lurín', 'En tránsito', 'Último precio de compra', 'A pedir (' + meses + ' meses)'];
@@ -9090,19 +9092,19 @@ async function invExcel(meses){
       const cm = +r.consumoMensual || 0, tr = +r.transito || 0, ul = appSkuHistorial(r.codigo).find(function(h){ return h.pu != null; }), pide = cm > 0 ? Math.max(0, Math.ceil(cm * meses - x.stock - tr)) : 0;
       v.push(Math.round(cm * 100) / 100, Math.round(cm * 12), Math.round(x.stock * 100) / 100, Math.round(tr * 100) / 100, ul ? Math.round(ul.pu * 100) / 100 : '—', pide);
       row.values = v;
-      row.eachCell({ includeEmpty:true }, function(c, k){ c.border = { bottom:borde }; c.font = { size:10, color:{ argb:C.tinta } }; c.alignment = { vertical:'middle', horizontal:k === 3 ? 'left' : 'center', wrapText:k === 3 };
+      row.eachCell({ includeEmpty:true }, function(c, k){ c.border = { bottom:borde, left:linea(k), right:linea(k + 1) }; c.font = { size:10, color:{ argb:C.tinta } }; c.alignment = { vertical:'middle', horizontal:k === 3 ? 'left' : 'center', wrapText:k === 3 };
         if(al && k <= 4) c.fill = relleno(C.alerta);   // el amarillo solo hasta la columna D (27.10.2026, Piero)
         const j = k - 7; if(j >= 0 && j < nY * 2 && Math.floor(j / 2) % 2 === 0) c.fill = relleno(C.anio); });
       const q = function(k, color){ const c = row.getCell(k); c.numFmt = fmtQ(c.value || 0); if(color) c.font = { size:10, color:{ argb:color } }; };
       row.getCell(2).numFmt = '@'; row.getCell(6).numFmt = '"US$ "#,##0;;"—"';
       if(x.cls){ const c = row.getCell(5); c.fill = relleno(x.cls === 'A' ? 'FFE6F0EC' : x.cls === 'B' ? 'FFFBF3E2' : 'FFF0F2F5'); c.font = { bold:true, size:10, color:{ argb:x.cls === 'A' ? C.teal : x.cls === 'B' ? C.naranja : C.gris } }; }
-      P.anios.forEach(function(y, j){ q(7 + j * 2, C.teal); q(8 + j * 2, C.azul); });
+      P.anios.forEach(function(y, j){ q(7 + j * 2, C.tinta); q(8 + j * 2, C.tinta); });   // números en negro
       const b = 7 + nY * 2; q(b, null); row.getCell(b).numFmt = '#,##0.00;;"·"'; q(b + 1, null);
       row.getCell(b + 2).numFmt = '#,##0.##;;"—"'; row.getCell(b + 2).numFmt = fmtQ(x.stock).replace('"·"', '"—"'); row.getCell(b + 2).font = { bold:true, size:10, color:{ argb:C.tinta } };
       q(b + 3, null); const mf = ul && ul.mon === 'S/' ? '"S/ "#,##0.00' : '"US$ "#,##0.00';
       row.getCell(b + 4).numFmt = mf;
-      const cp = row.getCell(b + 5); cp.numFmt = '#,##0;;"—"'; if(pide){ cp.fill = relleno('FFE6F0EC'); cp.font = { bold:true, size:10, color:{ argb:C.teal } }; } });
-    [6, 14, 52, 7, 7, 14].concat(P.anios.reduce(function(a){ return a.concat([8, 8]); }, []), [13, 13, 12, 12, 16, 13]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+      const cp = row.getCell(b + 5); cp.numFmt = '#,##0;;"—"'; if(pide){ cp.fill = relleno('FFE2EFEA'); cp.font = { bold:true, size:10, color:{ argb:C.tinta } }; } });
+    [6, 14, 52, 7, 7, 14].concat(P.anios.reduce(function(a){ return a.concat([10, 10]); }, []), [13, 13, 12, 12, 16, 13]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
     ws.getRow(4).height = 20; ws.getRow(5).height = 18;
     ws.autoFilter = { from:{ row:5, column:1 }, to:{ row:5 + P.l.length, column:nc } };
   });
