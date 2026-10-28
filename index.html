@@ -1494,6 +1494,8 @@
     .m-cal-nav button:disabled{opacity:.35;cursor:default;}
     .m-cal-ley i.g1{background:rgba(62,198,172,.22);} .m-cal-ley i.g3{background:rgba(62,198,172,.7);} .m-cal-ley i.g4{background:var(--brand-2);} .m-cal-ley span i{margin-right:2px;}
     .m-fams{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;}
+    .m-fams.inv-sublista{display:flex;flex-direction:column;gap:8px;} .inv-sublista .m-fam{padding:12px 16px;} .inv-sublista .m-fam-ic{font-size:22px;}
+    .inv-sublista .m-fam::after{content:'›';margin-left:auto;font-size:22px;font-weight:700;color:var(--ink-soft);}
     .m-fam{display:flex;align-items:center;gap:12px;width:100%;margin:0;text-align:left;font-family:inherit;color:var(--ink);cursor:pointer;}
     .m-fam-ic{font-size:26px;line-height:1;flex-shrink:0;} .m-fam-tx{display:flex;flex-direction:column;gap:3px;min-width:0;}
     .m-fam-tx b{font-size:14.5px;font-weight:800;line-height:1.25;} .m-fam-tx small{font-size:12px;color:var(--muted);font-weight:700;}
@@ -9009,18 +9011,20 @@ function invSubgruposHtml(g, keyOf, cnt, app, nivel){
   // Tarjetas en el orden en que están definidas (27.10.2026, Piero: "reordena las familias"); "Otros" al final.
   const gi = function(gr){ const i = G.findIndex(function(y){ return y[0] === gr; }); return i < 0 ? 999 : i; };
   const si = function(k){ const x = G[gi(grupoDe(k))], sb = k.split(' › ')[1]; const i = x ? x[3].findIndex(function(y){ return y[0] === sb; }) : -1; return i < 0 ? 999 : i; };
+  // Lista hacia abajo en orden alfabético, "Otros…" al final (28.10.2026, Piero: "las tarjetas se ven raras").
+  const alfa = function(a, b){ const o = /^otros/i; return (o.test(a) - o.test(b)) || a.localeCompare(b, 'es'); };
   let tit = g.label, cards = [], filas = g.rows;
   if(nivel && nivel.indexOf('G:') === 0){ const gr = nivel.slice(2); filas = g.rows.filter(function(r){ return grupoDe(keyOf.get(r)) === gr; });
     tit = g.label + ' › ' + gr; cards.push(tarjeta('T:' + gr, '📋', 'Ver todos (' + gr + ')'));
-    [...cnt.keys()].filter(function(k){ return grupoDe(k) === gr; }).sort(function(a, b){ return si(a) - si(b); })
+    [...cnt.keys()].filter(function(k){ return grupoDe(k) === gr; }).sort(function(a, b){ return alfa(a.slice(gr.length + 3) || gr, b.slice(gr.length + 3) || gr); })
       .forEach(function(k){ cards.push(tarjeta(k, icono(gr), k.slice(gr.length + 3) || gr)); }); }
   else { cards.push(tarjeta('*', '📋', 'Ver todos'));
     const grupos = new Map(); cnt.forEach(function(n, k){ const gr = grupoDe(k); (grupos.get(gr) || grupos.set(gr, []).get(gr)).push(k); });
-    [...grupos.keys()].sort(function(a, b){ return gi(a) - gi(b); }).forEach(function(gr){ const ks = grupos.get(gr);
+    [...grupos.keys()].sort(alfa).forEach(function(gr){ const ks = grupos.get(gr);
       cards.push(tarjeta(ks.length > 1 ? 'G:' + gr : ks[0], icono(gr), gr)); }); }
   INV_XLS = { label:g.label, sub:nivel ? tit.slice(g.label.length + 3) : '', rows:filas, keyOf:keyOf, por:nivel ? 'sub' : 'grupo' };
   const volver = app ? '' : (nivel ? `<div class="ks-bar par-sub"><button type="button" data-parsub="${e(invSubPadre(nivel))}">‹ Volver</button></div>` : '<div class="pedir-volver" id="pedirVolver">← Volver a las categorías</div>');
-  return `${volver}<div class="par-subs"><div class="par-head"><h3 class="par-subs-t">${iconForFamilia(sinAcentos(g.label))} ${e(tit)}</h3>${app ? INV_XLS_BTN : ''}</div><div class="m-fams">${cards.join('')}</div></div>`;
+  return `${volver}<div class="par-subs"><div class="par-head"><h3 class="par-subs-t">${iconForFamilia(sinAcentos(g.label))} ${e(tit)}</h3>${app ? INV_XLS_BTN : ''}</div><div class="m-fams inv-sublista">${cards.join('')}</div></div>`;
 }
 // Exportar a Excel lo que se ve (27.10.2026, Piero: "la opción de exportar a Excel como ícono arriba a la derecha, en base a lo que se
 // muestra… toda la información tal cual"): los productos de la familia / subgrupo abierto con todas las columnas de la lista.
