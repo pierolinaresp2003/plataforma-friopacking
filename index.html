@@ -14514,9 +14514,13 @@ function pdEsComprador(p){ return !!(p && PD_PERSONAS[p] && !PD_NO_COMPRADORES[p
 // Una línea de PedidoSinReq cuyo mismo pedido + producto YA está en Reporte Maestro (nació de un
 // requerimiento) es la misma línea repetida, no un pedido directo: se ignora (13.10.2026, Piero —
 // pedido 0001-0016605: 4 líneas por requerimiento y PedidoSinReq repetía 3 de ellas).
-function psrRepetida(r){ const k = appMemo('psrRM', function(){ const m = new Set();
-    getReqRows().forEach(function(x){ if(x.codPedido && x.idProducto) m.add(String(x.codPedido).trim() + '|' + String(x.idProducto).trim()); }); return m; });
-  return !!(r.codPedido && k.has(String(r.codPedido).trim() + '|' + String(r.idProducto || '').trim())); }
+// También es repetida si la misma OC ya trae ese producto con la misma cantidad en Reporte Maestro (28.10.2026, Piero: OC 12426).
+function psrRepetida(r){ const q = function(x){ return x.cantOrden != null ? x.cantOrden : x.cantidadOrden; };
+  const k = appMemo('psrRM', function(){ const m = new Set();
+    getReqRows().forEach(function(x){ if(x.codPedido && x.idProducto) m.add(String(x.codPedido).trim() + '|' + String(x.idProducto).trim());
+      if(x.codOrden && x.idProducto) m.add('OC|' + String(x.codOrden).trim() + '|' + String(x.idProducto).trim() + '|' + q(x)); }); return m; });
+  return !!((r.codPedido && k.has(String(r.codPedido).trim() + '|' + String(r.idProducto || '').trim())) ||
+    (r.codOrden && k.has('OC|' + String(r.codOrden).trim() + '|' + String(r.idProducto || '').trim() + '|' + q(r)))); }
 function pdFilas(){ return appMemo('pdFilas', pdFilasCalc).slice(); }
 function pdFilasCalc(){
   const out = [];
@@ -18260,7 +18264,7 @@ function embOCHtml(cod){
 function ocFechaVale(cod, f){ const i = ocImportInfo(cod); if(!i) return f; if(i.eta) return i.eta; return i.etd && f && f >= i.etd ? f : null; }
 function ocEnTransito(cod){ const i = ocImportInfo(cod); return !!(i && (i.etd || i.fReal || i.lista || i.arribo)); }
 function appOCDatos(cod){
-  const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return r.codOrden === cod; });
+  const filas = getReqRows().concat((PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return !psrRepetida(r); })).filter(function(r){ return r.codOrden === cod; });
   if(!filas.length) return null;
   const vistos = new Set();
   // Las recepciones siguientes de un mismo ítem llegan como filas "continuación" (sin cantidad ni unidad):
@@ -23111,7 +23115,7 @@ function polarBuscarProducto(palabras){
 
 // ---------- OC y pedido ----------
 function polarOC(cod){
-  const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return r.codOrden === cod; });
+  const filas = getReqRows().concat((PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return !psrRepetida(r); })).filter(function(r){ return r.codOrden === cod; });
   if(!filas.length) return null;
   POLAR.nuevoRef = 'oc ' + cod; POLAR.nuevoRefTxt = 'OC ' + cod;
   const f0 = filas.find(function(r){ return r.proveedor; }) || filas[0];
@@ -23516,7 +23520,7 @@ function polarHerramienta(nombre, a){
     }
     case 'consultar_oc': {
       const cod = appNormReq(a.codigo);
-      const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return r.codOrden === cod; });
+      const filas = getReqRows().concat((PEDIDO_SIN_REQ_ROWS || []).filter(function(r){ return !psrRepetida(r); })).filter(function(r){ return r.codOrden === cod; });
       if(!filas.length) return { error:'No existe la OC ' + cod };
       const f0 = filas.find(function(r){ return r.proveedor; }) || filas[0];
       return { oc:cod, proveedor:f0.proveedor, origen:f0.origen, estado:(filas.find(function(r){ return r.estadoOrden; }) || {}).estadoOrden || null,
