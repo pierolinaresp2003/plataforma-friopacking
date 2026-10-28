@@ -15662,7 +15662,8 @@ function appBienvenida(correoFijo){
   correo.oninput = function(){
     const t = tipoDe(correo.value), a = document.getElementById('bvAcceso');
     a.hidden = !t;
-    if(t) a.innerHTML = `${APP_VISTAS[t].ico} Acceso: <b>${APP_VISTAS[t].nombre}</b>` + (APP_ACCESO[t].filter(function(k){ return k !== t; }).length ? ` <small>(${t === 'gerencia' ? 'vistas' : 'también'} ${APP_ACCESO[t].filter(function(k){ return k !== t; }).map(function(k){ return APP_VISTAS[k].nombre; }).join(' y ')})</small>` : '');
+    const otras = t ? APP_ACCESO[t].filter(function(k){ return APP_VISTAS[k].nombre !== APP_VISTAS[t].nombre; }) : [];   // sin "(también Supervisor)" repetido
+    if(t) a.innerHTML = `${APP_VISTAS[t].ico} Acceso: <b>${APP_VISTAS[t].nombre}</b>` + (otras.length ? ` <small>(${t === 'gerencia' ? 'vistas' : 'también'} ${otras.map(function(k){ return APP_VISTAS[k].nombre; }).join(' y ')})</small>` : '');
     err('');
   };
   if(correoFijo){
