@@ -2077,7 +2077,9 @@
     .arh-hoja .arh-card,.arh-hoja .arh-kpis{z-index:1;}
     .inv-xls-p{margin:0 0 14px;font-size:14px;color:var(--ink-soft);line-height:1.45;} .inv-xls-op{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
     .inv-xls-op button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 10px;border:2px solid var(--border);border-radius:16px;background:var(--card);cursor:pointer;font:inherit;font-size:28px;color:var(--ink);} .inv-xls-op button:hover{border-color:#1a9c86;background:rgba(26,156,134,.06);}
-    .inv-xls-op b{font-size:15px;} .inv-xls-op span{font-size:12.5px;color:var(--muted);}
+    .inv-xls-op b{font-size:15px;} .inv-xls-op span{font-size:12.5px;color:var(--muted);} .inv-xls-op button.on{border-color:#1a9c86;background:rgba(26,156,134,.08);}
+    .inv-xls-m{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 0;font-size:14px;font-weight:700;} .inv-xls-m input{width:90px;font:inherit;font-size:18px;font-weight:800;text-align:center;padding:8px;border:2px solid var(--border);border-radius:12px;background:var(--card);color:var(--ink);}
+    .inv-xls-go{width:100%;margin-top:14px;padding:13px;border:0;border-radius:14px;background:#1a9c86;color:#fff;font:inherit;font-size:15px;font-weight:800;cursor:pointer;}
     .jvs-caja{position:absolute;left:-14000px;top:0;width:1280px;font-family:Inter,"DejaVu Sans",Arial,sans-serif;color:#1c2733;}
     .jvs-hoja{position:relative;width:1280px;height:720px;background:#fff;overflow:hidden;box-sizing:border-box;}
     .jvs-der{position:absolute;right:0;top:0;width:375px;height:720px;overflow:hidden;} .jvs-fondo{position:absolute;left:0;top:0;}
@@ -9036,17 +9038,23 @@ function appCargarExcelJs(){
     document.head.appendChild(s); });
   return APP_EXCELJS;
 }
-// Antes de exportar se elige el tipo de compra (28.10.2026, Piero: "que te dé la opción de compra nacional o importado; importado pide
-// para 6 meses y nacional para 3"): A pedir = consumo/mes × meses − (stock Lurín + en tránsito).
+// Antes de exportar se elige el tipo de compra y los meses (28.10.2026, Piero: "opción de compra nacional o importado" y luego "que te
+// permita colocar la cantidad de meses"): nacional propone 3 y importación 6, pero se pueden cambiar.
+// A pedir = consumo/mes × meses − (stock Lurín + en tránsito).
 function invExcelElegir(){
   if(!INV_XLS || !INV_XLS.rows.length){ appToast('No hay productos en esta vista.'); return; }
-  kxModal('Exportar a Excel', `<p class="inv-xls-p">¿Para qué tipo de compra? La columna <b>A pedir</b> cubre el consumo de esos meses, descontando el stock de Lurín y lo que está en tránsito.</p>
-    <div class="inv-xls-op"><button type="button" data-invxlsm="3">🇵🇪<b>Compra nacional</b><span>pedir para 3 meses</span></button><button type="button" data-invxlsm="6">🌎<b>Importación</b><span>pedir para 6 meses</span></button></div>`);
-  const m = document.getElementById('kxModal');
-  m.querySelectorAll('[data-invxlsm]').forEach(function(b){ b.addEventListener('click', function(){ m.classList.remove('abierto'); invExcel(+b.dataset.invxlsm); }); });
+  kxModal('Exportar a Excel', `<p class="inv-xls-p">Elige el tipo de compra y para cuántos meses. La columna <b>A pedir</b> cubre el consumo de esos meses, descontando el stock de Lurín y lo que está en tránsito.</p>
+    <div class="inv-xls-op"><button type="button" class="on" data-invxlst="nac" data-m="3">🇵🇪<b>Compra nacional</b><span>sugerido 3 meses</span></button><button type="button" data-invxlst="imp" data-m="6">🌎<b>Importación</b><span>sugerido 6 meses</span></button></div>
+    <label class="inv-xls-m"><span>Meses a cubrir</span><input type="number" id="invXlsMeses" min="1" max="36" step="1" value="3"></label>
+    <button type="button" class="inv-xls-go" id="invXlsGo">⬇️ Descargar Excel</button>`);
+  const m = document.getElementById('kxModal'), inp = m.querySelector('#invXlsMeses'); let tipo = 'nac';
+  m.querySelectorAll('[data-invxlst]').forEach(function(b){ b.addEventListener('click', function(){ tipo = b.dataset.invxlst; inp.value = b.dataset.m;
+    m.querySelectorAll('[data-invxlst]').forEach(function(x){ x.classList.toggle('on', x === b); }); }); });
+  m.querySelector('#invXlsGo').addEventListener('click', function(){ const n = Math.max(1, Math.min(36, Math.round(+inp.value || 0))); if(!n){ inp.focus(); return; }
+    m.classList.remove('abierto'); invExcel(n, tipo); });
 }
-async function invExcel(meses){
-  meses = meses || 3;
+async function invExcel(meses, tipo){
+  meses = meses || 3; tipo = tipo || (meses >= 6 ? 'imp' : 'nac');
   const X = INV_XLS; if(!X || !X.rows.length){ appToast('No hay productos en esta vista.'); return; }
   let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
   appToast('Preparando el Excel…');
@@ -9057,21 +9065,22 @@ async function invExcel(meses){
     const m = new Map(); X.rows.forEach(function(r){ const k = parte(r) || 'Otros'; (m.get(k) || m.set(k, []).get(k)).push(r); });
     [...m.keys()].sort(function(a, b){ return orden(a) - orden(b); }).forEach(function(k){ hojas.push({ nom:k, rows:m.get(k) }); }); }
   else hojas.push({ nom:X.sub ? X.sub.split(' › ').pop() : X.label, rows:X.rows });
+  if(hojas.length > 1) hojas.unshift({ nom:'Todos', rows:X.rows, todos:true });   // 1.ª hoja: todo lo descargado junto (28.10.2026, Piero)
   const wb = new EJ.Workbook(), usados = new Set(), C = { navy:'FF0A1E64', teal:'FF1A9C86', azul:'FF2F6FD6', borde:'FFD9E2EF', alerta:'FFFFF4D1', naranja:'FFC77700', gris:'FF5B6B7A', anio:'FFE6EEF9', navy2:'FF2A4A9C' };
   const relleno = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, borde = { style:'thin', color:{ argb:C.borde } };
   const fmtQ = function(v){ return Number.isInteger(v) ? '#,##0;-#,##0;"·"' : '#,##0.00;-#,##0.00;"·"'; };
   const corte = rqFecha(appIndCorte());
   hojas.forEach(function(H){
-    const P = invParetoFilas({ label:X.label, rows:H.rows }), nY = P.anios.length, nc = 6 + nY * 2 + 7;
+    const P = invParetoFilas({ label:X.label, rows:H.rows }), nY = P.anios.length, nc = 6 + nY * 2 + 6;
     let nm = (H.nom.length > 31 ? H.nom.replace(/\s*\(.*$/, '') : H.nom).replace(/[\\\/?*\[\]:]/g, '-').slice(0, 31).trim() || 'Hoja'; for(let k = 2; usados.has(nm.toLowerCase()); k++) nm = nm.slice(0, 27) + ' (' + k + ')'; usados.add(nm.toLowerCase());
-    const ws = wb.addWorksheet(nm, { views:[{ state:'frozen', xSplit:3, ySplit:5, showGridLines:false }], properties:{ tabColor:{ argb:C.teal } } });
-    ws.mergeCells(1, 1, 1, nc); const t = ws.getCell(1, 1); t.value = X.label + (X.por === 'grupo' || !X.sub ? '' : ' › ' + X.sub) + (X.por ? ' › ' + H.nom : '');
+    const ws = wb.addWorksheet(nm, { views:[{ state:'frozen', xSplit:3, ySplit:5, showGridLines:false }], properties:{ tabColor:{ argb:H.todos ? C.navy : C.teal } } });
+    ws.mergeCells(1, 1, 1, nc); const t = ws.getCell(1, 1); t.value = X.label + (X.por === 'grupo' || !X.sub ? '' : ' › ' + X.sub) + (X.por && !H.todos ? ' › ' + H.nom : H.todos ? ' · todos los productos' : '');
     t.font = { bold:true, size:15, color:{ argb:C.navy } };
     ws.mergeCells(2, 1, 2, nc); const st = ws.getCell(2, 1);
-    st.value = P.l.length + ' productos · clase A = suman el 80 % del consumo · por año: entró (verde) / salió (azul) · almacén Lurín · en amarillo: bajo el punto de reorden · ' + (meses === 6 ? 'IMPORTACIÓN' : 'COMPRA NACIONAL') + ': A pedir = consumo/mes × ' + meses + ' meses − (stock Lurín + en tránsito) · datos al ' + corte;
+    st.value = P.l.length + ' productos · clase A = suman el 80 % del consumo · por año: entró (verde) / salió (azul) · almacén Lurín · en amarillo: bajo el punto de reorden · ' + (tipo === 'imp' ? 'IMPORTACIÓN' : 'COMPRA NACIONAL') + ': A pedir = consumo/mes × ' + meses + ' meses − (stock Lurín + en tránsito) · datos al ' + corte;
     st.font = { italic:true, size:10, color:{ argb:C.gris } };
     // Cabecera en 2 filas: el año arriba y "Entró / Salió" abajo.
-    const cab = ['N°', 'Código', 'Descripción', 'UM', 'Clase', 'US$ comprado'], fin = ['Consumo/mes', 'Consumo/año', 'Stock Lurín', 'En tránsito', 'Último precio de compra', 'A pedir (' + meses + ' meses)', 'Monto estimado'], tot = {};
+    const cab = ['N°', 'Código', 'Descripción', 'UM', 'Clase', 'US$ comprado'], fin = ['Consumo/mes', 'Consumo/año', 'Stock Lurín', 'En tránsito', 'Último precio de compra', 'A pedir (' + meses + ' meses)'];
     cab.forEach(function(h, i){ ws.mergeCells(4, i + 1, 5, i + 1); ws.getCell(4, i + 1).value = h; });
     P.anios.forEach(function(y, i){ const c = 7 + i * 2; ws.mergeCells(4, c, 4, c + 1); ws.getCell(4, c).value = y; ws.getCell(5, c).value = 'Entró'; ws.getCell(5, c + 1).value = 'Salió'; });
     fin.forEach(function(h, i){ const c = 7 + nY * 2 + i; ws.mergeCells(4, c, 5, c); ws.getCell(4, c).value = h; });
@@ -9082,8 +9091,7 @@ async function invExcel(meses){
       const v = [i + 1, r.codigo, r.descripcion || '', (r.unidad || '').trim(), x.cls || '', Math.round(x.usd || 0)];
       P.anios.forEach(function(y){ v.push(Math.round((x.q[y] || 0) * 100) / 100, Math.round((x.sal[y] || 0) * 100) / 100); });
       const cm = +r.consumoMensual || 0, tr = +r.transito || 0, ul = appSkuHistorial(r.codigo).find(function(h){ return h.pu != null; }), pide = cm > 0 ? Math.max(0, Math.ceil(cm * meses - x.stock - tr)) : 0;
-      const mto = ul && pide ? Math.round(ul.pu * pide * 100) / 100 : 0; if(mto) tot[ul.mon] = (tot[ul.mon] || 0) + mto;
-      v.push(Math.round(cm * 100) / 100, Math.round(cm * 12), Math.round(x.stock * 100) / 100, Math.round(tr * 100) / 100, ul ? Math.round(ul.pu * 100) / 100 : '—', pide, mto || '');
+      v.push(Math.round(cm * 100) / 100, Math.round(cm * 12), Math.round(x.stock * 100) / 100, Math.round(tr * 100) / 100, ul ? Math.round(ul.pu * 100) / 100 : '—', pide);
       row.values = v;
       row.eachCell({ includeEmpty:true }, function(c, k){ c.border = { bottom:borde }; c.alignment = { vertical:'middle', horizontal:k === 3 ? 'left' : 'center', wrapText:k === 3 };
         if(al && k <= 4) c.fill = relleno(C.alerta);   // el amarillo solo hasta la columna D (27.10.2026, Piero)
@@ -9095,18 +9103,15 @@ async function invExcel(meses){
       const b = 7 + nY * 2; q(b, null); row.getCell(b).numFmt = '#,##0.00;;"·"'; row.getCell(b).font = { bold:true }; q(b + 1, null); row.getCell(b + 1).font = { bold:true };
       row.getCell(b + 2).numFmt = '#,##0.##;;"—"'; row.getCell(b + 2).numFmt = fmtQ(x.stock).replace('"·"', '"—"'); row.getCell(b + 2).font = { bold:true };
       q(b + 3, null); const mf = ul && ul.mon === 'S/' ? '"S/ "#,##0.00' : '"US$ "#,##0.00';
-      row.getCell(b + 4).numFmt = mf; row.getCell(b + 6).numFmt = mf; row.getCell(b + 6).font = { bold:true };
+      row.getCell(b + 4).numFmt = mf;
       const cp = row.getCell(b + 5); cp.numFmt = '#,##0;;"—"'; if(pide){ cp.fill = relleno('FFDDF3EC'); cp.font = { bold:true, color:{ argb:C.teal } }; } });
-    const bb = 7 + nY * 2, fl = 6 + P.l.length + 1;   // total estimado por moneda
-    Object.keys(tot).forEach(function(mon, i){ const r = ws.getRow(fl + i); r.getCell(bb + 4).value = 'Total estimado' + (Object.keys(tot).length > 1 ? (mon === 'S/' ? ' (S/)' : ' (US$)') : '');
-      r.getCell(bb + 4).font = { bold:true, color:{ argb:C.navy } }; const c = r.getCell(bb + 6); c.value = Math.round(tot[mon] * 100) / 100; c.numFmt = mon === 'S/' ? '"S/ "#,##0.00' : '"US$ "#,##0.00'; c.font = { bold:true, color:{ argb:C.navy } }; c.fill = relleno('FFE6EEF9'); });
-    [6, 14, 52, 7, 7, 14].concat(P.anios.reduce(function(a){ return a.concat([8, 8]); }, []), [13, 13, 12, 12, 16, 13, 16]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+    [6, 14, 52, 7, 7, 14].concat(P.anios.reduce(function(a){ return a.concat([8, 8]); }, []), [13, 13, 12, 12, 16, 13]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
     ws.getRow(4).height = 20; ws.getRow(5).height = 18;
     ws.autoFilter = { from:{ row:5, column:1 }, to:{ row:5 + P.l.length, column:nc } };
   });
   const nom = sinAcentos(X.label + (X.sub ? ' - ' + X.sub : '')).replace(/[\\/:*?"<>|›]+/g, '-').replace(/\s+/g, ' ').trim();
   const buf = await wb.xlsx.writeBuffer();
-  descargarBlob(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Inventario ' + nom + ' - ' + (meses === 6 ? 'Importacion 6 meses' : 'Nacional 3 meses') + ' - Grupo Friopacking.xlsx');
+  descargarBlob(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Inventario ' + nom + ' - ' + (tipo === 'imp' ? 'Importacion ' : 'Nacional ') + meses + ' meses' + ' - Grupo Friopacking.xlsx');
   appToast('Excel listo ✔ · ' + hojas.length + ' hoja' + (hojas.length === 1 ? '' : 's'));
 }
 function invParetoHtml(g, app){   // app = Inventario de la app: Pareto arriba, TODOS los códigos y botón "Ver detalle" en cada fila
