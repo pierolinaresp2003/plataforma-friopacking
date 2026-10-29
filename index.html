@@ -15972,6 +15972,9 @@ function almReqPedHtml(pend0){
 // Resumen de Javier y Marycarmen en 3 hojas, con el mismo formato que el de los compradores (20.10.2026, Piero: "el resumen
 // de mary y de javier así en 3 fotos como se hizo con compras, con respecto a lo que les corresponde de almacén"):
 // 1) pedidos generados (req → pedido) · 2) tiempo de atención con semáforo · 3) pendientes al corte en sus 4 grupos.
+// Guías de la persona (columna RESPONSABLE) en el período: I = recepción, S = salida.
+function almMovPer(cod, desde, hasta){ const MV = almMovRows().filter(function(m){ return m.f >= desde && m.f <= hasta && almPersona(m.r) === cod; });
+  return { I:MV.filter(function(m){ return m.t === 'i'; }), S:MV.filter(function(m){ return m.t === 's'; }) }; }
 function almHojas(cod){
   const st = APP_F.indicadores, rg = appFRango(st), corte = isoDay(appIndCorte()), desde = rg ? appIndIso(rg.desde) : '2026-01-01', hasta = rg && appIndIso(rg.hasta) < corte ? appIndIso(rg.hasta) : corte;
   const R = almPedReg(st), meta = R.meta, y = R.P.get(cod) || { ped:new Map(), dir:new Map(), n:0, ok:0, dias:0 }, L = [...y.ped.values()], e = escapeHtml;
@@ -16009,8 +16012,7 @@ function almHojas(cod){
       <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>Tiempo: de la fecha del requerimiento a la del pedido, en días hábiles.<br>Meta del Indicador 1: ${meta} días hábiles. Los pedidos directos no entran.</p></div></div>`;
   // Recepción y despacho de la persona en 2 hojas, en vez del detalle largo (28.10.2026, Piero: "que salga ese resumen en fotos"):
   // sus guías según la columna RESPONSABLE de Reporte Almacén, en todas las sedes y en el período de la barra.
-  const MV = almMovRows().filter(function(m){ return m.f >= desde && m.f <= hasta && almPersona(m.r) === cod; });
-  const I = MV.filter(function(m){ return m.t === 'i'; }), S = MV.filter(function(m){ return m.t === 's'; });
+  const MV = almMovPer(cod, desde, hasta), I = MV.I, S = MV.S;
   const usd = function(l){ return l.reduce(function(a, m){ return a + (m.u || 0); }, 0); }, guias = function(l){ return new Set(l.map(function(m){ return m.d; })).size; };
   const topU = function(l, k){ const m = new Map(); l.forEach(function(x){ const v = x[k] || 'Sin dato'; m.set(v, (m.get(v) || 0) + (x.u || 0)); }); return [...m.entries()].sort(function(a, b){ return b[1] - a[1]; }); };
   const porMes = function(l, col, txt){ const m = new Map(); l.forEach(function(x){ const k = x.f.slice(0, 7); if(!m.has(k)) m.set(k, new Set()); m.get(k).add(x.d); });
@@ -16048,24 +16050,27 @@ function almHojas(cod){
       <div class="cpx-card"><h2>Guías por mes</h2>${porMes(S, '#5f9de2', 'guías')}</div>
       <div class="cpx-card"><div class="cpx-h"><i class="cpx-tile">${CPX_ICO.gente(CPX_C.ink, 40)}</i><h2>Clientes atendidos</h2></div>${filasU(topU(S, 'cl'))}</div>
       <p class="cpx-pie">Valor despachado ${almUSD(usd(S))} al último precio de compra · ${n(new Set(SP.map(function(m){ return m.py; }).filter(Boolean)).size)} proyectos · un viaje = misma fecha, transportista y placa.</p></div>`;
-  const P0 = (appDailyAlmDatos(corte).todos.find(function(x){ return x.cod === 'JCENTENO'; }) || { pend:[] }).pend, C = almClasifPend(P0);
-  const req = function(l){ return new Set(l.map(function(p){ return p.req; })).size; }, cliT = top(P0, 'pry'), cortT = corte.slice(8) + ' ' + MESES_CORTOS[+corte.slice(5, 7) - 1].toUpperCase() + ' ' + corte.slice(0, 4);
-  const G = [['Stock en Lurín', C.stock, '#55c3ab'], ['En camino a Lurín', C.camino, '#5f9de2'], ['Stock en otra sede', C.sede, '#8b98a4'], ['Para compra', C.pedido, '#e0605a']];
-  const h3 = `<div class="cpx-hoja">
-      <div class="cpx-card cpx-cab">${cpxLogo()}<div class="cpx-cab-t"><h1 class="m">Requerimientos<br>por atender</h1><div class="cpx-cab-p">${pill}${fecha('AL ' + cortT)}</div></div></div>
-      <div class="cpx-card cpx-big"><i class="cpx-tile b">${CPX_ICO.doc('#fff', 84, '#5f9de2')}</i><div><h3>Pendientes al corte</h3><p>Sin pedido ni salida</p><b>${n(P0.length)}<small>ítems</small></b><p>${n(req(P0))} requerimientos</p></div></div>
-      <div class="cpx-tres"><div class="cpx-card"><i>${CPX_ICO.almacen('#55c3ab', 50)}</i><div><b>${n(req(C.stock))}</b><span>Req. con<br>stock en Lurín</span></div></div>
-        <div class="cpx-card"><i>${CPX_ICO.globo(CPX_C.blue, 50)}</i><div><b>${n(req(C.camino))}</b><span>Req. con<br>OC en camino</span></div></div>
-        <div class="cpx-card"><i>${CPX_ICO.doc('#e0605a', 50)}</i><div><b>${n(req(C.pedido))}</b><span>Req. para<br>compra</span></div></div></div>
-      <div class="cpx-card"><h2>Cómo se atienden</h2>
-        ${G.map(function(g){ return `<div class="cpx-cp"><span>${g[0]}</span><i><em style="width:${P0.length ? (g[1].length / P0.length * 100).toFixed(1) : 0}%;background:${g[2]}"></em></i><b>${n(g[1].length)} <small>ítems</small></b></div>`; }).join('')}</div>
-      <div class="cpx-card"><div class="cpx-h"><i class="cpx-tile">${CPX_ICO.gente(CPX_C.ink, 40)}</i><h2>Clientes involucrados</h2></div>
-        ${cliT.slice(0, 6).map(function(x){ return `<div class="cpx-cli"><span>${e(polarCorta(x[0], 46))}</span><b>${x[1]} ítems</b></div>`; }).join('') || '<p class="cpx-nota">Sin pendientes al corte.</p>'}</div>
-      <div class="cpx-card cpx-info c"><i>${CPX_ICO.info(40)}</i><p>Stock libre repartido por orden de llegada de los requerimientos.</p></div></div>`;
-  return { hojas:[h1, h2, h4, h5, h3], desde:desde, hasta:hasta };
+  return { hojas:[h1, h2, h4, h5], desde:desde, hasta:hasta };   // sin "Requerimientos por atender" (28.10.2026, Piero)
 }
-function almHojasHtml(cod){ appPsObservar(); return `<div class="ps-hojas">${almHojas(cod).hojas.map(function(h){ return `<div class="ps-hoja"><div class="ps-zoom">${h}</div></div>`; }).join('')}</div>`; }
-function almImagenes(cod){ const H = almHojas(cod), nom = PD_PERSONAS[cod] || cod, tit = ['Reporte de pedidos', 'Tiempo de req. a pedido', 'Recepción de mercadería', 'Despacho de almacén', 'Requerimientos por atender'];
+function almHojasHtml(cod){ appPsObservar(); const ver = ['ped', 'ped', 'rec', 'des'];
+  return `<div class="ps-hojas">${almHojas(cod).hojas.map(function(h, i){ return `<div class="ps-hoja" data-clic="1" data-almver="${ver[i]}" title="Toca para ver el detalle"><div class="ps-zoom">${h}</div></div>`; }).join('')}</div>`; }
+// Detalle de cada foto de Almacén (28.10.2026, Piero: "al hacer clic en las imágenes no sale el detalle"): pedidos y tiempo → sus pedidos;
+// recepción y despacho → sus guías, la más reciente primero (toca una para ver la OC o el requerimiento).
+function almVer(tipo){
+  const cod = APP_AS.persona, st = APP_F.indicadores, e = escapeHtml, nom = PD_PERSONAS[cod] || cod, per = appFLabel(Object.assign({}, st, { persona:'' }));
+  if(tipo === 'ped') return appListaAbrir('📝 Pedidos de ' + e(nom), e(per) + ' · req → pedido', almPedRegHtml(cod, st));
+  const rg = appFRango(st), corte = isoDay(appIndCorte()), desde = rg ? appIndIso(rg.desde) : '2026-01-01', hasta = rg && appIndIso(rg.hasta) < corte ? appIndIso(rg.hasta) : corte;
+  const MV = almMovPer(cod, desde, hasta), rec = tipo === 'rec', L = rec ? MV.I : MV.S, G = new Map();
+  L.forEach(function(m){ const g = G.get(m.d) || G.set(m.d, { d:m.d, f:m.f, s:m.s, l:[], u:0 }).get(m.d); g.l.push(m); g.u += m.u || 0; });
+  const filas = [...G.values()].sort(function(a, b){ return a.f < b.f ? 1 : a.f > b.f ? -1 : 0; }).map(function(g){ const m = g.l[0];
+    const attr = rec ? (m.oc ? 'data-oc="' + e(m.oc) + '"' : '') : (m.rq ? 'data-ocreq="' + e(m.rq) + '"' : '');
+    return appFilaHtml(attr, '', rec ? (appImpNombre(m.pv) || 'Sin proveedor') : (appImpNombre(m.cl) || m.py || 'Sin cliente'),
+      e(g.d) + ' · ' + e(rqFecha(new Date(g.f + 'T12:00:00Z'))) + ' · ' + e(ALM_SEDES[g.s] || g.s || '') + (rec ? (m.oc ? ' · OC ' + e(String(m.oc).replace(/^000\d-0*/, '')) : ' · sin OC') : (m.rq ? ' · Req. ' + e(String(m.rq).replace(/^000\d-0*/, '')) : '')),
+      appN(g.l.length) + ' ítem' + (g.l.length === 1 ? '' : 's'), almUSD(g.u)); }).join('');
+  appListaAbrir((rec ? '📥 Recepción de ' : '🚚 Despacho de ') + e(nom), e(per) + ' · ' + appN(G.size) + ' guías · ' + appN(L.length) + ' ítems · ' + almUSD(L.reduce(function(a, m){ return a + (m.u || 0); }, 0)),
+    filas ? `<div class="ini-card m-lista">${filas}</div>` : '<div class="ini-vacio">Sin guías en este período.</div>');
+}
+function almImagenes(cod){ const H = almHojas(cod), nom = PD_PERSONAS[cod] || cod, tit = ['Reporte de pedidos', 'Tiempo de req. a pedido', 'Recepción de mercadería', 'Despacho de almacén'];
   return appGenerarImagenes(H.hojas, { caja:'arh-caja', hoja:'.cpx-hoja', ancho:768, nombre:'Resumen ' + nom + ' ' + H.desde + ' al ' + H.hasta,
     titulo:'Resumen de ' + nom, sub:almFechaCorta(H.desde) + ' – ' + almFechaCorta(H.hasta), sec:function(el, i){ return tit[i] || ''; } }); }
 // Detalle de un ítem según su tarjeta (20.10.2026, Piero): en Lurín cuánto hay y cuánto le toca; en camino qué OC y cuándo llega
@@ -20765,6 +20770,7 @@ function appClickInicio(e){
   if(b.dataset.repsec){ APP_REP.sec = b.dataset.repsec; return appRenderInicio(); }
   if(b.dataset.pfocs) return appPfLista(b.dataset.pfocs);
   if(b.dataset.psver) return appPsVer(b.dataset.psver);
+  if(b.dataset.almver) return almVer(b.dataset.almver);
   if(b.dataset.pfprov || b.dataset.pfcli){ const cod = pdPersona(APP_F.indicadores.persona); return b.dataset.pfprov ? appPfLista(cod, 'prov', b.dataset.pfprov) : appPfLista(cod, 'cli', b.dataset.pfcli); }
   if(b.dataset.fcaraRk && APP.vista === 'compras' && APP.pantalla === 'pendcompras'){ APP_PC.persona = b.dataset.fcaraRk; APP_PC.tope = 20; APP_PC.fam = ''; window.scrollTo(0, 0); return appRenderInicio(); }
   if(b.dataset.fcaraRk){ const v = appFPersonas().find(function(x){ return pdPersona(x) === b.dataset.fcaraRk; }); if(v){ APP_F.indicadores.persona = v; window.scrollTo(0, 0); return appRenderInicio(); } }
