@@ -9105,7 +9105,7 @@ async function invExcel(meses){
       v.push(Math.round(cm * 100) / 100, Math.round(cm * 12), Math.round(x.stock * 100) / 100, Math.round(tr * 100) / 100, ul ? Math.round(ul.pu * 100) / 100 : '—', pide);
       row.values = v;
       row.eachCell({ includeEmpty:true }, function(c, k){ c.border = { bottom:borde, left:linea(k), right:linea(k + 1) }; c.font = { size:10, color:{ argb:C.tinta } }; const izq = k === 3 || (fam && k === 4); c.alignment = { vertical:'middle', horizontal:izq ? 'left' : 'center', wrapText:izq };   // sin amarillo: lo que hay que pedir ya lleva "A pedir" (30.10.2026)
-        const j = k - Y0; if(j >= 0 && j < nY * 2 && Math.floor(j / 2) % 2 === 0) c.fill = relleno(C.anio); });
+        const j = k - Y0; if(j >= 0 && j < nY * 2) c.fill = relleno(Math.floor(j / 2) % 2 === 0 ? C.anio : 'FFF8F4EA'); });   // años intercalados: celeste muy claro / crema muy claro (30.10.2026)
       const q = function(k, color){ const c = row.getCell(k); c.numFmt = fmtQ(c.value || 0); if(color) c.font = { size:10, color:{ argb:color } }; };
       row.getCell(2).numFmt = '@'; row.getCell(6 + o).numFmt = '"US$ "#,##0;;"—"';
       if(x.cls){ const c = row.getCell(5 + o); c.fill = relleno(x.cls === 'A' ? 'FFE6F0EC' : x.cls === 'B' ? 'FFFBF3E2' : 'FFF0F2F5'); c.font = { bold:true, size:10, color:{ argb:x.cls === 'A' ? C.teal : x.cls === 'B' ? C.naranja : C.gris } }; }
