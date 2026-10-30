@@ -21145,6 +21145,7 @@ function polarAccion(e){
     return;
   }
   if(b.dataset.q) return polarEnviar(b.dataset.q);
+  if(b.dataset.leoxlsx !== undefined) return polarComprasExcel((POLAR.cxs || [])[+b.dataset.leoxlsx]);
   if(b.dataset.asismas){ const r = b.previousElementSibling, abrir = r.hidden; r.hidden = !abrir;
     b.textContent = abrir ? 'Ver menos ▴' : 'Ver los ' + b.dataset.asismas + ' ' + b.dataset.txt + ' restantes ▾';
     if(abrir){ r.classList.remove('asis-entra'); void r.offsetWidth; r.classList.add('asis-entra'); } return; }
@@ -21257,6 +21258,7 @@ function polarAyuda(){
     📦 <b>Inventario:</b> "stock de válvula mariposa", "kardex de panel 100", "¿qué se queda sin stock este mes?", "productos sin movimiento", "¿qué ingresó hoy al almacén?", "¿qué hay que reponer?"<br>
     🚨 <b>Lo urgente:</b> "¿hay algo urgente?", "¿qué tengo que hacer hoy?", "¿cómo va compras?", "¿cómo va logística?"<br>
     🧾 <b>Compras:</b> "OC 12203", "OC vencidas de Carolina", "¿cuál es la OC más atrasada?", "OC sin aprobar", "¿cuántas importaciones llegan este mes?", "¿cuándo llega el compresor?", "¿qué le falta llegar a Danfoss?", "pedidos sin OC"<br>
+    🛒 <b>Cuánto se compró:</b> "¿cuántas puertas de oficina le compramos a Hermética de 2023 a 2026?", "compras de cable NHX a Sonepar este año", "¿qué le compramos a Savi Group desde 2024?" — y luego "excel de eso"<br>
     🏭 <b>Proveedores:</b> "¿a quién le compramos compresores?", "último precio de panel 100", "correo de Perfiles Metálicos", "¿qué proveedor demora más?", "¿cuánto tarda una importación?"<br>
     📊 <b>Gerencia</b> (con la clave): "¿cómo vamos esta semana?", "indicador más bajo", "este mes vs el anterior", "gasto de septiembre en paneles", "top proveedores", "compras del proyecto 36"<br>
     💼 <b>Presupuesto:</b> "presupuesto del PRY2026-0000028", "presupuesto de Bomarea", "presupuesto del req 23405", "partidas pasadas", "¿qué proyectos se pasaron del presupuesto?"<br>
@@ -22226,6 +22228,116 @@ function polarProveedor(nombre, que){
     ${top.size ? '<p><b>Lo que más se le compra:</b> ' + [...top.entries()].sort(function(a,b){ return b[1] - a[1]; }).slice(0, 3).map(function(e){ return escapeHtml(polarCorta(e[0], 40)); }).join(' · ') + '</p>' : ''}
     ${abiertas.size ? `<div class="asis-acc">${[...abiertas.keys()].slice(0, 3).map(function(o){ return polarBtn('q', 'OC ' + o, 'OC ' + escapeHtml(o)); }).join('')}</div>` : ''}`;
 }
+// ---------- Compras por producto / proveedor / años, con su Excel (30.10.2026, Piero: "¿cuántas puertas de oficina le compramos a
+// Hermética de 2023 a 2026?… que no se limite a puertas de oficina: si en un futuro le pido otra cosa con otro detalle, que me entienda y
+// lo filtre bien, en Excel"). Fuente: Consulta.xlsx (GASTO_DATA, OC de 2020 en adelante). Producto = todas las palabras en la descripción
+// (o el código); proveedor = el que va después de "a / al / con / proveedor"; período = los años nombrados ("de 2023 a 2026", "desde 2024",
+// "en 2025"), un mes o "este año"; sin período, de 2023 a hoy.
+const CX_RUIDO = /^(cuant[oa]s?|hemos|han|he|hubo|habido|comprad[oa]s?|compraron|compramos|comprar|compre|compro|compras?|totales?|anos?|anios?|desde|hasta|entre|excel|dame|saca|sacame|unidades|cantidad(es)?|ultim[oa]s|eso|esos|esas?|ese|codigos?|detalle|tod[oa]s?|hecho|realizad[oa]s?|que|cuales|cual|cuanto|cuantos|cuantas|lista|listado|resumen|tabla|historial|historico|periodo|del|los|las|por|para|nos|les|le|se|al|en)$/;
+function polarComprasParams(q, qr){
+  if(!(GASTO_DATA && GASTO_DATA.rows && GASTO_DATA.rows.length) || !/\bcompr/.test(qr)) return null;
+  if(/precio|costo|cuesta|a quien|que proveedor|cual(es)? proveedor|quien(es)? nos|pendient|por llegar|vencid|abiert|sin aprobar|\boc\s*\d|faltan|comprador/.test(qr)) return null;
+  // Proveedor solo si va después de "a / al / con / proveedor" (así "cables" no se confunde con un proveedor "Cables …").
+  let provs = polarProveedoresEn(qr).filter(function(n){ return polarNorm(n).split(/[^a-z0-9]+/).some(function(w){ return w.length >= 3 && new RegExp('\\b(a|al|con|proveedor|empresa)\\s+(\\S+\\s+){0,2}' + w + '\\b').test(qr); }); });
+  const provW = provs.length ? polarNorm(provs.join(' ')).split(/[^a-z0-9]+/) : [];
+  const pal = polarPalabrasProducto(qr).filter(function(w){ return !/^20[2-3]\d$/.test(w) && !CX_RUIDO.test(w) && provW.indexOf(w) === -1 && !(w.length >= 4 && provs.some(function(n){ return polarNorm(n).indexOf(w) !== -1; })); });
+  if(!provs.length && !pal.length) return null;
+  const c = appIndCorte(), yC = c.getUTCFullYear(), ys = (qr.match(/\b20[2-3]\d\b/g) || []).map(Number).sort();
+  let d0, d1, lbl;
+  if(ys.length >= 2){ d0 = ys[0] + '-01-01'; d1 = ys[ys.length - 1] + '-12-31'; lbl = ys[0] + '–' + ys[ys.length - 1]; }
+  else if(ys.length === 1 && /desde|a partir/.test(qr)){ d0 = ys[0] + '-01-01'; d1 = yC + '-12-31'; lbl = ys[0] + '–' + yC; }
+  else { const p = polarPeriodoDe(q); if(p){ d0 = appIndIso(p.desde); d1 = appIndIso(p.hasta); lbl = p.label; } else if(/ano pasado|anio pasado/.test(qr)){ d0 = (yC - 1) + '-01-01'; d1 = (yC - 1) + '-12-31'; lbl = 'el año ' + (yC - 1); } else { d0 = '2023-01-01'; d1 = yC + '-12-31'; lbl = '2023–' + yC + ' (todo lo cargado desde 2023)'; } }
+  return { provs:provs, pal:pal, d0:d0, d1:d1, lbl:lbl, excel:/excel|exporta|descarg|xlsx/.test(qr) };
+}
+function polarComprasFilas(P){
+  const prov = P.provs.length === 1 ? polarCompacto(P.provs[0]) : '';
+  const L = GASTO_DATA.rows.filter(function(r){
+    const f = r.anio ? r.anio + '-' + String(r.mes || 1).padStart(2, '0') + '-' + String(r.dia || 1).padStart(2, '0') : ''; if(!f || f < P.d0 || f > P.d1) return false;
+    if(prov && polarCompacto(r.proveedor) !== prov) return false;
+    const d = polarNorm(r.producto) + ' ' + (r.codigo || '');
+    return P.pal.every(function(w){ return /^\d{6,}$/.test(w) ? (r.codigo || '') === w || d.indexOf(w) !== -1 : polarContiene(d, w); });
+  }).map(function(r){ return Object.assign({ f:r.anio + '-' + String(r.mes || 1).padStart(2, '0') + '-' + String(r.dia || 1).padStart(2, '0'),
+    usd:monedaLabel(r.moneda) === 'US$' ? (+r.montoNativo || 0) : (+r.montoPEN || 0) / TIPO_CAMBIO['USD'] }, r); });
+  // "puertas de oficina": van los productos que SON puertas (la descripción empieza con "PUERTA"), no sus accesorios
+  // ("BISAGRA PARA PUERTA DE OFICINA"); si ninguno empieza así, se deja todo lo que calza.
+  const w0 = P.pal[0], es = function(r){ return w0 && !/^\d+$/.test(w0) && polarContiene(polarNorm(r.producto).split(' ')[0], w0); }, prin = w0 ? L.filter(es) : [];
+  P.otros = prin.length && prin.length < L.length ? new Set(L.filter(function(r){ return !es(r); }).map(function(r){ return r.codigo || r.producto; })).size : 0;
+  return P.otros ? prin : L;
+}
+function polarComprasAgrupar(L){
+  const um = new Map(); try{ appInvIndice().items.forEach(function(x){ um.set(x.r.codigo, (x.r.unidad || '').trim()); }); }catch(err){}
+  const M = new Map();
+  L.forEach(function(r){ const k = r.codigo || r.producto; const g = M.get(k) || { cod:r.codigo || '', pr:r.producto || '', um:um.get(r.codigo) || '', q:{}, u:{}, oc:new Set(), ult:null, prov:new Set() };
+    const y = r.f.slice(0, 4); g.q[y] = (g.q[y] || 0) + (+r.cantidad || 0); g.u[y] = (g.u[y] || 0) + r.usd; if(r.oc) g.oc.add(r.oc); g.prov.add(r.proveedor);
+    if(!g.ult || r.f >= g.ult.f) g.ult = { f:r.f, oc:r.oc, pu:+r.cantidad ? r.usd / r.cantidad : null }; M.set(k, g); });
+  const tot = function(o){ return Object.keys(o).reduce(function(a, k){ return a + o[k]; }, 0); };
+  return [...M.values()].map(function(g){ g.tq = tot(g.q); g.tu = tot(g.u); return g; }).sort(function(a, b){ return b.tq - a.tq || b.tu - a.tu; });
+}
+function polarCompras(P){
+  const e = escapeHtml, L = polarComprasFilas(P), sp = polarSinPrecios();
+  const que = (P.pal.length ? '"' + P.pal.join(' ') + '"' : 'todo') + (P.provs.length === 1 ? ' a ' + polarCorta(P.provs[0], 40) : '');
+  if(P.provs.length > 1) return `<p>Hay ${P.provs.length} proveedores con ese nombre. ¿Cuál?</p><div class="asis-acc">${P.provs.slice(0, 6).map(function(n){ return polarBtn('q', 'compras de ' + P.pal.join(' ') + ' a ' + n + ' ' + P.lbl.replace(/\s*\(.*$/, ''), e(polarCorta(n, 34))); }).join('')}</div>`;
+  if(!L.length){ POLAR.resultado = 'sin'; return `<p>No encontré compras de <b>${e(que)}</b> en ${e(P.lbl)}.</p><p class="q">Busco en las OC de Consulta: prueba con menos palabras o con otro nombre del producto.</p>`; }
+  const G = polarComprasAgrupar(L), ys = []; for(let y = +P.d0.slice(0, 4); y <= +P.d1.slice(0, 4); y++) ys.push(String(y));
+  const tq = G.reduce(function(a, g){ return a + g.tq; }, 0), tu = L.reduce(function(a, r){ return a + r.usd; }, 0), noc = new Set(L.map(function(r){ return r.oc; }).filter(Boolean)).size;
+  const usd = function(v){ return 'US$ ' + Math.round(v).toLocaleString('en-US'); };
+  POLAR.cxs = (POLAR.cxs || []).concat([P]).slice(-20); POLAR.comprasUlt = P; const ix = POLAR.cxs.length - 1;
+  POLAR.nuevoRef = 'compras ' + (P.pal.join(' ') + ' ' + (P.provs[0] ? 'a ' + polarNorm(P.provs[0]) : '')).trim(); POLAR.nuevoRefTxt = que;
+  const porAnio = ys.map(function(y){ const q = G.reduce(function(a, g){ return a + (g.q[y] || 0); }, 0), u = G.reduce(function(a, g){ return a + (g.u[y] || 0); }, 0);
+    return `<div class="asis-item"><div class="d"><b>${y}</b></div><div class="q"><b>${polarNum(q)}</b> unid.${sp ? '' : ' · ' + usd(u)}</div></div>`; }).join('');
+  return `<div class="cab">🛒 Compras de ${e(que)}</div><div class="sub">${e(P.lbl)} · OC de Consulta (Nisira) · cantidades pedidas en la OC${sp ? '' : ' · US$ sin IGV'}</div>
+    <div class="asis-kpis"><div><b>${polarNum(tq)}</b><span>Unidades</span></div>${sp ? '' : `<div><b>${usd(tu)}</b><span>Monto US$</span></div>`}<div><b>${appN(noc)}</b><span>OC · ${appN(G.length)} código${G.length === 1 ? '' : 's'}</span></div></div>
+    <p><b>Por año</b></p>${porAnio}
+    <p><b>Códigos con más unidades</b></p>${G.slice(0, 5).map(function(g){ return `<div class="asis-item"><div class="d">${e(polarCorta(g.pr, 60))}</div><div class="q"><span class="mono">${e(g.cod)}</span> · <b>${polarNum(g.tq)}</b> ${e(g.um || 'unid.')}${P.provs.length === 1 ? '' : ' · ' + e(polarCorta([...g.prov][0] || '', 26)) + (g.prov.size > 1 ? ' y ' + (g.prov.size - 1) + ' más' : '')}</div></div>`; }).join('')}
+    ${G.length > 5 ? `<p class="q">…y ${G.length - 5} códigos más en el Excel.</p>` : ''}${P.otros ? `<p class="q">No sumé ${P.otros} código${P.otros === 1 ? '' : 's'} que solo mencionan "${e(P.pal[0])}" (accesorios o repuestos).</p>` : ''}
+    <div class="asis-acc"><button type="button" data-leoxlsx="${ix}">📥 Excel</button></div>`;
+}
+async function polarComprasExcel(P){
+  if(!P) return;
+  let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
+  const L = polarComprasFilas(P), G = polarComprasAgrupar(L), sp = polarSinPrecios(); if(!L.length){ appToast('No hay compras con ese filtro.'); return; }
+  const ys = []; for(let y = +P.d0.slice(0, 4); y <= +P.d1.slice(0, 4); y++) ys.push(String(y));
+  const C = { navy:'FF25344A', navy2:'FF3A4B63', anio:'FFEDF1F6', anio2:'FFF3F0FA', linea:'FFD3DAE3', gris:'FF6B7785' };
+  const fill = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, bd = { style:'thin', color:{ argb:C.linea } };
+  const que = (P.pal.length ? P.pal.join(' ').toUpperCase() : 'TODO') + (P.provs.length === 1 ? ' · ' + P.provs[0] : '');
+  const wb = new EJ.Workbook(), ws = wb.addWorksheet('Resumen', { views:[{ state:'frozen', xSplit:3, ySplit:5, showGridLines:false }] });
+  const per = sp ? 1 : 2, Y0 = 5, b = Y0 + ys.length * per, fin = sp ? ['Total unidades', 'N° de OC', 'Última OC'] : ['Total unidades', 'Total US$', 'N° de OC', 'Último precio (US$)', 'Última OC'], nc = b - 1 + fin.length;
+  ws.mergeCells(1, 1, 1, nc); ws.getCell(1, 1).value = 'Compras de ' + que; ws.getCell(1, 1).font = { bold:true, size:14, color:{ argb:C.navy } };
+  ws.mergeCells(2, 1, 2, nc); const tq = G.reduce(function(a, g){ return a + g.tq; }, 0), tu = L.reduce(function(a, r){ return a + r.usd; }, 0);
+  ws.getCell(2, 1).value = P.lbl + ' · ' + G.length + ' códigos · ' + tq.toLocaleString('es-PE', { maximumFractionDigits:2 }) + ' unidades' + (sp ? '' : ' · US$ ' + Math.round(tu).toLocaleString('en-US') + ' sin IGV') + ' · OC de Consulta (Nisira), cantidades pedidas en la OC · generado por Leo';
+  ws.getCell(2, 1).font = { italic:true, size:10, color:{ argb:C.gris } };
+  ['N°', 'Código', 'Descripción', 'UM'].forEach(function(h, i){ ws.mergeCells(4, i + 1, 5, i + 1); ws.getCell(4, i + 1).value = h; });
+  ys.forEach(function(y, i){ const c = Y0 + i * per; if(per > 1){ ws.mergeCells(4, c, 4, c + 1); ws.getCell(5, c).value = 'Cant.'; ws.getCell(5, c + 1).value = 'US$'; } else { ws.getCell(5, c).value = 'Cant.'; } ws.getCell(4, c).value = +y; });
+  fin.forEach(function(h, i){ ws.mergeCells(4, b + i, 5, b + i); ws.getCell(4, b + i).value = h; });
+  for(let r = 4; r <= 5; r++) for(let c = 1; c <= nc; c++){ const x = ws.getCell(r, c), j = c - Y0; x.fill = fill(j >= 0 && j < ys.length * per && Math.floor(j / per) % 2 === 1 ? C.navy2 : C.navy);
+    x.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; x.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; x.border = { top:bd, bottom:bd, left:bd, right:bd }; }
+  G.forEach(function(g, i){ const row = ws.getRow(6 + i), v = [i + 1, g.cod, g.pr, g.um];
+    ys.forEach(function(y){ v.push(g.q[y] || null); if(per > 1) v.push(g.u[y] ? Math.round(g.u[y] * 100) / 100 : null); });
+    v.push(g.tq); if(!sp) v.push(Math.round(g.tu * 100) / 100); v.push(g.oc.size); if(!sp) v.push(g.ult && g.ult.pu != null ? Math.round(g.ult.pu * 100) / 100 : null);
+    v.push(g.ult ? (g.ult.oc || '') + ' · ' + g.ult.f.slice(8, 10) + '/' + g.ult.f.slice(5, 7) + '/' + g.ult.f.slice(0, 4) : '');
+    row.values = v;
+    row.eachCell({ includeEmpty:true }, function(c, k){ c.font = { size:10, color:{ argb:'FF000000' } }; c.border = { bottom:bd, left:bd, right:bd }; c.alignment = { vertical:'middle', horizontal:k === 3 ? 'left' : 'center', wrapText:k === 3 };
+      const j = k - Y0; if(j >= 0 && j < ys.length * per){ c.fill = fill(Math.floor(j / per) % 2 === 0 ? C.anio : C.anio2); c.numFmt = per > 1 && j % 2 === 1 ? '"$"#,##0;;"·"' : '#,##0.##;;"·"'; } });
+    row.getCell(2).numFmt = '@'; const t = row.getCell(b); t.font = { bold:true, size:10 }; t.fill = fill('FFE2EFEA'); t.numFmt = '#,##0.##';
+    if(!sp){ row.getCell(b + 1).numFmt = '"US$ "#,##0'; row.getCell(b + 3).numFmt = '"US$ "#,##0.00'; } });
+  const rT = ws.getRow(6 + G.length); rT.getCell(3).value = 'TOTAL';
+  ys.forEach(function(y, i){ const c = Y0 + i * per; rT.getCell(c).value = G.reduce(function(a, g){ return a + (g.q[y] || 0); }, 0) || null; rT.getCell(c).numFmt = '#,##0.##;;"·"';
+    if(per > 1){ rT.getCell(c + 1).value = Math.round(G.reduce(function(a, g){ return a + (g.u[y] || 0); }, 0)) || null; rT.getCell(c + 1).numFmt = '"$"#,##0;;"·"'; } });
+  rT.getCell(b).value = tq; if(!sp){ rT.getCell(b + 1).value = Math.round(tu); rT.getCell(b + 1).numFmt = '"US$ "#,##0'; }
+  for(let c = 1; c <= nc; c++){ const x = rT.getCell(c); x.font = { bold:true, size:11 }; x.fill = fill('FFE9ECEF'); x.alignment = { horizontal:c === 3 ? 'left' : 'center', vertical:'middle' }; x.border = { top:{ style:'medium', color:{ argb:C.navy } } }; }
+  [5, 14, 58, 7].concat(ys.reduce(function(a){ return a.concat(per > 1 ? [8, 11] : [9]); }, []), sp ? [11, 9, 22] : [11, 12, 9, 13, 22]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+  ws.autoFilter = { from:{ row:5, column:1 }, to:{ row:5 + G.length, column:nc } };
+  // Hoja 2: cada línea de OC, para revisar el detalle.
+  const wd = wb.addWorksheet('Detalle de OC', { views:[{ state:'frozen', ySplit:1, showGridLines:false }] });
+  const hd = ['Fecha', 'OC', 'Proveedor', 'Código', 'Descripción', 'Cantidad'].concat(sp ? [] : ['Moneda', 'Monto (moneda OC)', 'Monto US$']);
+  wd.addRow(hd); wd.getRow(1).eachCell(function(c){ c.fill = fill(C.navy); c.font = { bold:true, color:{ argb:'FFFFFFFF' } }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; });
+  L.slice().sort(function(a, b2){ return a.f < b2.f ? 1 : a.f > b2.f ? -1 : 0; }).forEach(function(r){
+    wd.addRow([r.f.slice(8, 10) + '/' + r.f.slice(5, 7) + '/' + r.f.slice(0, 4), r.oc || '', r.proveedor || '', r.codigo || '', r.producto || '', +r.cantidad || 0].concat(sp ? [] : [monedaLabel(r.moneda) || '', Math.round((+r.montoNativo || 0) * 100) / 100, Math.round(r.usd * 100) / 100])); });
+  [11, 14, 34, 14, 58, 10, 9, 16, 13].forEach(function(w, i){ wd.getColumn(i + 1).width = w; }); wd.autoFilter = { from:{ row:1, column:1 }, to:{ row:1, column:hd.length } };
+  const nom = sinAcentos('Compras ' + (P.pal.join(' ') || 'todo') + (P.provs.length === 1 ? ' - ' + P.provs[0].replace(/\s+(SOCIEDAD ANONIMA CERRADA|S\.?A\.?C\.?|S\.?A\.?|E\.?I\.?R\.?L\.?|S\.?R\.?L\.?)\.?$/i, '') : '') + ' ' + P.lbl.replace(/\s*\(.*$/, '')).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+  descargarBlob(new Blob([await wb.xlsx.writeBuffer()], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nom + ' - Grupo Friopacking.xlsx');
+  appToast('Excel listo ✔');
+}
 // ¿A quién le compramos X? · último precio de X (líneas de OC con monto y cantidad).
 function polarComprasDeProducto(palabras, que){
   // "últimos 5 precios", "historial de precios": varias compras por producto, no solo la última (06.10.2026).
@@ -22600,6 +22712,7 @@ function polarResumenGrupo(filas, pend, quien){
 const POLAR_CHARLA = /^(y )?(tu )?(como (estas|esta|te va|te sientes|andas|amaneciste|vas)|que tal( estas| tu dia| todo)?|todo bien|como va todo|estas bien)( (leo|tu|hoy))?$/;
 function polarResponder(texto){
   POLAR.resultado = 'ok'; POLAR.nuevoRef = null; POLAR.nuevoRefTxt = '';
+  POLAR.comprasPrev = POLAR.comprasUlt; POLAR.comprasUlt = null;   // "excel de eso" justo después de una consulta de compras
   const original = texto;
   texto = polarConContexto(texto);
   let html = polarResponder1(texto);
@@ -22654,6 +22767,10 @@ function polarResponder1(texto){
     if(m){ const cod = m[2] ? m[1] + '-' + m[2].padStart(7, '0') : '0001-' + m[1].padStart(7, '0');
       if(appReqPdf(cod)){ appPanelPdf(); return `<p>📄 Listo, armé el PDF del requerimiento <b class="mono">${escapeHtml(cod)}</b> con todos sus ítems.</p>`; } }
   }
+  // Compras de un producto / a un proveedor / en unos años, y su Excel (30.10.2026).
+  if(/excel|exporta|descarg|xlsx/.test(qr) && POLAR.comprasPrev && !/\bcompr/.test(qr.replace(/\b(eso|esas?|esos)\b.*$/, '')) && /\b(eso|esas?|esos|ese)\b/.test(qr)){ POLAR.comprasUlt = POLAR.comprasPrev; polarComprasExcel(POLAR.comprasPrev); return '<p>📥 Listo, estoy descargando el Excel de esas compras (resumen por código y año, y el detalle de cada OC).</p>'; }
+  const cxP = polarComprasParams(q, qr);
+  if(cxP){ if(cxP.excel){ POLAR.comprasUlt = cxP; polarComprasExcel(cxP); return '<p>📥 Listo, estoy descargando el Excel de esas compras.</p>' + polarCompras(cxP); } return polarCompras(cxP); }
   if(/excel|exporta|descarg|xlsx/.test(q)) return polarExportar(q, T);
   // Presupuesto vs. OC (07.10.2026): por PRY, por req., por OC, por cliente, o el resumen con las partidas pasadas.
   if(/presupuest|partidas? (pasad|excedid|sobrepasad)|se pas(o|aron) del presupuesto|excedid/.test(qr)){
