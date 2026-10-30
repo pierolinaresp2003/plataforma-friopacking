@@ -2312,7 +2312,7 @@
     .sup-res{flex-wrap:wrap;} .sup-res-pasos{flex:1 1 100%;margin-top:4px;} .sup-res .rqm-filtro{flex:1 1 100%;margin-top:2px;}
     .sup-res-t{flex:1;min-width:0;} .sup-res-t > b{display:block;font-size:16px;font-weight:900;line-height:1.2;} .sup-res-t > small{display:block;font-size:12px;opacity:.8;margin-top:2px;}
     .sup-res-n{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;} .sup-res-n span{font-size:11.5px;background:rgba(255,255,255,.14);border-radius:999px;padding:3px 9px;} .sup-res-n b{font-weight:900;} body:not(.app-pc) .sup-res-n{display:none;}
-    .sup-top{display:flex;justify-content:space-between;gap:8px;} .sup-num{font-weight:900;color:#0a1e64;font-size:15px;} .sup-f{font-size:12.5px;color:var(--ink-soft);}
+    .sup-top{display:flex;justify-content:space-between;gap:8px;} .sup-num{font-weight:900;color:#0a1e64;font-size:15px;min-width:0;} .sup-obs{font-size:12px;font-weight:700;color:#2f5f95;margin-left:6px;} .sup-top .sup-f{white-space:nowrap;flex-shrink:0;} html[data-theme="dark"] .sup-obs{color:#9cc8ff;} .sup-f{font-size:12.5px;color:var(--ink-soft);}
     .sup-py{font-weight:700;font-size:14px;margin-top:4px;color:var(--ink);} .sup-py small{font-size:11.5px;color:#5b6b7a;font-weight:700;} .sup-resp{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
     .sup-bar{display:flex;align-items:center;gap:10px;margin:10px 0 8px;} .sup-bar i{flex:1;height:9px;border-radius:6px;background:#eff4fb;overflow:hidden;} .sup-bar em{display:block;height:100%;background:#3fae78;border-radius:6px;} .sup-bar span{font-size:12.5px;color:#5b6b7a;}
     .sup-pasos{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;} .sup-p{text-align:center;border-radius:12px;padding:7px 2px;background:#eff4fb;opacity:.55;border:0;font:inherit;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;} .sup-p:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(27,58,107,.12);opacity:1;} .sup-p.si{opacity:1;}
@@ -17030,6 +17030,8 @@ function supSoloMios(){ return supEsSupervisor() && APP_SUP.mios; }
 // Requerimientos del Supervisor (13.10.2026, Piero): sin título ni chips Pendientes/Completos/Todos; filtros de
 // cliente y proyecto que se escriben y sugieren opciones; arriba el % atendido de lo filtrado; todos los req.
 // (sin "ver más": las tarjetas se agregan por tandas para que la pantalla no se trabe).
+// Clientes que en el Supervisor van como uno solo (30.10.2026, Piero: Distribuidora Exclusiva de Productos de Calidad = Leche Gloria).
+const SUP_CLI_UNIR = { 'DISTRIBUIDORA EXCLUSIVA DE PRODUCTOS DE CALIDAD':'LECHE GLORIA - GLORIA' };
 function supGrupos(){
   rqPreparar();
   const sup = supSoloMios(), base = sup ? (polarMisFilas() || []) : RQ.filas;
@@ -17041,8 +17043,8 @@ function supGrupos(){
     g.items.push(r); g.n[supPaso(r)]++; if(r.estadoCalc !== 'Archivado' && rqItemListo(r)) g.fin++; g.txt += ' ' + (r.producto || '') + ' ' + (r.idProducto || ''); M.set(k, g); });
   // Solo el año en curso (21.10.2026, Piero: "en la parte de supervisor solo lo que es del presente año"; la data ahora trae desde 2023).
   const anio = appIndCorte().getUTCFullYear(), l = [...M.values()].filter(function(g){ return g.f && new Date(+g.f).getUTCFullYear() === anio; });
-  l.forEach(function(g){ g.cli = appImpNombre(g.py || '') || '—'; g.pryN = /^SIN PROYECTO/i.test(g.id) ? 'Sin proyecto (almacén)' : (pryNombre(g.id) || '');
-    g.tot = g.items.length - g.n.arch; g.ok = g.fin; g.pct = g.tot ? dciN2(g.ok / g.tot * 100) : 0; g.txt = polarNorm(g.cod + ' ' + g.py + ' ' + g.id + ' ' + g.resp + g.txt); });
+  l.forEach(function(g){ g.cli = appImpNombre(g.py || '') || '—'; g.cli = SUP_CLI_UNIR[g.cli] || g.cli; g.obs = String((g.items.find(function(r){ return r.obs; }) || {}).obs || '').trim(); g.pryN = /^SIN PROYECTO/i.test(g.id) ? 'Sin proyecto (almacén)' : (pryNombre(g.id) || '');
+    g.tot = g.items.length - g.n.arch; g.ok = g.fin; g.pct = g.tot ? dciN2(g.ok / g.tot * 100) : 0; g.txt = polarNorm(g.cod + ' ' + g.py + ' ' + g.id + ' ' + g.resp + ' ' + g.obs + g.txt); });
   l.sort(function(a, b){ return (b.f || 0) - (a.f || 0); });
   APP_SUP._g = { base:base, n:base.length, l:l, sup:sup };
   return APP_SUP._g;
@@ -17070,8 +17072,8 @@ function supSugerencias(tipo, txt){
 }
 function supCard(g){
   const e = escapeHtml, sup = supSoloMios(), nPend = g.tot - g.ok;
-  return `<div class="sup-card" data-clic="1" data-req="${e(g.cod)}" title="Ver el detalle del requerimiento"><div class="sup-top"><span class="sup-num">Req. ${e(g.cod.replace(/^000\d-0*/, ''))}</span><span class="sup-f">${rqFecha(g.f)}</span></div>
-      <div class="sup-py">${e(polarCorta(appImpNombre(g.py || '—'), 48))}${g.id && !/^SIN PROYECTO/i.test(g.id) ? ` <small>${e(g.id)}</small>` : ''}</div>
+  return `<div class="sup-card" data-clic="1" data-req="${e(g.cod)}" title="Ver el detalle del requerimiento"><div class="sup-top"><span class="sup-num">Req. ${e(g.cod.replace(/^000\d-0*/, ''))}${g.obs ? ` <small class="sup-obs" title="${e(g.obs)}">${e(polarCorta(g.obs, 70))}</small>` : ''}</span><span class="sup-f">${rqFecha(g.f)}</span></div>
+      <div class="sup-py">${e(polarCorta(g.cli, 48))}${g.id && !/^SIN PROYECTO/i.test(g.id) ? ` <small>${e(g.id)}</small>` : ''}</div>
       ${sup ? '' : `<div class="sup-resp">👷 ${e(polarCorta(g.resp, 40))}</div>`}
       <div class="sup-bar"><i><em style="width:${g.pct}%"></em></i><span>${!g.tot ? '<b>🗄️ Archivado</b>' : nPend ? `<b>${g.ok}/${g.tot}</b> ítems en obra` : '<b>✅ Todo en obra</b>'}${g.tot && g.n.arch ? ` · 🗄️ ${g.n.arch} archivado${g.n.arch === 1 ? '' : 's'}` : ''}</span></div>
       <div class="sup-pasos">${SUP_PASOS.map(function(p){ return `<button type="button" class="sup-p ${p[0]}${g.n[p[0]] ? ' si' : ''}" data-req="${e(g.cod)}" title="Ver la trazabilidad completa"><i>${p[1]}</i><b>${g.n[p[0]]}</b><small>${p[2]}</small></button>`; }).join('')}</div>
