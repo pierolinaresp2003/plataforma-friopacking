@@ -486,7 +486,7 @@
   /* Velocidad (22.10.2026): las filas y tarjetas que no están en pantalla no se dibujan hasta que se llega a ellas. */
   .par-fila{content-visibility:auto;contain-intrinsic-size:auto 66px;} .ini-card.m-prod{content-visibility:auto;contain-intrinsic-size:auto 150px;}
   .ks-kdx tbody tr{content-visibility:auto;contain-intrinsic-size:auto 26px;}
-  .kx-res{display:grid;grid-template-columns:1.2fr 0.8fr 1.15fr 1fr;gap:12px;margin:4px 0 12px;}
+  .kx-res{display:grid;grid-template-columns:1.2fr 1fr 0.8fr 1.15fr;gap:12px;margin:4px 0 12px;}
   .kx-ys{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 10px;align-items:center;font-size:13px;} .kx-ys>span{font-weight:700;color:var(--ink-soft);} .kx-ys>small{font-size:11px;font-weight:700;color:var(--ink-soft);text-align:right;}
   .kx-ys button{border:0;background:none;padding:2px 0;font:inherit;font-weight:800;text-align:right;cursor:pointer;text-decoration:underline dotted;} .kx-ys-i{color:#1a9c86;} .kx-ys-s{color:#2f6fd6;} .kx-ys em{text-align:right;color:var(--ink-soft);font-style:normal;}
   .kx-c{background:var(--surface-2);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0;}
@@ -9249,13 +9249,13 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
     <div class="kx-c"><h4>Stock hoy <small>toca una sede para ver su kardex</small></h4>
       <div class="kx-sedes">${KARDEX_SUCURSALES.map(function(x){ return `<button type="button" data-ksuc="${x.key}" class="${x.key === suc ? 'on' : ''}"><span>${e(x.key === 'lima' ? 'Lima' : x.label)}</span><b>${n(p[x.key])}</b></button>`; }).join('')}</div>
       <button type="button" class="kx-tr${+p.transito > 0 ? '' : ' cero'}" data-kxtr="${e(p.codigo)}">🚚 En tránsito <b>${n(p.transito)} ${um}</b>${+p.transito > 0 ? ' <span>ver detalle ›</span>' : ''}</button></div>
-    <div class="kx-c"><h4>Consumo</h4>
+    ${kxPorAnioHtml(p, yC)}<div class="kx-c"><h4>Consumo</h4>
       <div class="kx-kv"><span>Por mes</span><b>${n(cons)} ${um}</b></div><div class="kx-kv"><span>Por año</span><b>${n(cons * 12, 0)} ${um}</b></div></div>
     <div class="kx-c"><h4>Reposición <span class="kx-seg">${[['nacional', 'Nacional'], ['importado', 'Importación']].map(function(o){ return `<button type="button" data-korg="${o[0]}" class="${(o[0] === 'importado') === esImp ? 'on' : ''}">${o[1]}</button>`; }).join('')}</span></h4>
       <div class="kx-kv"><span>Punto de reorden</span><b>${n(rop)}</b></div><div class="kx-kv"><span>Stock de seguridad</span><b>${n(ss)}</b></div>
       <div class="kx-kv"><span>Tiempo de entrega</span><b>${lt ? n(lt, 0) + ' días' : '—'}</b></div>
       <div class="kx-kv ped${aPedir ? ' si' : ''}"><span>¿Pedir? (${n(meses)} ${meses === 1 ? 'mes' : 'meses'})</span><b>${aPedir ? n(aPedir, 0) + ' ' + um : 'No'}</b></div>
-      <small class="kx-nota">Según la última OC es ${orgAuto.toLowerCase()}.</small></div>${kxPorAnioHtml(p, yC)}</div>`;
+      <small class="kx-nota">Según la última OC es ${orgAuto.toLowerCase()}.</small></div></div>`;
   const bar = `<div class="ks-bar"><span class="lbl">Período</span><span class="kx-seg">${['todo'].concat(anios).map(function(y){ return `<button type="button" data-kanio="${y}" class="${anioSel === y ? 'on' : ''}">${y === 'todo' ? 'Todos' : y}</button>`; }).join('')}</span>
     <span class="ks-hint">Arrastra sobre el gráfico para acercar · doble clic para ver todo</span></div>`;
   // Escalas
