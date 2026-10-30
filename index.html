@@ -1452,7 +1452,7 @@
     .pr-reqsel{display:block;margin:0 0 10px;} .pr-reqsel span{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;}
     .pr-filtro{background:color-mix(in srgb, var(--accent, #3a7bd5) 9%, var(--card));border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:13.5px;} .pr-part-s{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--border);font-size:13px;} .pr-part-s span{min-width:0;}
     .sku-hero{padding:18px 18px 16px;} .sku-hero-n{font-size:clamp(19px,3.4vw,26px);font-weight:900;line-height:1.2;color:var(--ink);letter-spacing:-.01em;}
-    .sku-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;} .sku-chips span{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;color:var(--ink-soft);}
+    .sku-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;} .sku-chips .sku-kdx{background:var(--surface-2);border:1px solid #5f9de2;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;color:#2f5f95;cursor:pointer;text-decoration:underline;} .sku-chips span{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;color:var(--ink-soft);}
     .sku-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px;}
     .sku-kpi{background:var(--surface-2);border-radius:14px;padding:12px 14px;border-left:5px solid #3a7bd5;min-width:0;} .sku-kpi span{display:block;font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
     .sku-kpi b{display:block;font-size:22px;font-weight:900;color:var(--ink);margin-top:4px;line-height:1.1;} .sku-kpi small{display:block;font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.3;} .sku-kpi small b{display:inline;font-size:inherit;margin:0;color:#b4560a;}
@@ -18492,6 +18492,7 @@ function appPanelMostrar(html){
     if(b.dataset.occerrar){ if(el._pila && el._pila.length){ el.innerHTML = el._pila.pop(); el.scrollTop = 0; return appTareasPintar(); } return appOCCerrar(); }
     if(b.dataset.taragregar !== undefined || b.dataset.tarest || b.dataset.tarcom || b.dataset.tarborrar) return appTareaAccion(b, el);
     if(b.dataset.oc){ (el._pila = el._pila || []).push(el.innerHTML); return appOCAbrir(b.dataset.oc, true); }
+    if(b.dataset.skukdx){ el._pila = []; appOCCerrar(); const v = appVistaConInv(); if(v && v !== APP.vista) appElegirVista(v); return appAbrirInv(b.dataset.skukdx); }   // código → kardex en Inventario (29.10.2026, Piero)
     if(b.dataset.sku && b.classList.contains('ocv-it-c')){ const pila = (el._pila || []).concat([el.innerHTML]); appSkuAbrir(b.dataset.sku, null, null, true); el._pila = pila; return; }   // ficha desde la OC (28.10.2026)
     if(b.dataset.dailyver){ const dia = APP_DAILY.dia || appDailyUltimo(), T = { sin:'📝 SKU sin OC al cierre', oc:'✅ Lo que hizo ese día', man:'📅 OC que llegan', venc:'⚠️ OC vencidas' }; (el._pila = el._pila || []).push(el.innerHTML);
       return appPanelMostrar(`<div class="oc-cab"><button type="button" class="atras" data-occerrar="1" aria-label="Volver">‹</button><div class="tx"><b>${T[b.dataset.dailyver]}</b><span>${escapeHtml(PD_PERSONAS[b.dataset.dailycod] || '')} · ${appDailyFechaTxt(dia)}</span></div></div><div class="oc-cuerpo">${appDailyVerHtml(dia, b.dataset.dailycod, b.dataset.dailyver)}</div>`); }
@@ -18830,6 +18831,9 @@ function appSkuCorreo(el, abrir){
   if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function(){ appToast('📋 Correo copiado'); }, function(){ window.prompt('Copia el correo:', txt); });
   else window.prompt('Copia el correo:', txt);
 }
+// Vista donde está Inventario: la actual o, si no lo tiene (Compras), la primera permitida que lo tenga (Almacén).
+function appVistaConInv(){ const t = function(v){ return ((APP_VISTAS[v] || {}).tabs || []).some(function(x){ return x[0] === 'inventario'; }); };
+  return t(APP.vista) ? APP.vista : (appVistasPermitidas().find(t) || ''); }
 function appSkuAbrir(cod, ped, req, soloProd){   // soloProd: desde una OC, sin buscar un pedido pendiente del código
   const fila = (!soloProd && (pdFilas().find(function(r){ return r.idProducto === cod && r.codPedido === ped && (!req || r.req === req); })
     || pdFilas().find(function(r){ return r.idProducto === cod; })))
@@ -18865,7 +18869,8 @@ function appSkuAbrir(cod, ped, req, soloProd){   // soloProd: desde una OC, sin 
       if(h.f > x.ult.f) x.ult = h; if(h.mon === x.min.mon && h.pu < x.min.pu) x.min = h; m.set(h.prov, x); });
     return [...m.values()].sort(function(a, b){ return b.ult.f - a.ult.f; }); })();
   const cuerpo = `<div class="oc-hero sku-hero"><div class="sku-hero-n">${e(fila.producto || cod)}</div>
-      <div class="sku-chips"><span class="mono">${e(cod)}</span><span>${e(fila.familia || 'Sin familia')}</span>${um ? '<span>' + um + '</span>' : ''}</div>
+      <div class="sku-chips">${appVistaConInv()
+        ? `<button type="button" class="mono sku-kdx" data-skukdx="${e(cod)}" title="Ver su kardex en Inventario">${e(cod)} · kardex ›</button>` : `<span class="mono">${e(cod)}</span>`}<span>${e(fila.familia || 'Sin familia')}</span>${um ? '<span>' + um + '</span>' : ''}</div>
       ${fila.fPedido ? `<div class="sku-estado"><b>${fila.cantPedido != null ? n(fila.cantPedido) + ' ' + um : '—'}</b><span class="${dh >= 5 ? 'rojo' : dh >= 3 ? 'ambar' : ''}">⏳ pedido esperando OC desde ${appDDMM(fila.fPedido)} · ${dh} d.h.</span></div>` : ''}
       <div class="sku-kpis">
         ${kpi('🏬', 'Stock en sedes', n(stT) + ' ' + um, 'Lima ' + n(st.lima) + ' · Ica ' + n(st.ica) + ' · Trujillo ' + n(st.trujillo), stT ? 'ok' : 'cero')}
