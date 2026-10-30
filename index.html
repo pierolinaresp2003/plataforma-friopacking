@@ -16344,7 +16344,9 @@ function appDailyFilas(){
 }
 function appDailyUltimo(){
   return appMemo('dailyUlt', function(){
-    const corte = (DATA && DATA.corte) ? isoDay(DATA.corte) : isoDay(new Date());
+    // Tope = el mayor entre el corte (última recepción) y hoy: los pedidos de hoy son posteriores a la última
+    // recepción y no deben quedar fuera (30.10.2026, Piero: la foto mostraba 0 pendientes con un pedido del día).
+    const hoy = isoDay(new Date()), c0 = (DATA && DATA.corte) ? isoDay(DATA.corte) : hoy, corte = c0 > hoy ? c0 : hoy;
     let u = '';
     appDailyFilas().forEach(function(r){ [r.fPedido, r.fOrden, r.fSalida].forEach(function(d){ const k = isoDay(d); if(k && k <= corte && k > u) u = k; }); });
     return u || corte;
