@@ -9070,7 +9070,7 @@ async function invExcel(meses){
     const m = new Map(); X.rows.forEach(function(r){ const k = parte(r) || 'Otros'; (m.get(k) || m.set(k, []).get(k)).push(r); });
     [...m.keys()].sort(function(a, b){ return orden(a) - orden(b); }).forEach(function(k){ hojas.push({ nom:k, rows:m.get(k) }); }); }
   else hojas.push({ nom:X.sub ? X.sub.split(' › ').pop() : X.label, rows:X.rows });
-  if(hojas.length > 1) hojas.unshift({ nom:'Todos', rows:X.rows, todos:true });   // 1.ª hoja: todo lo descargado junto (28.10.2026, Piero)
+  if(hojas.length > 1) hojas.splice(0, hojas.length, { nom:'Todos', rows:X.rows, todos:true });   // solo la hoja "Todos" con la columna Familia (30.10.2026, Piero)   // 1.ª hoja: todo lo descargado junto (28.10.2026, Piero)
   const wb = new EJ.Workbook(), usados = new Set(), C = { navy:'FF25344A', teal:'FF2E7360', azul:'FF3D5C82', borde:'FFE2E6EC', alerta:'FFFDF6E0', naranja:'FF9A6B1F', gris:'FF6B7785', anio:'FFEDF1F6', navy2:'FF3A4B63', tinta:'FF000000', linea:'FFD3DAE3', sep:'FF8C9BAE' };   // paleta sobria (28.10.2026, Piero)
   const relleno = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, borde = { style:'thin', color:{ argb:C.borde } };
   const linea = function(k){ return { style:'thin', color:{ argb:(k === 7 + oG || k === 7 + oG + nYg * 2 || (k > 7 + oG && k < 7 + oG + nYg * 2 && (k - 7 - oG) % 2 === 0)) ? C.sep : C.linea } }; };   // más marcada entre años
