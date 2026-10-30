@@ -486,7 +486,9 @@
   /* Velocidad (22.10.2026): las filas y tarjetas que no están en pantalla no se dibujan hasta que se llega a ellas. */
   .par-fila{content-visibility:auto;contain-intrinsic-size:auto 66px;} .ini-card.m-prod{content-visibility:auto;contain-intrinsic-size:auto 150px;}
   .ks-kdx tbody tr{content-visibility:auto;contain-intrinsic-size:auto 26px;}
-  .kx-res{display:grid;grid-template-columns:1.25fr 0.8fr 1.2fr;gap:12px;margin:4px 0 12px;}
+  .kx-res{display:grid;grid-template-columns:1.2fr 0.8fr 1.15fr 1fr;gap:12px;margin:4px 0 12px;}
+  .kx-ys{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 10px;align-items:center;font-size:13px;} .kx-ys>span{font-weight:700;color:var(--ink-soft);} .kx-ys>small{font-size:11px;font-weight:700;color:var(--ink-soft);text-align:right;}
+  .kx-ys button{border:0;background:none;padding:2px 0;font:inherit;font-weight:800;text-align:right;cursor:pointer;text-decoration:underline dotted;} .kx-ys-i{color:#1a9c86;} .kx-ys-s{color:#2f6fd6;} .kx-ys em{text-align:right;color:var(--ink-soft);font-style:normal;}
   .kx-c{background:var(--surface-2);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0;}
   .kx-c h4{margin:0 0 4px;font-size:12px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .kx-c h4 small{font-size:10.5px;font-weight:600;color:var(--ink-soft);text-transform:none;letter-spacing:0;}
@@ -9186,6 +9188,16 @@ function invParetoBind(box, g){
 // abajo las barras de lo que entró y salió cada día; al mover el mouse una guía vertical muestra el stock de ese día y sus movimientos;
 // se acerca arrastrando sobre el gráfico (o con los botones de año) y con doble clic vuelve a todo.
 let kdxRango = null;   // { t0, t1 } del zoom (null = todos los años)
+// Entró / salió por año en Lurín, desde 2023 (30.10.2026, Piero: "en los cuadros también los ingresos y salidas por año"); cada número
+// abre el detalle de ese año (kxDetalleAnio, el mismo de la lista de la familia).
+function kxPorAnioHtml(p, yC){
+  const A = {}, e = escapeHtml, n = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
+  for(let y = 2023; y <= yC; y++) A[y] = { i:0, s:0 };
+  (p.kardexMovs || []).forEach(function(m){ if(!m.f || (m.s || 'lima') !== 'lima' || !m.q) return; const y = +m.f.slice(0, 4); if(!A[y]) return; if(m.q > 0) A[y].i += m.q; else A[y].s -= m.q; });
+  const b = function(y, t, v){ return v ? `<button type="button" class="kx-ys-${t}" data-kxmov="${e(p.codigo)}|${y}|${t === 'i' ? 'in' : 'out'}" title="Ver qué ${t === 'i' ? 'entró' : 'salió'} en ${y}">${n(v)}</button>` : '<em>·</em>'; };
+  return `<div class="kx-c"><h4>Entró / salió por año <small>Lurín · toca un número</small></h4>
+    <div class="kx-ys"><span></span><small>Entró</small><small>Salió</small>${Object.keys(A).map(function(y){ return `<span>${y}</span>${b(y, 'i', A[y].i)}${b(y, 's', A[y].s)}`; }).join('')}</div></div>`;
+}
 function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario → familia → producto); sin él, la tarjeta de escritorio
   const box = cont ? cont.querySelector('.kx-chart') : document.getElementById('kardexChart'), e = escapeHtml, um = e((p.unidad || '').trim());
   const n = function(v, d){ return v == null || isNaN(v) ? '—' : Number(v).toLocaleString('es-PE', { maximumFractionDigits:d == null ? 2 : d }); };
@@ -9243,7 +9255,7 @@ function drawKardexSimple(p, cont){   // cont: contenedor de la app (Inventario 
       <div class="kx-kv"><span>Punto de reorden</span><b>${n(rop)}</b></div><div class="kx-kv"><span>Stock de seguridad</span><b>${n(ss)}</b></div>
       <div class="kx-kv"><span>Tiempo de entrega</span><b>${lt ? n(lt, 0) + ' días' : '—'}</b></div>
       <div class="kx-kv ped${aPedir ? ' si' : ''}"><span>¿Pedir? (${n(meses)} ${meses === 1 ? 'mes' : 'meses'})</span><b>${aPedir ? n(aPedir, 0) + ' ' + um : 'No'}</b></div>
-      <small class="kx-nota">Según la última OC es ${orgAuto.toLowerCase()}.</small></div></div>`;
+      <small class="kx-nota">Según la última OC es ${orgAuto.toLowerCase()}.</small></div>${kxPorAnioHtml(p, yC)}</div>`;
   const bar = `<div class="ks-bar"><span class="lbl">Período</span><span class="kx-seg">${['todo'].concat(anios).map(function(y){ return `<button type="button" data-kanio="${y}" class="${anioSel === y ? 'on' : ''}">${y === 'todo' ? 'Todos' : y}</button>`; }).join('')}</span>
     <span class="ks-hint">Arrastra sobre el gráfico para acercar · doble clic para ver todo</span></div>`;
   // Escalas
@@ -15350,6 +15362,11 @@ function appToast(txt){
 function appAtrasInv(){
   const m = document.getElementById('kxModal'); if(m && m.classList.contains('abierto')){ m.classList.remove('abierto'); return true; }
   if(!APP.enInicio || APP.pantalla !== 'inventario' || APP_INV.q) return false;
+  // Si el kardex se abrió desde otra pantalla (la ficha del SKU en Seguimiento), "atrás" vuelve ahí con la ficha abierta (30.10.2026, Piero).
+  const d = APP_INV.desde; APP_INV.desde = null;
+  if(APP_INV.kdx && d && d.kdx === APP_INV.kdx){ APP_INV.kdx = ''; APP_INV.fam = '';
+    appNavAtras = true; try{ if(d.v !== APP.vista){ APP.vista = d.v; try{ localStorage.setItem('fp-vista', d.v); }catch(err){} } appInicio(d.p || undefined); } finally{ appNavAtras = false; }
+    if(d.sku) appSkuAbrir(d.sku, null, null, true); return true; }
   if(APP_INV.kdx){ const c = APP_INV.kdx; APP_INV.kdx = ''; appRenderInicio();
     const f = document.querySelector('#invLista [data-invkdx="' + CSS.escape(c) + '"]'); if(f) f.closest('.par-fila').scrollIntoView({ block:'center' }); else window.scrollTo(0, 0); return true; }
   if(APP_INV.fam && INV_SUBFAM[APP_INV.fam] && invParetoSub.fam === APP_INV.fam && invParetoSub.sub){ invParetoSub = { fam:APP_INV.fam, sub:invSubPadre(invParetoSub.sub) || '' }; appRenderInicio(); window.scrollTo(0, 0); return true; }   // del Pareto del subgrupo vuelve a las tarjetas
@@ -18054,7 +18071,7 @@ function appGastoProv(prov){
 function appRefrescarCal(){ const c = document.getElementById('iniCal'); if(c) c.innerHTML = appDailyHtml(); }
 
 // ---------- Inventario (Logística) ----------
-const APP_INV = { f:'reponer', q:'', sel:'', tope:30, fam:'', kdx:'' };   // kdx: código abierto en detalle (familia → producto)
+const APP_INV = { f:'reponer', q:'', sel:'', tope:30, fam:'', kdx:'', desde:null };   // kdx: código abierto en detalle (familia → producto)
 function appInvIndice(){
   const rows = (ALMACEN_DATA && ALMACEN_DATA.rows) || [], otros = almOtrosLista();
   const firma = rows.length + '|' + otros.length + '|' + ((DATA && DATA.corte) ? +DATA.corte : 0) + '|' + (document.getElementById('mesesAbastecer') || {}).value;
@@ -18492,7 +18509,8 @@ function appPanelMostrar(html){
     if(b.dataset.occerrar){ if(el._pila && el._pila.length){ el.innerHTML = el._pila.pop(); el.scrollTop = 0; return appTareasPintar(); } return appOCCerrar(); }
     if(b.dataset.taragregar !== undefined || b.dataset.tarest || b.dataset.tarcom || b.dataset.tarborrar) return appTareaAccion(b, el);
     if(b.dataset.oc){ (el._pila = el._pila || []).push(el.innerHTML); return appOCAbrir(b.dataset.oc, true); }
-    if(b.dataset.skukdx){ el._pila = []; appOCCerrar(); const v = appVistaConInv(); if(v && v !== APP.vista) appElegirVista(v); return appAbrirInv(b.dataset.skukdx); }   // código → kardex en Inventario (29.10.2026, Piero)
+    if(b.dataset.skukdx){ el._pila = []; appOCCerrar(); const d = { v:APP.vista, p:APP.enInicio ? APP.pantalla : null, sku:b.dataset.skukdx }, v = appVistaConInv();
+      if(v && v !== APP.vista) appElegirVista(v); appAbrirInv(b.dataset.skukdx); if(APP_INV.kdx) APP_INV.desde = Object.assign(d, { kdx:APP_INV.kdx }); return; }   // "atrás" vuelve de donde vino (30.10.2026)   // código → kardex en Inventario (29.10.2026, Piero)
     if(b.dataset.sku && b.classList.contains('ocv-it-c')){ const pila = (el._pila || []).concat([el.innerHTML]); appSkuAbrir(b.dataset.sku, null, null, true); el._pila = pila; return; }   // ficha desde la OC (28.10.2026)
     if(b.dataset.dailyver){ const dia = APP_DAILY.dia || appDailyUltimo(), T = { sin:'📝 SKU sin OC al cierre', oc:'✅ Lo que hizo ese día', man:'📅 OC que llegan', venc:'⚠️ OC vencidas' }; (el._pila = el._pila || []).push(el.innerHTML);
       return appPanelMostrar(`<div class="oc-cab"><button type="button" class="atras" data-occerrar="1" aria-label="Volver">‹</button><div class="tx"><b>${T[b.dataset.dailyver]}</b><span>${escapeHtml(PD_PERSONAS[b.dataset.dailycod] || '')} · ${appDailyFechaTxt(dia)}</span></div></div><div class="oc-cuerpo">${appDailyVerHtml(dia, b.dataset.dailycod, b.dataset.dailyver)}</div>`); }
