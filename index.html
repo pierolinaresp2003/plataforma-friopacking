@@ -9089,7 +9089,7 @@ async function invExcel(meses){
     st.value = P.l.length + ' productos · clase A = suman el 80 % del consumo · por año: entró / salió · almacén Lurín · A pedir = consumo/mes × ' + meses + ' meses − (stock Lurín + en tránsito); si ya está en el punto de reorden o debajo, se suma ese punto de reorden · datos al ' + corte;
     st.font = { italic:true, size:10, color:{ argb:C.gris } };
     // Cabecera en 2 filas: el año arriba y "Entró / Salió" abajo.
-    const cab = ['N°', 'Código', 'Descripción'].concat(fam ? ['Familia'] : [], ['UM', 'Clase', 'US$ comprado']), fin = ['Consumo/mes', 'Consumo/año', 'Stock Lurín', 'En tránsito', 'Último precio de compra', 'A pedir (' + meses + ' meses)'];
+    const cab = ['N°', 'Código', 'Descripción'].concat(fam ? ['Familia'] : [], ['UM', 'Clase', 'US$ comprado']), fin = ['Consumo/mes', 'Consumo/año', 'Stock Lurín', 'En tránsito', 'A pedir (' + meses + ' meses)', 'Último precio de compra'];   // el precio después de "A pedir" (30.10.2026)
     cab.forEach(function(h, i){ ws.mergeCells(4, i + 1, 5, i + 1); ws.getCell(4, i + 1).value = h; });
     P.anios.forEach(function(y, i){ const c = Y0 + i * 2; ws.mergeCells(4, c, 4, c + 1); ws.getCell(4, c).value = y; ws.getCell(5, c).value = 'Entró'; ws.getCell(5, c + 1).value = 'Salió'; });
     fin.forEach(function(h, i){ const c = Y0 + nY * 2 + i; ws.mergeCells(4, c, 5, c); ws.getCell(4, c).value = h; });
@@ -9102,10 +9102,11 @@ async function invExcel(meses){
       const cm = +r.consumoMensual || 0, tr = +r.transito || 0, ul = appSkuHistorial(r.codigo).find(function(h){ return h.pu != null; }), pos = x.stock + tr;
       // Lo que está en el punto de reorden o debajo (antes en amarillo) siempre lleva pedido: reponer hasta ROP + consumo de los meses (30.10.2026, Piero).
       const pide = al ? Math.max(1, Math.ceil(al.rop + cm * meses - pos)) : cm > 0 ? Math.max(0, Math.ceil(cm * meses - pos)) : 0;
-      v.push(Math.round(cm * 100) / 100, Math.round(cm * 12), Math.round(x.stock * 100) / 100, Math.round(tr * 100) / 100, ul ? Math.round(ul.pu * 100) / 100 : '—', pide);
+      v.push(Math.round(cm * 100) / 100, Math.round(cm * 12), Math.round(x.stock * 100) / 100, Math.round(tr * 100) / 100, pide, ul ? Math.round(ul.pu * 100) / 100 : '—');
       row.values = v;
       row.eachCell({ includeEmpty:true }, function(c, k){ c.border = { bottom:borde, left:linea(k), right:linea(k + 1) }; c.font = { size:10, color:{ argb:C.tinta } }; const izq = k === 3 || (fam && k === 4); c.alignment = { vertical:'middle', horizontal:izq ? 'left' : 'center', wrapText:izq };   // sin amarillo: lo que hay que pedir ya lleva "A pedir" (30.10.2026)
-        const j = k - Y0; if(j >= 0 && j < nY * 2) c.fill = relleno(Math.floor(j / 2) % 2 === 0 ? C.anio : 'FFF8F4EA'); });   // años intercalados: celeste muy claro / crema muy claro (30.10.2026)
+        const j = k - Y0; if(j >= 0 && j < nY * 2) c.fill = relleno(Math.floor(j / 2) % 2 === 0 ? C.anio : 'FFF3F0FA');   // años intercalados: celeste / lila muy claro (30.10.2026)
+        if(k === Y0 + nY * 2 + 2) c.fill = relleno('FFE9ECEF'); if(k === Y0 + nY * 2 + 3) c.fill = relleno('FFFFF6D6'); });   // stock Lurín gris claro · en tránsito amarillo claro
       const q = function(k, color){ const c = row.getCell(k); c.numFmt = fmtQ(c.value || 0); if(color) c.font = { size:10, color:{ argb:color } }; };
       row.getCell(2).numFmt = '@'; row.getCell(6 + o).numFmt = '"US$ "#,##0;;"—"';
       if(x.cls){ const c = row.getCell(5 + o); c.fill = relleno(x.cls === 'A' ? 'FFE6F0EC' : x.cls === 'B' ? 'FFFBF3E2' : 'FFF0F2F5'); c.font = { bold:true, size:10, color:{ argb:x.cls === 'A' ? C.teal : x.cls === 'B' ? C.naranja : C.gris } }; }
@@ -9113,9 +9114,9 @@ async function invExcel(meses){
       const b = Y0 + nY * 2; q(b, null); row.getCell(b).numFmt = '#,##0.00;;"·"'; q(b + 1, null);
       row.getCell(b + 2).numFmt = '#,##0.##;;"—"'; row.getCell(b + 2).numFmt = fmtQ(x.stock).replace('"·"', '"—"'); row.getCell(b + 2).font = { bold:true, size:10, color:{ argb:C.tinta } };
       q(b + 3, null); const mf = ul && ul.mon === 'S/' ? '"S/ "#,##0.00' : '"US$ "#,##0.00';
-      row.getCell(b + 4).numFmt = mf;
-      const cp = row.getCell(b + 5); cp.numFmt = '#,##0;;"—"'; if(pide){ cp.fill = relleno('FFE2EFEA'); cp.font = { bold:true, size:10, color:{ argb:C.tinta } }; } });
-    [6, 14, 52].concat(fam ? [30] : [], [7, 7, 14],P.anios.reduce(function(a){ return a.concat([10, 10]); }, []), [13, 13, 12, 12, 16, 13]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+      row.getCell(b + 5).numFmt = mf;
+      const cp = row.getCell(b + 4); cp.numFmt = '#,##0;;"—"'; if(pide){ cp.fill = relleno('FFE2EFEA'); cp.font = { bold:true, size:10, color:{ argb:C.tinta } }; } });
+    [6, 14, 52].concat(fam ? [30] : [], [7, 7, 14],P.anios.reduce(function(a){ return a.concat([10, 10]); }, []), [13, 13, 12, 12, 13, 16]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
     ws.getRow(4).height = 20; ws.getRow(5).height = 18;
     ws.autoFilter = { from:{ row:5, column:1 }, to:{ row:5 + P.l.length, column:nc } };
   });
