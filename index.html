@@ -18596,9 +18596,10 @@ function appEntregadas(){ return appMemo('entregadas', function(){
   const M = new Map();
   const add = function(r, q, qr){
     if(!r.codOrden) return;
-    const o = M.get(r.codOrden) || { oc:r.codOrden, prov:r.proveedor || '', uc:r.usuarioCompras || '', fo:r.fOrden || null, fb:r.fAprob || null, fx:r.fCompromiso || null, fr:null, n:0, pend:false, anul:false, clis:new Set(), ids:new Set(), txt:[], vistos:new Set() };
+    const o = M.get(r.codOrden) || { oc:r.codOrden, prov:r.proveedor || '', uc:r.usuarioCompras || '', fo:r.fOrden || null, fb:r.fAprob || null, fx:r.fCompromiso || null, fr:null, n:0, pend:false, anul:false, clis:new Set(), ids:new Set(), peds:new Set(), reqs:new Set(), txt:[], vistos:new Set() };
     const k = (r.idProducto || r.producto || '') + '|' + (r.codRequerimiento || r.codPedido || '');
     if(!o.vistos.has(k)){ o.vistos.add(k); o.n++; o.txt.push(r.idProducto, r.producto, r.codRequerimiento, r.codPedido); }
+    if(r.codPedido) o.peds.add(r.codPedido); if(r.codRequerimiento) o.reqs.add(r.codRequerimiento);
     if(pdOcPendiente({ codOrden:r.codOrden, estadoOrden:r.estadoOrden, cantOrden:q, cantRecep:qr, fRecep:r.fRecep })) o.pend = true;
     if(/anul/i.test(r.estadoOrden || '')) o.anul = true;
     if(r.fRecep && (!o.fr || r.fRecep > o.fr)) o.fr = r.fRecep;
@@ -18790,19 +18791,22 @@ async function appPcExcel(){
   const hoy = new Date(), nom = function(p){ return PD_PERSONAS[p] || p || 'Sin asignar'; }, quien = D.per ? nom(D.per) : 'Todo el equipo', que = D.cliSel || ('"' + APP_PC.q + '"');
   const fd = function(d){ if(!d) return ''; d = d instanceof Date ? d : new Date(d); return isNaN(d) ? '' : String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + d.getUTCFullYear(); };
   const venc = D.S.venc[3].filter(function(o){ return D.ocHit.has(o.oc); }), luego = D.S.luego[3].filter(function(o){ return D.ocHit.has(o.oc); }), ent = D.entQ, its = D.items.filter(D.pasa);
-  const fo = new Map(), fb = new Map(); D.filas.forEach(function(r){ if(r.tipo !== 'oc') return; if(r.fOrden && !fo.has(r.codOrden)) fo.set(r.codOrden, r.fOrden); if(r.fAprob && !fb.has(r.codOrden)) fb.set(r.codOrden, r.fAprob); });
+  // OC, pedido y requerimiento en columnas separadas, como número (02.11.2026, Piero: "no sale el número de requerimiento… que se defina el número de oc y de pedido bien").
+  const num = function(l){ l = [...new Set(l.filter(Boolean).map(function(c){ return String(c).replace(/^000\d-0*/, ''); }))]; return l.length === 1 && /^\d+$/.test(l[0]) ? +l[0] : l.join(' · '); };
+  const fo = new Map(), fb = new Map(), PR = new Map(); D.filas.forEach(function(r){ if(r.tipo !== 'oc') return; if(r.fOrden && !fo.has(r.codOrden)) fo.set(r.codOrden, r.fOrden); if(r.fAprob && !fb.has(r.codOrden)) fb.set(r.codOrden, r.fAprob);
+    const x = PR.get(r.codOrden) || PR.set(r.codOrden, { p:[], r:[] }).get(r.codOrden); x.p.push(r.codPedido); x.r.push(r.req); });
   const obsOC = function(o){ const imp = o.oc.indexOf('0002-') === 0; return [o.est, ocEnTransito(o.oc) ? 'En tránsito' : '', imp ? 'Importación' : ''].filter(Boolean).join(' · '); };
   const cl = function(set){ const l = [...set].map(appImpNombre); return l.join(' · ') || 'Stock / sin proyecto'; }, cod = function(c){ return String(c || '').replace(/^000\d-0*/, ''); };
   const F = [];
-  venc.forEach(function(o){ F.push(['Vencida', cod(o.oc), appImpNombre(o.prov), cl(o.prys), nom(o.persona), fd(fo.get(o.oc)), fd(fb.get(o.oc)), fd(o.f), o.d + ' d.h. de atraso', o.n, obsOC(o)]); });
-  luego.forEach(function(o){ F.push(['Más adelante', cod(o.oc), appImpNombre(o.prov), cl(o.prys), nom(o.persona), fd(fo.get(o.oc)), fd(fb.get(o.oc)), fd(o.f), !o.f ? 'Sin fecha' : o.d === 0 ? 'Vence hoy' : o.d > 0 ? o.d + ' d.h. (ETA pasada)' : 'Faltan ' + (-o.d) + ' d.h.', o.n, obsOC(o)]); });
-  const P = new Map(); its.forEach(function(r){ const x = P.get(r.codPedido) || P.set(r.codPedido, { r:r, n:0, prys:new Set() }).get(r.codPedido); x.n++; x.prys.add(D.cliDe(r)); });
-  [...P.values()].forEach(function(x){ const r = x.r, dd = r.fPedido ? busdayCount(r.fPedido, hoy) : null; F.push(['Pedido sin OC', 'Ped. ' + cod(r.codPedido), '—', cl(x.prys), r.persona ? nom(r.persona) : 'Sin comprador', fd(r.fPedido), '', '', dd == null ? '' : dd + ' d.h. desde el pedido', x.n, r.req ? 'Req. ' + cod(r.req) : 'Pedido directo']); });
-  ent.forEach(function(o){ F.push([o.anul ? 'Anulada' : o.fin && !o.fr ? 'Cerrada' : 'Entregada', cod(o.oc), appImpNombre(o.prov), [...o.clis].join(' · ') || 'Stock / sin proyecto', nom(o.persona), fd(o.fo), fd(o.fb), fd(o.fx), o.anul ? '' : o.atraso == null ? '' : o.atraso > 0 ? o.atraso + ' d.h. tarde' : 'A tiempo', o.n, o.fr ? 'Llegó el ' + fd(o.fr) : '']); });
+  venc.forEach(function(o){ F.push(['Vencida', num([o.oc]), num(PR.get(o.oc).p), num(PR.get(o.oc).r), appImpNombre(o.prov), cl(o.prys), nom(o.persona), fd(fo.get(o.oc)), fd(fb.get(o.oc)), fd(o.f), o.d + ' d.h. de atraso', o.n, obsOC(o)]); });
+  luego.forEach(function(o){ F.push(['Más adelante', num([o.oc]), num(PR.get(o.oc).p), num(PR.get(o.oc).r), appImpNombre(o.prov), cl(o.prys), nom(o.persona), fd(fo.get(o.oc)), fd(fb.get(o.oc)), fd(o.f), !o.f ? 'Sin fecha' : o.d === 0 ? 'Vence hoy' : o.d > 0 ? o.d + ' d.h. (ETA pasada)' : 'Faltan ' + (-o.d) + ' d.h.', o.n, obsOC(o)]); });
+  const P = new Map(); its.forEach(function(r){ const x = P.get(r.codPedido) || P.set(r.codPedido, { r:r, n:0, prys:new Set(), reqs:[] }).get(r.codPedido); x.n++; x.prys.add(D.cliDe(r)); x.reqs.push(r.req); });
+  [...P.values()].forEach(function(x){ const r = x.r, dd = r.fPedido ? busdayCount(r.fPedido, hoy) : null; F.push(['Pedido sin OC', '', num([r.codPedido]), num(x.reqs), '—', cl(x.prys), r.persona ? nom(r.persona) : 'Sin comprador', fd(r.fPedido), '', '', dd == null ? '' : dd + ' d.h. desde el pedido', x.n, r.req ? '' : 'Pedido directo']); });
+  ent.forEach(function(o){ F.push([o.anul ? 'Anulada' : o.fin && !o.fr ? 'Cerrada' : 'Entregada', num([o.oc]), num([...o.peds]), num([...o.reqs]), appImpNombre(o.prov), [...o.clis].join(' · ') || 'Stock / sin proyecto', nom(o.persona), fd(o.fo), fd(o.fb), fd(o.fx), o.anul ? '' : o.atraso == null ? '' : o.atraso > 0 ? o.atraso + ' d.h. tarde' : 'A tiempo', o.n, o.fr ? 'Llegó el ' + fd(o.fr) : '']); });
   if(!F.length){ appToast('No hay nada con ese filtro para ' + quien + '.'); return; }
   const C = { navy:'FF25344A', linea:'FFD3DAE3', gris:'FF6B7785' }, EST = { 'Vencida':['FFFDE2E1', 'FFB42318'], 'Más adelante':['FFE3EEFB', 'FF1F5FA8'], 'Pedido sin OC':['FFEFF1F4', 'FF4A5565'], 'Entregada':['FFE2F3EA', 'FF1B7F4A'], 'Cerrada':['FFE2F3EA', 'FF1B7F4A'], 'Anulada':['FFEFF1F4', 'FF6B7785'] };
   const fill = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, bd = { style:'thin', color:{ argb:C.linea } };
-  const wb = new EJ.Workbook(), ws = wb.addWorksheet('Status', { views:[{ state:'frozen', ySplit:7, showGridLines:false }] }), H = ['N°', 'Estado', 'OC / Pedido', 'Proveedor', 'Cliente', 'Comprador', 'Emitida', 'Aprobada', 'Entrega / ETA', 'Plazo', 'Ítems', 'Observación'];
+  const wb = new EJ.Workbook(), ws = wb.addWorksheet('Status', { views:[{ state:'frozen', ySplit:7, showGridLines:false }] }), H = ['N°', 'Estado', 'OC', 'Pedido', 'Req.', 'Proveedor', 'Cliente', 'Comprador', 'Emitida', 'Aprobada', 'Entrega / ETA', 'Plazo', 'Ítems', 'Observación'];
   ws.mergeCells(1, 1, 1, H.length); ws.getCell(1, 1).value = 'Status de compras · ' + que; ws.getCell(1, 1).font = { bold:true, size:15, color:{ argb:C.navy } };
   ws.mergeCells(2, 1, 2, H.length); ws.getCell(2, 1).value = 'Comprador: ' + quien + ' · Datos al ' + fd(appIndCorte()) + ' · Generado el ' + fd(new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()))) + ' · Plataforma Friopacking';
   ws.getCell(2, 1).font = { italic:true, size:10, color:{ argb:C.gris } };
@@ -18813,10 +18817,10 @@ async function appPcExcel(){
   ws.getRow(4).height = 30;
   ws.getRow(7).values = H; ws.getRow(7).eachCell(function(c){ c.fill = fill(C.navy); c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; });
   F.forEach(function(f, i){ const row = ws.getRow(8 + i); row.values = [i + 1].concat(f);
-    row.eachCell({ includeEmpty:true }, function(c, k){ c.font = { size:10, color:{ argb:'FF000000' } }; c.border = { bottom:bd }; c.alignment = { vertical:'middle', horizontal:[4, 5, 12].indexOf(k) !== -1 ? 'left' : 'center', wrapText:[4, 5, 12].indexOf(k) !== -1 }; });
-    const e = EST[f[0]] || EST['Pedido sin OC'], c = row.getCell(2); c.fill = fill(e[0]); c.font = { bold:true, size:10, color:{ argb:e[1] } }; row.getCell(3).numFmt = '@';
-    if(f[0] === 'Vencida') row.getCell(10).font = { bold:true, size:10, color:{ argb:e[1] } }; });
-  [5, 14, 13, 30, 30, 18, 11, 11, 13, 20, 7, 26].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+    row.eachCell({ includeEmpty:true }, function(c, k){ c.font = { size:10, color:{ argb:'FF000000' } }; c.border = { bottom:bd }; c.alignment = { vertical:'middle', horizontal:[6, 7, 14].indexOf(k) !== -1 ? 'left' : 'center', wrapText:[4, 5, 6, 7, 14].indexOf(k) !== -1 }; });
+    const e = EST[f[0]] || EST['Pedido sin OC'], c = row.getCell(2); c.fill = fill(e[0]); c.font = { bold:true, size:10, color:{ argb:e[1] } }; 
+    if(f[0] === 'Vencida') row.getCell(12).font = { bold:true, size:10, color:{ argb:e[1] } }; });
+  [5, 14, 9, 12, 12, 28, 30, 18, 11, 11, 13, 20, 7, 26].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
   ws.autoFilter = { from:{ row:7, column:1 }, to:{ row:7 + F.length, column:H.length } };
   // Hoja 2: cada ítem todavía pendiente (OC por llegar y pedidos sin OC).
   const wi = wb.addWorksheet('Ítems pendientes', { views:[{ state:'frozen', ySplit:1, showGridLines:false }] }), HI = ['Estado', 'OC', 'Pedido', 'Req.', 'Código', 'Producto', 'UM', 'Cantidad', 'Recibido', 'Falta', 'Cliente', 'Proveedor', 'Entrega / ETA', 'Comprador', 'Familia'];
@@ -18824,9 +18828,9 @@ async function appPcExcel(){
   const est = new Map(); venc.forEach(function(o){ est.set(o.oc, 'Vencida'); }); luego.forEach(function(o){ est.set(o.oc, 'Más adelante'); });
   D.filas.filter(function(r){ return r.tipo === 'oc' && est.has(r.codOrden); }).sort(function(a, b){ return (est.get(a.codOrden) > est.get(b.codOrden) ? -1 : est.get(a.codOrden) < est.get(b.codOrden) ? 1 : 0) || String(a.codOrden).localeCompare(String(b.codOrden)); })
     .concat(its).forEach(function(r){ const oc = r.tipo === 'oc', q = oc ? +r.cantOrden || 0 : +r.cantPedido || 0, rc = oc ? +r.cantRecep || 0 : 0, row = wi.addRow([oc ? est.get(r.codOrden) : 'Pedido sin OC', oc ? cod(r.codOrden) : '', cod(r.codPedido), cod(r.req), r.idProducto || '', r.producto || '', r.unidad || '', q, rc || null, Math.max(0, q - rc), D.cliDe(r) || 'Stock / sin proyecto', oc ? appImpNombre(r.proveedor) : '', oc ? fd(r.fCompromiso) : '', r.persona ? nom(r.persona) : 'Sin comprador', r.familia || '']);
-      const e = EST[row.getCell(1).value] || EST['Pedido sin OC']; row.getCell(1).fill = fill(e[0]); row.getCell(1).font = { bold:true, size:10, color:{ argb:e[1] } };
+      [2, 3, 4].forEach(function(k){ const v = num([row.getCell(k).value]); row.getCell(k).value = v === '' ? null : v; }); const e = EST[row.getCell(1).value] || EST['Pedido sin OC']; row.getCell(1).fill = fill(e[0]); row.getCell(1).font = { bold:true, size:10, color:{ argb:e[1] } };
       row.eachCell({ includeEmpty:true }, function(c, k){ if(k > 1) c.font = { size:10 }; c.border = { bottom:bd }; c.alignment = { vertical:'middle', horizontal:[6, 11, 12, 15].indexOf(k) !== -1 ? 'left' : 'center', wrapText:k === 6 }; });
-      [2, 3, 4, 5].forEach(function(k){ row.getCell(k).numFmt = '@'; }); [8, 9, 10].forEach(function(k){ row.getCell(k).numFmt = '#,##0.##'; }); });
+      row.getCell(5).numFmt = '@'; [8, 9, 10].forEach(function(k){ row.getCell(k).numFmt = '#,##0.##'; }); });
   [13, 9, 9, 9, 14, 46, 7, 10, 10, 9, 28, 28, 12, 18, 22].forEach(function(w, i){ wi.getColumn(i + 1).width = w; }); wi.autoFilter = { from:{ row:1, column:1 }, to:{ row:1, column:HI.length } };
   const nomA = sinAcentos('Status compras - ' + (D.cliSel || APP_PC.q) + ' - ' + quien).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
   descargarBlob(new Blob([await wb.xlsx.writeBuffer()], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nomA + '.xlsx');
