@@ -16082,23 +16082,25 @@ function almHojas(cod){
   const L12 = [...MM.entries()], con = L12.filter(function(x){ return x[1].n; }), tN = con.reduce(function(a, x){ return a + x[1].n; }, 0), tO = con.reduce(function(a, x){ return a + x[1].ok; }, 0);
   const pM = function(b){ return b.ok / b.n * 100; }, mTxt = function(k){ return MESES_CORTOS[+k.slice(5) - 1] + ' ' + k.slice(2, 4); }, ult = MM.get(hasta.slice(0, 7));
   const ord = con.slice().sort(function(a, b){ return pM(b[1]) - pM(a[1]); }), mej = ord[0], peo = ord[ord.length - 1];
+  const mP = 85, enM = con.filter(function(x){ return pM(x[1]) >= mP; }).length, cP = function(v){ return v >= mP ? '#2f9a5c' : '#cf5a5a'; };   // meta: 85% o más a tiempo (02.11.2026, Piero)
   const W = 700, H = 400, pl = 52, pr = 18, pt = 34, pb = 70, cw = (W - pl - pr) / 12, yv = function(v){ return pt + (100 - v) / 100 * (H - pt - pb); };
   const xs = function(i){ return pl + cw * i + cw / 2; }, pts = L12.map(function(x, i){ return x[1].n ? [xs(i), yv(pM(x[1]))] : null; });
   const svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif">
     ${[0, 25, 50, 75, 100].map(function(v){ return `<line x1="${pl}" y1="${yv(v)}" x2="${W - pr}" y2="${yv(v)}" stroke="#e3e9f2" stroke-width="1.5"/><text x="${pl - 8}" y="${yv(v) + 6}" text-anchor="end" font-size="16" font-weight="700" fill="#2f5f95">${v}%</text>`; }).join('')}
+    <line x1="${pl}" y1="${yv(mP)}" x2="${W - pr}" y2="${yv(mP)}" stroke="#2f9a5c" stroke-width="2.5" stroke-dasharray="8 6"/><text x="${pl + 6}" y="${yv(mP) - 8}" text-anchor="start" font-size="16" font-weight="900" fill="#2f9a5c">META ${mP}%</text>
     <polyline points="${pts.filter(Boolean).map(function(q){ return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ')}" fill="none" stroke="${CPX_C.teal}" stroke-width="4" stroke-linejoin="round"/>
-    ${pts.map(function(q, i){ return q ? `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="7" fill="#fff" stroke="${CPX_C.teal}" stroke-width="3.5"/><text x="${q[0].toFixed(1)}" y="${(q[1] - 14).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="900" fill="${CPX_C.navy}">${Math.round(pM(L12[i][1]))}%</text>` : ''; }).join('')}
+    ${pts.map(function(q, i){ return q ? `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="7" fill="${cP(pM(L12[i][1]))}" stroke="#fff" stroke-width="2.5"/><text x="${q[0].toFixed(1)}" y="${(q[1] - 14).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="900" fill="${cP(pM(L12[i][1]))}">${Math.round(pM(L12[i][1]))}%</text>` : ''; }).join('')}
     ${L12.map(function(x, i){ return `<text x="${xs(i).toFixed(1)}" y="${H - pb + 28}" text-anchor="middle" font-size="16" font-weight="800" fill="${CPX_C.ink}">${MESES_CORTOS[+x[0].slice(5) - 1]}</text><text x="${xs(i).toFixed(1)}" y="${H - pb + 48}" text-anchor="middle" font-size="13" font-weight="700" fill="#2f5f95">${x[0].slice(2, 4)}</text><text x="${xs(i).toFixed(1)}" y="${H - pb + 66}" text-anchor="middle" font-size="13" font-weight="600" fill="#8b98a4">${x[1].n ? n(x[1].n) : '—'}</text>`; }).join('')}
   </svg>`;
   const per12 = MESES_CORTOS[+d12.slice(5, 7) - 1].toUpperCase() + ' ' + d12.slice(0, 4) + ' - ' + MESES_CORTOS[+hasta.slice(5, 7) - 1].toUpperCase() + ' ' + hasta.slice(0, 4);
   const h6 = `<div class="cpx-hoja">
       <div class="cpx-card cpx-cab">${cpxLogo()}<div class="cpx-cab-t"><h1 class="g">Req. a pedido<br>mes a mes</h1><div class="cpx-cab-p">${pill}${fecha(per12)}</div></div></div>
-      <div class="cpx-kp2"><div class="cpx-card"><i class="cpx-circ">${CPX_ICO.relojB(50)}</i><div><span>A tiempo<br>12 meses</span><b>${pc(tO, tN)}</b></div></div>
-        <div class="cpx-card"><i class="cpx-circ">${CPX_ICO.doc('#fff', 44, CPX_C.navy)}</i><div><span>A tiempo<br>${mTxt(hasta.slice(0, 7))}</span><b>${ult && ult.n ? pc(ult.ok, ult.n) : '—'}</b></div></div></div>
+      <div class="cpx-kp2"><div class="cpx-card"><i class="cpx-circ">${CPX_ICO.relojB(50)}</i><div><span>A tiempo<br>12 meses</span><b style="color:${tN ? cP(tO / tN * 100) : 'inherit'}">${pc(tO, tN)}</b></div></div>
+        <div class="cpx-card"><i class="cpx-circ">${CPX_ICO.doc('#fff', 44, CPX_C.navy)}</i><div><span>A tiempo<br>${mTxt(hasta.slice(0, 7))}</span><b style="color:${ult && ult.n ? cP(pM(ult)) : 'inherit'}">${ult && ult.n ? pc(ult.ok, ult.n) : '—'}</b></div></div></div>
       <div class="cpx-card"><h2>% de ítems a tiempo por mes <em>(≤ ${meta} d.h.)</em></h2>${con.length ? svg : '<p class="cpx-nota">Sin pedidos con requerimiento en los últimos 12 meses.</p>'}</div>
       <div class="cpx-card"><div class="cpx-dos"><div><i>${CPX_ICO.relojB(70)}</i><div><span>Mejor mes</span><b>${mej ? Math.round(pM(mej[1])) + '%' : '—'}</b><small>${mej ? mTxt(mej[0]) : ''}</small></div></div>
         <div><i>${CPX_ICO.reloj('#cf5a5a', 70)}</i><div><span>Mes más bajo</span><b>${peo ? Math.round(pM(peo[1])) + '%' : '—'}</b><small>${peo ? mTxt(peo[0]) : ''}</small></div></div></div></div>
-      <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>% de ítems de requerimiento con pedido en ${meta} día${meta === 1 ? '' : 's'} hábil${meta === 1 ? '' : 'es'} o menos, por mes de la fecha del pedido.<br>Debajo de cada mes, la cantidad de ítems. Los pedidos directos no entran.</p></div></div>`;
+      <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>% de ítems de requerimiento con pedido en ${meta} día${meta === 1 ? '' : 's'} hábil${meta === 1 ? '' : 'es'} o menos, por mes de la fecha del pedido.<br>Meta: ${mP}% o más (verde cumple, rojo no) · ${enM} de ${con.length} meses en meta. Debajo de cada mes, la cantidad de ítems.</p></div></div>`;
   return { hojas:[h1, h2, h4, h5, h6], desde:desde, hasta:hasta };   // sin "Requerimientos por atender" (28.10.2026, Piero)
 }
 function almHojasHtml(cod){ appPsObservar(); const ver = ['ped', 'ped', 'rec', 'des', 'ped'];
