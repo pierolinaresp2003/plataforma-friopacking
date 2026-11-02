@@ -1318,7 +1318,7 @@
     .ini-busca button{border:0;background:var(--brand);color:#fff;border-radius:12px;padding:0 18px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;}
     .ini-o{text-align:center;font-size:11.5px;color:var(--muted);margin:10px 0 8px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
     .ini-select{display:block;width:100%;max-width:100%;border:1px solid var(--border);background:var(--input-bg);color:var(--ink);border-radius:12px;padding:12px;font-size:14.5px;font-family:inherit;}
-    .m-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:0 0 12px;} .m-filtros label{flex:1 1 150px;min-width:0;}
+    .m-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:0 0 12px;} .pc-cli{flex-wrap:nowrap;} .pc-cli label{flex:0 1 420px;} .m-filtros label{flex:1 1 150px;min-width:0;}
     .m-filtros label > span{display:block;font-size:11px;font-weight:700;color:var(--ink-soft);margin:0 0 3px 2px;} .m-filtros .ini-select{padding:9px 10px;font-size:13.5px;border-radius:10px;}
     .m-filtros-x{flex:0 0 auto;background:none;border:0;color:var(--brand-ink);font-weight:800;font-size:12.5px;padding:9px 4px;cursor:pointer;font-family:inherit;}
     .ini-fila{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--border);padding:10px 0;
@@ -15280,7 +15280,7 @@ function appConstruir(){
       appBuscaEspera = setTimeout(function(){
         if(id === 'invBusca'){ APP_INV.q = v; APP_INV.tope = 30; APP_INV.sel = ''; const l = document.getElementById('invLista'); if(l) l.innerHTML = appInvLista();
           document.querySelectorAll('[data-invf]').forEach(function(x){ x.classList.toggle('on', !v && x.dataset.invf === APP_INV.f); }); }
-        else if(id === 'pcBusca'){ APP_PC.q = v; APP_PC.tope = 20; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true);
+        else if(id === 'pcBusca'){ APP_PC.q = v; APP_PC.cli = ''; APP_PC.tope = 20; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true);
           document.querySelectorAll('[data-pcsec]').forEach(function(x){ x.classList.toggle('sel', !v && x.dataset.pcsec === APP_PC.sec); }); }
         else { APP_PL.q = v; const l = document.getElementById('plLista'); if(l) l.innerHTML = appPendLogLista(); }
       }, 250);
@@ -15290,6 +15290,7 @@ function appConstruir(){
   document.getElementById('section-inicio').addEventListener('change', function(e){
     if(e.target.id === 'iniPry' && e.target.value) appAbrirProyecto(e.target.value);
     if(e.target.id === 'pcPer'){ APP_PC.persona = e.target.value; APP_PC.tope = 20; APP_PC.fam = ''; return appRenderInicio(); }
+    if(e.target.id === 'pcCli'){ APP_PC.cli = e.target.value; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true); return; }
     if(e.target.id === 'pcEntAnio' || e.target.id === 'pcEntMes'){ if(e.target.id === 'pcEntAnio'){ APP_PC.entAnio = e.target.value; APP_PC.entMes = String(+e.target.value === appIndCorte().getUTCFullYear() ? appIndCorte().getUTCMonth() + 1 : 0); } else APP_PC.entMes = e.target.value; APP_PC.entTope = 60; return appRenderInicio(); }
     if(e.target.id === 'dciFotoIn') return appDciFoto(e.target.files && e.target.files[0]);
     if(e.target.id === 'dciCod' || e.target.id === 'dciArea' || e.target.id === 'dciDia' || e.target.id === 'dciPer'){ APP_DCI[{ dciCod:'fCod', dciArea:'fArea', dciDia:'fDia', dciPer:'fPer' }[e.target.id]] = e.target.value; if(e.target.id === 'dciArea') APP_DCI.fCod = ''; return appDciPintar(); }
@@ -18587,7 +18588,7 @@ function appOCCerrar(){
 }
 
 // ---------- Pendientes de Compras (Logística) ----------
-const APP_PC = { sub:'nac', persona:'', sec:'venc', tope:20, q:'', fam:'', entAnio:'', entMes:'', entTope:60 };
+const APP_PC = { sub:'nac', persona:'', sec:'venc', tope:20, q:'', cli:'', fam:'', entAnio:'', entMes:'', entTope:60 };
 // ---------- OC entregadas (07.10.2026, Piero: "falta un buscador para todas las OC que ya se entregaron") ----------
 // Una OC entregada = ninguna de sus líneas sigue pendiente (regla de Pendientes: estado de Nisira + lo
 // recibido + OC Finalizadas.xlsx) y no está anulada. Fecha de entrega = la última recepción en Lurín.
@@ -18732,12 +18733,23 @@ function appPendComprasHtml(soloLista, sinCaras){
   // Buscador general (05.10.2026, Piero): OC, pedido, req., código, producto, proveedor o proyecto, en
   // todos los estados a la vez. Una OC sale completa si cualquiera de sus ítems coincide.
   const q = polarNorm(APP_PC.q || ''), tope = Infinity;   // todo a la vista (05.10.2026)
-  const pasa = function(r){ const t = polarNorm([r.codOrden, r.codPedido, r.req, r.idProducto, r.producto, r.proveedor, r.proyecto, r.idProyecto, r.solicitante, r.obs, r.familia].join(' '));
-    return q.split(' ').filter(Boolean).every(function(w){ return t.indexOf(w) !== -1 || polarCompacto(t).indexOf(polarCompacto(w)) !== -1; }); };
+  // Filtro por cliente (02.11.2026, Piero: "cuando pongas el nombre de alguien que te dé una opción para filtrar por nombre de
+  // cliente", en lista desplegable): con el buscador salen los clientes que coinciden; al elegir uno, solo lo de ese cliente.
+  const cliDe = function(r){ return appImpNombre(/^pedido directo/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : (r.proyecto || '')); };
+  const pasaQ = function(t){ return q.split(' ').filter(Boolean).every(function(w){ return t.indexOf(w) !== -1 || polarCompacto(t).indexOf(polarCompacto(w)) !== -1; }); };
+  const clis = new Map(), addCli = function(n, k){ if(n && pasaQ(polarNorm(n))){ if(!clis.has(n)) clis.set(n, new Set()); clis.get(n).add(k); } };
+  if(q){ filas.forEach(function(r){ addCli(cliDe(r), r.tipo === 'oc' ? r.codOrden : r.codPedido); }); entAll.forEach(function(o){ o.clis.forEach(function(n){ addCli(n, o.oc); }); }); }
+  const cliSel = q && APP_PC.cli && (soloLista === 'datos' || clis.has(APP_PC.cli)) ? APP_PC.cli : '';
+  const pasa = function(r){ if(cliSel) return cliDe(r) === cliSel;
+    return pasaQ(polarNorm([r.codOrden, r.codPedido, r.req, r.idProducto, r.producto, r.proveedor, r.proyecto, r.idProyecto, r.solicitante, r.obs, r.familia].join(' '))); };
+  const opC = function(v, t){ return `<option value="${escapeHtml(v)}"${v === cliSel ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
+  const cliFiltro = q ? `<div class="m-filtros pc-cli"><label><span>👥 Cliente</span><select class="ini-select" id="pcCli">${opC('', 'Todo lo que dice "' + APP_PC.q + '"')}${[...clis.entries()].sort(function(a, b){ return a[0].localeCompare(b[0]); }).map(function(x){ return opC(x[0], x[0] + ' · ' + x[1].size); }).join('')}</select></label>`
+    + INV_XLS_BTN.replace('data-invxls="1"', 'data-pcxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el status de lo filtrado') + '</div>' : '';
+  const wsQ = q.split(' ').filter(Boolean), entQ = q ? entAll.filter(function(o){ return cliSel ? o.clis.has(cliSel) : wsQ.every(function(w){ return o.txt.indexOf(w) !== -1 || polarCompacto(o.txt).indexOf(polarCompacto(w)) !== -1; }); }) : entPer;
   const ocHit = new Set(); if(q) filas.forEach(function(r){ if(r.tipo === 'oc' && pasa(r)) ocHit.add(r.codOrden); });
   const bloque = function(k){
     if(k === 'ent'){
-      const ws = q.split(' ').filter(Boolean), l = q ? entAll.filter(function(o){ return ws.every(function(w){ return o.txt.indexOf(w) !== -1 || polarCompacto(o.txt).indexOf(polarCompacto(w)) !== -1; }); }) : entPer;
+      const l = entQ;
       if(q && !l.length) return '';
       const tope = APP_PC.entTope, vis = l.slice(0, tope);
       return `<div class="m-pl-tit"><span>✅ Entregadas, cerradas o anuladas</span><b>${l.length}</b></div><div class="m-sec-nota">Ya no están pendientes · la más reciente primero · toca una para ver su detalle y presupuesto</div>`
@@ -18756,8 +18768,8 @@ function appPendComprasHtml(soloLista, sinCaras){
       + (l.length > tope ? `<button type="button" class="ini-link" data-pcmas="1">Ver más (${appN(l.length - tope)} restantes) ›</button>` : '');
   };
   // Para el reporte en imágenes: los mismos estados y las mismas tarjetas que se ven aquí.
-  if(soloLista === 'datos') return { per:per, S:S, items:items, cardOC:cardOC, cardEnt:cardEnt, skuGrupos:skuGrupos, filaSku:filaSku, entY:entY, entM:entM };
-  const lista = q ? (['venc', 'luego', 'ent', 'ped'].map(bloque).join('') || `<div class="ini-vacio">No hay OC ni pedidos con "${escapeHtml(APP_PC.q)}".</div>`) : bloque(APP_PC.sec);
+  if(soloLista === 'datos') return { per:per, S:S, items:items, cardOC:cardOC, cardEnt:cardEnt, skuGrupos:skuGrupos, filaSku:filaSku, entY:entY, entM:entM, q:q, cliSel:cliSel, pasa:pasa, ocHit:ocHit, entQ:entQ, filas:filas, cliDe:cliDe };
+  const lista = q ? cliFiltro + (['venc', 'luego', 'ent', 'ped'].map(bloque).join('') || `<div class="ini-vacio">No hay OC ni pedidos con "${escapeHtml(APP_PC.q)}".</div>`) : bloque(APP_PC.sec);
   if(soloLista) return lista;
   // Comprador en una lista desplegable (12.10.2026, Piero: "que sea para escoger por lista, no puntitos").
   const opP = function(v, t){ return `<option value="${escapeHtml(v)}"${v === (APP_PC.persona || '') ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
@@ -18767,6 +18779,58 @@ function appPendComprasHtml(soloLista, sinCaras){
     + `<div class="m-buscar pc-buscar-gen"><input type="search" id="pcBusca" placeholder="🔍 Buscar cualquier OC (pendiente o entregada), pedido, req., código, producto, proveedor o cliente" value="${escapeHtml(APP_PC.q || '')}"><button type="button" class="pc-img-btn" data-pcimg="1" title="Reporte en imágenes de todos los estados (ZIP por carpetas)" aria-label="Reporte en imágenes"><svg viewBox="0 0 24 24"><path d="M6 2h8l5 5v15H6z" fill="#fff" stroke="#b9c8de" stroke-width=".8"/><path d="M14 2v5h5" fill="#dbe4f3"/><path d="M9 5.5h3M9 8h4" stroke="#b9c8de" stroke-width="1.2" stroke-linecap="round"/><rect x="2.5" y="10.5" width="14.5" height="10" rx="1.8" fill="#1fa594"/><circle cx="6.6" cy="13.7" r="1.4" fill="#fff"/><path d="M4.2 19.2l3.5-3.6 2.4 2.2 2.6-3 2.8 4.4z" fill="#fff"/></svg></button></div>`
     + `<div class="m-resumen m-pl-tabs imp-tabs">${tile('venc')}${tile('luego')}${tile('ent')}${tile('ped')}</div>`
     + `<div id="pcLista">${lista}</div>`;
+}
+
+// Excel del status de lo filtrado en Compras pendientes (02.11.2026, Piero: "cuando se filtre así una opción de bajar en excel
+// para ver el resumen status de todo ello… en base a la persona que se vea"): mismo filtro (búsqueda o cliente) y solo las OC y
+// pedidos del comprador elegido arriba (Todos = todo el equipo). Hoja 1: una fila por OC / pedido con su estado; hoja 2: cada ítem pendiente.
+async function appPcExcel(){
+  let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
+  const D = appPendComprasHtml('datos', true); if(!D.q){ appToast('Primero busca o elige un cliente.'); return; }
+  const hoy = new Date(), nom = function(p){ return PD_PERSONAS[p] || p || 'Sin asignar'; }, quien = D.per ? nom(D.per) : 'Todo el equipo', que = D.cliSel || ('"' + APP_PC.q + '"');
+  const fd = function(d){ if(!d) return ''; d = d instanceof Date ? d : new Date(d); return isNaN(d) ? '' : String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + d.getUTCFullYear(); };
+  const venc = D.S.venc[3].filter(function(o){ return D.ocHit.has(o.oc); }), luego = D.S.luego[3].filter(function(o){ return D.ocHit.has(o.oc); }), ent = D.entQ, its = D.items.filter(D.pasa);
+  const fo = new Map(); D.filas.forEach(function(r){ if(r.tipo === 'oc' && r.fOrden && !fo.has(r.codOrden)) fo.set(r.codOrden, r.fOrden); });
+  const obsOC = function(o){ const imp = o.oc.indexOf('0002-') === 0; return [o.est, ocEnTransito(o.oc) ? 'En tránsito' : '', imp ? 'Importación' : ''].filter(Boolean).join(' · '); };
+  const cl = function(set){ const l = [...set].map(appImpNombre); return l.join(' · ') || 'Stock / sin proyecto'; }, cod = function(c){ return String(c || '').replace(/^000\d-0*/, ''); };
+  const F = [];
+  venc.forEach(function(o){ F.push(['Vencida', cod(o.oc), appImpNombre(o.prov), cl(o.prys), nom(o.persona), fd(fo.get(o.oc)), fd(o.f), o.d + ' d.h. de atraso', o.n, obsOC(o)]); });
+  luego.forEach(function(o){ F.push(['Más adelante', cod(o.oc), appImpNombre(o.prov), cl(o.prys), nom(o.persona), fd(fo.get(o.oc)), fd(o.f), !o.f ? 'Sin fecha' : o.d === 0 ? 'Vence hoy' : o.d > 0 ? o.d + ' d.h. (ETA pasada)' : 'Faltan ' + (-o.d) + ' d.h.', o.n, obsOC(o)]); });
+  const P = new Map(); its.forEach(function(r){ const x = P.get(r.codPedido) || P.set(r.codPedido, { r:r, n:0, prys:new Set() }).get(r.codPedido); x.n++; x.prys.add(D.cliDe(r)); });
+  [...P.values()].forEach(function(x){ const r = x.r, dd = r.fPedido ? busdayCount(r.fPedido, hoy) : null; F.push(['Pedido sin OC', 'Ped. ' + cod(r.codPedido), '—', cl(x.prys), r.persona ? nom(r.persona) : 'Sin comprador', fd(r.fPedido), '', dd == null ? '' : dd + ' d.h. desde el pedido', x.n, r.req ? 'Req. ' + cod(r.req) : 'Pedido directo']); });
+  ent.forEach(function(o){ F.push([o.anul ? 'Anulada' : o.fin && !o.fr ? 'Cerrada' : 'Entregada', cod(o.oc), appImpNombre(o.prov), [...o.clis].join(' · ') || 'Stock / sin proyecto', nom(o.persona), fd(o.fo), fd(o.fx), o.anul ? '' : o.atraso == null ? '' : o.atraso > 0 ? o.atraso + ' d.h. tarde' : 'A tiempo', o.n, o.fr ? 'Llegó el ' + fd(o.fr) : '']); });
+  if(!F.length){ appToast('No hay nada con ese filtro para ' + quien + '.'); return; }
+  const C = { navy:'FF25344A', linea:'FFD3DAE3', gris:'FF6B7785' }, EST = { 'Vencida':['FFFDE2E1', 'FFB42318'], 'Más adelante':['FFE3EEFB', 'FF1F5FA8'], 'Pedido sin OC':['FFEFF1F4', 'FF4A5565'], 'Entregada':['FFE2F3EA', 'FF1B7F4A'], 'Cerrada':['FFE2F3EA', 'FF1B7F4A'], 'Anulada':['FFEFF1F4', 'FF6B7785'] };
+  const fill = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, bd = { style:'thin', color:{ argb:C.linea } };
+  const wb = new EJ.Workbook(), ws = wb.addWorksheet('Status', { views:[{ state:'frozen', ySplit:7, showGridLines:false }] }), H = ['N°', 'Estado', 'OC / Pedido', 'Proveedor', 'Cliente', 'Comprador', 'Emitida', 'Entrega / ETA', 'Plazo', 'Ítems', 'Observación'];
+  ws.mergeCells(1, 1, 1, H.length); ws.getCell(1, 1).value = 'Status de compras · ' + que; ws.getCell(1, 1).font = { bold:true, size:15, color:{ argb:C.navy } };
+  ws.mergeCells(2, 1, 2, H.length); ws.getCell(2, 1).value = 'Comprador: ' + quien + ' · Datos al ' + fd(appIndCorte()) + ' · Generado el ' + fd(new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()))) + ' · Plataforma Friopacking';
+  ws.getCell(2, 1).font = { italic:true, size:10, color:{ argb:C.gris } };
+  const K = [['Vencidas', venc.length, 'Vencida'], ['Más adelante', luego.length, 'Más adelante'], ['SKU sin OC', its.length, 'Pedido sin OC'], ['Entregadas', ent.length, 'Entregada']];
+  K.forEach(function(k, i){ const c = 2 + i * 2; ws.mergeCells(4, c, 4, c + 1); ws.mergeCells(5, c, 5, c + 1); const a = ws.getCell(4, c), b = ws.getCell(5, c), e = EST[k[2]];
+    a.value = k[1]; a.font = { bold:true, size:20, color:{ argb:e[1] } }; b.value = k[0]; b.font = { bold:true, size:10, color:{ argb:e[1] } };
+    [a, b, ws.getCell(4, c + 1), ws.getCell(5, c + 1)].forEach(function(x){ x.fill = fill(e[0]); x.alignment = { horizontal:'center', vertical:'middle' }; }); });
+  ws.getRow(4).height = 30;
+  ws.getRow(7).values = H; ws.getRow(7).eachCell(function(c){ c.fill = fill(C.navy); c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; });
+  F.forEach(function(f, i){ const row = ws.getRow(8 + i); row.values = [i + 1].concat(f);
+    row.eachCell({ includeEmpty:true }, function(c, k){ c.font = { size:10, color:{ argb:'FF000000' } }; c.border = { bottom:bd }; c.alignment = { vertical:'middle', horizontal:[4, 5, 11].indexOf(k) !== -1 ? 'left' : 'center', wrapText:[4, 5, 11].indexOf(k) !== -1 }; });
+    const e = EST[f[0]] || EST['Pedido sin OC'], c = row.getCell(2); c.fill = fill(e[0]); c.font = { bold:true, size:10, color:{ argb:e[1] } }; row.getCell(3).numFmt = '@';
+    if(f[0] === 'Vencida') row.getCell(9).font = { bold:true, size:10, color:{ argb:e[1] } }; });
+  [5, 14, 13, 30, 30, 18, 11, 13, 20, 7, 26].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+  ws.autoFilter = { from:{ row:7, column:1 }, to:{ row:7 + F.length, column:H.length } };
+  // Hoja 2: cada ítem todavía pendiente (OC por llegar y pedidos sin OC).
+  const wi = wb.addWorksheet('Ítems pendientes', { views:[{ state:'frozen', ySplit:1, showGridLines:false }] }), HI = ['Estado', 'OC', 'Pedido', 'Req.', 'Código', 'Producto', 'UM', 'Cantidad', 'Recibido', 'Falta', 'Cliente', 'Proveedor', 'Entrega / ETA', 'Comprador', 'Familia'];
+  wi.addRow(HI); wi.getRow(1).eachCell(function(c){ c.fill = fill(C.navy); c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; });
+  const est = new Map(); venc.forEach(function(o){ est.set(o.oc, 'Vencida'); }); luego.forEach(function(o){ est.set(o.oc, 'Más adelante'); });
+  D.filas.filter(function(r){ return r.tipo === 'oc' && est.has(r.codOrden); }).sort(function(a, b){ return (est.get(a.codOrden) > est.get(b.codOrden) ? -1 : est.get(a.codOrden) < est.get(b.codOrden) ? 1 : 0) || String(a.codOrden).localeCompare(String(b.codOrden)); })
+    .concat(its).forEach(function(r){ const oc = r.tipo === 'oc', q = oc ? +r.cantOrden || 0 : +r.cantPedido || 0, rc = oc ? +r.cantRecep || 0 : 0, row = wi.addRow([oc ? est.get(r.codOrden) : 'Pedido sin OC', oc ? cod(r.codOrden) : '', cod(r.codPedido), cod(r.req), r.idProducto || '', r.producto || '', r.unidad || '', q, rc || null, Math.max(0, q - rc), D.cliDe(r) || 'Stock / sin proyecto', oc ? appImpNombre(r.proveedor) : '', oc ? fd(r.fCompromiso) : '', r.persona ? nom(r.persona) : 'Sin comprador', r.familia || '']);
+      const e = EST[row.getCell(1).value] || EST['Pedido sin OC']; row.getCell(1).fill = fill(e[0]); row.getCell(1).font = { bold:true, size:10, color:{ argb:e[1] } };
+      row.eachCell({ includeEmpty:true }, function(c, k){ if(k > 1) c.font = { size:10 }; c.border = { bottom:bd }; c.alignment = { vertical:'middle', horizontal:[6, 11, 12, 15].indexOf(k) !== -1 ? 'left' : 'center', wrapText:k === 6 }; });
+      [2, 3, 4, 5].forEach(function(k){ row.getCell(k).numFmt = '@'; }); [8, 9, 10].forEach(function(k){ row.getCell(k).numFmt = '#,##0.##'; }); });
+  [13, 9, 9, 9, 14, 46, 7, 10, 10, 9, 28, 28, 12, 18, 22].forEach(function(w, i){ wi.getColumn(i + 1).width = w; }); wi.autoFilter = { from:{ row:1, column:1 }, to:{ row:1, column:HI.length } };
+  const nomA = sinAcentos('Status compras - ' + (D.cliSel || APP_PC.q) + ' - ' + quien).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+  descargarBlob(new Blob([await wb.xlsx.writeBuffer()], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nomA + '.xlsx');
+  appToast('Excel listo ✔');
 }
 
 // ---------- Ficha del SKU (07.10.2026, Piero) ----------
@@ -20876,6 +20940,7 @@ function appClickInicio(e){
   if(b.dataset.pcdet){ APP_PC.det = !APP_PC.det; return appRenderInicio(); }
   if(b.dataset.pcsec){ APP_PC.sec = b.dataset.pcsec; APP_PC.q = ''; APP_PC.tope = 20; return appRenderInicio(); }
   if(b.dataset.pcmas){ APP_PC.tope += 30; return appRenderInicio(); }
+  if(b.dataset.pcxls) return appPcExcel();
   if(b.dataset.skufam !== undefined){ APP_PC.fam = b.dataset.skufam; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true); return; }
 
   if(b.dataset.impdf){ appImpPdf(); return; }
