@@ -16032,7 +16032,7 @@ function almHojas(cod){
         ${nivel('r', '#cf5a5a', s[2], 'Crítica', '(&gt; 5 d.h.)', 'Pedidos con demora crítica desde el requerimiento.')}</div></div>
       <div class="cpx-card"><div class="cpx-h"><i class="cpx-tile">${CPX_ICO.gente(CPX_C.ink, 40)}</i><h2>Clientes atendidos</h2></div>
         ${top(L, 'pry').slice(0, 7).map(function(x){ return `<div class="cpx-cli"><span>${e(polarCorta(x[0], 46))}</span><b>${x[1]} ped.</b></div>`; }).join('') || '<p class="cpx-nota">Sin pedidos en el período.</p>'}</div>
-      <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>Tiempo: de la fecha del requerimiento a la del pedido, en días hábiles.<br>Meta del Indicador 1: ${meta} días hábiles. Los pedidos directos no entran.</p></div></div>`;
+      <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>Tiempo: de la fecha del requerimiento a la del pedido, en días hábiles.<br>Meta del Indicador 1: ${meta} día${meta === 1 ? '' : 's'} hábil${meta === 1 ? '' : 'es'}. Los pedidos directos no entran.</p></div></div>`;
   // Recepción y despacho de la persona en 2 hojas, en vez del detalle largo (28.10.2026, Piero: "que salga ese resumen en fotos"):
   // sus guías según la columna RESPONSABLE de Reporte Almacén, en todas las sedes y en el período de la barra.
   const MV = almMovPer(cod, desde, hasta), I = MV.I, S = MV.S;
@@ -16073,9 +16073,35 @@ function almHojas(cod){
       <div class="cpx-card"><h2>Guías por mes</h2>${porMes(S, '#5f9de2', 'guías')}</div>
       <div class="cpx-card"><div class="cpx-h"><i class="cpx-tile">${CPX_ICO.gente(CPX_C.ink, 40)}</i><h2>Clientes atendidos</h2></div>${filasU(topU(S, 'cl'))}</div>
       <p class="cpx-pie">Valor despachado ${almUSD(usd(S))} al último precio de compra · ${n(new Set(SP.map(function(m){ return m.py; }).filter(Boolean)).size)} proyectos · un viaje = misma fecha, transportista y placa.</p></div>`;
-  return { hojas:[h1, h2, h4, h5], desde:desde, hasta:hasta };   // sin "Requerimientos por atender" (28.10.2026, Piero)
+  // 5) % de ítems a tiempo req → pedido por mes, últimos 12 meses hasta el fin del período (02.11.2026, Piero: "una quinta foto
+  // que salga la línea de tiempo por mes del % de req a pedido"). Mismo cálculo que "Ítems a tiempo" de la hoja 2.
+  const dm = new Date(Date.UTC(+hasta.slice(0, 4), +hasta.slice(5, 7) - 12, 1)), d12 = isoDay(dm), MM = new Map();
+  for(let i = 0; i < 12; i++) MM.set(isoDay(new Date(Date.UTC(dm.getUTCFullYear(), dm.getUTCMonth() + i, 1))).slice(0, 7), { n:0, ok:0 });
+  const y12 = almPedReg({ per:'custom', desde:d12, hasta:hasta, pry:st.pry }).P.get(cod);
+  if(y12) y12.ped.forEach(function(g){ const b = MM.get(g.fp.slice(0, 7)); if(b){ b.n += g.n; b.ok += g.ok || 0; } });
+  const L12 = [...MM.entries()], con = L12.filter(function(x){ return x[1].n; }), tN = con.reduce(function(a, x){ return a + x[1].n; }, 0), tO = con.reduce(function(a, x){ return a + x[1].ok; }, 0);
+  const pM = function(b){ return b.ok / b.n * 100; }, mTxt = function(k){ return MESES_CORTOS[+k.slice(5) - 1] + ' ' + k.slice(2, 4); }, ult = MM.get(hasta.slice(0, 7));
+  const ord = con.slice().sort(function(a, b){ return pM(b[1]) - pM(a[1]); }), mej = ord[0], peo = ord[ord.length - 1];
+  const W = 700, H = 400, pl = 52, pr = 18, pt = 34, pb = 70, cw = (W - pl - pr) / 12, yv = function(v){ return pt + (100 - v) / 100 * (H - pt - pb); };
+  const xs = function(i){ return pl + cw * i + cw / 2; }, pts = L12.map(function(x, i){ return x[1].n ? [xs(i), yv(pM(x[1]))] : null; });
+  const svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif">
+    ${[0, 25, 50, 75, 100].map(function(v){ return `<line x1="${pl}" y1="${yv(v)}" x2="${W - pr}" y2="${yv(v)}" stroke="#e3e9f2" stroke-width="1.5"/><text x="${pl - 8}" y="${yv(v) + 6}" text-anchor="end" font-size="16" font-weight="700" fill="#2f5f95">${v}%</text>`; }).join('')}
+    <polyline points="${pts.filter(Boolean).map(function(q){ return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ')}" fill="none" stroke="${CPX_C.teal}" stroke-width="4" stroke-linejoin="round"/>
+    ${pts.map(function(q, i){ return q ? `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="7" fill="#fff" stroke="${CPX_C.teal}" stroke-width="3.5"/><text x="${q[0].toFixed(1)}" y="${(q[1] - 14).toFixed(1)}" text-anchor="middle" font-size="17" font-weight="900" fill="${CPX_C.navy}">${Math.round(pM(L12[i][1]))}%</text>` : ''; }).join('')}
+    ${L12.map(function(x, i){ return `<text x="${xs(i).toFixed(1)}" y="${H - pb + 28}" text-anchor="middle" font-size="16" font-weight="800" fill="${CPX_C.ink}">${MESES_CORTOS[+x[0].slice(5) - 1]}</text><text x="${xs(i).toFixed(1)}" y="${H - pb + 48}" text-anchor="middle" font-size="13" font-weight="700" fill="#2f5f95">${x[0].slice(2, 4)}</text><text x="${xs(i).toFixed(1)}" y="${H - pb + 66}" text-anchor="middle" font-size="13" font-weight="600" fill="#8b98a4">${x[1].n ? n(x[1].n) : '—'}</text>`; }).join('')}
+  </svg>`;
+  const per12 = MESES_CORTOS[+d12.slice(5, 7) - 1].toUpperCase() + ' ' + d12.slice(0, 4) + ' - ' + MESES_CORTOS[+hasta.slice(5, 7) - 1].toUpperCase() + ' ' + hasta.slice(0, 4);
+  const h6 = `<div class="cpx-hoja">
+      <div class="cpx-card cpx-cab">${cpxLogo()}<div class="cpx-cab-t"><h1 class="g">Req. a pedido<br>mes a mes</h1><div class="cpx-cab-p">${pill}${fecha(per12)}</div></div></div>
+      <div class="cpx-kp2"><div class="cpx-card"><i class="cpx-circ">${CPX_ICO.relojB(50)}</i><div><span>A tiempo<br>12 meses</span><b>${pc(tO, tN)}</b></div></div>
+        <div class="cpx-card"><i class="cpx-circ">${CPX_ICO.doc('#fff', 44, CPX_C.navy)}</i><div><span>A tiempo<br>${mTxt(hasta.slice(0, 7))}</span><b>${ult && ult.n ? pc(ult.ok, ult.n) : '—'}</b></div></div></div>
+      <div class="cpx-card"><h2>% de ítems a tiempo por mes <em>(≤ ${meta} d.h.)</em></h2>${con.length ? svg : '<p class="cpx-nota">Sin pedidos con requerimiento en los últimos 12 meses.</p>'}</div>
+      <div class="cpx-card"><div class="cpx-dos"><div><i>${CPX_ICO.relojB(70)}</i><div><span>Mejor mes</span><b>${mej ? Math.round(pM(mej[1])) + '%' : '—'}</b><small>${mej ? mTxt(mej[0]) : ''}</small></div></div>
+        <div><i>${CPX_ICO.reloj('#cf5a5a', 70)}</i><div><span>Mes más bajo</span><b>${peo ? Math.round(pM(peo[1])) + '%' : '—'}</b><small>${peo ? mTxt(peo[0]) : ''}</small></div></div></div></div>
+      <div class="cpx-card cpx-info"><i>${CPX_ICO.info(40)}</i><p>% de ítems de requerimiento con pedido en ${meta} día${meta === 1 ? '' : 's'} hábil${meta === 1 ? '' : 'es'} o menos, por mes de la fecha del pedido.<br>Debajo de cada mes, la cantidad de ítems. Los pedidos directos no entran.</p></div></div>`;
+  return { hojas:[h1, h2, h4, h5, h6], desde:desde, hasta:hasta };   // sin "Requerimientos por atender" (28.10.2026, Piero)
 }
-function almHojasHtml(cod){ appPsObservar(); const ver = ['ped', 'ped', 'rec', 'des'];
+function almHojasHtml(cod){ appPsObservar(); const ver = ['ped', 'ped', 'rec', 'des', 'ped'];
   return `<div class="ps-hojas">${almHojas(cod).hojas.map(function(h, i){ return `<div class="ps-hoja" data-clic="1" data-almver="${ver[i]}" title="Toca para ver el detalle"><div class="ps-zoom">${h}</div></div>`; }).join('')}</div>`; }
 // Detalle de cada foto de Almacén (28.10.2026, Piero: "al hacer clic en las imágenes no sale el detalle"): pedidos y tiempo → sus pedidos;
 // recepción y despacho → sus guías, la más reciente primero (toca una para ver la OC o el requerimiento).
@@ -16093,7 +16119,7 @@ function almVer(tipo){
   appListaAbrir((rec ? '📥 Recepción de ' : '🚚 Despacho de ') + e(nom), e(per) + ' · ' + appN(G.size) + ' guías · ' + appN(L.length) + ' ítems · ' + almUSD(L.reduce(function(a, m){ return a + (m.u || 0); }, 0)),
     filas ? `<div class="ini-card m-lista">${filas}</div>` : '<div class="ini-vacio">Sin guías en este período.</div>');
 }
-function almImagenes(cod){ const H = almHojas(cod), nom = PD_PERSONAS[cod] || cod, tit = ['Reporte de pedidos', 'Tiempo de req. a pedido', 'Recepción de mercadería', 'Despacho de almacén'];
+function almImagenes(cod){ const H = almHojas(cod), nom = PD_PERSONAS[cod] || cod, tit = ['Reporte de pedidos', 'Tiempo de req. a pedido', 'Recepción de mercadería', 'Despacho de almacén', 'Req. a pedido mes a mes'];
   return appGenerarImagenes(H.hojas, { caja:'arh-caja', hoja:'.cpx-hoja', ancho:768, nombre:'Resumen ' + nom + ' ' + H.desde + ' al ' + H.hasta,
     titulo:'Resumen de ' + nom, sub:almFechaCorta(H.desde) + ' – ' + almFechaCorta(H.hasta), sec:function(el, i){ return tit[i] || ''; } }); }
 // Detalle de un ítem según su tarjeta (20.10.2026, Piero): en Lurín cuánto hay y cuánto le toca; en camino qué OC y cuándo llega
@@ -16147,7 +16173,7 @@ function almPedReg(st){
       const fp = isoDay(x.fPedido); if(x.d1 == null || !x.codPedido || !fp || fp < d0 || fp > d1 || (pf && !pf(x))) return;
       const c = pdPersona(x.responsableD1) || 'JCENTENO', y = P.get(c) || { cod:c, ped:new Map(), dir:new Map(), n:0, ok:0, dias:0 };
       const g = y.ped.get(x.codPedido) || { cp:x.codPedido, req:x.codRequerimiento || '', pry:x.proyecto || '', fr:x.fReq, fp:fp, d:0, n:0 };
-      g.n++; g.d = Math.max(g.d, x.d1); y.ped.set(x.codPedido, g); y.n++; y.dias += x.d1; if(x.d1 <= meta) y.ok++; P.set(c, y); });
+      g.n++; g.ok = (g.ok || 0) + (x.d1 <= meta ? 1 : 0); g.d = Math.max(g.d, x.d1); y.ped.set(x.codPedido, g); y.n++; y.dias += x.d1; if(x.d1 <= meta) y.ok++; P.set(c, y); });
     // Pedidos directos (PedidoSinReq, sin requerimiento): cuentan como generados por quien figura en la columna F; no tienen
     // tiempo req → pedido que medir (20.10.2026, Piero).
     (PEDIDO_SIN_REQ_ROWS || []).concat(PEDIDO_SIN_REQ_PEND || []).forEach(function(x){
