@@ -9026,7 +9026,7 @@ function invSubgruposHtml(g, keyOf, cnt, app, nivel){
   const gi = function(gr){ const i = G.findIndex(function(y){ return y[0] === gr; }); return i < 0 ? 999 : i; };
   const si = function(k){ const x = G[gi(grupoDe(k))], sb = k.split(' › ')[1]; const i = x ? x[3].findIndex(function(y){ return y[0] === sb; }) : -1; return i < 0 ? 999 : i; };
   // Lista hacia abajo en orden alfabético, "Otros…" al final (28.10.2026, Piero: "las tarjetas se ven raras").
-  const alfa = function(a, b){ const o = /^otros/i; return (o.test(a) - o.test(b)) || a.localeCompare(b, 'es'); };
+  const alfa = function(a, b){ const o = /^otr[oa]s/i; return (o.test(a) - o.test(b)) || a.localeCompare(b, 'es', { numeric:true }); };   // numérico: 3" · 6" · 8" · 10" (03.11.2026)
   let tit = g.label, cards = [], filas = g.rows;
   if(nivel && nivel.indexOf('G:') === 0){ const gr = nivel.slice(2); filas = g.rows.filter(function(r){ return grupoDe(keyOf.get(r)) === gr; });
     tit = g.label + ' › ' + gr; cards.push(tarjeta('T:' + gr, '📋', 'Ver todos (' + gr + ')'));
