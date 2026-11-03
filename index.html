@@ -8680,6 +8680,9 @@ const INV_FAM_REGLAS = [
   ['SIEMENS', /\bSIEMENS\b|SIMATIC|SIRIUS|SINAMICS|SENTRON|SITOP|\bLOGO ?!|\b6ED1|\b(3R[TVAUHBWPQ]|3KC|3WA|3VW|3S[UB]|3UG|3UA|3VA|3VM|3VL|3WL|3KD|3LD|3NA|3NE|3TF|3TH|5S[YVLMJTP]|5TT|5TE|6ES[57]|6EP|6AV|6SL|6SE|6GK|6XV|7KM|7KT|8WH|8US|3ZY)\d/],
   ['SCHNEIDER ELECTRIC', /SCHNEIDER|SCHENIDER|TELEMECANIQUE|\bTESYS\b|ACTI ?9|ALTIVAR|MODICON|HARMONY|EASY ?9|\b(LC1|LC2|LP1|LRD|LR2|LR9|GV2|GV3|GV4|GV7|GVAE|GVAN|GVAM|A9[A-Z]|IC60|EZ9|EZC|NSX|LV4|LV5|LV8|XB[457]|ZB[45]|ZBE|ZBV|ZBY|XA2|XVB|XVL|ATV|ATS|RXM|RSB|RXZ|RM[12]\d|RE17|RE22|BME|BMX|TM[23]\d|TMC|LXM|VW3|XUB|XUK|XCK|XCM|XS[1-9]|XMLA|ABL\d|LAD|NSY|METSE|HMIGXU|HMISTU|MCSESU|XPS|XVR)[A-Z0-9-]*/],
   ['PPR', function(x, d){ return x.ppr || /\bPP-R\b/.test(d); }], ['ACCESORIOS INOX', function(x){ return x.inx; }], ['TUBERÍAS SCH', function(x){ return x.tsc; }],
+  // Familia JUNTAS Y VÁLVULAS CHECK (03.11.2026, Piero: "haz de esto una familia, de lo que es juntas y válvulas check"): juntas flexibles /
+  // de expansión bridadas y toda válvula check o de retención (las de Danfoss siguen en DANFOSS y las de PPR en PPR, que van antes).
+  ['JUNTAS Y VÁLVULAS CHECK', /^JUNTA (FLEXIBLE|DE EXPANSION|EXPANSION|ELASTICA|ANTIVIBRA)|^VALV(ULA|\.)? *(DE +)?(DUO +)?(CHECK|CHEK|RETENCION|ANTIRRETORNO)|^CHECK VALVE/],
   ['UNIFORMES', /^(CAMISA|BLUSA|PANTALON|POLO\b|CASACA|CORTAVIENTO|POLERA|POLERON|CHOMPA|CHAQUETA|OVEROL|MAMELUCO|GORRA|GORRO|CHAMARRA|BUZO)/],
   ['EPP Y SEGURIDAD', /^(?!BALIZA)(BOTA|BOTIN|ZAPATO|ZAPATILLA|PUNTERA|CASCO|BARBIQUEJO|GUANTE|LENTE|SOBRELENTE|GAFA|CARETA|VISOR DE POLICARBONATO|PROTECTOR (FACIAL|AUDITIVO|DE OIDO)|TAPON (AUDITIVO|DE OIDO)|OREJERA|RESPIRADOR|MASCARILLA|FILTRO (PARA (HUMOS|RESPIRADOR|VAPORES)|P100|2097|6003)|ARNES|LINEA DE (VIDA|ANCLAJE)|ESLINGA|BLOQUE RETRACTIL|CHALECO|TRAJE|CAPOTIN|POLAINA|EXTINTOR|BOTIQUIN|INMOVILIZADOR|CAMILLA|MALETIN DE EMERGENCIA|MOCHILA DE EMERGENCIA|CONO|CINTA DE SEGURIDAD|MALLA DE SEGURIDAD|SENAL|LETRERO|CANDADO DE BLOQUEO|TARJETA DE BLOQUEO|DUCHA|LAVAOJOS|REPELENTE|BLOQUEADOR|PROTECTOR SOLAR)/],
   ['CABLES Y CONDUCTORES', /^(?!CABLE (DE ACERO|ACERADO|PARA))(CABLE|CONDUCTOR|NHX|N2XOH|N2XSY|THW|NLT|NMT|NYY|CORDON|CPT|GPT)\b|^C\//],
@@ -8704,6 +8707,13 @@ const INV_SUBFAM = {   // { familia: [[grupo, ícono, regla del grupo, [[subgrup
     ['Tuberías', '📏', /^(TUBERIA|TUBO)\b/, [['Tuberías PPR', /./]]],
     ['Accesorios', '🔧', /./, [['Reducciones y bujes', /REDUC|BUJE/], ['Tees', /^TEE/], ['Codos', /^CODO/], ['Coplas NPT (macho / hembra)', /COPLA/], ['Uniones (universal / americana)', /UNION/],
       ['Válvulas PPR (bola / esférica)', /VALV/], ['Adaptadores brida y carretes', /BRIDA|CARRETE/], ['Conectores y adaptadores a rosca', /CONECTOR|ADAPTADOR/], ['Caps', /^CAP\b/], ['Otros accesorios', /./]]]
+  ],
+  'JUNTAS Y VÁLVULAS CHECK':[   // juntas por medida; las check de agua (wafer, PVC, bronce) separadas de las de refrigeración (soldar ODF)
+    ['Juntas flexibles bridadas', '〰️', /^JUNTA/, [['Juntas 3" y 4"', /\b[34] ?("|”|''|PULG)|\b(80|100) ?MM/], ['Juntas 6"', /\b6 ?("|”|''|PULG)|\b1[56]0 ?MM/],
+      ['Juntas 8"', /\b8 ?("|”|''|PULG)|\b200 ?MM/], ['Juntas 10"', /\b10 ?("|”|''|PULG)|\b250 ?MM/], ['Juntas 12" y más', /\b1[2-9] ?("|”|''|PULG)|\b(300|350|400) ?MM/], ['Otras juntas', /./]]],
+    ['Válvulas check de agua', '💧', /^(?!.*(SPORLAN|HONSENG|HONGSEN|MAGNETICA|ODF|\bCVD\b|CVRH|DONFUN|SOLDAR|BLR\/|CMV|\bA1\d{4}\b|RETENCION 1\.3\/8))/, [['Check wafer (disco y duo check)', /WAFER|DUO/], ['Check PVC', /PVC/],
+      ['Check bronce, inox y swing', /BRONCE|SWING|ROSCA|INOX/], ['Otras check', /./]]],
+    ['Válvulas check de refrigeración', '❄️', /./, [['Check de refrigeración', /./]]]
   ],
   'TUBERÍAS SCH':[   // acero al carbono = lo que fabrica Tenaris (sin costura A-53/A-106); inoxidable aparte
     ['Acero al carbono', '⚫', /^(?!.*(INOX|SS ?3|C-? ?3[01]\d|A-?312|A-?269)).*/, [['SCH 40 sin costura (S/C)', /(SCH|SHC) ?-?40.*(S\/C|SIN COSTURA)|(S\/C|SIN COSTURA).*SCH ?-?40/],
