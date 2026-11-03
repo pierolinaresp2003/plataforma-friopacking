@@ -4,7 +4,7 @@
 // GitHub (Guardar y compartir) y a Google no pasa por aquí.
 // v5 (20.10.2026): los datos ya no están en este sitio sino en Supabase (privado); al activarse se borra la copia
 // vieja que guardaba data.json.gz.
-const CACHE = 'friopacking-v6';   // v6 (22.10.2026): nueva publicación para destrabar GitHub Pages y renovar la copia guardada
+const CACHE = 'friopacking-v7';   // v7 (03.11.2026): nueva publicación para destrabar GitHub Pages (deploy de v284 colgado) y renovar la copia guardada
 self.addEventListener('install', function(e){
   self.skipWaiting();
   // La primera vez se guarda la página misma, para que abra aunque luego no haya señal.
