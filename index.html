@@ -17156,7 +17156,7 @@ function appSupReqHtml(){
     ${supEsSupervisor() ? `<div class="sup-mios"><button type="button" data-supmios="0" class="${APP_SUP.mios ? '' : 'on'}">👥 Todos</button><button type="button" data-supmios="1" class="${APP_SUP.mios ? 'on' : ''}">👷 Mis requerimientos</button></div>` : ''}
     <div class="sup-fil">${ac('cli', '🏢', 'Escribe el cliente', APP_SUP.cli)}${ac('pry', '🏗️', 'Escribe el PRY o proyecto', pryTxt)}</div>
     ${supResumenHtml(l0)}
-    <div class="m-buscar"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}"></div>
+    <div class="m-buscar pc-buscar-gen"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}">${INV_XLS_BTN.replace('data-invxls="1"', 'data-supxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el estado de los productos de lo filtrado')}</div>
     <div id="supLista">${l.slice(0, n0).map(supCard).join('')}${l.length > n0 ? '<div class="sup-mas" id="supMas"></div>' : ''}${l.length ? '' : `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
 }
 // Consulta de producto (13.10.2026, Piero: "no es una tienda, es para que el supervisor consulte lo que se tiene en
@@ -20953,6 +20953,13 @@ function appClickInicio(e){
   if(b.dataset.pcsub){ APP_PC.sub = b.dataset.pcsub; return appRenderInicio(); }
   if(b.dataset.pcimg){ appPcImagenes(); return; }
   if(b.dataset.supsel){ const p = b.dataset.supsel.split('|'); if(p[0] === 'cli'){ APP_SUP.cli = p[1]; APP_SUP.pry = ''; } else { APP_SUP.pry = p[1]; const g = supGrupos().l.find(function(x){ return x.id === p[1]; }); if(g && !APP_SUP.cli) APP_SUP.cli = g.cli; } return appRenderInicio(); }
+  // Excel con el estado de todos los productos de lo filtrado (03.11.2026, Piero: "en la vista supervisor también descargar en
+  // excel para ver el estado general de los productos"): reusa el Excel de Leo (Resumen · Cómo va · detalle).
+  if(b.dataset.supxls){ const l = supConPaso(supFiltrados()), f = [].concat.apply([], l.map(function(g){ return g.items; }));
+    if(!f.length) return appToast('No hay requerimientos con ese filtro.');
+    const tit = APP_SUP.pry || APP_SUP.cli || (supSoloMios() ? 'Mis requerimientos' : 'Todos los clientes'), paso = APP_SUP.paso ? (SUP_PASOS.find(function(p){ return p[0] === APP_SUP.paso; }) || [])[2] : '';
+    polarExcelReqs(f, 'Estado de productos - ' + tit, [APP_SUP.pry ? pryNombre(APP_SUP.pry) : '', paso ? 'Req. con ítems en ' + paso : '', APP_SUP.q ? 'Búsqueda: ' + APP_SUP.q : ''].filter(Boolean).join(' · ') || 'Requerimientos de ' + appIndCorte().getUTCFullYear());
+    return appToast('Excel listo ✔'); }
   if(b.dataset.supmios){ APP_SUP.mios = b.dataset.supmios === '1'; APP_SUP.cli = ''; APP_SUP.pry = ''; APP_SUP.paso = ''; return appRenderInicio(); }
   if(b.dataset.suppaso){ APP_SUP.paso = APP_SUP.paso === b.dataset.suppaso ? '' : b.dataset.suppaso; return appRenderInicio(); }
   if(b.dataset.supx){ if(b.dataset.supx === 'cli'){ APP_SUP.cli = ''; APP_SUP.pry = ''; } else APP_SUP.pry = ''; return appRenderInicio(); }
