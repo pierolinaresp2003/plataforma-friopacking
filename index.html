@@ -18219,7 +18219,7 @@ function appInvFiltrada(){
       .sort(function(a,b){ return b.cons - a.cons || b.tot - a.tot; });
   } else {
     const orden = { sin:0, reponer:1, ok:2, sinmov:3, sinrop:4, nada:5 };
-    l = idx.filter(function(x){ return x.famU === APP_INV.fam && (x.e !== 'nada' || APP_INV.fam === 'TUBERÍAS SCH'); })
+    l = idx.filter(function(x){ return x.famU === APP_INV.fam && (x.e !== 'nada' || invFamTodos(APP_INV.fam)); })
       .sort(function(a,b){ return orden[a.e] - orden[b.e] || b.cons - a.cons || b.tot - a.tot; });
   }
   return l;
@@ -18230,7 +18230,7 @@ const APP_INV_PRIMEROS = 40;
 function appInvFamilias(){
   // Cada código en UNA familia (x.famU) y tarjetas solo con el nombre (27.10.2026, Piero: "las tarjetas sin el detalle, solo el nombre").
   const g = new Set();
-  appInvIndice().items.forEach(function(x){ if(x.e !== 'nada' || x.famU === 'TUBERÍAS SCH') g.add(x.famU); });
+  appInvIndice().items.forEach(function(x){ if(x.e !== 'nada' || invFamTodos(x.famU)) g.add(x.famU); });
   // Orden alfabético (22.10.2026, Piero: "grupo de familias en tarjetas que deben estar ordenadas alfabéticamente").
   // En lista hacia abajo, sin íconos y "OTROS" al final, igual que los subgrupos (28.10.2026, Piero).
   return `<div class="m-fams inv-sublista">${[...g].sort(function(a, b){ return (/^otros/i.test(a) - /^otros/i.test(b)) || a.localeCompare(b, 'es'); }).map(function(f){
@@ -18238,7 +18238,10 @@ function appInvFamilias(){
 }
 // Una familia (22.10.2026, Piero): primero el Pareto y debajo TODOS sus códigos con el detalle por año; cada fila tiene
 // "Ver detalle ›" que abre el kardex del producto. Botones para volver: producto → familia → todas las familias.
-function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return (x.e !== 'nada' || fam === 'TUBERÍAS SCH') && x.famU === fam; }).map(function(x){ return x.r; }); }
+// Familias que muestran también los códigos sin stock (se compran por proyecto, no se tienen en almacén): TUBERÍAS SCH y JUNTAS Y
+// VÁLVULAS CHECK (03.11.2026, Piero: "no salen en la familia" las juntas de 6", 8" y 10" porque no tienen stock).
+function invFamTodos(fam){ return fam === 'TUBERÍAS SCH' || fam === 'JUNTAS Y VÁLVULAS CHECK'; }
+function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return (x.e !== 'nada' || invFamTodos(fam)) && x.famU === fam; }).map(function(x){ return x.r; }); }
 function appInvFamiliaHtml(){
   return invParetoHtml({ label:APP_INV.fam, rows:appInvFamRows(APP_INV.fam) }, true);
 }
