@@ -17159,6 +17159,59 @@ function appSupReqHtml(){
     <div class="m-buscar pc-buscar-gen"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}">${INV_XLS_BTN.replace('data-invxls="1"', 'data-supxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el estado de los productos de lo filtrado')}</div>
     <div id="supLista">${l.slice(0, n0).map(supCard).join('')}${l.length > n0 ? '<div class="sup-mas" id="supMas"></div>' : ''}${l.length ? '' : `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
 }
+// Excel del Supervisor con el mismo formato que el status de Compras pendientes (03.11.2026, Piero): hoja 1 con el resumen
+// (KPIs, dónde están los ítems y una fila por req. con su avance), hoja 2 con cada producto, su estado en color y cómo va.
+const SUP_XLS_EST = { rev:['En revisión', 'FFFDE2E1', 'FFB42318'], com:['En Compras', 'FFFFF1D6', 'FFB54708'], oc:['Con OC, por llegar', 'FFE3EEFB', 'FF1F5FA8'],
+  alm:['En almacén', 'FFEFEAFB', 'FF5B3FA8'], sal:['Enviado a obra', 'FFDDF3F1', 'FF0E7C70'], obra:['En obra', 'FFE2F3EA', 'FF1B7F4A'], arch:['Archivado', 'FFEFF1F4', 'FF6B7785'] };
+async function supExcel(){
+  const l = supConPaso(supFiltrados()); if(!l.length) return appToast('No hay requerimientos con ese filtro.');
+  let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
+  const hoy = new Date(), fd = function(d){ if(!d) return ''; d = d instanceof Date ? d : new Date(d); return isNaN(d) ? '' : String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + d.getUTCFullYear(); };
+  const num = function(c){ const t = String(c || '').replace(/^000\d-0*/, ''); return /^\d+$/.test(t) ? +t : t; };
+  const tit = APP_SUP.pry || APP_SUP.cli || (supSoloMios() ? 'Mis requerimientos' : 'Todos los clientes'), paso = APP_SUP.paso ? SUP_XLS_EST[APP_SUP.paso][0] : '';
+  const sub = [supSoloMios() ? 'Mis requerimientos' : 'Todos los supervisores', APP_SUP.pry ? pryNombre(APP_SUP.pry) : '', paso ? 'Req. con ítems ' + paso.toLowerCase() : '', APP_SUP.q ? 'Búsqueda: ' + APP_SUP.q : ''].filter(Boolean).join(' · ');
+  const tot = l.reduce(function(a, g){ return a + g.tot; }, 0), ok = l.reduce(function(a, g){ return a + g.ok; }, 0), pend = l.filter(function(g){ return g.ok < g.tot; }).length;
+  const C = { navy:'FF25344A', linea:'FFD3DAE3', gris:'FF6B7785' }, fill = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, bd = { style:'thin', color:{ argb:C.linea } };
+  const cab = function(ws, fila, H){ ws.getRow(fila).values = H; ws.getRow(fila).eachCell(function(c){ c.fill = fill(C.navy); c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; }); ws.getRow(fila).height = 30; };
+  const wb = new EJ.Workbook(), ws = wb.addWorksheet('Resumen', { views:[{ state:'frozen', ySplit:11, showGridLines:false }] });
+  const H = ['N°', 'Req.', 'Fecha', 'Cliente', 'PRY', 'Pidió', 'Observación', 'Ítems', 'En obra', 'Avance', 'Dónde están los pendientes', 'Estado'];
+  ws.mergeCells(1, 1, 1, H.length); ws.getCell(1, 1).value = 'Estado de requerimientos · ' + tit; ws.getCell(1, 1).font = { bold:true, size:15, color:{ argb:C.navy } };
+  ws.mergeCells(2, 1, 2, H.length); ws.getCell(2, 1).value = sub + ' · Datos al ' + fd(appIndCorte()) + ' · Generado el ' + fd(new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()))) + ' · Plataforma Friopacking';
+  ws.getCell(2, 1).font = { italic:true, size:10, color:{ argb:C.gris } };
+  // KPIs grandes, como en el status de Compras.
+  [[tot ? ok / tot : 0, '% atendido', SUP_XLS_EST.obra, '0%'], [l.length, 'Requerimientos', SUP_XLS_EST.oc], [pend, 'Con pendientes', SUP_XLS_EST.com], [tot - ok, 'Ítems por llegar', SUP_XLS_EST.rev]].forEach(function(k, i){
+    const c = 2 + i * 2; ws.mergeCells(4, c, 4, c + 1); ws.mergeCells(5, c, 5, c + 1); const a = ws.getCell(4, c), b2 = ws.getCell(5, c), e = k[2];
+    a.value = k[0]; a.font = { bold:true, size:20, color:{ argb:e[2] } }; if(k[3]) a.numFmt = k[3]; b2.value = k[1]; b2.font = { bold:true, size:10, color:{ argb:e[2] } };
+    [a, b2, ws.getCell(4, c + 1), ws.getCell(5, c + 1)].forEach(function(x){ x.fill = fill(e[1]); x.alignment = { horizontal:'center', vertical:'middle' }; }); });
+  ws.getRow(4).height = 30;
+  // Dónde están los ítems: los 6 pasos con su color.
+  ws.getCell(7, 2).value = '¿Dónde están los ítems?'; ws.getCell(7, 2).font = { bold:true, size:11, color:{ argb:C.navy } };
+  SUP_PASOS.concat([['arch']]).forEach(function(p, i){ const e = SUP_XLS_EST[p[0]], c = 2 + i, n = l.reduce(function(a, g){ return a + (g.n[p[0]] || 0); }, 0), a = ws.getCell(8, c), b2 = ws.getCell(9, c);
+    a.value = n; a.font = { bold:true, size:16, color:{ argb:e[2] } }; b2.value = e[0]; b2.font = { bold:true, size:9, color:{ argb:e[2] } };
+    [a, b2].forEach(function(x){ x.fill = fill(e[1]); x.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; }); });
+  ws.getRow(8).height = 26; ws.getRow(9).height = 26;
+  cab(ws, 11, H);
+  l.forEach(function(g, i){ const row = ws.getRow(12 + i), done = g.tot && g.ok >= g.tot;
+    const donde = ['rev', 'com', 'oc', 'alm', 'sal'].filter(function(k){ return g.n[k]; }).map(function(k){ return g.n[k] + ' ' + SUP_XLS_EST[k][0].toLowerCase(); }).join(' · ');
+    const est = !g.tot ? SUP_XLS_EST.arch : done ? SUP_XLS_EST.obra : SUP_XLS_EST.com;
+    row.values = [i + 1, num(g.cod), fd(g.f), g.cli, g.id && !/^SIN PROYECTO/i.test(g.id) ? g.id + (g.pryN ? ' · ' + g.pryN : '') : 'Sin proyecto (almacén)', g.resp, g.obs, g.tot, g.ok, g.tot ? g.ok / g.tot : null, donde || (g.n.arch && !g.tot ? 'Todo archivado' : '—'), !g.tot ? 'Archivado' : done ? '✔ Todo en obra' : 'En proceso'];
+    row.eachCell({ includeEmpty:true }, function(c, k){ c.font = { size:10 }; c.border = { bottom:bd }; c.alignment = { vertical:'middle', horizontal:[4, 5, 6, 7, 11].indexOf(k) !== -1 ? 'left' : 'center', wrapText:[4, 5, 7, 11].indexOf(k) !== -1 }; });
+    row.getCell(10).numFmt = '0%'; row.getCell(10).font = { bold:true, size:10 }; const ce = row.getCell(12); ce.fill = fill(est[1]); ce.font = { bold:true, size:10, color:{ argb:est[2] } }; });
+  if(l.length) ws.addConditionalFormatting({ ref:'J12:J' + (11 + l.length), rules:[{ type:'dataBar', minLength:0, maxLength:100, cfvo:[{ type:'num', value:0 }, { type:'num', value:1 }], color:{ argb:'FF63BE7B' } }] });
+  [5, 9, 11, 28, 34, 24, 40, 7, 8, 12, 34, 15].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+  ws.autoFilter = { from:{ row:11, column:1 }, to:{ row:11 + l.length, column:H.length } };
+  // Hoja 2: cada producto, su estado en color y cómo va (el mismo texto del detalle del req.).
+  const wp = wb.addWorksheet('Productos', { views:[{ state:'frozen', ySplit:1, showGridLines:false }] }), HP = ['Req.', 'Cliente', 'PRY', 'Código', 'Producto', 'UM', 'Cantidad', 'Estado', '¿Cómo va?', 'Pedido', 'OC', 'Proveedor', 'Llega (pactado)', 'En obra'];
+  cab(wp, 1, HP); let fila = 2;
+  l.forEach(function(g){ g.items.slice().sort(function(a, b2){ return (rqItemListo(a) ? 1 : 0) - (rqItemListo(b2) ? 1 : 0); }).forEach(function(r){ const e = SUP_XLS_EST[supPaso(r)] || SUP_XLS_EST.rev, row = wp.getRow(fila++);
+    row.values = [num(g.cod), g.cli, g.id && !/^SIN PROYECTO/i.test(g.id) ? g.id : 'Sin proyecto', r.idProducto || '', r.producto || '', r.unidad || '', r.cantidad != null ? +r.cantidad : null, e[0], rqComoVa(r), num(r.codPedido) || null, num(r.codOrden) || null, appImpNombre(r.proveedor || ''), fd(r.fCompromiso), fd(r.fObra)];
+    row.eachCell({ includeEmpty:true }, function(c, k){ c.font = { size:10 }; c.border = { bottom:bd }; c.alignment = { vertical:'middle', horizontal:[2, 5, 9, 12].indexOf(k) !== -1 ? 'left' : 'center', wrapText:[5, 9].indexOf(k) !== -1 }; });
+    row.getCell(4).numFmt = '@'; row.getCell(7).numFmt = '#,##0.##'; const ce = row.getCell(8); ce.fill = fill(e[1]); ce.font = { bold:true, size:10, color:{ argb:e[2] } }; }); });
+  [9, 26, 18, 14, 46, 7, 9, 17, 60, 9, 9, 26, 13, 12].forEach(function(w, i){ wp.getColumn(i + 1).width = w; }); wp.autoFilter = { from:{ row:1, column:1 }, to:{ row:1, column:HP.length } };
+  const nom = sinAcentos('Estado de productos - ' + tit).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+  descargarBlob(new Blob([await wb.xlsx.writeBuffer()], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nom + '.xlsx');
+  appToast('Excel listo ✔');
+}
 // Consulta de producto (13.10.2026, Piero: "no es una tienda, es para que el supervisor consulte lo que se tiene en
 // stock en base a sus descripciones... no necesariamente va a ser igual lo que escriban y lo que se recomiende; analiza
 // qué se puede ofrecer como reemplazo o como literal lo que necesiten"). Se entiende la descripción con sinónimos,
@@ -20954,12 +21007,8 @@ function appClickInicio(e){
   if(b.dataset.pcimg){ appPcImagenes(); return; }
   if(b.dataset.supsel){ const p = b.dataset.supsel.split('|'); if(p[0] === 'cli'){ APP_SUP.cli = p[1]; APP_SUP.pry = ''; } else { APP_SUP.pry = p[1]; const g = supGrupos().l.find(function(x){ return x.id === p[1]; }); if(g && !APP_SUP.cli) APP_SUP.cli = g.cli; } return appRenderInicio(); }
   // Excel con el estado de todos los productos de lo filtrado (03.11.2026, Piero: "en la vista supervisor también descargar en
-  // excel para ver el estado general de los productos"): reusa el Excel de Leo (Resumen · Cómo va · detalle).
-  if(b.dataset.supxls){ const l = supConPaso(supFiltrados()), f = [].concat.apply([], l.map(function(g){ return g.items; }));
-    if(!f.length) return appToast('No hay requerimientos con ese filtro.');
-    const tit = APP_SUP.pry || APP_SUP.cli || (supSoloMios() ? 'Mis requerimientos' : 'Todos los clientes'), paso = APP_SUP.paso ? (SUP_PASOS.find(function(p){ return p[0] === APP_SUP.paso; }) || [])[2] : '';
-    polarExcelReqs(f, 'Estado de productos - ' + tit, [APP_SUP.pry ? pryNombre(APP_SUP.pry) : '', paso ? 'Req. con ítems en ' + paso : '', APP_SUP.q ? 'Búsqueda: ' + APP_SUP.q : ''].filter(Boolean).join(' · ') || 'Requerimientos de ' + appIndCorte().getUTCFullYear());
-    return appToast('Excel listo ✔'); }
+  // excel para ver el estado general de los productos… que sea como lo que se genera en pendientes de compras, dinámico y visual").
+  if(b.dataset.supxls) return supExcel();
   if(b.dataset.supmios){ APP_SUP.mios = b.dataset.supmios === '1'; APP_SUP.cli = ''; APP_SUP.pry = ''; APP_SUP.paso = ''; return appRenderInicio(); }
   if(b.dataset.suppaso){ APP_SUP.paso = APP_SUP.paso === b.dataset.suppaso ? '' : b.dataset.suppaso; return appRenderInicio(); }
   if(b.dataset.supx){ if(b.dataset.supx === 'cli'){ APP_SUP.cli = ''; APP_SUP.pry = ''; } else APP_SUP.pry = ''; return appRenderInicio(); }
