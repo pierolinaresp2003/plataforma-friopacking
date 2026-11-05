@@ -884,6 +884,7 @@
   html[data-theme="dark"] .sel-pop li button.on{background:rgba(111,182,255,.16);color:#9cc8ff;}
   @keyframes selSube{from{transform:translateY(100%);}to{transform:none;}} @keyframes selFade{from{opacity:0;}to{opacity:1;}}
   .crt-barra{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  #section-certificados.crt-solover .crt-sel, #section-certificados.crt-solover .crt-accion{display:none !important;}   /* Supervisor: solo ver (05.11.2026) */
   /* Certificados con el estilo de la app (14.10.2026) */
   html.app-modo #section-certificados .crt-barra input{border-radius:14px;box-shadow:var(--shadow);padding:13px 14px;font-size:15px;}
   html.app-modo #section-certificados .crt-chip{border-radius:999px;padding:8px 14px;font-weight:800;}
@@ -2987,13 +2988,12 @@
     <div id="section-certificados" class="section">
       <div class="note" id="crtNota" style="display:none;"></div>
 
+      <!-- Filtros como en Supervisor (05.11.2026, Piero): se escribe el cliente o el PRY y salen las opciones. -->
+      <div class="sup-fil crt-fil">
+        <div class="sup-ac" id="crtAcCli"><i>🏢</i><input type="text" id="crtCli" placeholder="Escribe el cliente" autocomplete="off" enterkeyhint="search" aria-label="Cliente"><button type="button" class="sup-x" id="crtCliX" aria-label="Quitar el cliente" hidden>×</button><div class="sup-sug" id="crtSugCli"></div></div>
+        <div class="sup-ac" id="crtAcPry"><i>🏗️</i><input type="text" id="crtPry" placeholder="Escribe el PRY o proyecto" autocomplete="off" enterkeyhint="search" aria-label="Proyecto"><button type="button" class="sup-x" id="crtPryX" aria-label="Quitar el proyecto" hidden>×</button><div class="sup-sug" id="crtSug"></div></div>
+      </div>
       <div class="crt-barra">
-        <div class="crt-pry">
-          <input id="crtPry" type="text" placeholder="Todos los proyectos" autocomplete="off"
-                 role="combobox" aria-expanded="false" aria-controls="crtSug" aria-label="Proyecto">
-          <button class="crt-x" id="crtPryX" type="button" title="Quitar el proyecto" hidden>&times;</button>
-          <ul class="crt-sug" id="crtSug" role="listbox" hidden></ul>
-        </div>
         <div class="crt-buscar">
           <input id="crtQ" type="search" autocomplete="off" aria-label="Buscar">
         </div>
@@ -12254,7 +12254,7 @@ const CRT_DRIVE = {
 };
 
 const CRT = {
-  filas: [], proyectos: [], pry: '', q: '', filtro: 'todos',
+  filas: [], proyectos: [], pry: '', cli: '', q: '', filtro: 'todos',
   sel: new Set(), abiertos: new Set(), subidas: new Map(),
   sug: [], sugIdx: -1, pendiente: null, listo: false, firma: '', pedAbierto: false,
   leyendo: false,        // true mientras Drive contesta la consulta global
@@ -12702,6 +12702,7 @@ function crtCargar(){
       req: req,
       idPry: r.idProyecto || 'SIN PROYECTO',
       nomPry: r.proyecto || '',
+      cli: crtCliDe(r.proyecto),
       codigo: cod,
       producto: r.producto || '',
       oc: oc,
@@ -12729,46 +12730,35 @@ function crtCargar(){
 }
 
 // ---------------------------------------------------------------- selector
+// Cliente como en Supervisor: el nombre corto del cliente, con los que van juntos unidos (SUP_CLI_UNIR).
+function crtCliDe(py){ const c = appImpNombre(py || '') || '—'; return (typeof SUP_CLI_UNIR !== 'undefined' && SUP_CLI_UNIR[c]) || c; }
+// Sugerencias mientras se escribe el cliente o el PRY (05.11.2026, Piero: "que sea así como se busca en supervisor").
+function crtSugerencias(tipo, txt){
+  const e = escapeHtml, ws = polarNorm(txt || '').trim().split(' ').filter(Boolean), cuenta = new Map();
+  CRT.filas.forEach(function(f){
+    if(tipo === 'pry' && CRT.cli && f.cli !== CRT.cli) return;
+    const k = tipo === 'cli' ? f.cli : f.idPry; if(!k || k === '—') return;
+    const x = cuenta.get(k) || { k:k, t:tipo === 'cli' ? k : k + (pryNombre(k) ? ' · ' + pryNombre(k) : ''), s:k + ' ' + (tipo === 'pry' ? (pryNombre(k) || '') + ' ' + f.cli : ''), n:0 };
+    x.n++; cuenta.set(k, x); });
+  let l = [...cuenta.values()];
+  if(ws.length) l = l.filter(function(x){ const t = polarNorm(x.s + ' ' + x.t); return ws.every(function(w){ return t.indexOf(w) !== -1; }); });
+  l.sort(function(a, b){ return tipo === 'pry' ? b.k.localeCompare(a.k) : a.k.localeCompare(b.k); });
+  return l.slice(0, 8).map(function(x){ return `<button type="button" data-crtsel="${tipo}|${e(x.k)}"><span>${e(polarCorta(x.t, 60))}</span><b>${x.n}</b></button>`; }).join('') || '<div class="sup-sug-vacio">Sin coincidencias</div>';
+}
+function crtRefrescarPry(){
+  const cli = document.getElementById('crtCli'), pry = document.getElementById('crtPry');
+  if(document.activeElement !== cli) cli.value = CRT.cli || '';
+  if(document.activeElement !== pry) pry.value = CRT.pry ? CRT.pry + (pryNombre(CRT.pry) ? ' · ' + pryNombre(CRT.pry) : '') : '';
+  document.getElementById('crtCliX').hidden = !CRT.cli; document.getElementById('crtPryX').hidden = !CRT.pry;
+  document.getElementById('crtAcCli').classList.toggle('lleno', !!CRT.cli); document.getElementById('crtAcPry').classList.toggle('lleno', !!CRT.pry);
+  document.getElementById('crtQ').placeholder = '🔍 ' + (CRT.pry ? 'Buscar en ' + CRT.pry : CRT.cli ? 'Buscar en ' + CRT.cli : 'N° de req., producto, OC o proveedor');
+}
 function crtNombrePry(id){
   const p = CRT.proyectos.find(x => x.id === id);
   return p ? p.nombre : id;
 }
-function crtPintarSug(texto){
-  const t = crtNorm(texto||'');
-  const calzan = CRT.proyectos.filter(p => !t || crtNorm(p.id).indexOf(t) !== -1 || crtNorm(p.nombre).indexOf(t) !== -1);
-  CRT.sug = [{ id:'', nombre:'Todos los proyectos', n:CRT.filas.length }].concat(calzan);
-  if(CRT.sugIdx >= CRT.sug.length) CRT.sugIdx = -1;
-  const ul = document.getElementById('crtSug');
-  ul.innerHTML = calzan.length
-    ? CRT.sug.map((p,i)=>`<li role="option" data-i="${i}" aria-selected="${i===CRT.sugIdx}">
-        ${p.id ? `<span class="id">${escapeHtml(p.id)}</span>` : ''}
-        <span class="nom">${escapeHtml(p.nombre)}</span><span class="n">${p.n}</span></li>`).join('')
-    : '<li style="color:var(--muted);cursor:default;">Ningún proyecto con ese número o nombre</li>';
-  ul.hidden = false;
-  document.getElementById('crtPry').setAttribute('aria-expanded','true');
-}
-function crtCerrarSug(){
-  document.getElementById('crtSug').hidden = true;
-  CRT.sugIdx = -1;
-  document.getElementById('crtPry').setAttribute('aria-expanded','false');
-}
-function crtRefrescarPry(){
-  const inp = document.getElementById('crtPry');
-  inp.value = CRT.pry ? CRT.pry + ' · ' + crtNombrePry(CRT.pry) : '';
-  document.getElementById('crtPryX').hidden = !CRT.pry;
-  document.getElementById('crtQ').placeholder =
-    (CRT.pry ? 'Buscar en ' + crtNombrePry(CRT.pry) : 'Buscar en todos los proyectos') +
-    ': código, producto, OC, proveedor, comprador…';
-}
-function crtElegirSug(i){
-  const p = CRT.sug[i];
-  if(!p) return;
-  CRT.pry = p.id;
-  CRT.abiertos.clear();
-  crtCerrarSug(); crtRefrescarPry();
-  document.getElementById('crtPry').blur();
-  crtDibujar();
-}
+// Supervisor: solo ve y descarga los documentos; subir y pedir al proveedor queda para Compras (05.11.2026).
+function crtSoloVer(){ return document.documentElement.classList.contains('app-modo') && typeof APP !== 'undefined' && APP.vista === 'super'; }
 
 // ---------------------------------------------------------------- subidas
 async function crtHuella(file){
@@ -12854,7 +12844,7 @@ function crtMensaje(html){
 const crtPasaChip = (f) => CRT.filtro === 'todos' || crtEstado(f) === CRT.filtro;
 function crtPasaTexto(f){
   if(!CRT.q) return true;
-  return [f.idPry, f.nomPry, f.req, f.codigo, f.producto, f.proveedor, f.oc, f.usuario]
+  return [f.idPry, f.nomPry, f.cli, pryNombre(f.idPry), f.req, f.codigo, f.producto, f.proveedor, f.oc, f.usuario]
     .concat(f.lotes ? f.lotes.map(l=>l[0]) : [])
     .some(v => crtNorm(v).indexOf(CRT.q) !== -1);
 }
@@ -12888,13 +12878,14 @@ function crtDibujarResumen(){
     })();
 }
 function crtDibujar(){
-  document.getElementById('crtLimpiar').hidden = !(CRT.pry || CRT.q || CRT.filtro !== 'todos');
+  document.getElementById('crtLimpiar').hidden = !(CRT.cli || CRT.pry || CRT.q || CRT.filtro !== 'todos');
+  document.getElementById('section-certificados').classList.toggle('crt-solover', crtSoloVer());
   crtDibujarResumen(); crtDibujarAccion();
   const cont = document.getElementById('crtVista');
   CRT.pry ? crtVistaProyecto(cont) : crtVistaProyectos(cont);
 }
 function crtVistaProyectos(cont){
-  const base = CRT.filas.filter(crtPasaChip).filter(crtPasaTexto);
+  const base = CRT.filas.filter(function(f){ return !CRT.cli || f.cli === CRT.cli; }).filter(crtPasaChip).filter(crtPasaTexto);
   const prys = new Map();
   for(const f of base){
     if(!prys.has(f.idPry)) prys.set(f.idPry, { nombre:f.nomPry, filas:[] });
@@ -12977,7 +12968,7 @@ function crtVistaProyecto(cont){
   const pend = crtPendientesPorProveedor();
   const conCorreo = pend.filter(g => g.correo && g.correo.to);
   // Va plegado: es una alternativa al pedido de a uno, no lo primero que hay que ver (23.09.2026).
-  const panel = pend.length ? `<details class="card crt-ped"${CRT.pedAbierto ? ' open' : ''}>
+  const panel = pend.length && !crtSoloVer() ? `<details class="card crt-ped"${CRT.pedAbierto ? ' open' : ''}>
       <summary>
         <svg class="caret" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg>
         <span class="crt-ped-tit">Pedir lo que falta — un solo correo por proveedor</span>
@@ -13073,7 +13064,8 @@ function crtVistaProyecto(cont){
 function crtFila(f){
   const clave = crtClave(f);
   // Botón chico para sumarle otro documento del mismo tipo a un producto que ya tiene uno.
-  const mas = (tipo, etiqueta) => `<button class="crt-doc mas" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}" title="Agregar otro ${etiqueta.toLowerCase()} a este producto">＋</button>`;
+  const ver = crtSoloVer();
+  const mas = (tipo, etiqueta) => ver ? '' : `<button class="crt-doc mas" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}" title="Agregar otro ${etiqueta.toLowerCase()} a este producto">＋</button>`;
   const doc = (tipo, etiqueta, leve)=>{
     const lista = crtDocs(f, tipo);
     // Un producto puede tener varios documentos del mismo tipo: van todos en un solo botón y el clic
@@ -13082,7 +13074,7 @@ function crtFila(f){
       <button class="crt-doc si" type="button" data-crtver="${escapeHtml(clave)}" data-tipo="${tipo}" title="Ver ${lista.length===1 ? 'el documento' : 'los ' + lista.length + ' documentos'}">📄 ${etiqueta}${lista.length>1 ? `<span class="n">${lista.length}</span>` : ''}</button>
       <div class="crt-menu" hidden>${lista.map((d,i)=>
         `<a href="${escapeHtml(d.url)}" target="_blank" rel="noopener" title="${escapeHtml(d.nombre || etiqueta)}">📄 ${escapeHtml(d.nombre || (etiqueta + ' ' + (i+1)))}</a>`).join('')}
-        <button class="sube" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}">⬆ Subir ${tipo === 'cert' ? 'otro certificado' : 'otra ficha técnica'}</button>
+        ${ver ? '' : `<button class="sube" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}">⬆ Subir ${tipo === 'cert' ? 'otro certificado' : 'otra ficha técnica'}</button>`}
       </div></span>`;
     const sub = f[crtCampo(tipo)];
     if(sub){
@@ -13099,6 +13091,7 @@ function crtFila(f){
         ? `<a class="crt-doc si" href="${escapeHtml(her.url)}" target="_blank" rel="noopener" title="Documento de la orden de compra que trajo este material">${et}</a>`
         : `<span class="crt-doc sub" title="${escapeHtml(her.nombre)}">${et}</span>`;
     }
+    if(ver) return `<span class="crt-doc no${leve?' lev':''}">Sin ${etiqueta.toLowerCase()}</span>`;
     return `<button class="crt-doc no${leve?' lev':''}" type="button" data-crtsube="${escapeHtml(clave)}" data-tipo="${tipo}">⬆ Subir ${etiqueta.toLowerCase()}</button>`;
   };
   const mk = CRT.sel.has(clave);
@@ -13113,7 +13106,7 @@ function crtFila(f){
       : `OC ${crtMarca(f.oc)} · ${escapeHtml(f.fecha)}`}
       ${f.usuario && !f.stock ? `<br><span class="crt-quien">👤 ${crtMarca(f.usuario)}</span>` : ''}</div>
     <div class="crt-docs">${doc('cert','Certificado',false)}${doc('ficha','Ficha técnica',true)}${
-      (!crtTiene(f,'cert') || !crtTiene(f,'ficha'))
+      (!ver && (!crtTiene(f,'cert') || !crtTiene(f,'ficha')))
         ? (function(){ const c = crtCorreoDe(f); return `<button class="crt-mail${c.sin?' sin':''}" type="button" data-crtmail="${escapeHtml(clave)}" title="${c.sin ? 'Este proveedor no tiene correo en DB Proveedores.xlsx — el correo se abre sin destinatario' : 'Pedirle al proveedor lo que falta por correo'}">✉</button>` + crtCheckPedido('f|' + clave); })() : ''}</div>
     ${f.nota ? `<div class="crt-nota">${f.nota.html}</div>` : ''}
   </div>`;
@@ -14824,36 +14817,31 @@ document.querySelectorAll('.crt-chip').forEach(b=>{
   });
 });
 document.getElementById('crtLimpiar').addEventListener('click', ()=>{
-  CRT.pry=''; CRT.q=''; CRT.filtro='todos'; CRT.sel.clear(); CRT.abiertos.clear();
+  CRT.cli=''; CRT.pry=''; CRT.q=''; CRT.filtro='todos'; CRT.sel.clear(); CRT.abiertos.clear();
   document.getElementById('crtQ').value='';
   document.querySelectorAll('.crt-chip').forEach(o=>o.setAttribute('aria-pressed', String(o.dataset.cf==='todos')));
   crtMensaje(''); crtRefrescarPry(); crtDibujar();
 });
 (function(){
-  const inp = document.getElementById('crtPry');
-  inp.addEventListener('focus', ()=>{ inp.select(); crtPintarSug(''); });
-  inp.addEventListener('input', ()=>{ CRT.sugIdx = -1; crtPintarSug(inp.value); });
-  inp.addEventListener('blur', ()=> setTimeout(()=>{ crtCerrarSug(); crtRefrescarPry(); }, 140));
-  inp.addEventListener('keydown', (e)=>{
-    const ul = document.getElementById('crtSug');
-    if(ul.hidden && (e.key === 'ArrowDown' || e.key === 'Enter')){ crtPintarSug(inp.value); return; }
-    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
-      e.preventDefault();
-      if(!CRT.sug.length) return;
-      CRT.sugIdx = e.key === 'ArrowDown' ? (CRT.sugIdx+1) % CRT.sug.length : (CRT.sugIdx <= 0 ? CRT.sug.length-1 : CRT.sugIdx-1);
-      crtPintarSug(inp.value);
-      const act = ul.querySelector('[aria-selected="true"]');
-      if(act) act.scrollIntoView({ block:'nearest' });
-    } else if(e.key === 'Enter'){
-      e.preventDefault(); crtElegirSug(CRT.sugIdx >= 0 ? CRT.sugIdx : (CRT.sug.length > 1 ? 1 : 0));
-    } else if(e.key === 'Escape'){ crtCerrarSug(); crtRefrescarPry(); inp.blur(); }
-  });
-  document.getElementById('crtSug').addEventListener('mousedown', (e)=>{
-    const li = e.target.closest('li[data-i]');
-    if(li) crtElegirSug(Number(li.dataset.i));
-  });
-  document.getElementById('crtPryX').addEventListener('click', ()=>{
-    CRT.pry=''; CRT.abiertos.clear(); crtRefrescarPry(); crtDibujar(); inp.focus();
+  const sec = document.getElementById('section-certificados'), caja = function(t){ return document.getElementById(t === 'cli' ? 'crtSugCli' : 'crtSug'); };
+  const tipoDe = function(el){ return el && el.id === 'crtCli' ? 'cli' : el && el.id === 'crtPry' ? 'pry' : null; };
+  sec.addEventListener('focusin', function(e){ const t = tipoDe(e.target); if(!t) return;
+    e.target.select(); const b = caja(t); b.innerHTML = crtSugerencias(t, e.target.closest('.sup-ac').classList.contains('lleno') ? '' : e.target.value); b.classList.add('ver'); });
+  sec.addEventListener('input', function(e){ const t = tipoDe(e.target); if(!t) return; const b = caja(t); b.innerHTML = crtSugerencias(t, e.target.value); b.classList.add('ver'); });
+  sec.addEventListener('keydown', function(e){ const t = tipoDe(e.target); if(!t) return;
+    if(e.key === 'Enter'){ e.preventDefault(); const b = caja(t).querySelector('[data-crtsel]'); if(b) b.click(); }
+    else if(e.key === 'Escape'){ caja(t).classList.remove('ver'); e.target.blur(); } });
+  sec.addEventListener('focusout', function(e){ if(tipoDe(e.target)) setTimeout(crtRefrescarPry, 200); });
+  sec.addEventListener('click', function(e){
+    const b = e.target.closest('[data-crtsel], #crtCliX, #crtPryX'); if(!b) return;
+    if(b.id === 'crtCliX'){ CRT.cli = ''; CRT.pry = ''; }
+    else if(b.id === 'crtPryX') CRT.pry = '';
+    else { const p = b.dataset.crtsel.split('|'), k = p.slice(1).join('|');
+      if(p[0] === 'cli'){ CRT.cli = k; CRT.pry = ''; }
+      else { CRT.pry = k; const f = CRT.filas.find(function(x){ return x.idPry === k; }); if(f && !CRT.cli) CRT.cli = f.cli; } }
+    CRT.abiertos.clear(); sec.querySelectorAll('.sup-sug.ver').forEach(function(x){ x.classList.remove('ver'); });
+    if(document.activeElement && tipoDe(document.activeElement)) document.activeElement.blur();
+    crtRefrescarPry(); crtDibujar();
   });
 })();
 // Varios archivos a la vez para el mismo certificado o ficha (13.10.2026, Piero): se suben uno tras otro
@@ -15029,7 +15017,7 @@ const APP_VISTAS = {
   // Supervisor (13.10.2026, Piero): trazabilidad de requerimientos y consulta de stock por producto. Reemplaza a la vista
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
   super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
-    tabs:[['supreq','📋','Requerimientos'], ['polar'], ['tienda','🔎','Producto']] },
+    tabs:[['supreq','📋','Requerimientos'], ['polar'], ['tienda','🔎','Producto'], ['certificados','📄','Certificados']] },   // Certificados también en Supervisor, solo para ver (05.11.2026, Piero)
   // Gerencial (15.10.2026, Piero: "kalegria, mlujan y apl no deben tener Compras ni Almacén sino un módulo gerencial con
   // el resumen de todo Logística, con las fotos, para ver en un pantallazo lo que hace cada uno y darle seguimiento").
   gerencial:  { nombre:'Gerencial',  ico:'📈', desc:'Resumen de todo Logística: qué hace cada uno en Compras, Comex y Almacén.',
@@ -15067,7 +15055,7 @@ const APP_SESION = 'fp_app_ok';
 function appNecesitaClave(){ return !!APP.usuario && !sbSesion(); }
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
 // Gerencia de Logística (15.10.2026, Piero): entran primero al módulo Gerencial; también tienen Compras, Almacén y Supervisor.
-const APP_GERENCIAL_USR = ['kalegria', 'mlujan', 'apl'];
+const APP_GERENCIAL_USR = ['kalegria', 'mlujan', 'apl', 'rcarlos'];   // rcarlos = Renato Carlos Sarmiento (05.11.2026, Piero)
 // Respaldo: copia de DB Supervisores del 29.09.2026 (nombre, correo y Acceso; sin DNI), para que cada uno
 // entre con su acceso y se le salude por su nombre aunque el link publicado todavía no traiga la base.
 // Cuando se publica con la base cargada, manda la publicada (SUPERVISOR_ROL).
