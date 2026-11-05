@@ -22354,7 +22354,10 @@ function polarPedidosSinOC(persona){
 // Palabras que nunca son nombre de proveedor (antes se descartaba todo el vocabulario de productos, y así
 // "Danfoss", que también sale en productos, no se reconocía como proveedor).
 const POLAR_RUIDO_PROV = ['proveedor','proveedores','compra','compras','compramos','gasto','gastos','gastamos','correo','contacto','llegar','falta','pendiente','pendientes','vencidas','ordenes','orden','cuanto','cuantas','cuantos','tiene','tienen'];
+// Nombres comerciales de proveedores que en Nisira figuran con su razón social (05.11.2026, hoja de Leo: "promelsa").
+const POLAR_PROV_ALIAS = { promelsa:'promotores electricos' };
 function polarProveedoresEn(q){
+  Object.keys(POLAR_PROV_ALIAS).forEach(function(k){ q = q.replace(new RegExp('\\b' + k + '\\b', 'g'), POLAR_PROV_ALIAS[k]); });
   const nombres = new Set();
   polarLineasOC().forEach(function(r){ if(r.proveedor) nombres.add(r.proveedor); });
   if(GASTO_DATA && GASTO_DATA.rows) GASTO_DATA.rows.forEach(function(r){ if(r.proveedor) nombres.add(r.proveedor); });
@@ -22362,7 +22365,13 @@ function polarProveedoresEn(q){
   const exacto = [...nombres].filter(function(n){ return polarNorm(n).length >= 6 && q.indexOf(polarNorm(n)) !== -1; });
   if(exacto.length) return [exacto.sort(function(a,b){ return b.length - a.length; })[0]];
   const pal = q.replace(/[^a-z0-9 ]+/g, ' ').replace(ruido, ' ').split(' ').filter(function(w){ return w.length >= 4 && POLAR_COMUNES.indexOf(w) === -1 && POLAR_RUIDO_PROV.indexOf(w) === -1; });
-  if(!pal.length) return [];
+  // Solo una sigla ("jrm" = ESTANTERIAS METALICAS J.R.M. S.A.C) (05.11.2026, hoja de Leo: "jrm" no se entendía).
+  if(!pal.length){
+    const sg = q.replace(/[^a-z0-9 ]+/g, ' ').split(' ').filter(function(w){ return /^[a-z]{3,5}$/.test(w) && !/^(sac|srl|eirl|del|los|las|que|con|por|para|oc|req|pry|hay|dame|ver|mis)$/.test(w); });
+    if(!sg.length) return [];
+    return [...nombres].filter(function(n){ const sig = (polarNorm(n).match(/\b(?:[a-z]\.){2,}[a-z]?\.?/g) || []).map(function(x){ return x.replace(/\./g, ''); });
+      return sg.some(function(w){ return sig.indexOf(w) !== -1; }); }).slice(0, 4);
+  }
   const hits = [];
   nombres.forEach(function(n){
     const w = polarNorm(n).replace(/[^a-z0-9 ]+/g, ' ').replace(ruido, ' ').split(' ').filter(function(x){ return /^[a-z]{4,}$/.test(x); });   // "DANFOSS. S.A": sin puntos
@@ -22924,7 +22933,7 @@ function polarResponder1(texto){
   if(polarSinPrecios() && /precio|costo|cuesta|monto|gasto|gastado|gastamos|invirti|inversion|valorizado|cuanto (se )?(pago|pagamos|compro|compramos)|indicador|kpi|presupuest|partidas? (pasad|excedid)/.test(q)) return polarCandado();
   const fueraDeAlcance = '<p>En la vista <b>Supervisor</b> te ayudo con tus <b>requerimientos</b> y <b>proyectos</b> 📋</p><p>Escríbeme tu N° de requerimiento (por ejemplo <span class="mono">23303</span>), tu proyecto (PRY… o el nombre del cliente) o pregúntame por "mis requerimientos".</p>';
   const p = polarPeriodoDe(q), foco = polarFocoDe(qr);
-  const quiereProducto = (/stock|kardex|consumo|consume|rotacion|precio|costo|cuesta|movimiento|ingresos de|salidas de/.test(q) || /(a que|a quien|que|cual) proveedor|quien(es)? nos (vende|provee)|a quien le (compramos|compran)|donde (compramos|se compra)/.test(qr)) && !/requerimiento|\boc\b|\bpedido\b|proyecto|\bpry\b/.test(q);
+  const quiereProducto = (/stock|kardex|consumo|consume|rotacion|precio|costo|cuesta|movimiento|ingresos de|salidas de/.test(q) || /(a que|a quien|que|cual) proveedor|quien(es)? nos (vende|provee)|a quien le (compramos|compran|compras|compra|compro)|donde (compramos|se compra)/.test(qr)) && !/requerimiento|\boc\b|\bpedido\b|proyecto|\bpry\b/.test(q);
 
   // PDF "Estatus de embarques" (Control Tower) del módulo de Importaciones (07.10.2026).
   if(/\bpdf\b|imagen|imagenes/.test(qr) && /embarque|control tower|estatus de (las )?importac/.test(qr)){ appImpPdf(); return '<p>🖼️ Estoy armando las imágenes <b>Estatus de embarques</b> (en tránsito, por embarcar y pendiente booking), numeradas. Aparecen en unos segundos.</p>'; }
@@ -22970,6 +22979,15 @@ function polarResponder1(texto){
     if(!perR && /^compras?$/.test(mRep[5])) return polarResponder1('pendientes de compras');
     if(!perR && /^(logistica|almacen)$/.test(mRep[5])) return polarResponder1('pendientes de logistica');
     if(perR && pdEsComprador(perR)) return `<div class="asis-acc">${polarBtn('cmpimg', perR, '🖼️ Resumen de ' + escapeHtml((PD_PERSONAS[perR] || perR).split(' ')[0]) + ' en imágenes')}</div>` + polarPendientesPersona(perR, polarFiltrosDe(q)); }
+  // "¿A qué OC pertenece la factura F004-00002522?" (05.11.2026, hoja de Leo): la factura del proveedor registrada en la recepción.
+  const mFac = /factura|\bfac\b|comprobante/.test(qr) && String(texto).match(/\b([a-z]{1,2}\d{2,3})\s*-\s*0*(\d{1,10})\b/i);
+  if(mFac && !soloReqs) return polarFactura(mFac[1], mFac[2]);
+  // "¿Cuántos días de crédito tenemos con Promelsa?" (05.11.2026, hoja de Leo): condición de pago de sus OC.
+  if(/credito|forma de pago|condicion(es)? de pago|dias de pago|plazo de pago|al contado|como (le )?pagamos/.test(qr) && !soloReqs){
+    const pvC = polarProveedoresEn(qr);
+    if(pvC.length === 1) return polarCreditoProveedor(pvC[0]);
+    if(pvC.length > 1) return `<p>Encontré ${pvC.length} proveedores. ¿De cuál?</p><div class="asis-acc">${pvC.slice(0, 6).map(function(h){ return polarBtn('q', 'credito con ' + h, escapeHtml(polarCorta(h, 36))); }).join('')}</div>`;
+  }
   // "pedido" / "oc" / "req" a secas: se pide el número.
   if(/^(el |la |un |una )?(pedido|pedidos|oc|orden de compra|req|requerimiento)$/.test(qr)){
     const k = /pedido/.test(qr) ? 'pedido' : /req/.test(qr) ? 'requerimiento' : 'OC';
@@ -23027,14 +23045,37 @@ function polarResponder1(texto){
       : esPed ? [polarPedido.bind(null, cod1), polarReq.bind(null, cod1), polarOC.bind(null, cod1)]
       : [polarReq.bind(null, cod1), polarOC.bind(null, cod1), polarPedido.bind(null, cod1), polarOC.bind(null, cod2)];
     if(/\b(guia|grc|grr)\b/.test(qr) && !soloReqs) orden.unshift(polarGuia.bind(null, num));
-    for(const fn of orden){ const r = fn(); if(r) return r; }
+    // Número suelto que es req. y también OC ("12279": req. de 2023 y OC de este mes): va lo más reciente, con
+    // un botón para lo otro (05.11.2026, hoja de Leo: 6 veces se preguntó "OC N" justo después del número solo).
+    if(!doc && !esOC && !esPed && !esPry && !soloReqs && !foco && !/\b(guia|grc|grr)\b/.test(qr) && !/requerimiento|\breq\b/.test(q)){
+      const rq0 = getReqRows().find(function(r){ return r.codRequerimiento === cod1 && r.fReq; });
+      const oc0 = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).find(function(r){ return r.codOrden === cod1 && r.fOrden; });
+      if(rq0 && oc0){
+        const ocPrimero = oc0.fOrden > rq0.fReq, r = ocPrimero ? polarOC(cod1) : polarReq(cod1);
+        if(r) return r + `<div class="asis-acc">${ocPrimero ? polarBtn('q', 'requerimiento ' + num, '¿Buscabas el req. ' + escapeHtml(num) + '? (' + rqFecha(rq0.fReq) + ')') : polarBtn('q', 'OC ' + num, '¿O la OC ' + escapeHtml(num) + '? (' + rqFecha(oc0.fOrden) + ')')}</div>`;
+      }
+    }
+    // Si se pidió una OC o un pedido y lo que existe con ese número es otra cosa, se dice (05.11.2026, hoja de Leo:
+    // "OC 11320" mostraba el pedido 11320 sin avisar).
+    const queEs = soloReqs ? ['req'] : esOC ? ['oc', 'oc', 'req', 'pedido'] : esPed ? ['pedido', 'req', 'oc'] : ['req', 'oc', 'pedido', 'oc'];
+    const nomEs = { req:'un requerimiento', oc:'una OC', pedido:'un pedido' }, pidio = esOC ? 'oc' : esPed ? 'pedido' : null;
+    for(let i = 0; i < orden.length; i++){ const r = orden[i](); if(!r) continue;
+      const k = queEs[i - (orden.length - queEs.length)];
+      return (pidio && k && k !== pidio ? `<p class="asis-nota">No encontré ${pidio === 'oc' ? 'la OC' : 'el pedido'} ${escapeHtml(num)}; con ese número hay ${nomEs[k]}:</p>` : '') + r; }
     // No es requerimiento, pedido ni OC: ¿es una guía de almacén? (13.10.2026, hoja de Leo: "12824" era la GRC 0002-0012824).
     if(!soloReqs){ const g = polarGuia(num); if(g) return `<p class="asis-nota">No hay requerimiento, pedido ni OC ${escapeHtml(num)}; es una guía de almacén:</p>` + g; }
     POLAR.resultado = 'no encontró';
+    // Req. más nuevo que los datos publicados ("23977" con datos al 03.11) o mal escrito ("req. 2363") (05.11.2026, hoja de Leo).
+    if(!esOC && !esPed && !doc){
+      const mx = polarReqMax();
+      if(num.length === 5 && mx && +num > mx) return `<p>El req. <b class="mono">${escapeHtml(num)}</b> todavía no está en los datos publicados: el último que tengo es el <b class="mono">${mx}</b>${DATA && DATA.corte ? ' (datos al ' + fmtDate(DATA.corte) + ')' : ''}.</p><p>Aparecerá cuando se vuelvan a publicar los datos (☁ Guardar y compartir).</p>`;
+      const par = polarReqsParecidos(num);
+      if(par.length) return `<p>No encontré el req. <b class="mono">${escapeHtml(num)}</b>. ¿Quisiste decir alguno de estos?</p><div class="asis-acc">${par.map(function(x){ return polarBtn('q', 'requerimiento ' + x, 'Req. ' + x); }).join('')}</div>`;
+    }
     return `<p>No encontré <b class="mono">${escapeHtml(num)}</b> como ${esOC ? 'OC' : (esPed ? 'pedido' : 'requerimiento')}${soloReqs ? '' : ' ni como ' + [esOC ? 'requerimiento' : 'OC', esPed ? 'requerimiento' : 'pedido', 'guía de almacén'].join(', ').replace(/, ([^,]*)$/, ' ni $1')} en los datos cargados${DATA && DATA.corte ? ' (datos al ' + fmtDate(DATA.corte) + ')' : ''}.</p><p>Si es reciente, puede que todavía no esté en lo publicado. Revisa el número o prueba con el código completo, por ejemplo <span class="mono">0001-0023303</span>.</p>`;
   }
 
-  const mReqDe = qr.match(/\b(?:req|reqs|requerimientos?)\s+(pendientes|abiertos|por atender|atrasados|vencidos|sin atender)\s+(?:de|del)\s+(.+)$/);
+  const mReqDe = qr.match(/\b(?:req|reqs|requerimientos?)\s+(pendientes|abiertos|por atender|atrasados|vencidos|sin atender)\s+(?:(?:de|del|de la)\s+)?(?:cliente\s+|proyecto\s+)?(.+)$/);   // "req pendientes ara foods" (05.11.2026, hoja de Leo: sin "de")
   if(mReqDe && !/\bmis?\b/.test(qr) && !/^(despach|compra|almacen|revision|obra|aprobac|entrega|salida|oc\b|pedido)/.test(mReqDe[2])){
     const r2 = polarResponder1('requerimientos de ' + mReqDe[2]);
     if(POLAR.resultado === 'ok' && !/^(atrasados|vencidos)$/.test(mReqDe[1])) return r2;
@@ -23144,7 +23185,7 @@ function polarResponder1(texto){
   if(/proveedor(es)?.*(vencidas|demor|tarde|incumpl|peor|lento|falla|atras)|(vencidas|demor|tarde|lento|atras).*proveedor/.test(q)) return polarProveedoresDemora();
   const palP = polarPalabrasProducto(q);
   if(/precio|costo|cuanto cuesta|a cuanto (se )?compr/.test(qr) && palP.length){ const r = polarComprasDeProducto(palP, 'precio'); if(r) return r; }
-  if(/(a que|a quien|que|cual|cuales) proveedor(es)?|quien(es)? nos (vende|venden|provee|proveen)|donde (compramos|se compra)|a quien le (compramos|compran)/.test(qr) && !/top|mayores|principales|mas (compramos|gastamos)/.test(qr) && palP.length){
+  if(/(a que|a quien|que|cual|cuales) proveedor(es)?|quien(es)? nos (vende|venden|provee|proveen)|donde (compramos|se compra)|a quien le (compramos|compran|compras|compra|compro)/.test(qr) && !/top|mayores|principales|mas (compramos|gastamos)/.test(qr) && palP.length){
     const r = polarComprasDeProducto(palP, 'prov'); if(r) return r;
   }
   if(/valorizado|valor del (stock|inventario)|cuanto vale (el|la) (stock|inventario|almacen)/.test(q)) return '<p>El Reporte Almacén no trae el costo de cada producto, así que no puedo valorizar el inventario. Puedo darte cantidades por almacén, qué reponer o qué no se mueve.</p>';
@@ -23655,6 +23696,61 @@ function rqHojaComoVa(filas, wb){
   polarHoja(wb, 'Cómo va', cv, [16, 5, 14, 46, 8, 7, 22, 24, 70, 12, 16, 12, 26, 28, 16, 14, 16]);
   return wb;
 }
+// Excel de una OC: sus ítems con lo recibido y lo que falta (05.11.2026, hoja de Leo).
+function polarExcelOC(cod, soloFalta){
+  const d = appOCDatos(cod), hoy = new Date(), f0 = d.f0;
+  const falta = function(i){ return Math.max(0, Math.round(((i.q || 0) - (i.x || 0)) * 100) / 100); };
+  const its = d.items.filter(function(i){ return !soloFalta || falta(i) > 0; });
+  const nPend = d.items.filter(function(i){ return falta(i) > 0; }).length, tarde = d.fComp && busdayCount(d.fComp, hoy) > 0;
+  const aoa = [['OC ' + cod + ' · ' + (f0.proveedor || '')],
+    ['Emitida', d.fOrden ? fmtDate(d.fOrden) : '', 'Entrega pactada', d.fComp ? fmtDate(d.fComp) : '', 'Comprador', PD_PERSONAS[pdPersona(f0.usuarioCompras)] || f0.usuarioCompras || ''],
+    ['Estado', f0.estadoOrden || '', 'Ítems', d.items.length, 'Con saldo por llegar', nPend], ['Generado', fmtDate(hoy)], [],
+    ['Código', 'Descripción', 'UM', 'Req.', 'Cant. OC', 'Recibido', 'Falta', 'Última recepción', 'Estado']];
+  its.forEach(function(i){ const r = i.r, fa = falta(i);
+    aoa.push([r.idProducto || '', r.producto || '', r.unidad || '', r.codRequerimiento || 'Pedido directo', i.q == null ? '' : i.q, i.x || 0, fa,
+      i.fRec ? fmtDate(i.fRec) : '', fa > 0 ? (tarde ? 'Atrasado' : 'Por llegar') : 'Completo']); });
+  const wb = XLSX.utils.book_new();
+  polarHoja(wb, soloFalta ? 'Lo que falta' : 'Detalle OC', aoa, [14, 50, 7, 14, 10, 10, 10, 16, 12]);
+  const nombre = polarArchivo('OC ' + cod.replace(/^000\d-0*/, '') + (soloFalta ? ' - lo que falta' : '') + ' - ' + polarCorta(f0.proveedor || '', 30));
+  if(its.length) XLSX.writeFile(wb, nombre);
+  return { nombre:nombre, n:its.length, total:d.items.length, soloFalta:!!soloFalta };
+}
+// Factura del proveedor → OC (05.11.2026, hoja de Leo: "¿a qué OC pertenece la factura F004 - 00002522?").
+function polarFactura(serie, num){
+  const s = String(serie).toUpperCase(), n = String(+num), etq = s + '-' + String(num).replace(/^0+/, '').padStart(8, '0');
+  const filas = getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).filter(function(r){
+    return (String(r.factura || '').toUpperCase().match(/[A-Z]{1,2}\d{2,3}\s*-\s*\d+/g) || []).some(function(f){ const m = f.match(/([A-Z]{1,2}\d{2,3})\s*-\s*0*(\d+)/); return m && m[1] === s && String(+m[2]) === n; }); });
+  const ocs = [...new Set(filas.map(function(r){ return r.codOrden; }).filter(Boolean))];
+  if(!ocs.length){ POLAR.resultado = 'no encontró';
+    return `<p>No encontré la factura <b class="mono">${escapeHtml(etq)}</b> en las recepciones cargadas${DATA && DATA.corte ? ' (datos al ' + fmtDate(DATA.corte) + ')' : ''}.</p><p>La factura aparece cuando Almacén registra la recepción con su provisión. Si es reciente, puede que todavía no esté en lo publicado.</p>`; }
+  if(ocs.length === 1) return `<p class="asis-nota">La factura <b class="mono">${escapeHtml(etq)}</b> es de la OC ${escapeHtml(ocs[0].replace(/^000\d-0*/, ''))}:</p>` + (polarOC(ocs[0]) || '');
+  return `<p>La factura <b class="mono">${escapeHtml(etq)}</b> está en ${ocs.length} OC:</p><div class="asis-acc">${ocs.slice(0, 6).map(function(o){ return polarBtn('q', 'OC ' + o, 'OC ' + escapeHtml(o.replace(/^000\d-0*/, ''))); }).join('')}</div>`;
+}
+// Condición de pago (crédito) con un proveedor, según sus OC (05.11.2026, hoja de Leo: "¿cuántos días de crédito tenemos con Promelsa?").
+function polarCreditoProveedor(nombre){
+  const oc = new Map();
+  polarLineasOC().concat(getReqRows(), PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(r.proveedor === nombre && r.codOrden && r.condiciones && !oc.has(r.codOrden)) oc.set(r.codOrden, { c:String(r.condiciones).trim(), f:r.fOrden || null }); });
+  if(!oc.size) return `<div class="cab">${escapeHtml(nombre)}</div><p>No tengo la condición de pago de sus OC en los datos cargados.</p>`;
+  const cnt = new Map(); oc.forEach(function(v){ cnt.set(v.c, (cnt.get(v.c) || 0) + 1); });
+  const top = [...cnt.entries()].sort(function(a,b){ return b[1] - a[1]; });
+  const ult = [...oc.entries()].sort(function(a,b){ return (b[1].f || 0) - (a[1].f || 0); })[0];
+  return `<div class="cab">💳 Condición de pago · ${escapeHtml(polarCorta(nombre, 40))}</div>
+    <p>Lo más usado: <b>${escapeHtml(top[0][0])}</b> (${top[0][1]} de ${oc.size} OC).</p>
+    ${top.length > 1 ? '<p>También: ' + top.slice(1, 4).map(function(e){ return escapeHtml(e[0]) + ' (' + e[1] + ')'; }).join(' · ') + '.</p>' : ''}
+    <p>Última OC: <span class="mono">${escapeHtml(ult[0].replace(/^000\d-0*/, ''))}</span>${ult[1].f ? ' del ' + rqFecha(ult[1].f) : ''} · <b>${escapeHtml(ult[1].c)}</b>.</p>
+    <div class="asis-acc">${polarBtn('q', 'OC ' + ult[0], 'Ver la última OC')}${polarBtn('q', 'proveedor ' + nombre, 'Proveedor')}</div>`;
+}
+// Requerimientos parecidos a un número mal escrito ("req. 2363" → 23663, 23630…) (05.11.2026, hoja de Leo).
+function polarReqsParecidos(num){
+  const fecha = appMemo('polarReqFechas', function(){ const m = new Map(); getReqRows().forEach(function(r){ const c = r.codRequerimiento; if(c && /^0001-/.test(c) && !m.has(c)) m.set(c, r.fReq || null); }); return m; });
+  const c = new Set();
+  for(let i = 0; i <= num.length; i++) for(let d = 0; d <= 9; d++){ const x = num.slice(0, i) + d + num.slice(i); if(x[0] !== '0') c.add(x); }
+  if(num.length >= 5) for(let i = 0; i < num.length; i++) for(let d = 0; d <= 9; d++){ const x = num.slice(0, i) + d + num.slice(i + 1); if(x !== num && x[0] !== '0') c.add(x); }
+  return [...c].map(function(x){ return ['0001-' + x.padStart(7, '0'), x]; }).filter(function(x){ return fecha.has(x[0]); })
+    .sort(function(a,b){ return (fecha.get(b[0]) || 0) - (fecha.get(a[0]) || 0); }).slice(0, 6).map(function(x){ return x[1]; });
+}
+// El N° de requerimiento más alto de los datos cargados: para decir "es más nuevo que lo publicado".
+function polarReqMax(){ return appMemo('polarReqMax', function(){ let m = 0; getReqRows().forEach(function(r){ const x = /^0001-0*(\d+)$/.exec(r.codRequerimiento || ''); if(x && +x[1] > m) m = +x[1]; }); return m; }); }
 function polarExcelReqs(filas, titulo, sub){
   const reqs = appResumenReqs(filas);
   const est = {};
@@ -23775,6 +23871,16 @@ function polarFiltrosDe(q){
 // ---------- Exportar desde el modo de reglas ----------
 function polarExportar(q, T){
   const pryId = polarCodProyecto(T);
+  // "dame el excel de lo que falta de oc 12332" (05.11.2026, hoja de Leo: bajaba el req 12332 en vez de la OC).
+  const mOCx = !pryId && q.match(/\b(?:oc|orden(?: de compra)?)\s*(?:n(?:ro|o|°)?\.?\s*)?(?:(000\d)\s*-\s*)?0*(\d{3,7})\b/);
+  if(mOCx){
+    const cands = mOCx[1] ? [mOCx[1] + '-' + mOCx[2].padStart(7, '0')] : ['0001-' + mOCx[2].padStart(7, '0'), '0002-' + mOCx[2].padStart(7, '0')];
+    const cod = cands.find(function(c){ return appOCDatos(c); });
+    if(!cod) return `<p>No encontré la <b>OC ${escapeHtml(mOCx[2])}</b> en los datos cargados${DATA && DATA.corte ? ' (datos al ' + fmtDate(DATA.corte) + ')' : ''}.</p>`;
+    const x = polarExcelOC(cod, /falta|pendiente|saldo|por llegar|no (ha )?llega/.test(q));
+    if(!x.n) return `<p>La <b>OC ${escapeHtml(cod.replace(/^000\d-0*/, ''))}</b> ya llegó completa: no hay nada pendiente.</p>` + (polarOC(cod) || '');
+    return `<p>📥 Listo, descargué <b>${escapeHtml(x.nombre)}</b>.</p><p class="q">${x.soloFalta ? 'Solo los ítems que faltan llegar (' + x.n + ' de ' + x.total + ')' : 'Todos sus ítems (' + x.n + ')'}: cantidad de la OC, lo recibido, lo que falta, el req. y la última recepción.</p>`;
+  }
   const doc = T.match(/\b(\d{4})\s*-\s*(\d{3,7})\b/);
   const bare = T.match(/\b(\d{3,7})\b/);
   rqPreparar();
