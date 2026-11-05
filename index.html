@@ -2035,6 +2035,7 @@
   .asis-escucha .ondas{display:flex;align-items:center;gap:3px;height:22px;} .asis-escucha .ondas i{width:4px;height:8px;border-radius:3px;background:#55c3ab;animation:micOnda .9s ease-in-out infinite;}
   .asis-escucha .ondas i:nth-child(2){animation-delay:.12s;} .asis-escucha .ondas i:nth-child(3){animation-delay:.24s;} .asis-escucha .ondas i:nth-child(4){animation-delay:.36s;} .asis-escucha .ondas i:nth-child(5){animation-delay:.48s;}
   @keyframes micOnda{0%,100%{height:6px;}50%{height:22px;}}
+  .asis-pie.oyendo button[type=submit]{box-shadow:0 0 0 0 rgba(85,195,171,.7);animation:ocvPulso 1.1s ease-in-out infinite;}
   .asis-callar{display:block;margin-top:8px;border:0;background:var(--surface-2);color:var(--brand-ink);border-radius:14px;padding:7px 12px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}
   .asis-msg.bot.hablando{box-shadow:0 0 0 2px var(--brand-2), var(--shadow);}
   .asis-pie button{border:0;background:var(--brand-2);color:#1c2733;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;}
@@ -15216,7 +15217,7 @@ function appConstruir(){
         <input type="text" id="asisInput" placeholder="Escribe tu consulta…" enterkeyhint="send">
         <button type="button" class="asis-mic" id="asisMic" aria-label="Hablarle a Leo" hidden><svg viewBox="0 0 24 24" width="22" height="22"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
         <button type="submit" aria-label="Enviar">➤</button></form>
-      <div class="asis-escucha" id="asisEscucha" hidden><span class="ondas"><i></i><i></i><i></i><i></i><i></i></span><b>Te escucho…</b><small>Toca aquí cuando termines</small></div>
+      <div class="asis-escucha" id="asisEscucha" hidden><span class="ondas"><i></i><i></i><i></i><i></i><i></i></span><b>Te escucho…</b><small>Al terminar, toca ➤ para enviar</small></div>
     </div>`);
 
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
@@ -15323,8 +15324,10 @@ function appConstruir(){
     document.getElementById('asisEscucha').addEventListener('click', function(){ if(POLAR_VOZ.rec) try{ POLAR_VOZ.rec.stop(); }catch(err){} }); }
   try{ window.speechSynthesis && speechSynthesis.getVoices(); }catch(err){}   // carga las voces por adelantado
   document.getElementById('asisForm').addEventListener('submit', function(e){
-    e.preventDefault(); const i = document.getElementById('asisInput'); const t = i.value.trim();
-    if(t){ i.value = ''; polarEnviar(t); }
+    e.preventDefault(); const i = document.getElementById('asisInput');
+    if(POLAR_VOZ.oyendo){ POLAR_VOZ.enviar = true; try{ POLAR_VOZ.rec.stop(); }catch(err){} return; }   // grabando: ➤ termina y envía
+    const t = i.value.trim(), voz = POLAR_VOZ.pendiente; POLAR_VOZ.pendiente = false;
+    if(t){ i.value = ''; polarEnviar(t, voz); }
   });
   document.getElementById('asisChat').addEventListener('click', polarAccion);
   document.getElementById('asisDet').addEventListener('click', polarDetClick);
@@ -21213,16 +21216,16 @@ function polarEnviar(texto, porVoz){
 // Gratis y sin servidor propio: el dictado y la voz son los del propio celular (Web Speech API de
 // Chrome/Safari). La respuesta completa queda escrita; en voz solo va lo esencial (el titular y la
 // primera línea), en palabras que se entiendan al oírlas.
-const POLAR_VOZ = { rec:null, oyendo:false, texto:'' };
+const POLAR_VOZ = { rec:null, oyendo:false, texto:'', enviar:false, pendiente:false };
 function polarVozSoportada(){ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
 function polarVozIniciar(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if(!SR) return;
   try{ window.speechSynthesis && speechSynthesis.cancel(); }catch(err){}
   if(POLAR_VOZ.oyendo){ try{ POLAR_VOZ.rec.stop(); }catch(err){} return; }
   const rec = new SR(); POLAR_VOZ.rec = rec; POLAR_VOZ.texto = '';
-  rec.lang = 'es-PE'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  rec.lang = 'es-PE'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
   const input = document.getElementById('asisInput'), ui = document.getElementById('asisEscucha'), mic = document.getElementById('asisMic');
-  rec.onstart = function(){ POLAR_VOZ.oyendo = true; ui.hidden = false; mic.classList.add('on'); input.value = ''; input.placeholder = 'Te escucho…'; };
+  rec.onstart = function(){ POLAR_VOZ.oyendo = true; POLAR_VOZ.enviar = false; ui.hidden = false; mic.classList.add('on'); input.form.classList.add('oyendo'); input.value = ''; input.placeholder = 'Te escucho…'; };
   rec.onresult = function(e){
     let t = ''; for(let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
     POLAR_VOZ.texto = t; input.value = t;
@@ -21233,9 +21236,10 @@ function polarVozIniciar(){
     else if(e.error !== 'aborted') appToast('No pude usar el micrófono (' + e.error + ')');
   };
   rec.onend = function(){
-    POLAR_VOZ.oyendo = false; ui.hidden = true; mic.classList.remove('on'); input.placeholder = 'Escribe tu consulta…';
-    const t = (POLAR_VOZ.texto || '').trim(); input.value = '';
-    if(t) polarEnviar(t.charAt(0).toUpperCase() + t.slice(1), true);
+    POLAR_VOZ.oyendo = false; ui.hidden = true; mic.classList.remove('on'); input.form.classList.remove('oyendo'); input.placeholder = 'Escribe tu consulta…';
+    const t = (POLAR_VOZ.texto || '').trim();
+    if(t){ input.value = t.charAt(0).toUpperCase() + t.slice(1); POLAR_VOZ.pendiente = true; }   // queda escrito: se envía con ➤
+    if(POLAR_VOZ.enviar){ POLAR_VOZ.enviar = false; const v = input.value.trim(); input.value = ''; POLAR_VOZ.pendiente = false; if(v) polarEnviar(v, true); }
   };
   try{ rec.start(); }catch(err){ appToast('No pude usar el micrófono'); }
 }
