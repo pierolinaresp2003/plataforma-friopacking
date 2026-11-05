@@ -12663,6 +12663,11 @@ function crtHeredado(f, tipo){
 const crtEstado = (f) => !crtTiene(f,'cert') ? 'sincert' : (!crtTiene(f,'ficha') ? 'sinficha' : 'completos');
 const crtFecha = (d) => d ? String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear() : '';
 
+/** Responsable (usuario de Compras) de una OC, con o sin requerimiento. */
+function crtUsuarioOc(oc){
+  const m = appMemo('crtUsuarioOc', function(){ const x = new Map(); getProcesoRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ const o = (r.codOrden || '').trim(), u = (r.usuarioCompras || '').trim(); if(o && u && !x.has(o)) x.set(o, u); }); return x; });
+  return m.get(String(oc || '').trim()) || '';
+}
 /** Una fila por (requerimiento, producto, OC) a partir del Reporte Maestro. */
 function crtCargar(){
   // Trazabilidad de lotes (23.09.2026, ver parseTrazaLotes): de qué compra salió lo que se atendió con
@@ -12710,7 +12715,8 @@ function crtCargar(){
       lotes: lotes,
       motivo: motivo,
       fecha: crtFecha(oc ? r.fOrden : (r.fSalida || r.fReq)),
-      usuario: (r.usuarioCompras||'').trim(),
+      // Atendido de stock: el responsable de la OC de la que vino el material (05.11.2026, Piero).
+      usuario: oc ? (r.usuarioCompras||'').trim() : (lotes ? crtUsuarioOc(lotes[0][0]) : ''),
       supervisor: (r.responsableReq||'').trim(),
       ruc: (r.rucProveedor||'').trim(),
       proveedor: oc ? (r.proveedor||'').trim() : (lotes ? lotes[0][1] : ''),
@@ -13104,7 +13110,7 @@ function crtFila(f){
           ? crtLoteTexto(f)
           : `<span class="crt-lote sin">${escapeHtml(crtMotivoLote(f))}</span>`)
       : `OC ${crtMarca(f.oc)} · ${escapeHtml(f.fecha)}`}
-      ${f.usuario && !f.stock ? `<br><span class="crt-quien">👤 ${crtMarca(f.usuario)}</span>` : ''}</div>
+      ${f.usuario ? `<br><span class="crt-quien">👤 ${crtMarca(f.usuario)}</span>` : ''}</div>
     <div class="crt-docs">${doc('cert','Certificado',false)}${doc('ficha','Ficha técnica',true)}${
       (!ver && (!crtTiene(f,'cert') || !crtTiene(f,'ficha')))
         ? (function(){ const c = crtCorreoDe(f); return `<button class="crt-mail${c.sin?' sin':''}" type="button" data-crtmail="${escapeHtml(clave)}" title="${c.sin ? 'Este proveedor no tiene correo en DB Proveedores.xlsx — el correo se abre sin destinatario' : 'Pedirle al proveedor lo que falta por correo'}">✉</button>` + crtCheckPedido('f|' + clave); })() : ''}</div>
