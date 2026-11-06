@@ -21296,8 +21296,15 @@ function polarVozIniciar(){
   try{ rec.start(); }catch(err){ appToast('No pude usar el micrófono'); }
 }
 // Resumen para decir en voz alta: titular + primera línea útil, sin emojis ni siglas raras.
+// Lo que Leo dice en voz alta, directo al grano (06.11.2026, Piero: "que vaya directo a la respuesta, siendo claro y
+// preciso"): las respuestas principales traen su propia frase hablada (polarVoz); las demás siguen con el resumen de abajo.
+function polarVoz(t){ return t ? `<i class="asis-voz" hidden data-t="${escapeHtml(t)}"></i>` : ''; }
+function polarTitulo(t){ return String(t || '').toLowerCase().replace(/(^|\s)([a-záéíóúñ])/g, function(m, a, b){ return a + b.toUpperCase(); }).replace(/\b(S\.?a\.?c?|S\.?r\.?l|Sac|Eirl)\.?\b/gi, '').trim(); }
+function polarFechaVoz(d){ if(!d) return ''; const M = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
+  return d.getUTCDate() + ' de ' + M[d.getUTCMonth()] + (d.getUTCFullYear() !== new Date().getFullYear() ? ' de ' + d.getUTCFullYear() : ''); }
 function polarTextoParaVoz(burbuja){
   if(!burbuja) return '';
+  const vz = burbuja.querySelector('.asis-voz'); if(vz && vz.dataset.t) return vz.dataset.t;
   const q = function(sel){ const el = burbuja.querySelector(sel); return el ? el.innerText.trim() : ''; };
   let partes = [];
   const cab = q('.cab');
@@ -21335,8 +21342,14 @@ function polarHablar(burbuja){
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(t);
     const voces = speechSynthesis.getVoices(), pref = ['es-PE', 'es-419', 'es-US', 'es-MX', 'es-ES', 'es'];
-    let voz = null; for(const l of pref){ voz = voces.find(function(v){ return v.lang && v.lang.replace('_', '-').toLowerCase().indexOf(l.toLowerCase()) === 0; }); if(voz) break; }
-    if(voz) u.voice = voz; u.lang = voz ? voz.lang : 'es-PE'; u.rate = 1.04; u.pitch = 1;
+    // La voz de Leo del video es "Jorge" de Microsoft (06.11.2026, Piero: "¿no puede ser la misma voz del video?"). Viene gratis en
+    // el navegador Edge (PC y celular) y en Windows; si el equipo no la tiene, otra voz masculina en español, y si no, la de siempre.
+    const es = voces.filter(function(v){ return /^es/i.test(v.lang || ''); });
+    let voz = es.find(function(v){ return /jorge/i.test(v.name) && /natural|online/i.test(v.name); }) || es.find(function(v){ return /jorge/i.test(v.name); })
+      || es.find(function(v){ return /\b(alex|gonzalo|alonso|tomas|tomás|pablo|alvaro|álvaro|raul|raúl|dario|darío|jorge|andres|andrés|gerardo|lorenzo|federico|emilio)\b/i.test(v.name); }) || null;
+    const deLeo = !!voz;
+    if(!voz) for(const l of pref){ voz = voces.find(function(v){ return v.lang && v.lang.replace('_', '-').toLowerCase().indexOf(l.toLowerCase()) === 0; }); if(voz) break; }
+    if(voz) u.voice = voz; u.lang = voz ? voz.lang : 'es-PE'; u.rate = deLeo ? 1.1 : 1.04; u.pitch = deLeo ? 1.05 : 1;
     burbuja.classList.add('hablando');
     const aviso = document.createElement('button'); aviso.type = 'button'; aviso.className = 'asis-callar'; aviso.textContent = '🔊 Leo está hablando · tocar para callar';
     aviso.onclick = function(){ speechSynthesis.cancel(); };
@@ -22048,7 +22061,18 @@ function polarLlegaDeCliente(qr){
     else est = `<span class="asis-est">${escapeHtml(r.estado || 'sin OC todavía')}</span>`;
     return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 48))}</div><div class="s">${est}</div><div class="s"><small>Req. ${escapeHtml(String(r.codRequerimiento).replace(/^0001-0*/, ''))} · ${escapeHtml(polarCorta(appImpNombre(r.proyecto), 32))}</small></div></div>`;
   };
-  return `<div class="cab">🚚 Cuándo llega "${escapeHtml(prod.join(' '))}" · ${escapeHtml(polarCorta(appImpNombre(reqs[0].proyecto), 30))}</div><div class="sub">${reqs.length} ítem${reqs.length === 1 ? '' : 's'} de requerimiento${reqs.some(enObra) ? ' · ' + reqs.filter(enObra).length + ' ya en obra' : ''}</div>${reqs.slice(0, 8).map(fila).join('')}`
+  const vozL = (function(){ const r = reqs[0], cli = polarTitulo(appImpNombre(r.proyecto)), pr = prod.join(' ').replace(/^./, function(c){ return c.toUpperCase(); }) + ' para ' + cli;
+    if(enObra(r)) return pr + ': ya está en obra.';
+    const oc = abiertas.find(function(x){ return x.codOrden && x.codOrden === r.codOrden && x.idProducto === r.idProducto; }) || abiertas.find(function(x){ return x.idProducto === r.idProducto; });
+    const num = function(c){ return String(c).replace(/^000[12]-0*/, ''); };
+    let t = !oc ? pr + ': todavía no tiene orden de compra, está ' + String(r.estado || 'pendiente').toLowerCase() + '.'
+      : !oc.fCompromiso ? pr + ': tiene la orden de compra ' + num(oc.codOrden) + ', sin fecha de entrega.'
+      : busdayCount(oc.fCompromiso, new Date()) > 0 ? pr + ': debía llegar el ' + polarFechaVoz(oc.fCompromiso) + ' con la orden de compra ' + num(oc.codOrden) + '. Está atrasado.'
+      : pr + ': llega el ' + polarFechaVoz(oc.fCompromiso) + ', con la orden de compra ' + num(oc.codOrden) + '.';
+    const otros = reqs.filter(function(x){ return !enObra(x); }).length - 1;
+    if(otros > 0) t += ' Hay ' + otros + ' ítem' + (otros === 1 ? '' : 's') + ' más en la lista.';
+    return t; })();
+  return polarVoz(vozL) + `<div class="cab">🚚 Cuándo llega "${escapeHtml(prod.join(' '))}" · ${escapeHtml(polarCorta(appImpNombre(reqs[0].proyecto), 30))}</div><div class="sub">${reqs.length} ítem${reqs.length === 1 ? '' : 's'} de requerimiento${reqs.some(enObra) ? ' · ' + reqs.filter(enObra).length + ' ya en obra' : ''}</div>${reqs.slice(0, 8).map(fila).join('')}`
     + `<div class="asis-acc">${polarBtn('q', 'req ' + String(reqs[0].codRequerimiento).replace(/^0001-0*/, ''), 'Ver req. ' + escapeHtml(String(reqs[0].codRequerimiento).replace(/^0001-0*/, '')))}</div>`;
 }
 function polarCuandoLlegaProducto(pal, per){
@@ -22071,7 +22095,9 @@ function polarCuandoLlegaProducto(pal, per){
   const resPry = per && porPry.size ? `<p>📍 ${[...porPry.entries()].sort(function(a,b){ return b[1] - a[1]; }).slice(0, 8).map(function(x){ return `${escapeHtml(polarCorta(appImpNombre(x[0]), 30))} <b>${x[1]}</b>`; }).join(' · ')}</p>` : '';
   const fila = function(r){ const v = r.fCompromiso && busdayCount(r.fCompromiso, hoy) > 0;
     return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 48))}</div><div class="s"><span class="asis-est ${v ? 'tarde' : 'camino'}">${r.fCompromiso ? (v ? 'debía llegar ' : 'llega ') + rqFecha(r.fCompromiso) : 'sin fecha'}</span><small>OC ${escapeHtml(r.codOrden.replace(/^000\d-0*/, ''))} · ${escapeHtml(polarCorta(r.proveedor || '', 24))}${r.req ? ' · req ' + escapeHtml(r.req.replace(/^0001-0*/, '')) : ''}</small></div></div>`; };
-  return `<div class="cab">🚚 ${per ? 'Llega ' + escapeHtml(per.label) : 'Cuándo llega'} "${escapeHtml(pal.join(' '))}"</div><div class="sub">${hits.length} línea${hits.length === 1 ? '' : 's'} con OC abierta${per ? ' · por cliente / proyecto:' : ''}</div>${resPry}${hits.slice(0, 5).map(fila).join('')}${polarMas(hits, 5, fila, 'líneas')}`;
+  const h0 = hits[0], vozC = (hits.length === 1 ? pal.join(' ').replace(/^./, function(c){ return c.toUpperCase(); }) + ':' : 'De ' + pal.join(' ') + ' hay ' + hits.length + ' líneas con orden de compra abierta. Lo primero')
+    + (h0.fCompromiso ? (busdayCount(h0.fCompromiso, hoy) > 0 ? ' debía llegar el ' : ' llega el ') + polarFechaVoz(h0.fCompromiso) : ' no tiene fecha de entrega') + ', con la orden de compra ' + String(h0.codOrden).replace(/^000[12]-0*/, '') + '.';
+  return polarVoz(vozC) + `<div class="cab">🚚 ${per ? 'Llega ' + escapeHtml(per.label) : 'Cuándo llega'} "${escapeHtml(pal.join(' '))}"</div><div class="sub">${hits.length} línea${hits.length === 1 ? '' : 's'} con OC abierta${per ? ' · por cliente / proyecto:' : ''}</div>${resPry}${hits.slice(0, 5).map(fila).join('')}${polarMas(hits, 5, fila, 'líneas')}`;
 }
 // "¿En qué OC está el cemento Thorgen?", "OC de Upgrade Industrial": busca en TODAS las OC (abiertas,
 // atendidas y finalizadas) por producto o proveedor, para ubicar el número de OC (01.10.2026, Piero: "si
@@ -23427,7 +23453,21 @@ function polarReq(cod){
   // Compacto: cabecera, una barra de avance y cada pendiente en una línea (lo más urgente primero).
   const orden = { 'Enviado a pedido — cuenta con OC':0, 'Pedido pendiente':1, 'En Revisión':2, 'Recibido en Almacén':3, 'Enviado a Obra':4 };
   const base = pend.slice().sort(function(a,b){ const o = function(x){ return x.estadoCalc in orden ? orden[x.estadoCalc] : 9; }; return o(a) - o(b); }), ver = base.slice(0, 5);
-  return `<div class="cab">Req. <span class="mono">${escapeHtml(cod.replace(/^0001-0*/, ''))}</span> · ${escapeHtml(polarCorta(r0.proyecto || '', 34))}</div>
+  const voz = (function(){ const num = cod.replace(/^0001-0*/, '');
+    if(!pend.length) return 'El requerimiento ' + num + ' ya salió completo a obra.';
+    const F = { 'Enviado a pedido — cuenta con OC':'con orden de compra, por llegar', 'Pedido pendiente':'en Compras, todavía sin orden de compra', 'En Revisión':'en revisión de almacén',
+      'Recibido en Almacén':'en almacén, por despachar', 'Enviado a Obra':'en camino a obra' };
+    const g = new Map(); pend.forEach(function(r){ const k = F[r.estadoCalc] || String(r.estadoCalc || 'pendiente').toLowerCase(); g.set(k, (g.get(k) || 0) + 1); });
+    const partes = [...g.entries()].sort(function(a, b){ return b[1] - a[1]; });
+    let t = 'Del requerimiento ' + num + (pend.length === 1 ? ' falta 1 ítem: está ' + partes[0][0] : ' faltan ' + pend.length + ' de ' + n + ' ítems: '
+      + (partes.length === 1 ? (pend.length === n ? 'los ' : 'esos ') + pend.length + ' están ' + partes[0][0] : partes.map(function(x){ return x[1] + ' ' + x[0]; }).join(', ').replace(/, ([^,]*)$/, ' y $1'))) + '.';
+    const hoy = new Date(), conOC = pend.filter(function(r){ return r.estadoCalc === 'Enviado a pedido — cuenta con OC' && r.fCompromiso; });
+    const atr = conOC.filter(function(r){ return busdayCount(r.fCompromiso, hoy) > 0; }).length, prox = conOC.filter(function(r){ return !(busdayCount(r.fCompromiso, hoy) > 0); }).sort(function(a, b){ return a.fCompromiso - b.fCompromiso; })[0];
+    if(pend.length === 1 && conOC.length === 1) t = 'Del requerimiento ' + num + ' falta 1 ítem, con orden de compra. ' + (atr ? 'Debía llegar el ' + polarFechaVoz(conOC[0].fCompromiso) + ': está atrasado.' : 'Llega el ' + polarFechaVoz(conOC[0].fCompromiso) + '.');
+    else { if(prox) t += ' Lo próximo llega el ' + polarFechaVoz(prox.fCompromiso) + '.';
+      if(atr) t += ' ' + (atr === 1 ? 'Uno está atrasado.' : atr + ' están atrasados.'); }
+    return t; })();
+  return polarVoz(voz) + `<div class="cab">Req. <span class="mono">${escapeHtml(cod.replace(/^0001-0*/, ''))}</span> · ${escapeHtml(polarCorta(r0.proyecto || '', 34))}</div>
     <div class="sub">${escapeHtml(polarCorta(r0.responsable || '—', 30))} · ${rqFecha(r0.fReq)}</div>
     <div class="asis-avance"><i><em style="width:${pct}%"></em></i><span>${pend.length ? `<b>Faltan ${pend.length}</b> de ${n}` : '<b>✅ Todo salió a obra</b>'} · ${listos} en obra</span></div>
     ${ver.map(function(r){ return polarItemCorto(r); }).join('')}
