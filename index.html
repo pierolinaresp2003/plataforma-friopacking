@@ -21313,7 +21313,7 @@ function polarVozIniciar(){
 // Lo que Leo dice en voz alta, directo al grano (06.11.2026, Piero: "que vaya directo a la respuesta, siendo claro y
 // preciso"): las respuestas principales traen su propia frase hablada (polarVoz); las demás siguen con el resumen de abajo.
 function polarVoz(t){ return t ? `<i class="asis-voz" hidden data-t="${escapeHtml(t)}"></i>` : ''; }
-function polarTitulo(t){ return String(t || '').toLowerCase().replace(/(^|\s)([a-záéíóúñ])/g, function(m, a, b){ return a + b.toUpperCase(); }).replace(/\b(S\.?a\.?c?|S\.?r\.?l|Sac|Eirl)\.?\b/gi, '').trim(); }
+function polarTitulo(t){ return String(t || '').toLowerCase().replace(/(^|\s)([a-záéíóúñ])/g, function(m, a, b){ return a + b.toUpperCase(); }).replace(/\b(S\.?a\.?c?|S\.?r\.?l|Sac|Eirl)\.?\b/gi, '').replace(/ (Y|De|Del|La|Los|Las|E) /g, function(m){ return m.toLowerCase(); }).trim(); }
 function polarFechaVoz(d){ if(!d) return ''; const M = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
   return d.getUTCDate() + ' de ' + M[d.getUTCMonth()] + (d.getUTCFullYear() !== new Date().getFullYear() ? ' de ' + d.getUTCFullYear() : ''); }
 function polarTextoParaVoz(burbuja){
@@ -22055,7 +22055,10 @@ function polarLlegaDeCliente(qr){
   for(let i = 1; i < partes.length && !delCli.length; i++){
     prod = limpia(partes.slice(0, i).join(' de ')); cli = limpia(partes.slice(i).join(' de '));
     if(!prod.length || !cli.length) continue;
-    delCli = getReqRows().filter(function(r){ const n = polarNorm(r.proyecto || ''); return cli.every(function(w){ return polarNombreCalza(n, w); }); });   // solo el cliente: el nombre del proyecto trae palabras de producto ("sala de compresores")
+    delCli = getReqRows().filter(function(r){ const n = polarNorm(r.proyecto || ''); return cli.every(function(w){ return polarNombreCalza(n, w); }); });
+    // Tolerancia con el dictado: "bomaria" / "agroberris" → una letra de diferencia con una palabra del cliente.
+    if(!delCli.length && cli.some(function(w){ return w.length >= 5; })) delCli = getReqRows().filter(function(r){ const ws = polarNorm(r.proyecto || '').split(/[^a-z0-9]+/);
+      return cli.every(function(w){ return polarNombreCalza(polarNorm(r.proyecto || ''), w) || (w.length >= 5 && ws.some(function(x){ return x.length >= 5 && tdLev1(x, w); })); }); });   // solo el cliente: el nombre del proyecto trae palabras de producto ("sala de compresores")
   }
   if(!delCli.length || prod.every(function(w){ return /^(pedidos?|req\w*|ocs?|ordenes|orden|compras?|materiales|material|cosas|todo)$/.test(w); })) return null;
   const reqs = delCli.filter(function(r){ const d = polarNorm((r.producto || '') + ' ' + (r.idProducto || '')).replace(/[-\/]+/g, ' '); return prod.every(function(w){ return polarContiene(d, w); }); });
@@ -23032,6 +23035,11 @@ function polarResponder1(texto){
   // Ronda 6 de la hoja de Leo (06.11.2026): por voz el número sale partido ("requerimiento 23 309") y los clientes tienen
   // nombre corto ("proagro" = PROCESOS AGROINDUSTRIALES, POLAR_CLI_ALIAS).
   texto = texto.replace(/\b(req\w*|oc|orden(?: de compra)?|pedido|gu[ií]a|el|del)\s+(\d{1,2}) (\d{3})\b/gi, '$1 $2$3').replace(/^\s*(\d{1,2}) (\d{3})\s*$/, '$1$2');
+  // Tolerancia con el dictado (06.11.2026, Piero: "tener tolerancia con los errores que registre el audio"): el celular escribe
+  // "23.309" o "23 mil 309", agrega "oye Leo…" o "por favor", y deletrea "o c". Se limpia antes de entender.
+  texto = texto.replace(/^\s*(oye|hola|ya|ok|okey|bueno|eh+|a ver)?[\s,]*(leo|polar)\b[\s,:]*/i, '').replace(/\s*,?\s*por favor\b/gi, '').replace(/^\s*(oye|eh+|a ver)[\s,]+/i, '')
+    .replace(/\b(\d{1,3})\.(\d{3})\b(?!\.\d)/g, '$1$2').replace(/\b(\d{1,3}) mil (\d{1,3})\b/gi, function(m, a, b){ return String(+a * 1000 + +b); })
+    .replace(/\b[oO]\.?\s?[cC]\.?(?=\s|$)/g, 'oc').replace(/\b(o ce|oce|osé|ose)\b(?=\s+\d)/gi, 'oc').replace(/\bre(?:que|ke)rimiento\b/gi, 'requerimiento');
   Object.keys(POLAR_CLI_ALIAS).sort(function(a, b){ return b.length - a.length; }).forEach(function(k){ texto = texto.replace(new RegExp('\\b' + k.replace(/ /g, '\\s+') + '\\b', 'gi'), POLAR_CLI_ALIAS[k]); });   // "q llega hoy", "k llega"
   const q = polarEntender(texto);
   POLAR.entendido = q;
@@ -23698,7 +23706,14 @@ function polarOC(cod){
   const venc = f && busdayCount(f.fCompromiso, new Date()) > 0 && !/atendido completo/i.test(est) && !enTr;
   const fin = ocFinalizada(cod);
   const filaI = function(r){ const c = rec(r); return `<div class="asis-it"><div class="n">${escapeHtml(polarCorta(r.producto, 46))}</div><div class="s"><small>recibido ${polarNum(c[1])} de ${polarNum(c[0])}</small>${r.codRequerimiento ? '<small class="mono">req ' + escapeHtml(r.codRequerimiento.replace(/^0001-0*/, '')) + '</small>' : '<small>pedido directo</small>'}</div></div>`; };
-  return `<div class="cab">OC <span class="mono">${escapeHtml(cod.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(polarCorta(f0.proveedor || 'sin proveedor', 32))}</div>
+  const vozOC = (function(){ const num = cod.replace(/^000\d-0*/, ''), prov = polarTitulo(appImpNombre(f0.proveedor || '')), de = prov ? ' de ' + prov : '';
+    if(fin) return 'La orden de compra ' + num + de + ' está finalizada.';
+    if(!pendL.length) return 'La orden de compra ' + num + de + ' ya llegó completa.';
+    const falta = pendL.length === items.length ? 'falta todo, ' + items.length + (items.length === 1 ? ' ítem' : ' ítems') : 'faltan ' + pendL.length + ' de ' + items.length + ' ítems';
+    if(enTr) return 'La orden de compra ' + num + de + ' está en tránsito' + (impI && impI.eta ? ', llega el ' + polarFechaVoz(impI.eta) : '') + '.';
+    if(!f) return 'De la orden de compra ' + num + de + ' ' + falta + '. No tiene fecha de entrega.';
+    return 'De la orden de compra ' + num + de + ' ' + falta + '. ' + (venc ? 'Debía llegar el ' + polarFechaVoz(f.fCompromiso) + ': está atrasada.' : 'Llega el ' + polarFechaVoz(f.fCompromiso) + '.'); })();
+  return polarVoz(vozOC) + `<div class="cab">OC <span class="mono">${escapeHtml(cod.replace(/^000\d-0*/, ''))}</span> · ${escapeHtml(polarCorta(f0.proveedor || 'sin proveedor', 32))}</div>
     <div class="sub">${f0.fOrden ? 'Emitida ' + rqFecha(f0.fOrden).replace(/ \d{4}$/, '') : ''}${impI ? (impI.etd ? ' · zarpó ' + rqFecha(impI.etd).replace(/ \d{4}$/, '') + ' · ETA ' + (impI.eta || f ? rqFecha(impI.eta || f.fCompromiso).replace(/ \d{4}$/, '') : 'por definir') : impI.fReal ? ' · lista en fábrica ' + rqFecha(impI.fReal).replace(/ \d{4}$/, '') + ' · zarpe por definir' : (impI.fRef ? ' · entrega del proveedor en fábrica para el zarpe, estimada ' + rqFecha(impI.fRef).replace(/ \d{4}$/, '') : ' · entrega del proveedor por definir')) : (f ? ' · entrega ' + rqFecha(f.fCompromiso).replace(/ \d{4}$/, '') : '')}${f0.origen === 'importado' || impI ? ' · 🌎 importación' : ''}${f0.usuarioCompras ? ' · comprador ' + escapeHtml(PD_PERSONAS[pdPersona(f0.usuarioCompras)] || f0.usuarioCompras) : ''}</div>
     ${fin ? `<p><span class="asis-est ok">✔ Finalizada (OC Finalizadas.xlsx)</span>${[OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).length ? '<small> · ' + escapeHtml([OC_FIN[cod].motivo, OC_FIN[cod].por, OC_FIN[cod].f].filter(Boolean).join(' · ')) + '</small>' : ''}</p>` : est ? `<p><span class="asis-est ${/atendido completo/i.test(est) ? 'ok' : venc ? 'tarde' : 'camino'}">${escapeHtml(est)}${venc ? (impI ? ' · proveedor atrasado' : ' · atrasada') : (enTr && !/atendido completo/i.test(est) ? (impI.etd ? ' · en tránsito' : ' · lista en fábrica') : '')}</span></p>` : ''}
     ${impI && impI.emb ? (function(){ const e = impI.emb, x = embEtiqueta(e), dd = function(d){ return rqFecha(d).replace(/ \d{4}$/, ''); };
