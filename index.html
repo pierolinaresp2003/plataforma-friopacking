@@ -3867,7 +3867,8 @@ function origenFor(ruc){
 }
 
 // ---------- Guardar y compartir (desde el 20.10.2026 en Supabase, privado; antes en el repo público de GitHub) ----------
-const SNAPSHOT_GZ_PATH = "data.json.gz";  // formato nuevo, comprimido (08.09.2026, ver publishSnapshot)
+const SNAPSHOT_GZ_PATH = "data2.json.gz";  // formato compacto por columnas (06.11.2026, ver snapCompactar)
+const SNAPSHOT_GZ_VIEJO = "data.json.gz";   // el de antes: se lee solo si todavía no se publicó el compacto
 const TOKEN_KEY = "fp_platform_gh_token";
 
 // ---------- Datos protegidos en Supabase (20.10.2026, Piero: "¿cualquiera puede acceder a todo si tiene el link?") ----------
@@ -3932,7 +3933,8 @@ async function sbDescargarDatos(){
   if(!pub || !pub.bytes) return null;                                     // todavía no se publicó nada
   const c = await sbCache('snap');
   if(c && c.version === pub.version && c.buf) return c.buf;
-  const r = await sbFetch('/storage/v1/object/authenticated/datos/' + SNAPSHOT_GZ_PATH + '?v=' + encodeURIComponent(pub.version));
+  let r = await sbFetch('/storage/v1/object/authenticated/datos/' + SNAPSHOT_GZ_PATH + '?v=' + encodeURIComponent(pub.version));
+  if(r.status === 400 || r.status === 404) r = await sbFetch('/storage/v1/object/authenticated/datos/' + SNAPSHOT_GZ_VIEJO + '?v=' + encodeURIComponent(pub.version));
   if(!r.ok){ const j = await r.json().catch(function(){ return {}; }); throw sbError(j, r.status === 400 && /not.?found/i.test(j.error || j.message || '') ? 404 : r.status); }
   const buf = await r.arrayBuffer();
   sbCache('snap', { version:pub.version, buf:buf });
@@ -3963,6 +3965,47 @@ function bytesToBase64(bytes){
     binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize));
   }
   return btoa(binary);
+}
+// Formato compacto (06.11.2026, Piero: "se puso lenta"): el Reporte Maestro ahora trae desde 2023 y los datos
+// pasaron de ~35 a 97 MB de JSON. Las listas grandes se publican por columnas (cada clave una sola vez) y los
+// textos que se repiten (proyecto, estado, familia, proveedor…) como un diccionario: ~38 MB, 6 MB comprimido.
+// Al leer se arman las mismas filas de siempre, así que el resto del app no cambia.
+const SNAP_LISTAS = [['proceso','req'], ['proceso','rows'], ['proceso','pedidoDirecto'], ['proceso','alertas'], ['gasto','rows'], ['almacen','rows']];
+function snapCompactar(snap){
+  const sal = Object.assign({}, snap);
+  SNAP_LISTAS.forEach(function(rt){
+    const g = sal[rt[0]], arr = g && g[rt[1]];
+    if(!Array.isArray(arr) || arr.length < 50) return;
+    const ks = [], vistos = new Set();
+    arr.forEach(function(r){ for(const k in r) if(r[k] !== undefined && !vistos.has(k)){ vistos.add(k); ks.push(k); } });
+    const c = [], d = [], a = {};
+    ks.forEach(function(k, j){
+      let texto = true; const aus = [];
+      const v = arr.map(function(r, i){ const x = r[k]; if(x === undefined){ aus.push(i); return null; } if(x !== null && typeof x !== 'string') texto = false; return x; });
+      if(texto){ const L = [], m = new Map(); aus.forEach(function(i){ v[i] = undefined; });
+        c.push(v.map(function(x){ if(x === undefined) return -2; if(x === null) return -1; let n = m.get(x); if(n === undefined){ n = L.length; L.push(x); m.set(x, n); } return n; })); d.push(L); }
+      else { c.push(v); d.push(0); if(aus.length) a[j] = aus; }
+    });
+    sal[rt[0]] = Object.assign({}, g); sal[rt[0]][rt[1]] = { __pk:1, n:arr.length, k:ks, c:c, d:d, a:a };
+  });
+  return sal;
+}
+function snapExpandir(snap){
+  if(!snap) return snap;
+  SNAP_LISTAS.forEach(function(rt){
+    const g = snap[rt[0]], p = g && g[rt[1]];
+    if(!p || p.__pk !== 1) return;
+    const n = p.n, K = p.k;
+    const cols = K.map(function(k, j){
+      const c = p.c[j], L = p.d[j];
+      if(!L){ (p.a[j] || []).forEach(function(i){ c[i] = undefined; }); return c; }
+      const o = new Array(n); for(let i = 0; i < n; i++){ const x = c[i]; o[i] = x >= 0 ? L[x] : (x === -1 ? null : undefined); } return o;
+    });
+    const crea = new Function('c', 'i', 'return {' + K.map(function(k, j){ return JSON.stringify(k) + ':c[' + j + '][i]'; }).join(',') + '};');
+    const filas = new Array(n); for(let i = 0; i < n; i++) filas[i] = crea(cols, i);
+    g[rt[1]] = filas;
+  });
+  return snap;
 }
 async function gzipBytes(str){
   if(typeof CompressionStream === 'undefined') return null; // navegador viejo: se sube sin comprimir
@@ -4267,7 +4310,7 @@ async function publishSnapshot(){
   btn.textContent = "Publicando...";
   try{
     const snapshot = buildSnapshot();
-    const jsonStr = JSON.stringify(snapshot);
+    const jsonStr = JSON.stringify(snapCompactar(snapshot));
     btn.textContent = "Comprimiendo...";
     const gz = await gzipBytes(jsonStr);
     if(!gz) throw new Error("este navegador no puede comprimir los datos. Usa Chrome o Edge actualizado.");
@@ -4331,7 +4374,7 @@ async function loadPublishedSnapshot(manual){
       const buf = await sbDescargarDatos();
       if(!buf){ SNAP_ESTADO = 'vacio'; if(manual) showPublishBanner('Todavía no hay ninguna versión publicada. Carga tus archivos y usa "Guardar y compartir".', true); return; }
       const txt = await gunzipToText(buf);
-      if(txt) snap = JSON.parse(txt);
+      if(txt) snap = snapExpandir(JSON.parse(txt));
     }catch(e){
       SNAP_ESTADO = { error:(e && e.message) || String(e) };
       if(e.status === 401 || e.status === 403){ if(APP.usuario && RQ_MOVIL.matches) appBienvenida(APP.usuario.correo); return; }
@@ -14548,7 +14591,9 @@ function pdEsComprador(p){ return !!(p && PD_PERSONAS[p] && !PD_NO_COMPRADORES[p
 // requerimiento) es la misma línea repetida, no un pedido directo: se ignora (13.10.2026, Piero —
 // pedido 0001-0016605: 4 líneas por requerimiento y PedidoSinReq repetía 3 de ellas).
 // También es repetida si la misma OC ya trae ese producto con la misma cantidad en Reporte Maestro (28.10.2026, Piero: OC 12426).
-function psrRepetida(r){ const q = function(x){ return x.cantOrden != null ? x.cantOrden : x.cantidadOrden; };
+// Se guarda la respuesta por fila (06.11.2026, velocidad): los indicadores la preguntan miles de veces por cada pantalla.
+function psrRepetida(r){ const c = appMemo('psrRepFila', function(){ return new WeakMap(); }); let v = c.get(r); if(v === undefined){ v = psrRepetidaCalc(r); c.set(r, v); } return v; }
+function psrRepetidaCalc(r){ const q = function(x){ return x.cantOrden != null ? x.cantOrden : x.cantidadOrden; };
   const k = appMemo('psrRM', function(){ const m = new Set();
     getReqRows().forEach(function(x){ if(x.codPedido && x.idProducto) m.add(String(x.codPedido).trim() + '|' + String(x.idProducto).trim());
       if(x.codOrden && x.idProducto) m.add('OC|' + String(x.codOrden).trim() + '|' + String(x.idProducto).trim() + '|' + q(x)); }); return m; });
@@ -17636,7 +17681,9 @@ function appMemo(clave, fn){
 }
 function appIndDatos(f){ return appMemo('ind' + JSON.stringify(f || {}), function(){ return appIndDatosCalc(f); }); }
 function appIndDatosCalc(f){
-  const r = indConFiltros(f, function(){ return INDICATORS.map(function(ind){ return { ind:ind, st:aggStatsForIndicator(rowsForIndicator(ind), ind) }; }); });
+  // Las filas filtradas se arman una vez por pasada y no una por indicador (06.11.2026, velocidad).
+  const r = indConFiltros(f, function(){ const filas = {}; return INDICATORS.map(function(ind){ const oc = ind.key === 'd2' || ind.key === 'd3' || ind.key === 'd4';
+    const k = oc ? 'oc' : 'req'; if(!filas[k]) filas[k] = rowsForIndicator(ind); return { ind:ind, st:aggStatsForIndicator(filas[k], ind) }; }); });
   return Array.isArray(r) ? r : [];
 }
 // Tendencia: % a tiempo de las últimas 6 semanas (si se mira por semana) o de los últimos 6 meses.
