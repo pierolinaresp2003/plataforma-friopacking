@@ -15069,7 +15069,7 @@ const APP_VISTAS = {
   // Supervisor (13.10.2026, Piero): trazabilidad de requerimientos y consulta de stock por producto. Reemplaza a la vista
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
   super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
-    tabs:[['supreq','📋','Requerimientos'], ['polar'], ['tienda','🔎','Producto'], ['certificados','📄','Certificados']] },   // Certificados también en Supervisor, solo para ver (05.11.2026, Piero)
+    tabs:[['supreq','📋','Requerimientos'], ['polar'], ['tienda','🔎','Producto']] },   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
   // Gerencial (15.10.2026, Piero: "kalegria, mlujan y apl no deben tener Compras ni Almacén sino un módulo gerencial con
   // el resumen de todo Logística, con las fotos, para ver en un pantallazo lo que hace cada uno y darle seguimiento").
   gerencial:  { nombre:'Gerencial',  ico:'📈', desc:'Resumen de todo Logística: qué hace cada uno en Compras, Comex y Almacén.',
@@ -22748,6 +22748,7 @@ function polarMovimientosAlmacen(p, tipo){
     ${top.slice(0, 8).map(function(y){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(y.r.descripcion, 60))}</div><div class="q">${polarNum(Math.round(y.q * 100) / 100)} ${escapeHtml(y.r.unidad || '')} · ${y.n} mov. ${polarBtn('inv', y.r.codigo, 'kardex')}</div></div>`; }).join('')}`;
 }
 function polarCertificados(){
+  if(crtSoloVer()) return '<p>Los certificados no están disponibles en la vista Supervisor por ahora.</p>';   // 07.11.2026
   if(!CRT.listo || !CRT.filas || !CRT.filas.length) return `<p>Los certificados se leen de Drive al abrir el módulo. Ábrelo una vez y vuelve a preguntarme.</p><div class="asis-acc">${polarBtn('ir', 'certificados', 'Abrir Certificados')}</div>`;
   const falta = CRT.filas.filter(function(f){ return !(crtTiene(f, 'cert') && crtTiene(f, 'ficha')); });
   const pp = new Map(); falta.forEach(function(f){ pp.set(f.idPry, (pp.get(f.idPry) || 0) + 1); });
