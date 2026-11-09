@@ -12745,7 +12745,11 @@ function crtCorreoSeleccion(clave){
   // Títulos en una celda: al pegar, Outlook quita el color del texto suelto pero respeta el de las celdas.
   const tit = t => '<table style="border-collapse:collapse;margin:0 0 6pt;"><tr><td style="padding:0;color:' + AZ + ';font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;font-weight:bold;"><span style="color:' + AZ + ';"><b>' + t + '</b></span></td></tr></table>';
   // Cabecera blanca y centrada: el color va en la celda y en un span (lo que Outlook conserva al pegar), sin <font>.
-  const th = (t) => '<td align="center" bgcolor="' + AZ + '" style="' + bo + 'background:' + AZ + ';color:#ffffff;padding:6px 9px;text-align:center;font-weight:bold;"><span style="color:#ffffff;"><b>' + t + '</b></span></td>';
+  // Outlook borra el color de letra al pegar con Ctrl+V (09.11.2026): el título de cada columna va como imagen
+  // (letra blanca sobre azul) para que quede igual sí o sí. Si el navegador no puede dibujarla, queda el texto.
+  const th = (t) => { const im = crtImgTexto(t, AZ);
+    return '<td align="center" bgcolor="' + AZ + '" style="' + bo + 'background:' + AZ + ';color:#ffffff;padding:6px 9px;text-align:center;font-weight:bold;">' +
+      (im ? '<img src="' + im.src + '" width="' + im.w + '" height="' + im.h + '" alt="' + t + '" style="display:inline-block;border:0;vertical-align:middle;">' : '<span style="color:#ffffff;"><b>' + t + '</b></span>') + '</td>'; };
   const td = (t, al) => '<td align="' + (al || 'left') + '" style="' + bo + 'padding:6px 9px;vertical-align:top;text-align:' + (al || 'left') + ';">' + t + '</td>';
   const H = [];
   H.push(p('Estimados, <b>' + e(g.nombre) + '</b>:'));
@@ -12770,6 +12774,18 @@ function crtCorreoSeleccion(clave){
   crtCopiarHtml(html, L.join('\r\n')).then(abrir, function(){ abrir(false); });
 }
 // Copia HTML con formato al portapapeles (con texto plano de respaldo). Si el navegador no deja, cae al método antiguo.
+/** Texto blanco en negrita sobre el color dado, como imagen PNG (data URI) nítida en pantallas 2x. */
+function crtImgTexto(t, fondo){
+  try{
+    const k = 2, fuente = 'bold 13px Aptos, Calibri, "Segoe UI", Arial, sans-serif';
+    const c = document.createElement('canvas'), x = c.getContext('2d');
+    x.font = fuente; const w = Math.ceil(x.measureText(t).width) + 2, h = 17;
+    c.width = w * k; c.height = h * k; x.scale(k, k);
+    x.fillStyle = fondo; x.fillRect(0, 0, w, h);
+    x.font = fuente; x.fillStyle = '#ffffff'; x.textBaseline = 'middle'; x.fillText(t, 1, h / 2 + 1);
+    return { src:c.toDataURL('image/png'), w:w, h:h };
+  }catch(err){ return null; }
+}
 function crtCopiarHtml(html, texto){
   // Primero se copia "como de la pantalla" (09.11.2026): así Outlook conserva el color de las letras (cabecera blanca).
   // Va en un iframe aparte para que no se mezclen los estilos de la app.
