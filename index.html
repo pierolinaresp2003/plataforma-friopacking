@@ -15220,7 +15220,8 @@ const APP_VISTAS = {
   // Supervisor (13.10.2026, Piero): trazabilidad de requerimientos y consulta de stock por producto. Reemplaza a la vista
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
   super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
-    tabs:[['supreq','📋','Requerimientos'], ['polar'], ['tienda','🔎','Producto']] },   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
+    // Inventario (stock por sede y kardex) se suma al Supervisor (09.11.2026, Piero).
+    tabs:[['supreq','📋','Requerimientos'], ['polar'], ['tienda','🔎','Producto'], ['inventario','📦','Inventario']] },   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
   // Gerencial (15.10.2026, Piero: "kalegria, mlujan y apl no deben tener Compras ni Almacén sino un módulo gerencial con
   // el resumen de todo Logística, con las fotos, para ver en un pantallazo lo que hace cada uno y darle seguimiento").
   gerencial:  { nombre:'Gerencial',  ico:'📈', desc:'Resumen de todo Logística: qué hace cada uno en Compras, Comex y Almacén.',
@@ -16047,7 +16048,7 @@ function appInicio(pantalla){
   // Importaciones vuelve a ser su propio módulo (19.10.2026, Piero: "todo lo que son importaciones ponlo en otro módulo").
   if(APP.vista === 'compras' && pantalla === 'indicadores'){ APP_PC.persona = pdPersona(APP_F.indicadores.persona) || ''; pantalla = 'pendcompras'; }   // Reportes vive dentro de Compras (19.10.2026)
   if(APP.vista === 'almacen' && (pantalla === 'indicadores' || pantalla === 'almrep')) pantalla = 'almseg';   // viven en Seguimiento (20.10.2026)
-  if(APP.vista === 'super' && pantalla !== 'tienda') pantalla = 'supreq';
+  if(APP.vista === 'super' && pantalla !== 'tienda' && pantalla !== 'inventario') pantalla = 'supreq';
   if((APP.vista === 'compras' || APP.vista === 'almacen') && (!pantalla || pantalla === 'inicio')) pantalla = 'daily';
   if(!(APP.enInicio && APP.pantalla === (APP_PANTALLAS[pantalla] ? pantalla : 'inicio'))) appNavPush();
   if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(undefined, true); APP.entrada = false; return; }
