@@ -12566,6 +12566,19 @@ const CRT_COPIA_FIJA = [
  * Copias del correo: los demás correos del proveedor, el supervisor que pidió cada requerimiento
  * (DB Supervisores.xlsx) y la lista fija de Compras y Logística. Sin repetidos y sin el destinatario.
  */
+// Correo del supervisor que hizo el req. El Maestro trae el nombre completo ("RENATO CARLOS SARMIENTO") y DB Supervisores
+// a veces más corto ("RENATO CARLOS"): si no calza exacto, vale si todas las palabras de un nombre están en el otro y es uno solo (09.11.2026).
+function crtCorreoSupervisor(nombre){
+  const k = claveNombre(nombre);
+  if(!k || !SUPERVISOR_MAIL) return '';
+  if(SUPERVISOR_MAIL[k]) return SUPERVISOR_MAIL[k];
+  const w = k.split(' ');
+  const hay = Object.keys(SUPERVISOR_MAIL).filter(function(n){
+    const v = n.split(' ');
+    return Math.min(v.length, w.length) >= 2 && (v.every(x => w.indexOf(x) !== -1) || w.every(x => v.indexOf(x) !== -1));
+  });
+  return hay.length === 1 ? SUPERVISOR_MAIL[hay[0]] : '';
+}
 function crtCopias(filas, correoProv, otrosDelProveedor){
   const vistos = new Set(), cc = [];
   const sumar = (m)=>{
@@ -12576,7 +12589,7 @@ function crtCopias(filas, correoProv, otrosDelProveedor){
     vistos.add(k); cc.push(e);
   };
   (otrosDelProveedor || []).forEach(sumar);
-  if(SUPERVISOR_MAIL) filas.forEach(f => { const m = SUPERVISOR_MAIL[claveNombre(f.supervisor)]; if(m) sumar(m); });
+  if(SUPERVISOR_MAIL) filas.forEach(f => { const m = crtCorreoSupervisor(f.supervisor); if(m) sumar(m); });
   CRT_COPIA_FIJA.forEach(sumar);
   return cc;
 }
