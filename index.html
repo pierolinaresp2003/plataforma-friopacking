@@ -12713,9 +12713,42 @@ function crtCorreoSeleccion(clave){
   const q = [], cc = crtCopias(g.filas, d.to, d.cc);
   if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
   q.push('subject=' + encodeURIComponent('Certificados de calidad — ' + (porOc.size === 1 ? 'OC ' + [...porOc.keys()][0] : porOc.size + ' órdenes de compra') + ' — ' + pry));
-  q.push('body=' + encodeURIComponent(L.join('\r\n')));
-  if(d.sin) appToast('Este proveedor no tiene correo en DB Proveedores: el correo sale sin destinatario.');
-  window.location.href = 'mailto:' + d.to + '?' + q.join('&');
+  // Texto con formato (09.11.2026, Piero: "que lo copie en un mejor formato y al pegarlo en el correo salga tal cual; así no se
+  // diferencian los productos"): se copia al portapapeles como tabla y el correo se abre ya con destinatario, copias y asunto.
+  const e = escapeHtml, td = 'border:1px solid #d5dce8;padding:6px 9px;vertical-align:top;', th = td + 'background:#0a1e64;color:#ffffff;font-weight:bold;text-align:left;';
+  const chip = (t, si) => '<span style="display:inline-block;padding:1px 7px;margin:1px 2px;border-radius:9px;font-size:9.5pt;font-weight:bold;' + (si ? 'background:#fde2e1;color:#b42318;' : 'background:#e2f3ea;color:#1b7f4a;') + '">' + t + '</span>';
+  const H = [];
+  H.push('<p style="margin:0 0 11pt;">' + (d.contacto ? 'Estimado(a) ' + e(d.contacto) + ':' : 'Estimados:') + '</p>');
+  H.push('<p style="margin:0 0 11pt;">Por favor, su apoyo con la <b>documentación de calidad</b> de los siguientes productos del proyecto <b>' + e(pry) + '</b>:</p>');
+  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10.5pt;margin:0 0 11pt;"><tr><th style="' + th + '">N°</th><th style="' + th + '">Orden de compra</th><th style="' + th + '">Código</th><th style="' + th + '">Producto</th><th style="' + th + '">Qué falta</th></tr>');
+  let i = 0;
+  porOc.forEach(function(l, oc){ l.forEach(function(x, k){ i++;
+    const bg = (i % 2) ? '' : 'background:#f3f6fb;';
+    H.push('<tr><td style="' + td + bg + 'text-align:center;">' + i + '</td>' + (k === 0 ? '<td rowspan="' + l.length + '" style="' + td + 'font-weight:bold;">' + e(oc) + '<br><span style="font-weight:normal;color:#6b7785;font-size:9pt;">Req. ' + e([...new Set(l.map(y => y.req))].join(', ')) + '</span></td>' : '') +
+      '<td style="' + td + bg + 'font-family:Consolas,monospace;">' + e(x.codigo) + '</td><td style="' + td + bg + '">' + e(x.producto) + '</td><td style="' + td + bg + '">' +
+      (!crtTiene(x,'cert') || crtTiene(x,'ficha') ? chip('Certificado de calidad', true) : '') + (!crtTiene(x,'ficha') || crtTiene(x,'cert') ? chip('Ficha técnica', true) : '') + '</td></tr>'); }); });
+  H.push('</table>');
+  H.push('<p style="margin:0 0 11pt;">Agradeceremos enviarlos <b>en respuesta a este correo</b>.</p><p style="margin:0;">Saludos cordiales,</p>');
+  const html = '<div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;color:#000000;">' + H.join('') + '</div>';
+  const abrir = function(copiado){
+    q.push('body=' + encodeURIComponent(copiado ? '' : L.join('\r\n')));
+    if(d.sin) appToast('Este proveedor no tiene correo en DB Proveedores: el correo sale sin destinatario.');
+    else if(copiado) appToast('📋 Mensaje copiado: en el correo pega con Ctrl+V');
+    window.location.href = 'mailto:' + d.to + '?' + q.join('&');
+  };
+  crtCopiarHtml(html, L.join('\r\n')).then(abrir, function(){ abrir(false); });
+}
+// Copia HTML con formato al portapapeles (con texto plano de respaldo). Si el navegador no deja, cae al método antiguo.
+function crtCopiarHtml(html, texto){
+  try{
+    if(navigator.clipboard && window.ClipboardItem) return navigator.clipboard.write([new ClipboardItem({ 'text/html':new Blob([html], { type:'text/html' }), 'text/plain':new Blob([texto], { type:'text/plain' }) })]).then(function(){ return true; });
+  }catch(err){}
+  return new Promise(function(ok, no){
+    const div = document.createElement('div'); div.contentEditable = 'true'; div.style.cssText = 'position:fixed;left:-9999px;top:0;'; div.innerHTML = html; document.body.appendChild(div);
+    const r = document.createRange(); r.selectNodeContents(div); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    let hecho = false; try{ hecho = document.execCommand('copy'); }catch(err){}
+    sel.removeAllRanges(); div.remove(); hecho ? ok(true) : no();
+  });
 }
 /** Abre el correo ya escrito en el cliente de correo y descarga aparte el Excel del detalle. */
 function crtCorreoYExcel(clave){
