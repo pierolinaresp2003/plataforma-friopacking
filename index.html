@@ -4154,7 +4154,7 @@ function buildSnapshot(){
         // null/"" (no hay valor "por defecto" engañoso posible aquí, a diferencia de "rp").
         mn: r.moneda, mo: r.montoNativo==null?null:Math.round(r.montoNativo*100)/100, cd: r.condiciones,
         et: isoDay(r.etd), fe: isoDay(r.fEntregaReal), fer: isoDay(r.fEntregaRef),
-        qo2: r.cantidadOrden, qr2: r.cantRecepcion, um: r.unidad, eo: r.estadoOrden || '',
+        qo2: r.cantidadOrden, qr2: r.cantRecepcion, um: r.unidad, eo: r.estadoOrden || '', qrq: r.cantidadReq,
       })),
       // Alertas de atención (Req sin Pedido / Pedido sin OC) — se publican aparte porque son casos SIN
       // fecha final (siguen abiertos), y "proceso.rows" de arriba solo contiene casos con al menos un
@@ -4444,7 +4444,7 @@ function loadFromSnapshot(snap){
       moneda: r.mn || null, montoNativo: (r.mo!=null ? r.mo : null), condiciones: r.cd || "",
       etd: fromIsoDay(r.et), fEntregaReal: fromIsoDay(r.fe), fEntregaRef: fromIsoDay(r.fer),
       cantidadOrden: (r.qo2!=null ? r.qo2 : null), cantRecepcion: (r.qr2!=null ? r.qr2 : null), unidad: r.um || '',
-      estadoOrden: r.eo || '',
+      estadoOrden: r.eo || '', cantidadReq: (r.qrq!=null ? r.qrq : null),
     })) : [],
     // Requerimientos (24.09.2026): ausente en snapshots viejos — el módulo avisa que hay que
     // volver a publicar, en vez de mostrar una lista vacía como si no hubiera requerimientos.
@@ -4784,6 +4784,7 @@ function processWorkbook(wb, filename){
     codRequerimiento: findCol(headerRow, ["CodRequerimiento"]),
     codPedido: findCol(headerRow, ["CodPedido"]),
     cantidadPedido: findCol(headerRow, ["Cantidad de pedido","CantidadPedido"]),
+    cantidadReq: findCol(headerRow, ["CantidadRequerimiento","Cantidad de requerimiento"]),
     // Columna agregada por Piero en Reporte Maestro.xlsx (02.09.2026, al final de la hoja): marca con
     // el texto "Regularización" las líneas que no deben contar en el cálculo del Indicador 4 (Tiempo de
     // Entrega de OC) — verificado contra el archivo real: header exacto "¿Es regularización?", valores
@@ -5098,6 +5099,8 @@ function processWorkbook(wb, filename){
         estadoPedido: estadoPedidoAt,
         cantidadPedido: (col.cantidadPedido!==-1 && r[col.cantidadPedido]!=null && !isNaN(Number(r[col.cantidadPedido])))
           ? Number(r[col.cantidadPedido]) : null,
+        // Cantidad pedida en el requerimiento (09.11.2026): la usa el correo de certificados cuando se atendió de stock.
+        cantidadReq: (col.cantidadReq!==-1 && r[col.cantidadReq]!=null && !isNaN(Number(r[col.cantidadReq]))) ? Number(r[col.cantidadReq]) : null,
         usuarioCompras: col.usuarioCompras!==-1 ? (r[col.usuarioCompras]||"").toString().trim() : "",
         responsableSalida: col.responsableSalida!==-1 ? (r[col.responsableSalida]||"").toString().trim() : "",
         codRequerimiento: col.codRequerimiento!==-1 ? (r[col.codRequerimiento]||"").toString().trim() : "",
@@ -12739,9 +12742,11 @@ function crtCorreoSeleccion(clave){
   q.push('subject=' + encodeURIComponent('Certificados de calidad — ' + (porOc.size === 1 ? 'OC ' + [...porOc.keys()][0] : porOc.size + ' órdenes de compra') + ' — ' + pry));
   const e = escapeHtml, AZ = '#0a1e64', VE = '#2bbf9f', bo = 'border:1px solid #c5cae0;';
   const p = (t) => '<p style="margin:0 0 12pt;">' + t + '</p>';
-  const tit = t => '<p style="margin:0 0 6pt;"><font color="' + AZ + '"><b style="color:' + AZ + ';">' + t + '</b></font></p>';
-  const th = (t, al) => '<td bgcolor="' + AZ + '" style="' + bo + 'background:' + AZ + ';padding:6px 9px;text-align:' + (al || 'left') + ';"><font color="#ffffff"><b style="color:#ffffff;">' + t + '</b></font></td>';
-  const td = (t, al) => '<td style="' + bo + 'padding:6px 9px;vertical-align:top;text-align:' + (al || 'left') + ';">' + t + '</td>';
+  // Títulos en una celda: al pegar, Outlook quita el color del texto suelto pero respeta el de las celdas.
+  const tit = t => '<table style="border-collapse:collapse;margin:0 0 6pt;"><tr><td style="padding:0;color:' + AZ + ';font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;font-weight:bold;"><span style="color:' + AZ + ';"><b>' + t + '</b></span></td></tr></table>';
+  // Cabecera blanca y centrada: el color va en la celda y en un span (lo que Outlook conserva al pegar), sin <font>.
+  const th = (t) => '<td align="center" bgcolor="' + AZ + '" style="' + bo + 'background:' + AZ + ';color:#ffffff;padding:6px 9px;text-align:center;font-weight:bold;"><span style="color:#ffffff;"><b>' + t + '</b></span></td>';
+  const td = (t, al) => '<td align="' + (al || 'left') + '" style="' + bo + 'padding:6px 9px;vertical-align:top;text-align:' + (al || 'left') + ';">' + t + '</td>';
   const H = [];
   H.push(p('Estimados, <b>' + e(g.nombre) + '</b>:'));
   H.push(p('Reciban un cordial saludo. Por el proceso de certificación de nuestro proyecto <b>' + e(pryTxt) + '</b>, solicitamos su apoyo con el envío de los siguientes documentos de los materiales que nos suministraron:'));
@@ -12749,7 +12754,7 @@ function crtCorreoSeleccion(clave){
   docs.forEach(t => H.push('<table style="border-collapse:collapse;margin:0 0 6pt;"><tr><td style="border-left:4px solid ' + VE + ';padding:3px 0 3px 10px;font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;"><b>' + t[0] + '</b>' + t[1] + '</td></tr></table>'));
   H.push('<p style="margin:0;font-size:5pt;">&nbsp;</p>');
   H.push(tit('2. Materiales'));
-  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10pt;margin:0 0 12pt;"><tr>' + th('N°', 'center') + th('N° OC') + th('Descripción') + th('Cantidad', 'right') + th('U.M', 'center') + '</tr>');
+  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10pt;margin:0 0 12pt;"><tr>' + th('N°') + th('N° OC') + th('Descripción') + th('Cantidad') + th('U.M') + '</tr>');
   lineas.forEach((y, n) => H.push('<tr>' + td(n + 1, 'center') + td(e(y.oc)) + td(e(y.x.producto)) + td(e(cant(y.x)), 'right') + td(e(y.x.um || ''), 'center') + '</tr>'));
   H.push('</table>');
   H.push(p('Agradeceremos nos los remitan a la brevedad posible, respondiendo a este correo. Si algún documento no estuviera disponible, por favor indíquenoslo para coordinar.'));
@@ -12889,7 +12894,7 @@ function crtCargar(){
       usuario: oc ? (r.usuarioCompras||'').trim() : (lotes ? crtUsuarioOc(lotes[0][0]) : ''),
       supervisor: (r.responsableReq||'').trim(),
       // Cantidad y U.M. para el correo al proveedor (09.11.2026): la de la OC; si salió de stock, la del lote despachado.
-      cant: oc ? r.cantidadOrden : (lotes && lotes[0][2] != null ? lotes[0][2] : r.cantidadPedido),
+      cant: oc ? r.cantidadOrden : ((lotes && lotes[0][2]) || r.cantidadPedido || r.cantidadReq || null),
       um: (r.unidad || '').trim(),
       ruc: (r.rucProveedor||'').trim(),
       proveedor: oc ? (r.proveedor||'').trim() : (lotes ? lotes[0][1] : ''),
