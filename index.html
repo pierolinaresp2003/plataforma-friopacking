@@ -12716,17 +12716,19 @@ function crtCorreoSeleccion(clave){
   // Texto con formato (09.11.2026, Piero: "que lo copie en un mejor formato y al pegarlo en el correo salga tal cual; así no se
   // diferencian los productos"): se copia al portapapeles como tabla y el correo se abre ya con destinatario, copias y asunto.
   const e = escapeHtml, td = 'border:1px solid #d5dce8;padding:6px 9px;vertical-align:top;', th = td + 'background:#0a1e64;color:#ffffff;font-weight:bold;text-align:left;';
-  const chip = (t, si) => '<span style="display:inline-block;padding:1px 7px;margin:1px 2px;border-radius:9px;font-size:9.5pt;font-weight:bold;' + (si ? 'background:#fde2e1;color:#b42318;' : 'background:#e2f3ea;color:#1b7f4a;') + '">' + t + '</span>';
+  // Outlook borra color/fondo de los <span> al pegar: el color va con <font> y el fondo rojo en la celda (09.11.2026).
+  const chip = (t) => '<font color="#b42318"><b>&#9679; ' + t + '</b></font>';
+  const cab = t => '<th bgcolor="#0a1e64" style="' + th + '"><font color="#ffffff">' + t + '</font></th>';
   const H = [];
   H.push('<p style="margin:0 0 11pt;">' + (d.contacto ? 'Estimado(a) ' + e(d.contacto) + ':' : 'Estimados:') + '</p>');
   H.push('<p style="margin:0 0 11pt;">Por favor, su apoyo con la <b>documentación de calidad</b> de los siguientes productos del proyecto <b>' + e(pry) + '</b>:</p>');
-  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10.5pt;margin:0 0 11pt;"><tr><th style="' + th + '">N°</th><th style="' + th + '">Orden de compra</th><th style="' + th + '">Código</th><th style="' + th + '">Producto</th><th style="' + th + '">Qué falta</th></tr>');
+  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10.5pt;margin:0 0 11pt;"><tr>' + cab('N°') + cab('Orden de compra') + cab('Código') + cab('Producto') + cab('Qué falta') + '</tr>');
   let i = 0;
   porOc.forEach(function(l, oc){ l.forEach(function(x, k){ i++;
     const bg = (i % 2) ? '' : 'background:#f3f6fb;';
-    H.push('<tr><td style="' + td + bg + 'text-align:center;">' + i + '</td>' + (k === 0 ? '<td rowspan="' + l.length + '" style="' + td + 'font-weight:bold;">' + e(oc) + '<br><span style="font-weight:normal;color:#6b7785;font-size:9pt;">Req. ' + e([...new Set(l.map(y => y.req))].join(', ')) + '</span></td>' : '') +
-      '<td style="' + td + bg + 'font-family:Consolas,monospace;">' + e(x.codigo) + '</td><td style="' + td + bg + '">' + e(x.producto) + '</td><td style="' + td + bg + '">' +
-      (!crtTiene(x,'cert') || crtTiene(x,'ficha') ? chip('Certificado de calidad', true) : '') + (!crtTiene(x,'ficha') || crtTiene(x,'cert') ? chip('Ficha técnica', true) : '') + '</td></tr>'); }); });
+    H.push('<tr><td style="' + td + bg + 'text-align:center;">' + i + '</td>' + (k === 0 ? '<td rowspan="' + l.length + '" style="' + td + 'font-weight:bold;">' + e(oc) + '<br><font color="#6b7785"><span style="font-weight:normal;font-size:9pt;">Req. ' + e([...new Set(l.map(y => y.req))].join(', ')) + '</span></font></td>' : '') +
+      '<td style="' + td + bg + 'font-family:Consolas,monospace;">' + e(x.codigo) + '</td><td style="' + td + bg + '">' + e(x.producto) + '</td><td bgcolor="#fde2e1" style="' + td + 'background:#fde2e1;white-space:nowrap;">' +
+      [(!crtTiene(x,'cert') || crtTiene(x,'ficha')) ? chip('Certificado de calidad') : '', (!crtTiene(x,'ficha') || crtTiene(x,'cert')) ? chip('Ficha técnica') : ''].filter(Boolean).join('<br>') + '</td></tr>'); }); });
   H.push('</table>');
   H.push('<p style="margin:0 0 11pt;">Agradeceremos enviarlos <b>en respuesta a este correo</b>.</p><p style="margin:0;">Saludos cordiales,</p>');
   const html = '<div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;color:#000000;">' + H.join('') + '</div>';
