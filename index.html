@@ -12704,48 +12704,58 @@ function crtCorreoSeleccion(clave){
     return;
   }
   const d = g.correo;
-  const falta = (x) => (!crtTiene(x,'cert') && !crtTiene(x,'ficha')) ? 'certificado de calidad y ficha técnica'
-    : (!crtTiene(x,'cert') ? 'certificado de calidad' : (!crtTiene(x,'ficha') ? 'ficha técnica' : 'certificado de calidad y ficha técnica'));
   const porOc = new Map();
   g.filas.forEach(function(f){ const oc = (crtProvDe(f) || {}).oc || 'sin OC'; if(!porOc.has(oc)) porOc.set(oc, []); porOc.get(oc).push(f); });
   const f0 = g.filas[0], pry = (f0.idPry && f0.idPry !== 'SIN PROYECTO') ? (f0.idPry + ' — ' + f0.nomPry) : f0.nomPry;
+  // Formato que dio Piero (09.11.2026, "debe ser igualito"): saludo al proveedor, 1. Documentos solicitados, 2. Materiales
+  // (N° · N° OC · Descripción · Cantidad · U.M) y cierre.
+  const pryCorto = (f0.idPry && f0.idPry !== 'SIN PROYECTO') ? f0.idPry.replace(/-0+(?=\d)/, '-') : '';
+  const pryTxt = f0.nomPry + (pryCorto ? ' (' + pryCorto + ')' : '');
+  const pideCert = g.filas.some(x => !crtTiene(x,'cert')), pideFicha = g.filas.some(x => !crtTiene(x,'ficha'));
+  const docs = [];
+  if(pideCert || !pideFicha) docs.push(['Certificado de calidad', ' del lote despachado en la Orden de Compra indicada.']);
+  if(pideFicha || !pideCert) docs.push(['Ficha técnica', ' del producto.']);
+  const lineas = [];
+  porOc.forEach(function(l, oc){ l.forEach(function(x){ lineas.push({ oc:oc, x:x }); }); });
+  const cant = (x) => x.cant == null ? '' : String(x.cant);
   const L = [];
-  L.push(d.contacto ? ('Estimado(a) ' + d.contacto + ':') : 'Estimados:');
+  L.push('Estimados, ' + g.nombre + ':');
   L.push('');
-  L.push('Solicitamos la documentación de calidad de los siguientes productos:');
+  L.push('Reciban un cordial saludo. Por el proceso de certificación de nuestro proyecto ' + pryTxt + ', solicitamos su apoyo con el envío de los siguientes documentos de los materiales que nos suministraron:');
   L.push('');
-  L.push('Proyecto: ' + pry);
-  porOc.forEach(function(l, oc){
-    L.push('');
-    L.push('Orden de compra ' + oc + ' (req. ' + [...new Set(l.map(x => x.req))].join(', ') + '):');
-    l.forEach(x => L.push('  \u00b7 ' + x.codigo + ' — ' + x.producto + '  ->  falta ' + falta(x)));
-  });
+  L.push('1. Documentos solicitados');
+  docs.forEach(t => L.push('   - ' + t[0] + t[1]));
   L.push('');
-  L.push('Agradeceremos enviarlos en respuesta a este correo.');
+  L.push('2. Materiales');
+  lineas.forEach((y, n) => L.push('   ' + (n + 1) + '. OC ' + y.oc + ' — ' + y.x.producto + ' — ' + cant(y.x) + ' ' + (y.x.um || '')));
+  L.push('');
+  L.push('Agradeceremos nos los remitan a la brevedad posible, respondiendo a este correo. Si algún documento no estuviera disponible, por favor indíquenoslo para coordinar.');
+  L.push('');
+  L.push('Quedamos atentos. Muchas gracias.');
+  L.push('');
   L.push('Saludos cordiales,');
   const q = [], cc = crtCopias(g.filas, d.to, d.cc);
   if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
   q.push('subject=' + encodeURIComponent('Certificados de calidad — ' + (porOc.size === 1 ? 'OC ' + [...porOc.keys()][0] : porOc.size + ' órdenes de compra') + ' — ' + pry));
-  // Texto con formato (09.11.2026, Piero: "que lo copie en un mejor formato y al pegarlo en el correo salga tal cual; así no se
-  // diferencian los productos"): se copia al portapapeles como tabla y el correo se abre ya con destinatario, copias y asunto.
-  const e = escapeHtml, td = 'border:1px solid #d5dce8;padding:6px 9px;vertical-align:top;', th = td + 'background:#d6e2f5;color:#0a1e64;font-weight:bold;text-align:left;';
-  // Outlook al pegar respeta el fondo de las celdas pero no el color de las letras: cabecera celeste con letra oscura y
-  // lo que falta con fondo rosado, así se lee bien aunque el texto quede negro (09.11.2026).
-  const chip = (t) => '<font color="#b42318"><b>&#9679; ' + t + '</b></font>';
-  const cab = t => '<th bgcolor="#d6e2f5" style="' + th + '"><font color="#0a1e64">' + t + '</font></th>';
+  const e = escapeHtml, AZ = '#0a1e64', VE = '#2bbf9f', bo = 'border:1px solid #c5cae0;';
+  const p = (t) => '<p style="margin:0 0 12pt;">' + t + '</p>';
+  const tit = t => '<p style="margin:0 0 6pt;"><font color="' + AZ + '"><b style="color:' + AZ + ';">' + t + '</b></font></p>';
+  const th = (t, al) => '<td bgcolor="' + AZ + '" style="' + bo + 'background:' + AZ + ';padding:6px 9px;text-align:' + (al || 'left') + ';"><font color="#ffffff"><b style="color:#ffffff;">' + t + '</b></font></td>';
+  const td = (t, al) => '<td style="' + bo + 'padding:6px 9px;vertical-align:top;text-align:' + (al || 'left') + ';">' + t + '</td>';
   const H = [];
-  H.push('<p style="margin:0 0 11pt;">' + (d.contacto ? 'Estimado(a) ' + e(d.contacto) + ':' : 'Estimados:') + '</p>');
-  H.push('<p style="margin:0 0 11pt;">Por favor, su apoyo con la <b>documentación de calidad</b> de los siguientes productos del proyecto <b>' + e(pry) + '</b>:</p>');
-  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10.5pt;margin:0 0 11pt;"><tr>' + cab('N°') + cab('Orden de compra') + cab('Código') + cab('Producto') + cab('Qué falta') + '</tr>');
-  let i = 0;
-  porOc.forEach(function(l, oc){ l.forEach(function(x, k){ i++;
-    const bg = (i % 2) ? '' : 'background:#f3f6fb;';
-    H.push('<tr><td style="' + td + bg + 'text-align:center;">' + i + '</td>' + '<td style="' + td + bg + 'font-weight:bold;">' + e(oc) + '<br><font color="#6b7785"><span style="font-weight:normal;font-size:9pt;">Req. ' + e(x.req) + '</span></font></td>' +
-      '<td style="' + td + bg + 'font-family:Consolas,monospace;">' + e(x.codigo) + '</td><td style="' + td + bg + '">' + e(x.producto) + '</td><td bgcolor="#fde2e1" style="' + td + 'background:#fde2e1;white-space:nowrap;">' +
-      [(!crtTiene(x,'cert') || crtTiene(x,'ficha')) ? chip('Certificado de calidad') : '', (!crtTiene(x,'ficha') || crtTiene(x,'cert')) ? chip('Ficha técnica') : ''].filter(Boolean).join('<br>') + '</td></tr>'); }); });
+  H.push(p('Estimados, <b>' + e(g.nombre) + '</b>:'));
+  H.push(p('Reciban un cordial saludo. Por el proceso de certificación de nuestro proyecto <b>' + e(pryTxt) + '</b>, solicitamos su apoyo con el envío de los siguientes documentos de los materiales que nos suministraron:'));
+  H.push(tit('1. Documentos solicitados'));
+  docs.forEach(t => H.push('<table style="border-collapse:collapse;margin:0 0 6pt;"><tr><td style="border-left:4px solid ' + VE + ';padding:3px 0 3px 10px;font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;"><b>' + t[0] + '</b>' + t[1] + '</td></tr></table>'));
+  H.push('<p style="margin:0;font-size:5pt;">&nbsp;</p>');
+  H.push(tit('2. Materiales'));
+  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10pt;margin:0 0 12pt;"><tr>' + th('N°', 'center') + th('N° OC') + th('Descripción') + th('Cantidad', 'right') + th('U.M', 'center') + '</tr>');
+  lineas.forEach((y, n) => H.push('<tr>' + td(n + 1, 'center') + td(e(y.oc)) + td(e(y.x.producto)) + td(e(cant(y.x)), 'right') + td(e(y.x.um || ''), 'center') + '</tr>'));
   H.push('</table>');
-  H.push('<p style="margin:0 0 11pt;">Agradeceremos enviarlos <b>en respuesta a este correo</b>.</p><p style="margin:0;">Saludos cordiales,</p>');
-  const html = '<div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;color:#000000;">' + H.join('') + '</div>';
+  H.push(p('Agradeceremos nos los remitan a la brevedad posible, respondiendo a este correo. Si algún documento no estuviera disponible, por favor indíquenoslo para coordinar.'));
+  H.push(p('Quedamos atentos. Muchas gracias.'));
+  H.push('<p style="margin:0;">Saludos cordiales,</p>');
+  const html = '<div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;">' + H.join('') + '</div>';
   const abrir = function(copiado){
     q.push('body=' + encodeURIComponent(copiado ? '' : L.join('\r\n')));
     if(d.sin) appToast('Este proveedor no tiene correo en DB Proveedores: el correo sale sin destinatario.');
@@ -12756,15 +12766,21 @@ function crtCorreoSeleccion(clave){
 }
 // Copia HTML con formato al portapapeles (con texto plano de respaldo). Si el navegador no deja, cae al método antiguo.
 function crtCopiarHtml(html, texto){
+  // Primero se copia "como de la pantalla" (09.11.2026): así Outlook conserva el color de las letras (cabecera blanca).
+  // Va en un iframe aparte para que no se mezclen los estilos de la app.
+  const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:600px;border:0;'; document.body.appendChild(fr);
+  let hecho = false;
+  try{
+    const dd = fr.contentDocument; dd.open(); dd.write('<!doctype html><html><body style="margin:0;background:#fff;color:#000;">' + html + '</body></html>'); dd.close();
+    const r = dd.createRange(); r.selectNodeContents(dd.body); const sel = fr.contentWindow.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    hecho = dd.execCommand('copy'); sel.removeAllRanges();
+  }catch(err){}
+  fr.remove();
+  if(hecho) return Promise.resolve(true);
   try{
     if(navigator.clipboard && window.ClipboardItem) return navigator.clipboard.write([new ClipboardItem({ 'text/html':new Blob([html], { type:'text/html' }), 'text/plain':new Blob([texto], { type:'text/plain' }) })]).then(function(){ return true; });
   }catch(err){}
-  return new Promise(function(ok, no){
-    const div = document.createElement('div'); div.contentEditable = 'true'; div.style.cssText = 'position:fixed;left:-9999px;top:0;'; div.innerHTML = html; document.body.appendChild(div);
-    const r = document.createRange(); r.selectNodeContents(div); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-    let hecho = false; try{ hecho = document.execCommand('copy'); }catch(err){}
-    sel.removeAllRanges(); div.remove(); hecho ? ok(true) : no();
-  });
+  return Promise.reject();
 }
 /** Abre el correo ya escrito en el cliente de correo y descarga aparte el Excel del detalle. */
 function crtCorreoYExcel(clave){
@@ -12872,6 +12888,9 @@ function crtCargar(){
       // Atendido de stock: el responsable de la OC de la que vino el material (05.11.2026, Piero).
       usuario: oc ? (r.usuarioCompras||'').trim() : (lotes ? crtUsuarioOc(lotes[0][0]) : ''),
       supervisor: (r.responsableReq||'').trim(),
+      // Cantidad y U.M. para el correo al proveedor (09.11.2026): la de la OC; si salió de stock, la del lote despachado.
+      cant: oc ? r.cantidadOrden : (lotes && lotes[0][2] != null ? lotes[0][2] : r.cantidadPedido),
+      um: (r.unidad || '').trim(),
       ruc: (r.rucProveedor||'').trim(),
       proveedor: oc ? (r.proveedor||'').trim() : (lotes ? lotes[0][1] : ''),
       cert: null, ficha: null,
