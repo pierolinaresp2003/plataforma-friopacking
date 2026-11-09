@@ -16,6 +16,7 @@ self.addEventListener('activate', function(e){
 self.addEventListener('fetch', function(e){
   const req = e.request, url = new URL(req.url);
   if(req.method !== 'GET' || url.origin !== self.location.origin) return;
+  if(/\.mp4$/.test(url.pathname)) return;   // el video de ayuda (09.11.2026) va directo por la red: el navegador lo pide por partes
   // Se guarda sin el "?_=hora" con que se pide data.json.gz: una sola copia por archivo, no una por visita.
   const clave = url.origin + url.pathname;
   // La página y los datos se piden siempre revalidando con el servidor (14.10.2026): sin esto el navegador podía

@@ -2298,6 +2298,14 @@
     .sup-mios{display:flex;gap:4px;padding:4px;margin:4px 0 8px;background:var(--card);border:1px solid var(--border);border-radius:14px;}
     .sup-mios button{flex:1;border:0;background:none;border-radius:10px;padding:9px 8px;font:inherit;font-size:13px;font-weight:800;color:var(--muted);cursor:pointer;-webkit-tap-highlight-color:transparent;}
     .sup-mios button.on{background:var(--brand);color:#fff;}
+    /* Video de ayuda del Supervisor (09.11.2026): tarjeta arriba y reproductor a pantalla completa, igual en celular y en PC */
+    .sup-video{display:flex;align-items:center;gap:12px;width:100%;margin:4px 0 10px;padding:10px 12px;border:0;border-radius:16px;background:linear-gradient(135deg,#0a1e64,#1b3a8f);color:#fff;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .sup-video img{width:54px;height:72px;object-fit:cover;border-radius:10px;flex-shrink:0;} .sup-video b{display:block;font-size:14.5px;} .sup-video small{display:block;font-size:12px;opacity:.85;margin-top:2px;}
+    .sup-video i{margin-left:auto;font-style:normal;font-size:24px;width:44px;height:44px;border-radius:50%;background:#3ec6a8;display:grid;place-items:center;flex-shrink:0;}
+    .sup-video.mini{display:inline-flex;width:auto;padding:7px 14px;border:1px solid var(--border);border-radius:999px;background:var(--card);color:var(--brand);font-weight:800;font-size:13px;}
+    .vid-capa{position:fixed;inset:0;z-index:9999;background:rgba(5,12,40,.9);display:flex;align-items:center;justify-content:center;padding:16px;}
+    .vid-capa video{max-width:100%;max-height:calc(100vh - 96px);max-height:calc(100dvh - 96px);border-radius:14px;background:#000;box-shadow:0 20px 50px rgba(0,0,0,.5);}
+    .vid-capa .vid-x{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;width:44px;height:44px;border-radius:50%;border:0;background:#fff;color:#0a1e64;font-size:20px;font-weight:900;cursor:pointer;}
     .sup-fil{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px;margin:4px 0 10px;}
     .sup-ac{position:relative;display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid #d9e2ef;border-radius:14px;padding:0 6px 0 12px;min-height:46px;}
     .sup-ac:focus-within{border-color:#5f9de2;box-shadow:0 0 0 3px rgba(91,151,222,.18);} .sup-ac.lleno{background:#eff4fb;border-color:#aac6ef;}
@@ -17195,6 +17203,21 @@ function appSupObservar(){
   const mirar = function(){ const m = document.getElementById('supMas'); if(m && m !== visto){ if(visto) io.unobserve(visto); visto = m; io.observe(m); } };
   new MutationObserver(mirar).observe(sec, { childList:true, subtree:true }); setTimeout(mirar, 0);
 }
+// Video explicativo del app para Supervisores (09.11.2026, Piero: "en la vista de supervisor colocar el video para que se pueda ver,
+// en celular y en la web"). La primera vez sale una tarjeta grande; después de verlo queda un botón chico.
+function supVideoVisto(){ try{ return localStorage.getItem('fp-sup-video') === '1'; }catch(e){ return false; } }
+function supVideoHtml(){
+  return supVideoVisto() ? '<button type="button" class="sup-video mini" data-supvideo="1">🎬 Video: cómo usar el app</button>'
+    : '<button type="button" class="sup-video" data-supvideo="1"><img src="video-supervisor.jpg" alt=""><span><b>¿Primera vez? Mira cómo usar el app</b><small>Video de 1 minuto y medio con Leo</small></span><i>▶</i></button>';
+}
+function supVideoAbrir(btn){
+  try{ localStorage.setItem('fp-sup-video', '1'); }catch(e){}
+  if(btn) btn.outerHTML = supVideoHtml();
+  const capa = document.createElement('div'); capa.className = 'vid-capa';
+  capa.innerHTML = '<video src="video-supervisor.mp4" poster="video-supervisor.jpg" controls autoplay playsinline preload="auto"></video><button type="button" class="vid-x" aria-label="Cerrar">✕</button>';
+  capa.addEventListener('click', function(ev){ if(ev.target === capa || ev.target.closest('.vid-x')){ try{ capa.querySelector('video').pause(); }catch(e){} capa.remove(); } });
+  document.body.appendChild(capa);
+}
 function appSupReqHtml(){
   const e = escapeHtml;
   if(!RQ.filas.length){ rqPreparar(); if(!RQ.filas.length) return '<div class="ini-card"><div class="ini-vacio">⏳ Cargando los requerimientos…</div></div>'; }
@@ -17209,6 +17232,7 @@ function appSupReqHtml(){
   // un montón"): antes se metían las 3,000+ tarjetas en segundo plano y la pantalla quedaba pesadísima para todo lo demás.
   appSupObservar();
   return `<div class="sup">
+    ${supVideoHtml()}
     ${supEsSupervisor() ? `<div class="sup-mios"><button type="button" data-supmios="0" class="${APP_SUP.mios ? '' : 'on'}">👥 Todos</button><button type="button" data-supmios="1" class="${APP_SUP.mios ? 'on' : ''}">👷 Mis requerimientos</button></div>` : ''}
     <div class="sup-fil">${ac('cli', '🏢', 'Escribe el cliente', APP_SUP.cli)}${ac('pry', '🏗️', 'Escribe el PRY o proyecto', pryTxt)}</div>
     ${supResumenHtml(l0)}
@@ -21070,6 +21094,7 @@ function appClickInicio(e){
   // Excel con el estado de todos los productos de lo filtrado (03.11.2026, Piero: "en la vista supervisor también descargar en
   // excel para ver el estado general de los productos… que sea como lo que se genera en pendientes de compras, dinámico y visual").
   if(b.dataset.supxls) return supExcel();
+  if(b.dataset.supvideo) return supVideoAbrir(b);
   if(b.dataset.supmios){ APP_SUP.mios = b.dataset.supmios === '1'; APP_SUP.cli = ''; APP_SUP.pry = ''; APP_SUP.paso = ''; return appRenderInicio(); }
   if(b.dataset.suppaso){ APP_SUP.paso = APP_SUP.paso === b.dataset.suppaso ? '' : b.dataset.suppaso; return appRenderInicio(); }
   if(b.dataset.supx){ if(b.dataset.supx === 'cli'){ APP_SUP.cli = ''; APP_SUP.pry = ''; } else APP_SUP.pry = ''; return appRenderInicio(); }
