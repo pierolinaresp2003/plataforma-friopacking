@@ -14784,7 +14784,7 @@ function psrRepetidaCalc(r){ const q = function(x){ return x.cantOrden != null ?
     (r.codOrden && k.has('OC|' + String(r.codOrden).trim() + '|' + String(r.idProducto || '').trim() + '|' + q(r)))); }
 function pdFilas(){ return appMemo('pdFilas', pdFilasCalc).slice(); }
 function pdFilasCalc(){
-  const out = [];
+  const out = [], parc = new Map();
   getReqRows().forEach(function(r){
     const base = { req: r.codRequerimiento, proyecto: r.proyecto, idProyecto: r.idProyecto, solicitante: r.responsable, obs: r.obs, familia: r.familia,
       idProducto: r.idProducto, producto: r.producto, unidad: r.unidad, codPedido: r.codPedido,
@@ -14793,7 +14793,15 @@ function pdFilasCalc(){
       fCompromiso: r.fCompromiso, estructura: r.estructura, tareaPry: r.tareaPry, presVenta: r.presVenta, presCosto: r.presCosto };
     if(pdOcPendiente(r)) out.push(Object.assign({ tipo:'oc', persona: pdPersona(r.usuarioCompras) }, base));
     else if(pdPedidoAbierto(r)) out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, base));
+    // OC parcial (10.11.2026, Piero: "uno que generé parcial y no lo estás considerando"): si la OC cubre solo parte del
+    // pedido y el pedido sigue Pendiente en Nisira, lo que falta también va en "SKU sin OC", con la OC parcial a la vista.
+    if(r.codPedido && r.codOrden && String(r.estadoPedido || '').trim().toLowerCase() === 'pendiente' && !/anul/i.test(r.estadoOrden || '')){
+      const k = r.codRequerimiento + '|' + r.codPedido + '|' + r.idProducto + '|' + r.cantPedido, g = parc.get(k) || { r:r, base:base, q:0, ocs:[] };
+      g.q += +r.cantOrden || 0; if(g.ocs.indexOf(r.codOrden) === -1) g.ocs.push(r.codOrden); parc.set(k, g); }
   });
+  parc.forEach(function(g){ const r = g.r, falta = (+r.cantPedido || 0) - g.q;
+    if(falta <= 1e-6 || pedidoCerradoManual({ codPedido:r.codPedido, idProducto:r.idProducto, cantidadPedido:r.cantPedido })) return;
+    out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, g.base, { codOrden:'', cantPedido:Math.round(falta * 1000) / 1000, parcial:{ q:g.q, total:r.cantPedido, ocs:g.ocs } })); });
   // Familia de los pedidos directos (no la traen): la del mismo código en el Reporte Maestro o PedidoSinReq.
   const famDe = new Map();
   getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(x){ if(x.idProducto && x.familia && x.familia !== 'Sin familia' && !famDe.has(x.idProducto)) famDe.set(x.idProducto, x.familia); });
@@ -19025,6 +19033,7 @@ function appPendComprasHtml(soloLista, sinCaras){
     return appFilaHtml('data-sku="' + escapeHtml(r.idProducto || '') + '" data-skuped="' + escapeHtml(r.codPedido || '') + '" data-skureq="' + escapeHtml(r.req || '') + '"', dh >= 5 ? 'rojo' : dh >= 3 ? 'ambar' : 'verde', r.producto || r.idProducto,
       // Con req., cliente, PRY y solicitante a la vista (14.10.2026, Piero), sin tener que abrir la ficha.
       'Pedido ' + escapeHtml(String(r.codPedido || '').replace(/^000\d-0*/, '')) + (r.req ? ' · Req. ' + escapeHtml(String(r.req).replace(/^000\d-0*/, '')) : '') + (r.directo ? ' · 🛒 directo' : '')
+        + (r.parcial ? ' · <b>Falta: OC parcial ' + r.parcial.ocs.map(function(o){ return escapeHtml(String(o).replace(/^000\d-0*/, '')); }).join(', ') + ' por ' + appN(r.parcial.q) + ' de ' + appN(r.parcial.total) + '</b>' : '')
         + ((cli || pryId || pry) ? '<br>🏢 ' + [cli ? escapeHtml(polarCorta(cli, 30)) : '', pryId ? escapeHtml(pryId) : '', pry && pry !== cli ? escapeHtml(polarCorta(pry, 30)) : ''].filter(Boolean).join(' · ') : '')
         + (r.solicitante ? '<br>👷 ' + escapeHtml(polarCorta(r.solicitante, 36)) : ''),
       r.cantPedido != null ? appN(r.cantPedido) + ' ' + escapeHtml(r.unidad || '') : '—', polarDh(r.fPedido) + (r.persona ? ' · ' + escapeHtml(nom(r.persona)) : ''));
