@@ -21383,13 +21383,14 @@ function gxBarra(mod, subs, sub){
   for(let a = cy; a >= 2023; a--) anios.push(a);
   return `<div class="gx-top"><div class="gx-tit"><b>${GX_MODS[mod][0]} ${e(GX_MODS[mod][1])}</b><small>Logística · datos al ${e(fmtDate(DATA.corte))}</small></div>
     <div class="gx-fil">${APP_GX.vista !== 'sem' ? `<select class="ini-select gx-anio" data-gxanio="1">${anios.map(function(a){ return `<option value="${a}"${a === y ? ' selected' : ''}>Año ${a}</option>`; }).join('')}</select>` : ''}
-    <div class="gx-vistas">${[['sem', 'Semanal'], ['mes', 'Mensual'], ['acum', 'Acumulado'], ['ana', 'Análisis']].map(function(v){ return `<button type="button" class="${APP_GX.vista === v[0] ? 'on' : ''}" data-gxvista="${v[0]}">${v[1]}</button>`; }).join('')}</div><button type="button" class="gx-todo" data-rpttodo="1" title="Descargar todo lo que se ve como imágenes para WhatsApp">${APP_ICO_WA}<span>Reporte completo</span></button></div></div>`
+    <div class="gx-vistas">${[['sem', 'Semanal'], ['mes', 'Mensual'], ['acum', 'Acumulado'], ['yoy', 'Año vs anterior'], ['ana', 'Análisis']].map(function(v){ return `<button type="button" class="${APP_GX.vista === v[0] ? 'on' : ''}" data-gxvista="${v[0]}">${v[1]}</button>`; }).join('')}</div><button type="button" class="gx-todo" data-rpttodo="1" title="Descargar todo lo que se ve como imágenes para WhatsApp">${APP_ICO_WA}<span>Reporte completo</span></button></div></div>`
     + (subs && subs.length ? `<nav class="gx-menu">${subs.map(function(s){ return `<button type="button" class="${s[0] === sub ? 'on' : ''}" data-gxsub="${mod}|${s[0]}"><span>${s[1]}</span>${e(s[2])}</button>`; }).join('')}</nav>` : '');
 }
 function appGxHtml(mod){
   if(!appHayDatos()) return '';
   if(mod === 'gobj') return gxObjetivosHtml();
   if(APP_GX.vista === 'ana') return gxAnalisisHtml(mod);
+  if(APP_GX.vista === 'yoy') return gxYoyHtml(mod);
   const D = gxDef(mod, APP_GX.sub[mod]), cols = gxCols(), e = escapeHtml, n = cols.length;
   APP_GX.sub[mod] = D.sub;
   const cuerpo = !n ? '<div class="ini-vacio">No hay datos para ese año.</div>' : gxCuerpo(mod, D, cols);
@@ -21436,6 +21437,65 @@ function gxDetalle(clave){
   appListaAbrir(e(r.n), e(c.dia) + ' · ' + appN(L.length) + ' registro' + (L.length === 1 ? '' : 's') + (L.length > tope ? ' (se muestran ' + tope + ')' : ''),
     L.length ? `<div class="gx-det">${L.slice(0, tope).map(function(x){ return `<div class="gx-dr"><div><b>${e(x.a || '')}</b><small>${e(x.b || '')}</small></div><div class="gx-dv">${e(x.c || '')}${x.f ? '<small>' + f(x.f) + '</small>' : ''}</div></div>`; }).join('')}</div>` : '<div class="ini-vacio">Sin registros.</div>');
 }
+// Año contra el anterior (10.11.2026, Piero: "comparación de 1 año con el anterior, en gráficos; salidas e ingresos de almacén
+// también"). Cada concepto mes a mes: el año elegido contra el anterior, y el acumulado a la misma fecha con su variación.
+// Ingresos y salidas con historia de varios años: el Reporte Almacén solo trae movimientos desde nov-2025, así que para comparar
+// años se usa el Reporte Maestro (recepciones de OC y salidas de almacén de cada requerimiento).
+function gxAlmM(d, h){ return appMemo('gxAlmM' + d + h, function(){ const o = { rec:new Set(), iR:0, sal:new Set(), iS:0, py:new Set() };
+  getReqRows().forEach(function(r){ const fr = isoDay(r.fRecep), fs = isoDay(r.fSalida);
+    if(r.codOrden && gxEn(fr, d, h)){ o.rec.add(r.codOrden + '|' + fr); o.iR++; }
+    if(gxEn(fs, d, h)){ o.sal.add(r.docSalida || (r.codRequerimiento + '|' + fs)); o.iS++; if(r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto)) o.py.add(r.idProyecto); } });
+  return o; }); }
+function gxYoyHtml(mod){
+  const e = escapeHtml, Y = gxAnio(), Y0 = Y - 1, c = appIndCorte(), cy = c.getUTCFullYear();
+  const mes = function(y, m){ const a = new Date(Date.UTC(y, m, 1)), b = new Date(Date.UTC(y, m + 1, 0)), hoy = isoDay(c);
+    return { desde:isoDay(a), hasta:isoDay(b) > hoy ? hoy : isoDay(b), futuro:isoDay(a) > hoy }; };
+  const W = MESES_CORTOS.map(function(m, i){ return { etq:m, dia:POLAR_MESES[i], parcial:Y === cy && i === c.getUTCMonth() }; });
+  // Acumulado comparable: del 1 de enero a la misma fecha (o al 31/12 si el año ya cerró)
+  const corteDia = Y === cy ? isoDay(c).slice(5) : '12-31', ytd = function(y){ return { desde:y + '-01-01', hasta:y + '-' + corteDia }; };
+  let filas, subs = null, sub = null, nota = '';
+  const almMin = almMovRows().reduce(function(m, x){ return x.f && (!m || x.f < m) ? x.f : m; }, ''), almHist = !almMin || almMin > Y0 + '-01-01';
+  const M = function(col){ return gxAlmM(col.desde, col.hasta); };
+  const almFilas = [
+    { id:'mrec', n:'Ingresos a almacén: recepciones de OC', fmt:'n', val:function(col){ return M(col).rec.size; } },
+    { id:'miR', n:'Ítems recibidos', fmt:'n', val:function(col){ return M(col).iR; } },
+    { id:'msal', n:'Salidas de almacén: guías de salida a obra', fmt:'n', val:function(col){ return M(col).sal.size; } },
+    { id:'miS', n:'Ítems despachados', fmt:'n', val:function(col){ return M(col).iS; } },
+    { id:'mpy', n:'Proyectos atendidos', fmt:'n', val:function(col){ return M(col).py.size; } } ];
+  if(almHist && (mod === 'gobj' || mod === 'galm')) nota = ' · ingresos y salidas desde el Reporte Maestro (el Reporte Almacén solo trae movimientos desde ' + (almMin ? almMin.split('-').reverse().join('/') : '—') + ')';
+  if(mod === 'gobj'){
+    const st = function(col, k){ const l = appIndDatos({ desde:col.desde, hasta:col.hasta }), x = l.find(function(y){ return y.ind.key === k; }); return x ? x.st : {}; };
+    filas = [
+      { id:'otif', n:'OTIF: entrega completa y a tiempo', fmt:'pct', val:function(col){ const o = gxOtif(col.desde, col.hasta); return gxPct(o.ok.length, o.tot.length); } },
+      { id:'ent', n:'Entrega de OC a tiempo', fmt:'pct', val:function(col){ const o = gxEntregas(col.desde, col.hasta); return gxPct(o.ok.length, o.ok.length + o.tarde.length + o.venc.length); } },
+      { id:'d2', n:'Lead time pedido → OC (días hábiles prom.)', fmt:'d', bajo:1, val:function(col){ return st(col, 'd2').promedio; } },
+      { id:'sal', n:'SKU puestos en OC', fmt:'n', val:function(col){ return gxFlujo(col.desde, col.hasta).sal.length; } },
+      almHist ? almFilas[0] : { id:'grc', n:'Ingresos a almacén (guías de recepción)', fmt:'n', val:function(col){ return gxAlm(col.desde, col.hasta).grc.size; } },
+      almHist ? almFilas[2] : { id:'grr', n:'Salidas de almacén (guías de salida)', fmt:'n', val:function(col){ return gxAlm(col.desde, col.hasta).grr.size; } },
+      { id:'gas', n:'Gasto (S/ sin IGV)', fmt:'sol', val:function(col){ return gxGasto(col.desde, col.hasta).tot; } } ];
+  } else {
+    const D = gxDef(mod, APP_GX.sub[mod]); subs = D.subs; sub = D.sub;
+    filas = [];
+    if(mod === 'galm' && sub === 'mov' && almHist) D.rows = almFilas.map(function(f){ return Object.assign({ hijos:[] }, f); });
+    D.rows.forEach(function(r){ filas.push(r); r.hijos.forEach(function(h){ if(h.kpi) filas.push(h); }); });
+    filas = filas.slice(0, 8);
+    // Nivel de servicio y entregas: el % es lo que importa comparar
+    filas = [].concat(...filas.map(function(r){ return r.pct && r.fmt !== 'sol' ? [r, { id:r.id + '%', n:r.n + ' (' + (r.pl || D.ph || '%') + ')', fmt:'pct', bajo:r.bajo, val:r.pct }] : [r]; })).slice(0, 10);
+  }
+  const fmtO = function(f){ return f === 'sol' ? { sol:1 } : f === 'd' ? { d:1 } : f === 'pct' ? { pct:1 } : {}; };
+  const prom = function(f){ return f === 'd' || f === 'pct'; };
+  const cards = filas.map(function(r){
+    const a = MESES_CORTOS.map(function(_, i){ const m = mes(Y0, i); return m.futuro ? null : r.val(m); }), b = MESES_CORTOS.map(function(_, i){ const m = mes(Y, i); return m.futuro ? null : r.val(m); });
+    const ya = r.val(ytd(Y0)), yb = r.val(ytd(Y)), o = fmtO(r.fmt);
+    const graf = rptCombo('yoy' + mod + r.id, W, Object.assign({}, o, prom(r.fmt) ? { lines:[{ k:'a', n:String(Y0), c:'var(--muted)', v:a, dash:'5 4' }, { k:'b', n:String(Y), c:'var(--s1)', v:b }] }
+      : { bars:[{ k:'a', n:String(Y0), c:'var(--azul-br)', v:a }, { k:'b', n:String(Y), c:'var(--s1)', v:b }] }, { alt:r.n }));
+    let lect = '';
+    if(ya != null && yb != null){ const dif = yb - ya, pc = !prom(r.fmt) && ya ? dif / ya * 100 : null, bueno = dif === 0 ? null : (dif > 0) === !r.bajo;
+      lect = 'acumulado al ' + corteDia.split('-').reverse().join('/') + ': <b>' + rptFmt(yb, o) + '</b> en ' + Y + ' contra <b>' + rptFmt(ya, o) + '</b> en ' + Y0
+        + (dif ? ' → <b style="color:var(--' + (bueno ? 'green' : 'red') + '-ink)">' + (dif > 0 ? '▲ ' : '▼ ') + (r.fmt === 'pct' ? Math.round(Math.abs(dif)) + ' pts' : rptFmt(Math.abs(dif), o)) + (pc != null ? ' (' + (pc > 0 ? '+' : '') + Math.round(pc) + '%)' : '') + '</b>' : ' (sin cambio)') + '.'; }
+    return rptCard('yoy-' + mod + '-' + String(r.id).replace(/[^\w-]/g, '_'), '📊', e(r.n), Y0 + ' vs ' + Y + ' · mes a mes', graf, lect); }).join('');
+  return gxBarra(mod, subs, sub) + `<div class="gx-ana"><div class="gx-mostrando">Comparación de <b>${Y}</b> contra <b>${Y0}</b>${Y === cy ? ' · ' + POLAR_MESES[c.getUTCMonth()] + ' en curso' : ''}${e(nota)}</div><div class="rpt-cols">${cards}</div></div>`;
+}
 // Análisis: los gráficos de ingeniería industrial del módulo (control, Pareto, VSM, histogramas)
 function gxAnalisisHtml(mod){
   const C = appReportesHtml('cards'), e = escapeHtml, D = gxDef(mod, APP_GX.sub[mod]) || {};
@@ -21455,6 +21515,7 @@ function gxAnalisisHtml(mod){
 // Objetivos: tablero de metas de Logística (mensual/semanal/acumulado) + resumen ejecutivo + desviaciones
 function gxObjetivosHtml(){
   const C = appReportesHtml('cards'), e = escapeHtml;
+  if(APP_GX.vista === 'yoy') return gxYoyHtml('gobj');
   if(APP_GX.vista === 'ana') return gxBarra('gobj') + `<div class="gx-ana"><div class="rpt-cols">${C.vsm + C.pch + C.ich + C.tie}</div></div>`;
   const cols = gxCols(), n = cols.length; if(!n) return gxBarra('gobj') + '<div class="ini-vacio">No hay datos para ese año.</div>';
   const st = function(c, k){ const l = appIndDatos({ desde:c.desde, hasta:c.hasta }), x = l.find(function(y){ return y.ind.key === k; }); return x ? x.st : {}; };
