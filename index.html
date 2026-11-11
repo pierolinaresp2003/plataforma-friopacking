@@ -2442,6 +2442,11 @@
     .gd-fb{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;} .gd-fb .gd-cta{font-size:15px;padding:11px 22px;} .gd-del{border:1px solid var(--gd-bad);background:transparent;color:var(--gd-bad);border-radius:14px;padding:10px 16px;font:700 13.5px Inter,sans-serif;cursor:pointer;}
     .gd-ferr{color:var(--gd-bad);font-size:13px;margin:4px 0 0;}
     .gd .gx-top{margin-top:0;}
+    .gd-lock{min-height:calc(100vh - 120px);display:grid;place-items:center;padding:20px 0;} .gd-lock-c{width:min(440px,100%);background:var(--card);border:1px solid var(--gd-line);border-radius:26px;padding:32px 30px 24px;text-align:center;box-shadow:0 24px 50px -24px rgba(18,48,100,.45);}
+    .gd-lock-logo{width:160px;height:auto;margin:0 auto 14px;display:block;} html[data-theme="dark"] .gd-lock-logo{background:#fff;border-radius:12px;padding:6px 10px;}
+    .gd-lock-i{display:inline-grid;place-items:center;width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,#173FA8,#245FE5);color:#fff;margin-bottom:10px;} .gd-lock-i .gd-ic{width:24px;height:24px;}
+    .gd-lock h1{font-size:22px;margin:0 0 6px;color:var(--gd-ink);} .gd-lock p{color:var(--gd-ink2);font-size:14px;margin:0 0 16px;} .gd-lock-f{display:flex;flex-direction:column;gap:10px;} .gd-lock-f .gd-busca{margin:0;text-align:center;font-size:16px;} .gd-lock-f .gd-cta{align-self:stretch;justify-content:center;}
+    .gd-lock small{display:block;margin-top:16px;color:var(--gd-ink3);font-size:12.5px;} .gd-lock a{color:var(--gd-b);font-weight:700;}
     /* Pestañas de análisis y ficha de indicador como la referencia (11.11.2026) */
     .gd-pills .gd-ic{width:17px;height:17px;}
     .gd-kpis.k3{grid-template-columns:repeat(3,minmax(0,1fr));}
@@ -15544,6 +15549,12 @@ function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v ===
 const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto', gastopresu:'Gasto y presupuesto', almrep:'Almacén', almseg:'Seguimiento', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones', daily:'Daily Call In', reportes:'Reportería', gobj:'Objetivos', gabas:'Abastecimiento', ggas:'Gasto', galm:'Almacén', gser:'Nivel de servicio', gdport:'Portada', gdagen:'Agenda', gdobj:'Objetivos', gdpan:'Panorama ejecutivo', gdabas:'Abastecimiento', gdcom:'Compras', gdalm:'Almacén', gdcex:'Comercio exterior', gdmej:'Mejoras', gdacu:'Acuerdos y decisiones', supreq:'Requerimientos', tienda:'Consulta de producto', equipo:'Equipo Logística' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
+// Reporte gerencial en su propio link (11.11.2026, Piero: "todo esto de gerencial colócalo en otro link aparte, no dentro del
+// aplicativo, pero con un link para ir allá que tenga contraseña, como algo oculto"): ./?gerencial (o gerencial.html). Ahí solo
+// está Gerencial y, además del usuario de la plataforma, pide la clave gerencial (se valida en Supabase: fp_gerencial_clave).
+// En el aplicativo ya no hay vista Gerencial: solo un candado arriba que abre el link; los usuarios gerenciales van directo allá.
+const GD_MODO = /(^|&)gerencial(=|&|$)/.test(location.search.slice(1)) || /gerencial\.html$/i.test(location.pathname);
+const GD_LINK = './?gerencial';
 try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v; }catch(err){}
 // Usuario del celular (29.09.2026, Piero: "al abrir la aplicación, previo a todo, una interfaz de Grupo
 // Friopacking para crear usuario y así definir qué tipo de usuario tendrá acceso a ciertas vistas";
@@ -15552,7 +15563,7 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
 // La vista Gerencia ya no existe (12.10.2026, Piero): Compras y Almacén tienen lo gerencial; el acceso Gerencia entra a Compras.
 const APP_ACCESO = { gerencial:['gerencial','compras','almacen','super'], gerencia:['compras','almacen','super'], logistica:['compras','almacen','super'], compras:['compras','almacen','super'], almacen:['almacen','compras','super'], supervisor:['super'], frioteam:['frioteam'] };
-function appVistaInicial(t){ return (APP_ACCESO[t] || [t])[0]; }
+function appVistaInicial(t){ return GD_MODO ? 'gerencial' : (APP_ACCESO[t] || [t])[0]; }
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
 // y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
 // solo entran los correos que están ahí. Desde el 20.10.2026 cada uno entra con su propia clave (Supabase).
@@ -15618,10 +15629,8 @@ if(APP.usuario){
 } else APP.vista = null;
 function appVistasPermitidas(){
   if(!APP.usuario) return ['supervisor'];
-  const l = (APP_ACCESO[APP.usuario.tipo] || []).slice();
-  // Piero también ve el módulo Gerencial (ahí está el registro de ingresos al app, 15.10.2026).
-  if(appUsuarioDe(APP.usuario.correo) === 'plinares' && l.indexOf('gerencial') === -1) l.push('gerencial');
-  return l;
+  if(GD_MODO) return ['gerencial'];   // el link gerencial solo tiene Gerencial (11.11.2026)
+  return (APP_ACCESO[APP.usuario.tipo] || []).filter(function(v){ return v !== 'gerencial'; });   // y el aplicativo ya no lo tiene
 }
 
 function appLogo(){ const l = document.querySelector('.sidebar-brand .logo-lockup'); return l ? l.src : ''; }
@@ -15701,6 +15710,7 @@ function appConstruir(){
   document.querySelector('.main').insertAdjacentHTML('afterbegin',
     `<header class="app-top"><button type="button" class="app-atras" id="appAtrasBtn" aria-label="Volver" title="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button><button type="button" class="app-atras" id="appCasaBtn" aria-label="Ir a los módulos" title="Ir a los módulos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/></svg></button>
        <div class="app-tit"><b id="appTit">Inicio</b><span id="appSubTit"></span></div><nav class="app-toptabs" id="appTopTabs" aria-label="Módulos"></nav>
+       <button type="button" class="app-tema app-gdbtn" id="appGdBtn" title="Reporte gerencial" aria-label="Reporte gerencial" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
        <button type="button" class="app-tema" id="appTemaBtn" aria-label="Cambiar a modo oscuro"></button>
        <button type="button" class="app-vista" id="appVistaBtn"></button><button type="button" class="app-carpeta" id="appCarpetaBtn" title="Cargar archivos" aria-label="Cargar archivos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></button><button type="button" class="app-lado" id="appLadoBtn" aria-label="Ocultar o mostrar el menú" title="Ocultar / mostrar el menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></header>`);
   document.querySelector('.content').insertAdjacentHTML('afterbegin', '<div id="section-inicio" class="section"></div>');
@@ -15725,6 +15735,7 @@ function appConstruir(){
 
   document.getElementById('appVistaBtn').addEventListener('click', appAbrirSheet);
   document.getElementById('appTemaBtn').addEventListener('click', function(){ appTemaCambiar(); });
+  document.getElementById('appGdBtn').addEventListener('click', function(){ window.open(GD_LINK, '_blank', 'noopener'); });
   document.getElementById('appCarpetaBtn').addEventListener('click', function(){ const f = document.getElementById('fileInput'); if(f) f.click(); });
   // En la web el menú lateral queda siempre oculto; el ☰ abre un menú flotante (14.10.2026, Piero: "que se vea así siempre").
   // 22.10.2026 (Piero: "en la vista web haz un sidebar a la izquierda con las opciones de los módulos"): el menú lateral queda
@@ -16020,7 +16031,7 @@ body.app-pc .rqm-desc{font-size:20px !important;font-weight:800;margin-top:6px;}
   /* Menú lateral fijo con los módulos (22.10.2026, Piero): la barra de arriba queda solo con volver, inicio, tema y carpeta, y el
      contenido usa todo el ancho que queda a la derecha del menú. */
   body.app-pc .app-toptabs{display:none !important;}
-  body.app-pc .app-top .app-tema{margin-left:auto;}
+  body.app-pc .app-top .app-tema{margin-left:auto;} body.app-pc .app-top .app-gdbtn:not([hidden]) + .app-tema{margin-left:8px;}
   body.app-pc .app-tabbar .app-lado-in{display:none;}
   /* Menú lateral del ancho justo de sus textos (22.10.2026, Piero: "un sidebar normal… ajusta el tamaño para que no quede espacio a la
      derecha de las letras"): el ancho lo dan las opciones y el contenido empieza justo donde termina el menú (--lado, ver appPintarBarra). */
@@ -16286,6 +16297,7 @@ function appCerrarUsuario(){
 }
 
 function appElegirVista(v){
+  if(v === 'gerencial' && !GD_MODO){ location.href = GD_LINK; return; }   // Gerencial vive en su link (11.11.2026)
   if(appVistasPermitidas().indexOf(v) === -1) return;
   appNavPush();
   APP.vista = v;
@@ -16308,6 +16320,7 @@ function appPintarBarra(activa){
   // Leo ya no va en el centro de la barra (07.10.2026, Piero: "interfiere y da problemas"): es una burbuja
   // flotante a la derecha, encima de la barra (#asisFab).
   const tabs = v.tabs.filter(function(t){ return t[0] !== 'polar'; });
+  const gb = document.getElementById('appGdBtn'); if(gb) gb.hidden = GD_MODO || !(APP.usuario && appVeGerencial(APP.usuario.tipo));   // candado al link gerencial
   // Más de 5 pestañas (Compras y Almacén tienen 8): en el celular la barra se desliza de lado.
   barra.style.gridTemplateColumns = tabs.length > 6 && !APP_EN_PC ? 'repeat(' + tabs.length + ',minmax(78px,1fr))' : 'repeat(' + Math.max(1, tabs.length) + ',minmax(0,1fr))';
   barra.classList.toggle('muchas', tabs.length > 6 && !APP_EN_PC); barra.classList.toggle('seis', tabs.length === 6 && !APP_EN_PC);
@@ -16347,6 +16360,7 @@ function appAnim(el, cls, ms){
   clearTimeout(el._tr); el._tr = setTimeout(function(){ el.classList.remove(cls); }, ms || 900);
 }
 function appInicio(pantalla){
+  if(APP.vista === 'gerencial' && !GD_MODO){ location.replace(GD_LINK); return; }
   appPanelCerrarYa();   // la vista previa de imágenes u otro detalle no se queda abierto al cambiar de pantalla (19.10.2026)
   if(APP.vista === 'frioteam') pantalla = 'inventario';
   if((APP.vista === 'compras' || APP.vista === 'gerencial') && (pantalla === 'gasto' || pantalla === 'presu')){ APP_GP.sub = pantalla; pantalla = 'gastopresu'; }
@@ -16778,6 +16792,7 @@ function appRenderInicio(){
     if(APP.usuario.tipo !== antes) return appInicio(APP.pantalla);
   }
   let cuerpo = '';
+  if(APP.vista === 'gerencial' && !gdClaveOk()){ cont.innerHTML = gdCandadoHtml(); const i = document.getElementById('gdClave'); if(i && !RQ_MOVIL.matches) setTimeout(function(){ i.focus(); }, 50); return; }
   if(!hay){
     appIntentos++;
     const err = SNAP_ESTADO && SNAP_ESTADO.error;
@@ -22065,6 +22080,7 @@ function gdClick(b){ const p = b.dataset.gd.split('|');
   if(p[0] === 'op'){ const o = b.closest('.gd-op'); if(o) o.classList.toggle('abierto'); return; }
   if(p[0] === 'pag') return gdPag(+p[1]);
   if(p[0] === 'tema') return appTemaCambiar();
+  if(p[0] === 'bloquear'){ try{ sessionStorage.removeItem('fp-gd-ok'); }catch(err){} window.scrollTo(0, 0); return appRenderInicio(); }
   if(p[0] === 'vista') return appAbrirSheet();
   if(p[0] === 'defs') return gdDefs();
   if(p[0] === 'fs') return gdPantalla();
@@ -22079,7 +22095,7 @@ const GD_IC = { list:'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01', target
   box:'M21 8l-9-5-9 5v8l9 5 9-5zM3.3 7L12 12l8.7-5M12 22V12', globe:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18', trend:'M23 6l-9.5 9.5-5-5L1 18M17 6h6v6',
   check:'M22 11.1V12a10 10 0 1 1-5.9-9.1M22 4L12 14l-3-3', flag:'M4 22V4M4 4h13l-2 4 2 4H4', expand:'M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3',
   arrowL:'M19 12H5M12 19l-7-7 7-7', arrowR:'M5 12h14M12 5l7 7-7 7', book:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z', chev:'M6 9l6 6 6-6',
-  layers:'M12 2l10 5-10 5L2 7zM2 17l10 5 10-5M2 12l10 5 10-5', cal:'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', moon:'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z', user:'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', coins:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3', clock:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2', shield:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' };
+  layers:'M12 2l10 5-10 5L2 7zM2 17l10 5 10-5M2 12l10 5 10-5', cal:'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18', moon:'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z', user:'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', coins:'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3', clock:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2', shield:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', lock:'M6 11h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM8 11V7a4 4 0 0 1 8 0v4' };
 function gdIc(k){ return `<svg class="gd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${GD_IC[k]}"/></svg>`; }
 function gdNavHtml(act){ const i = GD_NAV.findIndex(function(x){ return x[0] === act; }), P = gdPer(), op = i >= 4 && i <= 7, e = escapeHtml;
   const lb = function(t){ const q = t.split('|'); return e(q[0]) + (q[1] ? `<i class="gd-lx"> ${e(q[1])}</i>` : ''); };
@@ -22087,12 +22103,28 @@ function gdNavHtml(act){ const i = GD_NAV.findIndex(function(x){ return x[0] ===
   let vistas = 1; try{ vistas = appVistasPermitidas().length; }catch(err){}
   return `<div class="gd-nav"><div class="gd-top"><img src="fotos/logo-friopacking.png" class="gd-tlogo" alt="Grupo Friopacking" data-gd="ir|gdport" onerror="this.style.display='none'"><b class="gd-tt">Reporte Gerencial de Logística</b>
       <span class="gd-tp"><b>${e(P.M.nom.charAt(0).toUpperCase() + P.M.nom.slice(1))}</b> · corte ${e(fmtDate(P.corte))}</span><span class="gd-sp"></span><span class="gd-real">Datos reales de la plataforma</span>
-      <button type="button" class="gd-tb ic" data-gd="tema" title="Modo claro / oscuro" aria-label="Modo claro / oscuro">${gdIc('moon')}</button>${vistas > 1 ? `<button type="button" class="gd-tb" data-gd="vista" title="Cambiar de vista">${gdIc('user')}<span>Vista</span></button>` : ''}
+      <button type="button" class="gd-tb ic" data-gd="tema" title="Modo claro / oscuro" aria-label="Modo claro / oscuro">${gdIc('moon')}</button><button type="button" class="gd-tb ic" data-gd="bloquear" title="Cerrar el reporte (vuelve a pedir la clave)" aria-label="Cerrar el reporte">${gdIc('lock')}</button>${vistas > 1 ? `<button type="button" class="gd-tb" data-gd="vista" title="Cambiar de vista">${gdIc('user')}<span>Vista</span></button>` : ''}
       <button type="button" class="gd-tb" data-gd="defs" title="Definiciones y reglas (tecla D)">${gdIc('book')}<span>Definiciones</span></button><button type="button" class="gd-tb" data-gd="fs" title="Pantalla completa (tecla F)">${gdIc('expand')}<span>Pantalla completa</span></button></div>
     <nav class="gd-menu" aria-label="Módulos del reporte gerencial">${GD_NAV.slice(0, 4).map(item).join('')}
       <div class="gd-op"><button type="button" class="gd-mi${op ? ' on' : ''}" data-gd="op" aria-haspopup="true">${gdIc('layers')}${op ? '<small>' + String(i + 1).padStart(2, '0') + '</small>' : ''}<span>${op ? lb(GD_NAV[i][2]) : 'Operación'}</span>${gdIc('chev')}</button><div class="gd-sub" role="group" aria-label="Frentes">${GD_NAV.slice(4, 8).map(function(x, k){ return item(x, k + 4); }).join('')}</div></div>
       ${GD_NAV.slice(8).map(function(x, k){ return item(x, k + 8); }).join('')}<button type="button" class="gd-mi${act === 'daily' ? ' on' : ''}" data-gd="ir|daily">${gdIc('cal')}<span>Daily</span></button><span class="gd-sp"></span>
       <div class="gd-pager"><button type="button" data-gd="pag|-1" aria-label="Módulo anterior"${i <= 0 ? ' disabled' : ''}>${gdIc('arrowL')}</button><b>${i < 0 ? '–' : i + 1} / ${GD_NAV.length}</b><button type="button" data-gd="pag|1" aria-label="Módulo siguiente"${i >= GD_NAV.length - 1 ? ' disabled' : ''}>${gdIc('arrowR')}</button></div></nav></div>`; }
+// Candado del link gerencial: además del usuario, la clave gerencial (Supabase la compara con su hash; no está en el código).
+function gdPuede(){ return !!(APP.usuario && appVeGerencial(APP.usuario.tipo)); }
+function gdClaveOk(){ if(!gdPuede()) return false; try{ return sessionStorage.getItem('fp-gd-ok') === '1'; }catch(err){ return false; } }
+function gdCandadoHtml(){ const e = escapeHtml, nom = APP.usuario ? (APP.usuario.nombre || APP.usuario.correo) : '';
+  return `<div class="gd-lock"><div class="gd-lock-c"><img src="fotos/logo-friopacking.png" alt="Grupo Friopacking" class="gd-lock-logo" onerror="this.style.display='none'"><span class="gd-lock-i">${gdIc('lock')}</span>
+    <h1>Reporte Gerencial de Logística</h1>${gdPuede() ? `<p>Acceso restringido. Ingresa la clave gerencial.</p>
+    <form class="gd-lock-f" data-gdlock="1" autocomplete="off"><input type="password" id="gdClave" class="gd-busca" placeholder="Clave gerencial" autocomplete="off" enterkeyhint="go"><button type="submit" class="gd-cta">Entrar <span>→</span></button></form><p class="gd-ferr" id="gdClaveErr" hidden></p>`
+    : '<p>Tu usuario no tiene acceso al reporte gerencial. Si lo necesitas, pídeselo a Logística.</p>'}
+    <small>${nom ? 'Entraste como ' + e(nom) + ' · ' : ''}<a href="./">Ir al aplicativo</a></small></div></div>`; }
+document.addEventListener('submit', function(ev){ const f = ev.target; if(!f || !f.dataset || !f.dataset.gdlock) return; ev.preventDefault();
+  const i = document.getElementById('gdClave'), er = document.getElementById('gdClaveErr'), b = f.querySelector('button'), c = i.value;
+  if(!c){ i.focus(); return; } b.disabled = true; er.hidden = true;
+  sbFetch('/rest/v1/rpc/fp_gerencial_clave', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ c:c }) })
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(new Error(r.status === 401 ? 'Tu sesión terminó: vuelve a entrar.' : 'No pude validar la clave (' + r.status + ').')); })
+    .then(function(ok){ if(ok !== true) throw new Error('Clave incorrecta.'); try{ sessionStorage.setItem('fp-gd-ok', '1'); }catch(err){} i.value = ''; appInicio(APP.pantalla && GD_PANT[APP.pantalla] ? APP.pantalla : 'gdport'); })
+    .catch(function(x){ b.disabled = false; er.hidden = false; er.textContent = '⚠️ ' + (x.message === 'Failed to fetch' ? 'No hay conexión.' : x.message); i.select(); }); });
 function gdPag(d){ const i = GD_NAV.findIndex(function(x){ return x[0] === APP.pantalla; }), j = i < 0 ? 0 : Math.max(0, Math.min(GD_NAV.length - 1, i + d)); if(j !== i){ window.scrollTo(0, 0); appInicio(GD_NAV[j][0]); } }
 function gdDefs(){ const e = escapeHtml, P = gdPer();
   appListaAbrir('📘 Definiciones y reglas', 'Cómo se calcula cada indicador',
