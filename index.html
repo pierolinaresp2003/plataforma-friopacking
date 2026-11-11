@@ -3178,6 +3178,25 @@ html[data-theme="dark"] .tlh-tr::before{background:#1f3a48;}
 .pmm-res small{display:block;padding:6px 10px;color:var(--ink-soft);font-size:12px;} .pmm-res .pmm-card{animation:none;}
 .pm-v-mapa:has(.pmm-pop) .pmm-res{display:none;}
 @media (max-width:900px){ .pmm-bar{position:static;max-width:none;margin-bottom:8px;} .pmm-q, .pmm-q:focus-within{width:auto;flex:1 1 200px;} .pmm-res{position:static;width:auto;margin-bottom:8px;max-height:50vh;} }
+
+/* Mapa más legible (v334): más contraste entre departamentos, círculos azules y nombre de los que tienen proyectos */
+.pm-dep{stroke:#fff;stroke-width:1.3;} .pm-dep.t0{fill:#dbe3ec;} .pm-dep.t1{fill:#a8e0d1;} .pm-dep.t2{fill:#6ccbb3;} .pm-dep.t3{fill:#2fae94;} .pm-dep.t4{fill:#178a77;} .pm-dep.t5{fill:#0b6b5c;}
+.pmm .pm-dep.t0:hover{fill:#dbe3ec !important;}
+.pm-mapa svg{filter:drop-shadow(0 10px 24px rgba(10,30,100,.10));}
+.pm-pin circle{fill:#0a1e64;stroke:#fff;stroke-width:2.5;} .pm-pin text{fill:#fff;font-size:12px;}
+.pm-pin:hover circle, .pm-pin.sel circle{fill:#14b8a6;stroke:#fff;}
+.pm-pin text.pm-lbl{fill:#0f1b2d;font:700 11px Inter,sans-serif;paint-order:stroke;stroke:rgba(255,255,255,.92);stroke-width:3.5px;stroke-linejoin:round;}
+html[data-theme="dark"] .pm-dep{stroke:#0b111b;} html[data-theme="dark"] .pm-dep.t0{fill:#253244;} html[data-theme="dark"] .pm-pin text.pm-lbl{fill:#e7edf5;stroke:rgba(11,17,27,.9);}
+/* Ítems de un día */
+.tlh-card[data-tld]{cursor:pointer;transition:box-shadow .2s,transform .2s;} .tlh-card[data-tld]:hover{transform:translateY(-2px);box-shadow:0 14px 30px -14px rgba(16,24,40,.4);}
+.tlh-mas{color:#1f56b8 !important;font-weight:700;}
+.tld-g{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--c,#8a97a6);border-radius:14px;margin-bottom:10px;overflow:hidden;animation:pzSube .3s var(--pz-ease) both;}
+.tld-g.rq{--c:#7c5cc4;} .tld-g.pd{--c:#e0a100;} .tld-g.oc{--c:#2f6fd6;} .tld-g.pv{--c:#14b8a6;} .tld-g.rc{--c:#0e8f8a;} .tld-g.sl{--c:#3fa16a;} .tld-g.ob{--c:#1e7a3c;}
+.tld-h{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:12px 14px;border-bottom:1px solid var(--border);} .tld-h i{width:12px;height:12px;border-radius:50%;background:var(--c);}
+.tld-h b{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--c);} .tld-h span{font-size:13px;color:var(--ink);font-weight:600;display:inline-flex;align-items:center;} .tld-h em{margin-left:auto;font-style:normal;font-size:12px;color:var(--ink-soft);}
+.tld-it{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;border-bottom:1px solid var(--border);padding:9px 14px;cursor:pointer;}
+.tld-it:last-child{border-bottom:0;} .tld-it:hover{background:var(--row-hover);} .tld-it b{display:block;font-size:13px;color:var(--ink);} .tld-it small{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
+.tld-it .pm-c b{color:#fff;} .tld-it em{font-style:normal;font-weight:800;font-size:13px;color:var(--ink);white-space:nowrap;}
 @media (prefers-reduced-motion: reduce){ .lz *, .app-bienv *, .pm *, .pmx *{animation:none !important;transition:none !important;} }
 </style>
 </head>
@@ -18126,7 +18145,12 @@ const PM_PAIS_NOM = { pe:'Perú', cn:'China', us:'Estados Unidos', de:'Alemania'
   ca:'Canadá', tw:'Taiwán', th:'Tailandia', vn:'Vietnam', my:'Malasia', id:'Indonesia', uy:'Uruguay', ec:'Ecuador', do:'Rep. Dominicana', hn:'Honduras', pt:'Portugal', il:'Israel', ae:'Emiratos Árabes', za:'Sudáfrica' };
 function pmPais(prov, oc){ const P = PROVEEDOR_PAIS || {}, k = gdNorm(gdCorto(prov || '')), iso = (P.n && (P.n[k] || P.n[gdNorm(prov || '')])) || null;
   if(iso && PM_ISO[iso]) return PM_ISO[iso];
-  return /^0001-/.test(oc || '') ? 'pe' : null; }
+  if(/^0001-/.test(oc || '')) return 'pe';
+  // Proveedores del exterior que no están en DB Proveedores: por el nombre (provincias chinas, país en el nombre, GmbH, A/S).
+  const n = sinAcentos(String(prov || '').toUpperCase());
+  return /\b(CHINA|ZHEJIANG|SHANGHAI|GUANGZHOU|GUANGDONG|SHENZHEN|NINGBO|JIANGSU|WEIFANG|HENGCHANG|FUJIAN|QINGDAO|TAIZHOU|HANGZHOU|BEIJING|TIANJIN|SHANDONG|HEBEI|HENAN|XIAMEN|SUZHOU|WUXI|FOSHAN|DONGGUAN|YANTAI|CHANGZHOU)\b/.test(n) ? 'cn'
+    : /\bCOLOMBIA\b/.test(n) ? 'co' : /\bMEXICO\b/.test(n) ? 'mx' : /\bCHILE\b/.test(n) ? 'cl' : /\bBRASIL|BRAZIL\b/.test(n) ? 'br' : /\bARGENTINA\b/.test(n) ? 'ar' : /\bESPANA|SPAIN\b/.test(n) ? 'es'
+    : /\bITALIA|ITALY\b/.test(n) ? 'it' : /\bGMBH\b/.test(n) ? 'de' : /\bA\/S\b/.test(n) ? 'dk' : /\b(USA|U\.S\.A)\b/.test(n) ? 'us' : null; }
 function pmBandera(prov, oc){ const a = pmPais(prov, oc); if(!a) return /^0002-/.test(oc || '') ? '<span class="pm-fl x" title="Importado (país sin registrar)">IMP</span>' : '';
   const n = PM_PAIS_NOM[a] || a.toUpperCase(); return `<img class="pm-fl" src="https://flagcdn.com/w40/${a}.png" srcset="https://flagcdn.com/w80/${a}.png 2x" width="20" height="15" alt="${escapeHtml(n)}" title="${escapeHtml(n)}" loading="lazy" onerror="this.outerHTML='<span class=&quot;pm-fl x&quot;>${a.toUpperCase()}</span>'">`; }
 function pmOcTxt(r){ return r.codOrden ? `<button type="button" class="pm-oc" data-oc="${escapeHtml(r.codOrden)}" title="Ver la OC">${pmBandera(r.proveedor, r.codOrden)}OC ${escapeHtml(String(r.codOrden).replace(/^000\d-0*/, ''))}</button>` : ''; }
@@ -18178,7 +18202,7 @@ function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
   const paths = deps.map(function(k){ const o = por[k], d = M.dep[k];
     return `<path d="${d.d}" class="pm-dep t${tono(o ? o.n : 0)}${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o ? o.n : 0}|${o && o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o ? o.venc : 0}|${o ? o.sin : 0}"/>`; }).join('');
   const pins = deps.filter(function(k){ return por[k]; }).map(function(k){ const o = por[k], c = M.dep[k].c, r = 9 + 9 * Math.sqrt(o.n / mx);
-    return `<g class="pm-pin${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o.n}|${o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o.venc}|${o.sin}" style="--d:${(deps.indexOf(k) * 25)}ms"><circle cx="${c[0]}" cy="${c[1]}" r="${r.toFixed(1)}"/><text x="${c[0]}" y="${(c[1] + 4).toFixed(1)}" text-anchor="middle">${o.n}</text></g>`; }).join('');
+    return `<g class="pm-pin${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o.n}|${o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o.venc}|${o.sin}" style="--d:${(deps.indexOf(k) * 25)}ms"><circle cx="${c[0]}" cy="${c[1]}" r="${r.toFixed(1)}"/><text x="${c[0]}" y="${(c[1] + 4).toFixed(1)}" text-anchor="middle">${o.n}</text><text class="pm-lbl" x="${c[0]}" y="${(c[1] + r + 13).toFixed(1)}" text-anchor="middle">${e(titleCase(k))}</text></g>`; }).join('');
   return `<div class="pm-mapa"><svg viewBox="0 0 ${M.w} ${M.h}" role="img" aria-label="Mapa del Perú con los proyectos por departamento"><g class="pm-deps">${paths}</g><g class="pm-pins">${pins}</g></svg>
     <div class="pm-tip" id="pmTip" hidden></div>
     </div>`; }
@@ -18249,7 +18273,7 @@ function pmFaltaHtml(p){ const e = escapeHtml, fams = Object.keys(p.cat).map(fun
 // Línea de tiempo horizontal y minimalista (11.11.2026, Piero, con una idea de referencia): un círculo por día sobre una línea,
 // tarjetas arriba y abajo, el separador de cada mes, la marca de HOY y lo que viene (llegadas previstas de las OC abiertas).
 // Cada día lleva su fecha exacta y cuánto falta o cuánto pasó. Se recorre con las flechas o deslizando.
-const PM_TL = { req:['Requerimiento', 'rq'], ped:['Pedido a Compras', 'pd'], oc:['OC emitida', 'oc'], prev:['Llegada prevista', 'pv'], rec:['Llegó a almacén', 'rc'], sal:['Salió a obra', 'sl'], obra:['Recibido en obra', 'ob'] };
+const PM_TL = { req:['Requerimiento', 'rq'], ped:['Pedido a Compras', 'pd'], oc:['OC emitida', 'oc'], prev:['Llega a almacén (previsto)', 'pv'], rec:['Llegó a almacén', 'rc'], sal:['Salió a obra', 'sl'], obra:['Recibido en obra', 'ob'] };
 const PM_TL_ORD = ['req', 'ped', 'oc', 'prev', 'rec', 'sal', 'obra'];
 function pmLineaEventos(p){ return appMemo('pmTl' + p.id + p.tot, function(){ const M = new Map(), hoy = +appIndCorte();
   const add = function(t, f, key, r){ if(!f) return; const k = t + '|' + key + '|' + isoDay(f); let x = M.get(k); if(!x){ x = { t:t, f:+f, key:key, L:[] }; M.set(k, x); } x.L.push(r); };
@@ -18274,16 +18298,26 @@ function pmLineaHtml(p, filtro){ const e = escapeHtml, hoy = +appIndCorte(), tod
     if(m !== mes){ mes = m; html += `<div class="tlh-mes"><span>${e(m.toUpperCase())}</span></div>`; }
     const arriba = i++ % 2 === 0, tipo = PM_TL[L[0].t][1], dia = dt.toLocaleDateString('es-PE', { weekday:'long', timeZone:'UTC' });
     const fecha = `<div class="tlh-f"><b>${e(dia.charAt(0).toUpperCase() + dia.slice(1))} ${e(d[0].split('-').reverse().join('/'))}</b><span class="${f > hoy ? 'fut' : ''}">${rel(f)}</span></div>`;
-    const card = `<div class="tlh-card ${tipo}">${L.slice(0, 2).map(fila).join('')}${L.length > 2 ? `<span class="tlh-mas">+${L.length - 2} movimiento${L.length - 2 === 1 ? '' : 's'} más este día</span>` : ''}</div>`;
+    const card = `<div class="tlh-card ${tipo}" data-tld="${d[0]}" title="Ver todos los ítems de este día">${L.slice(0, 2).map(fila).join('')}<span class="tlh-mas">${L.length > 2 ? '+' + (L.length - 2) + ' movimiento' + (L.length - 2 === 1 ? '' : 's') + ' más · ' : ''}Ver los ${appN(L.reduce(function(a, x){ return a + x.L.length; }, 0))} ítems ›</span></div>`;
     html += `<div class="tlh-d ${arriba ? 'ar' : 'ab'}${f > hoy ? ' fut' : ''}" style="--i:${i}"><div class="tlh-s1">${arriba ? card : fecha}</div><div class="tlh-c ${tipo}"><b>${dt.getUTCDate()}</b><small>${e(MESES_CORTOS[dt.getUTCMonth()].toUpperCase())}</small></div><div class="tlh-s2">${arriba ? fecha : card}</div></div>`; });
   if(!hoyPuesto) html += marcaHoy();
   const cnt = function(t){ return todos.filter(function(x){ return x.t === t; }).length; };
   return `<div class="tlh-fil">${[['', 'Todo', todos.length]].concat(PM_TL_ORD.map(function(t){ return [t, PM_TL[t][0], cnt(t)]; })).map(function(x){ return x[2] || !x[0] ? `<button type="button" class="pm-ch${(filtro || '') === x[0] ? ' sel' : ''}" data-pmlf="${x[0]}">${x[1]} <b>${appN(x[2])}</b></button>` : ''; }).join('')}</div>
     <div class="tlh"><button type="button" class="tlh-fl iz" data-tlh="-1" aria-label="Anterior">‹</button><div class="tlh-sc" id="tlhSc"><div class="tlh-tr">${html}</div></div><button type="button" class="tlh-fl de" data-tlh="1" aria-label="Siguiente">›</button></div>`; }
+// Todos los movimientos e ítems de un día de la línea de tiempo (11.11.2026, Piero: "la opción para que al dar clic se pueda ver el total de ítems")
+function pmLineaDia(id, dia){ const p = pmDatos().l.find(function(x){ return x.id === id; }); if(!p) return; const e = escapeHtml, hoy = +appIndCorte();
+  const L = pmLineaEventos(p).filter(function(x){ return isoDay(new Date(x.f)) === dia; }), corto = function(c){ return String(c || '').replace(/^000\d-0*/, ''); };
+  const el = document.getElementById('appOC'), pila = (el._pila || []).concat([el.innerHTML]), dt = new Date(dia + 'T00:00:00Z'), dn = dt.toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long', year:'numeric', timeZone:'UTC' });
+  appListaAbrir(e(dn.charAt(0).toUpperCase() + dn.slice(1)), e(p.cli + ' · ' + p.id),
+    L.map(function(x){ const doc = x.t === 'req' ? 'Req. ' + corto(x.key) : x.t === 'ped' ? 'Pedido ' + corto(x.key) : ['oc', 'prev', 'rec'].indexOf(x.t) !== -1 ? '' : (x.key || '');
+      return `<div class="tld-g ${PM_TL[x.t][1]}"><div class="tld-h"><i></i><b>${PM_TL[x.t][0]}</b>${doc ? `<span>${e(doc)}</span>` : ''}${x.L[0].codOrden && ['oc', 'prev', 'rec'].indexOf(x.t) !== -1 ? `<span>${pmOcTxt(x.L[0])} · ${e(polarCorta(gdCorto(x.L[0].proveedor || ''), 40))}</span>` : ''}<em>${appN(x.L.length)} ítem${x.L.length === 1 ? '' : 's'}</em></div>
+        <div class="tld-l">${x.L.map(function(r){ const E = PM_EST[r._pm]; return `<button type="button" class="tld-it" data-req="${e(r.codRequerimiento || '')}"><span><b>${e(r.producto || r.idProducto || '')}</b><small>${e(r.idProducto || '')} · Req. ${e(corto(r.codRequerimiento))}${r.codOrden && x.t !== 'oc' && x.t !== 'prev' && x.t !== 'rec' ? ' · OC ' + e(corto(r.codOrden)) : ''}</small></span><em>${appN(r.cantidad, 2)} ${e((r.unidad || '').toLowerCase())}</em><span class="pm-c ${E[0]} mini"><b>${E[1]}</b></span></button>`; }).join('')}</div></div>`; }).join(''));
+  el._pila = pila; el.classList.add('ancho'); }
 // Al abrir la línea de tiempo se ubica en HOY (con lo último que pasó a la vista)
 function pmLineaIr(){ requestAnimationFrame(function(){ const sc = document.getElementById('tlhSc'), h = document.getElementById('tlhHoy'); if(!sc || !h) return; sc.style.scrollBehavior = 'auto'; sc.scrollLeft = Math.max(0, h.offsetLeft - sc.clientWidth * .62); sc.style.scrollBehavior = ''; }); }
 // Clics del mapa, las tarjetas, las pestañas del proyecto y los filtros de la línea de tiempo
-document.addEventListener('click', function(ev){ const b = ev.target.closest('[data-pmdep],[data-pmver],[data-pmtab],[data-pmlf],[data-pmvista],[data-tlh],[data-pmfil]'); if(!b) return;
+document.addEventListener('click', function(ev){ const b = ev.target.closest('[data-pmdep],[data-pmver],[data-pmtab],[data-pmlf],[data-pmvista],[data-tlh],[data-pmfil],[data-tld]'); if(!b) return;
+  if(b.dataset.tld){ if(ev.target.closest('button')) return; const x = b.closest('.pmx'); if(x) pmLineaDia(x.dataset.pmx, b.dataset.tld); return; }
   if(b.dataset.tlh){ const sc = document.getElementById('tlhSc'); if(sc) sc.scrollBy({ left:+b.dataset.tlh * sc.clientWidth * .8, behavior:'smooth' }); return; }
   if(b.dataset.pmvista !== undefined){ APP_PM.ver = b.dataset.pmvista; return appRenderInicio(); }
   if(b.dataset.pmfil){ APP_PM.fil = !APP_PM.fil; return appRenderInicio(); }
