@@ -2508,6 +2508,7 @@
     .gd-sp{flex:1 1 auto;}
     .gd-real{display:inline-flex;align-items:center;gap:7px;border:1px solid #9FDCD8;background:#E1F6F4;color:#12304A;border-radius:999px;padding:5px 12px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
     .gd-real::before{content:'';width:8px;height:8px;border-radius:50%;background:#16B8B0;box-shadow:0 0 0 3px rgba(22,184,176,.28);}
+    a.gd-tb{text-decoration:none;}
     .gd-tb{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--gd-line);background:var(--card);color:var(--gd-ink);border-radius:12px;padding:8px 14px;font:700 14px Inter,sans-serif;cursor:pointer;white-space:nowrap;} .gd-tb:hover{background:var(--gd-xl);} .gd-tb.ic{padding:8px 10px;}
     .gd-menu{display:flex;align-items:center;gap:2px;padding:8px 24px;background:linear-gradient(90deg,#12306E,#173FA8 52%,#245FE5);min-height:56px;}
     .gd-mi{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:#fff;border-radius:12px;padding:8px 10px;font:700 14px Inter,sans-serif;cursor:pointer;white-space:nowrap;}
@@ -15625,7 +15626,10 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
 // La vista Gerencia ya no existe (12.10.2026, Piero): Compras y Almacén tienen lo gerencial; el acceso Gerencia entra a Compras.
 const APP_ACCESO = { gerencial:['gerencial','compras','almacen','super'], gerencia:['compras','almacen','super'], logistica:['compras','almacen','super'], compras:['compras','almacen','super'], almacen:['almacen','compras','super'], supervisor:['super'], frioteam:['frioteam'] };
-function appVistaInicial(t){ return GD_MODO ? 'gerencial' : (APP_ACCESO[t] || [t])[0]; }
+// "Ir al aplicativo" desde el reporte gerencial abre ./?app (11.11.2026): ahí el usuario gerencial entra a su primera vista del
+// aplicativo en vez de rebotar otra vez al link gerencial.
+const GD_APP = /[?&]app\b/.test(location.search);
+function appVistaInicial(t){ if(GD_MODO) return 'gerencial'; const l = APP_ACCESO[t] || [t]; return GD_APP ? (l.find(function(v){ return v !== 'gerencial'; }) || l[0]) : l[0]; }
 // El tipo de usuario lo define el correo corporativo (29.09.2026, Piero: "deben usar su correo corporativo
 // y en base a ese correo se designará la vista"). Manda DB Supervisores (columna Acceso, ver SUPERVISOR_ROL):
 // solo entran los correos que están ahí. Desde el 20.10.2026 cada uno entra con su propia clave (Supabase).
@@ -22279,7 +22283,7 @@ function gdNavHtml(act){ const i = GD_NAV.findIndex(function(x){ return x[0] ===
   let vistas = 1; try{ vistas = appVistasPermitidas().length; }catch(err){}
   return `<div class="gd-nav"><div class="gd-top"><img src="fotos/logo-friopacking.png" class="gd-tlogo" alt="Grupo Friopacking" data-gd="ir|gdport" onerror="this.style.display='none'"><b class="gd-tt">Reporte Gerencial de Logística</b>
       <span class="gd-tp"><b>${e(P.M.nom.charAt(0).toUpperCase() + P.M.nom.slice(1))}</b> · corte ${e(fmtDate(P.corte))}</span><span class="gd-sp"></span><span class="gd-real">Datos reales de la plataforma</span>
-      <button type="button" class="gd-tb ic" data-gd="tema" title="Modo claro / oscuro" aria-label="Modo claro / oscuro">${gdIc('moon')}</button><button type="button" class="gd-tb ic" data-gd="bloquear" title="Cerrar el reporte (vuelve a pedir la clave)" aria-label="Cerrar el reporte">${gdIc('lock')}</button>${vistas > 1 ? `<button type="button" class="gd-tb" data-gd="vista" title="Cambiar de vista">${gdIc('user')}<span>Vista</span></button>` : ''}
+      <button type="button" class="gd-tb ic" data-gd="tema" title="Modo claro / oscuro" aria-label="Modo claro / oscuro">${gdIc('moon')}</button><button type="button" class="gd-tb ic" data-gd="bloquear" title="Cerrar el reporte (vuelve a pedir la clave)" aria-label="Cerrar el reporte">${gdIc('lock')}</button>${vistas > 1 ? `<button type="button" class="gd-tb" data-gd="vista" title="Cambiar de vista">${gdIc('user')}<span>Vista</span></button>` : ''}${GD_MODO ? `<a class="gd-tb" href="./?app" title="Volver al aplicativo">${gdIc('grid')}<span>Ir al aplicativo</span></a>` : ''}
       <button type="button" class="gd-tb" data-gd="defs" title="Definiciones y reglas (tecla D)">${gdIc('book')}<span>Definiciones</span></button><button type="button" class="gd-tb" data-gd="fs" title="Pantalla completa (tecla F)">${gdIc('expand')}<span>Pantalla completa</span></button></div>
     <nav class="gd-menu" aria-label="Módulos del reporte gerencial">${GD_NAV.slice(0, 4).map(item).join('')}
       <div class="gd-op"><button type="button" class="gd-mi${op ? ' on' : ''}" data-gd="op" aria-haspopup="true">${gdIc('layers')}${op ? '<small>' + String(i + 1).padStart(2, '0') + '</small>' : ''}<span>${op ? lb(GD_NAV[i][2]) : 'Operación'}</span>${gdIc('chev')}</button><div class="gd-sub" role="group" aria-label="Frentes">${GD_NAV.slice(4, 8).map(function(x, k){ return item(x, k + 4); }).join('')}</div></div>
@@ -22293,7 +22297,7 @@ function gdCandadoHtml(){ const e = escapeHtml, nom = APP.usuario ? (APP.usuario
     <h1>Reporte Gerencial de Logística</h1>${gdPuede() ? `<p>Acceso restringido. Ingresa la clave gerencial.</p>
     <form class="gd-lock-f" data-gdlock="1" autocomplete="off"><input type="password" id="gdClave" class="gd-busca" placeholder="Clave gerencial" autocomplete="off" enterkeyhint="go"><button type="submit" class="gd-cta">Entrar <span>→</span></button></form><p class="gd-ferr" id="gdClaveErr" hidden></p>`
     : '<p>Tu usuario no tiene acceso al reporte gerencial. Si lo necesitas, pídeselo a Logística.</p>'}
-    <small>${nom ? 'Entraste como ' + e(nom) + ' · ' : ''}<a href="./">Ir al aplicativo</a></small></div></div>`; }
+    <small>${nom ? 'Entraste como ' + e(nom) + ' · ' : ''}<a href="./?app">Ir al aplicativo</a></small></div></div>`; }
 document.addEventListener('submit', function(ev){ const f = ev.target; if(!f || !f.dataset || !f.dataset.gdlock) return; ev.preventDefault();
   const i = document.getElementById('gdClave'), er = document.getElementById('gdClaveErr'), b = f.querySelector('button'), c = i.value;
   if(!c){ i.focus(); return; } b.disabled = true; er.hidden = true;
