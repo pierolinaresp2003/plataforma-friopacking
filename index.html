@@ -18254,11 +18254,15 @@ function pmDepK(dep){ const d = sinAcentos(String(dep || '').toUpperCase()).trim
 function pmDurTxt(ini, hoy){ const a = new Date(ini), b = new Date(hoy); let m = (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + b.getUTCMonth() - a.getUTCMonth(); if(b.getUTCDate() < a.getUTCDate()) m--;
   const c = new Date(a); c.setUTCMonth(c.getUTCMonth() + m); const d = Math.round((hoy - c) / 864e5);
   return [m ? m + (m === 1 ? ' mes' : ' meses') : '', d ? d + (d === 1 ? ' día' : ' días') : ''].filter(Boolean).join(' y ') || 'menos de un día'; }
-// Alerta del plazo de atención (meta OTIF: 15 d.h. desde el requerimiento hasta que sale a obra). Solo lo que todavía no sale.
-// Amarillo: se pasó por poco (hasta 5 d.h. sobre la meta); rojo: más de 5 d.h. sobre la meta.
-const PM_ALERTA_TOL = 5;
-function pmAlerta(r){ if(r._pm >= 4 || !r.fReq) return ''; const d = busdayCount(r.fReq, appIndCorte()) || 0; if(d <= OTIF_META) return '';
-  const rojo = d > OTIF_META + PM_ALERTA_TOL, t = d + ' d.h. desde el requerimiento · meta ' + OTIF_META + ' d.h.';
+// Alerta según el estado (11.11.2026, Piero: "las alertas deben ser en base al estado"), con las metas de los indicadores de la app:
+//  En revisión: 1 d.h. desde el req. (Tiempo de Generación de Pedido) · Sin OC: 2 d.h. desde el pedido (Emisión de OC)
+//  OC en camino: la fecha pactada con el proveedor · Por despachar: 15 d.h. desde el req. (Despacho de Requerimiento)
+// Amarillo: se pasó por poco (hasta la tolerancia); rojo: se pasó más que eso. Lo que ya salió a obra no lleva alerta.
+const PM_ALERTA = { 0:{ desde:'fReq', meta:1, tol:2, txt:'en revisión desde el requerimiento · meta 1 d.h.' }, 1:{ desde:'fPedido', meta:2, tol:3, txt:'sin OC desde el pedido · meta 2 d.h.' },
+  2:{ desde:'fCompromiso', meta:0, tol:5, txt:'de atraso sobre la fecha pactada con el proveedor' }, 3:{ desde:'fReq', meta:15, tol:5, txt:'desde el requerimiento sin salir a obra · meta 15 d.h.' } };
+function pmAlerta(r){ const A = PM_ALERTA[r._pm]; if(!A) return ''; const f0 = r[A.desde] || (r._pm === 1 ? r.fReq : null); if(!f0) return '';
+  const d = busdayCount(f0, appIndCorte()) || 0, sobre = d - A.meta; if(sobre <= 0) return '';
+  const rojo = sobre > A.tol, t = (r._pm === 2 ? sobre + ' d.h. ' : d + ' d.h. ') + A.txt + (r._pm === 2 ? ' (' + rqFecha(r.fCompromiso) + ')' : '');
   return rojo ? `<i class="pm-al-ic rojo" title="${t}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#d92d20"/><path d="M12 6.5v7" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1.5" fill="#fff"/></svg></i>`
     : `<i class="pm-al-ic amb" title="${t}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#f2b632"/><path d="M12 6.2 18 16.8H6z" fill="#fff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 10.2v3.2" stroke="#b26a00" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15.1" r=".95" fill="#b26a00"/></svg></i>`; }
 // Lo que está en camino de un código: OC abiertas con su destino (cliente · PRY, o stock)
