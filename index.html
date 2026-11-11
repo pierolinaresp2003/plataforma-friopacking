@@ -16916,6 +16916,148 @@ function appPcPersonaF(){ const cod = APP_PC.persona || ''; APP_F.indicadores.pe
 function appFEnAnios(st){ const r = appFRango(st); if(!r) return function(){ return true; };
   const a = (r.desde || appIndCorte()).getUTCFullYear(), b = (r.hasta || appIndCorte()).getUTCFullYear();
   return function(f){ if(!f) return true; const y = new Date(+f).getUTCFullYear(); return y >= a && y <= b; }; }
+// Excel "Compras del año por producto y trimestre" (11.11.2026, Piero: mejorar el Excel y descargarlo desde Compras):
+// hoja Dashboard con el resumen del año, y una hoja por tipo de producto (familias normalizadas de la app) con el proveedor y
+// el volumen de compra a la izquierda, el detalle por trimestre y la aplicación del proyecto (amoníaco, freón, glicol, CO₂ o stock).
+// Fuente: Consulta.xlsx (líneas de OC del año). La aplicación sale del proyecto de la línea (Reporte Maestro / PedidoSinReq → R.PRY).
+const CMP_XLS_APL = ['Amoníaco', 'Freón', 'Glicol', 'CO₂', 'Otros', 'Stock / sin proyecto', 'Sin dato'];
+const CMP_XLS_APL_COL = { 'Amoníaco':'FF1E6FB8', 'Freón':'FF0E8A7C', 'Glicol':'FF7C5CC4', 'CO₂':'FF5A6878', 'Otros':'FF8A97A6', 'Stock / sin proyecto':'FFB26A00', 'Sin dato':'FFA0AAB6' };
+function cmpAplDesc(t){ t = sinAcentos(String(t || '').toUpperCase());
+  return /\bNH3\b|AMONIACO|R-?717\b/.test(t) ? 'Amoníaco' : /GLICOL|GLYCOL|PROPILENGLICOL/.test(t) ? 'Glicol' : /\bCO2\b|R-?744\b/.test(t) ? 'CO₂' : /FREON|\bR-?(22|134A?|404A?|407[A-F]?|410A?|448A?|449A?|452A?|507A?|513A?|1234[A-Z]*)\b/.test(t) ? 'Freón' : ''; }
+function cmpXlsDatos(Y){
+  const TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75, hoy = appIndCorte(), mesCorte = hoy.getUTCFullYear() === Y ? hoy.getUTCMonth() + 1 : 12;
+  // OC + código → proyectos (para la aplicación) y unidad de medida
+  const pry = new Map(), um = new Map(), nk = function(o){ return String(o || '').trim().replace(/^(\d+)-0*/, '$1-'); };
+  getReqRows().forEach(function(r){ if(r.idProducto && r.unidad && !um.has(r.idProducto)) um.set(r.idProducto, r.unidad);
+    if(!r.codOrden || !r.idProducto) return; const k = nk(r.codOrden) + '|' + r.idProducto; (pry.get(k) || pry.set(k, new Set()).get(k)).add(String(r.idProyecto || '').trim() || 'SIN'); });
+  (PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(r.idProducto && r.unidad && !um.has(r.idProducto)) um.set(r.idProducto, r.unidad);
+    if(!r.codOrden || !r.idProducto) return; const k = nk(r.codOrden) + '|' + r.idProducto; (pry.get(k) || pry.set(k, new Set()).get(k)).add(String(r.idProyecto || '').trim() || 'SIN'); });
+  const aplDe = function(id){ if(!id || id === 'SIN' || /^SIN PROYECTO/i.test(id)) return 'Stock / sin proyecto'; const x = pryInfo(id), rf = x && pmRf(x.rf); return rf ? (CMP_XLS_APL.indexOf(rf[1]) !== -1 ? rf[1] : 'Otros') : 'Sin dato'; };
+  const famNom = function(c){ c = String(c || 'OTROS'); return c.charAt(0) + c.slice(1).toLowerCase(); };
+  const L = ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){ return r.anio === Y && r.codigo; }).map(function(r){
+    const q = Math.min(4, Math.ceil((r.mes || 1) / 3)), usd = (r.montoPEN || 0) / TC, pr = { idProducto:r.codigo, producto:r.producto || '' }, fam = pmCat(pr);
+    const ps = [...(pry.get(nk(r.oc) + '|' + r.codigo) || [])], dsc = cmpAplDesc(r.producto);
+    // Primero el refrigerante de los proyectos; si la compra no tiene proyecto, el que dice la descripción (NH3, glicol, R404A…)
+    let apls = [...new Set(ps.map(aplDe))].sort(function(a, b){ return CMP_XLS_APL.indexOf(a) - CMP_XLS_APL.indexOf(b); });
+    if(dsc && (!apls.length || apls.every(function(a){ return a === 'Stock / sin proyecto' || a === 'Sin dato'; }))) apls = [dsc];
+    const pais = pmPais(r.proveedor, r.oc) || (r.origen === 'importado' ? '' : 'pe');
+    return { r:r, q:q, usd:usd, cant:+r.cantidad || 0, fam:famNom(fam), sub:pmSubfam(fam, pr), apl:apls.length ? apls.join(' / ') : (r.origen === 'importado' ? 'Sin dato' : 'Stock / sin proyecto'), apl0:apls[0] || (r.origen === 'importado' ? 'Sin dato' : 'Stock / sin proyecto'),
+      prys:ps.filter(function(x){ return x && x !== 'SIN'; }), pais:pais, org:pais === 'pe' || (!pais && r.origen !== 'importado') ? 'Nacional' : pais === 'cn' ? 'Importación China' : 'Importación (otros países)',
+      paisNom:pais ? (PM_PAIS_NOM[pais] || pais.toUpperCase()) : (r.origen === 'importado' ? 'Exterior' : 'Perú'), f:new Date(Date.UTC(r.anio, (r.mes || 1) - 1, r.dia || 1)), um:um.get(r.codigo) || '' };
+  });
+  return { Y:Y, L:L, mesCorte:mesCorte, TC:TC };
+}
+async function cmpXlsDescargar(){
+  const Y = appIndCorte().getUTCFullYear();
+  if(!GASTO_DATA || !GASTO_DATA.rows || !GASTO_DATA.rows.length){ appToast('Carga Consulta.xlsx (o abre la plataforma con los datos publicados) para armar el Excel.'); return; }
+  let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
+  appToast('Preparando el Excel de Compras ' + Y + '…');
+  const D = cmpXlsDatos(Y); if(!D.L.length){ appToast('No hay compras de ' + Y + ' en Consulta.xlsx.'); return; }
+  const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
+  const TQ = [1, 2, 3, 4].map(function(t){ const m1 = (t - 1) * 3, m3 = Math.min(t * 3, D.mesCorte) - 1; return m3 < m1 ? null : 'T' + t + ' (' + MES[m1] + '-' + MES[m3] + ')' + (t * 3 > D.mesCorte ? '*' : ''); });
+  const nQ = TQ.filter(Boolean).length;
+  const C = { navy:'FF0F2A4A', navy2:'FF1D3B60', teal:'FF0E8A7C', gris:'FF5A6878', claro:'FFF4F6F9', borde:'FFE2E6EC', azulq:'FFEAF1FB', verdeq:'FFE8F5EF', amar:'FFFFF6D6', blanco:'FFFFFFFF', tinta:'FF0F1B2D' };
+  const fill = function(c){ return { type:'pattern', pattern:'solid', fgColor:{ argb:c } }; }, bd = { style:'thin', color:{ argb:C.borde } }, caja = { top:bd, left:bd, bottom:bd, right:bd };
+  const usdF = '"US$ "#,##0;-"US$ "#,##0;"—"', qF = '#,##0.##;-#,##0.##;"·"', pcF = '0.0%;-0.0%;"—"';
+  const wb = new EJ.Workbook(); wb.creator = 'Plataforma Friopacking'; wb.created = new Date();
+  const sum = function(l, f){ return l.reduce(function(a, x){ return a + (f ? f(x) : x.usd); }, 0); };
+  const tot = sum(D.L), corte = rqFecha(appIndCorte());
+  const grp = function(l, key){ const m = new Map(); l.forEach(function(x){ const k = key(x); (m.get(k) || m.set(k, []).get(k)).push(x); }); return [...m.entries()].map(function(e){ return { k:e[0], l:e[1], usd:sum(e[1]) }; }).sort(function(a, b){ return b.usd - a.usd; }); };
+  const fams = grp(D.L, function(x){ return x.fam; });
+  const usados = new Set(), hojaDe = new Map();
+  fams.forEach(function(F){ let nm = F.k.replace(/[\\\/?*\[\]:]/g, '-').slice(0, 31).trim() || 'Hoja'; for(let k = 2; usados.has(nm.toLowerCase()) || nm.toLowerCase() === 'dashboard'; k++) nm = nm.slice(0, 27) + ' (' + k + ')'; usados.add(nm.toLowerCase()); hojaDe.set(F.k, nm); });
+  const titulo = function(ws, nc, t, s){ ws.mergeCells(1, 1, 1, nc); const a = ws.getCell(1, 1); a.value = t; a.font = { bold:true, size:16, color:{ argb:C.navy } }; ws.getRow(1).height = 24;
+    ws.mergeCells(2, 1, 2, nc); const b = ws.getCell(2, 1); b.value = s; b.font = { italic:true, size:10, color:{ argb:C.gris } }; };
+  const cab = function(ws, fila, vals, color){ vals.forEach(function(v, i){ const c = ws.getCell(fila, i + 1); c.value = v; c.fill = fill(color || C.navy); c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; c.border = caja; }); ws.getRow(fila).height = 30; };
+  const kpi = function(ws, fila, col, lbl, val, fmt){ ws.mergeCells(fila, col, fila, col + 1); ws.mergeCells(fila + 1, col, fila + 1, col + 1);
+    const a = ws.getCell(fila, col), b = ws.getCell(fila + 1, col); a.value = lbl; a.font = { size:9, bold:true, color:{ argb:C.gris } }; a.fill = fill(C.claro);
+    b.value = val; b.numFmt = fmt || '#,##0'; b.font = { size:16, bold:true, color:{ argb:C.navy } }; b.fill = fill(C.claro); a.alignment = b.alignment = { horizontal:'left', vertical:'middle', indent:1 }; ws.getRow(fila + 1).height = 24; };
+  const nOC = function(l){ return new Set(l.map(function(x){ return x.r.oc; })).size; };
+  const aplUsd = function(l){ const m = {}; CMP_XLS_APL.forEach(function(a){ m[a] = 0; }); l.forEach(function(x){ m[CMP_XLS_APL.indexOf(x.apl0) !== -1 ? x.apl0 : 'Sin dato'] += x.usd; }); return m; };
+
+  // ===== Dashboard =====
+  const ws0 = wb.addWorksheet('Dashboard', { views:[{ showGridLines:false }], properties:{ tabColor:{ argb:C.navy } } });
+  const NC0 = 4 + nQ + 1 + CMP_XLS_APL.length + 2;
+  titulo(ws0, NC0, 'Compras ' + Y + ' · Grupo Friopacking', 'Líneas de OC de ' + Y + ' (Consulta.xlsx) · montos en US$ al TC ' + D.TC + ' · * trimestre en curso · datos al ' + corte + ' · toca una familia para ir a su hoja');
+  const imp = sum(D.L.filter(function(x){ return x.org !== 'Nacional'; }));
+  kpi(ws0, 4, 1, 'COMPRADO EN ' + Y, tot, usdF); kpi(ws0, 4, 3, 'ÓRDENES DE COMPRA', nOC(D.L)); kpi(ws0, 4, 5, 'PROVEEDORES', new Set(D.L.map(function(x){ return x.r.proveedor; })).size);
+  kpi(ws0, 4, 7, 'PRODUCTOS (CÓDIGOS)', new Set(D.L.map(function(x){ return x.r.codigo; })).size); kpi(ws0, 4, 9, 'IMPORTADO', tot ? imp / tot : 0, pcF);
+  // Por trimestre
+  let f = 8; ws0.getCell(f, 1).value = 'Por trimestre'; ws0.getCell(f, 1).font = { bold:true, size:12, color:{ argb:C.navy } }; f++;
+  cab(ws0, f, ['Trimestre', 'US$', '% del año', 'N° OC']); f++;
+  TQ.forEach(function(t, i){ if(!t) return; const l = D.L.filter(function(x){ return x.q === i + 1; }), u = sum(l); const row = ws0.getRow(f++); row.values = [t, u, tot ? u / tot : 0, nOC(l)];
+    row.getCell(2).numFmt = usdF; row.getCell(3).numFmt = pcF; row.eachCell(function(c){ c.border = caja; c.font = { size:10 }; }); });
+  // Por origen
+  f++; ws0.getCell(f, 1).value = 'Por origen'; ws0.getCell(f, 1).font = { bold:true, size:12, color:{ argb:C.navy } }; f++;
+  cab(ws0, f, ['Origen', 'US$', '% del año', 'Proveedores']); f++;
+  grp(D.L, function(x){ return x.org; }).forEach(function(G){ const row = ws0.getRow(f++); row.values = [G.k, G.usd, tot ? G.usd / tot : 0, new Set(G.l.map(function(x){ return x.r.proveedor; })).size];
+    row.getCell(2).numFmt = usdF; row.getCell(3).numFmt = pcF; row.eachCell(function(c){ c.border = caja; c.font = { size:10 }; }); });
+  // Por tipo de producto: US$, %, trimestres, aplicación (amoníaco, freón, glicol…) y principal proveedor
+  f++; ws0.getCell(f, 1).value = 'Por tipo de producto (cada uno tiene su hoja)'; ws0.getCell(f, 1).font = { bold:true, size:12, color:{ argb:C.navy } }; f++;
+  const cabF = ['Tipo de producto', 'US$ ' + Y, '% del año', 'N° OC'].concat(TQ.filter(Boolean).map(function(t){ return t + ' US$'; }), ['Proveedores'], CMP_XLS_APL, ['Principal proveedor', '% del principal']);
+  cab(ws0, f, cabF); CMP_XLS_APL.forEach(function(a, i){ ws0.getCell(f, 5 + nQ + 1 + i).fill = fill(C.navy2); }); const fCabF = f; f++;
+  fams.forEach(function(F, i){ const P = grp(F.l, function(x){ return x.r.proveedor; }), A = aplUsd(F.l), row = ws0.getRow(f++);
+    row.values = [{ text:F.k, hyperlink:"#'" + hojaDe.get(F.k) + "'!A1" }, F.usd, tot ? F.usd / tot : 0, nOC(F.l)].concat(TQ.map(function(t, j){ return t ? sum(F.l.filter(function(x){ return x.q === j + 1; })) : null; }).filter(function(v, j){ return TQ[j]; }),
+      [P.length], CMP_XLS_APL.map(function(a){ return A[a]; }), [polarCorta(appImpNombre(P[0].k), 40), F.usd ? P[0].usd / F.usd : 0]);
+    row.eachCell({ includeEmpty:true }, function(c, k){ c.border = caja; c.font = { size:10 }; if(i % 2) c.fill = fill(C.claro);
+      if(k === 2 || (k > 4 && k <= 4 + nQ) || (k > 5 + nQ && k <= 5 + nQ + CMP_XLS_APL.length)) c.numFmt = usdF; if(k === 3 || k === NC0) c.numFmt = pcF; });
+    row.getCell(1).font = { size:10, bold:true, color:{ argb:'FF1F56B8' }, underline:true }; });
+  const rt = ws0.getRow(f); rt.values = ['Total', tot, 1, nOC(D.L)].concat(TQ.map(function(t, j){ return t ? sum(D.L.filter(function(x){ return x.q === j + 1; })) : null; }).filter(function(v, j){ return TQ[j]; }),
+    [new Set(D.L.map(function(x){ return x.r.proveedor; })).size], CMP_XLS_APL.map(function(a){ return aplUsd(D.L)[a]; }), ['', '']);
+  rt.eachCell({ includeEmpty:true }, function(c, k){ c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.fill = fill(C.navy); c.border = caja; if(k === 2 || (k > 4 && k <= 4 + nQ) || (k > 5 + nQ && k <= 5 + nQ + CMP_XLS_APL.length)) c.numFmt = usdF; if(k === 3) c.numFmt = pcF; });
+  f += 2;
+  // Principales proveedores
+  ws0.getCell(f, 1).value = 'Principales proveedores'; ws0.getCell(f, 1).font = { bold:true, size:12, color:{ argb:C.navy } }; f++;
+  cab(ws0, f, ['Proveedor', 'US$ ' + Y, '% del año', 'N° OC', 'País', 'Tipos de producto']); f++;
+  grp(D.L, function(x){ return x.r.proveedor; }).slice(0, 25).forEach(function(G, i){ const row = ws0.getRow(f++);
+    row.values = [appImpNombre(G.k), G.usd, tot ? G.usd / tot : 0, nOC(G.l), G.l[0].paisNom, grp(G.l, function(x){ return x.fam; }).slice(0, 3).map(function(z){ return z.k; }).join(' · ')];
+    row.getCell(2).numFmt = usdF; row.getCell(3).numFmt = pcF; row.eachCell({ includeEmpty:true }, function(c){ c.border = caja; c.font = { size:10 }; if(i % 2) c.fill = fill(C.claro); }); });
+  [34, 15, 10, 9].concat(TQ.filter(Boolean).map(function(){ return 14; }), [11], CMP_XLS_APL.map(function(){ return 13; }), [34, 11]).forEach(function(w, i){ ws0.getColumn(i + 1).width = w; });
+  ws0.getRow(fCabF).height = 34;
+
+  // ===== Una hoja por tipo de producto =====
+  const EQUIPO = /evapor|enfri|condens|compres|chiller|unidad|equipo|bomba|ventilad|motor/i;
+  fams.forEach(function(F){
+    const nm = hojaDe.get(F.k), eq = EQUIPO.test(F.k);
+    const ws = wb.addWorksheet(nm, { views:[{ state:'frozen', xSplit:3, ySplit:7, showGridLines:false }], properties:{ tabColor:{ argb:eq ? C.teal : 'FF8A9BB0' } } });
+    // Filas: proveedor + código (si un producto se compró a dos proveedores, sale en dos filas), del proveedor con más volumen al de menos
+    const P = grp(F.l, function(x){ return x.r.proveedor; }), filas = [];
+    P.forEach(function(G){ grp(G.l, function(x){ return x.r.codigo; }).forEach(function(H, j){ filas.push({ G:G, H:H, primero:j === 0 }); }); });
+    const cols = ['Proveedor', 'Volumen US$', 'Cant. total', 'UM', 'País', 'Código', 'Descripción', 'Subfamilia', 'Aplicación'].concat([].concat.apply([], TQ.map(function(t){ return t ? [t + ' Cant.', t + ' US$'] : []; })), ['N° OC', 'Último precio US$', 'Última OC', 'Proyectos']);
+    const NC = cols.length, cQ = 10, cApl = 9;
+    titulo(ws, NC, F.k + ' · compras ' + Y, P.length + ' proveedores · ' + new Set(F.l.map(function(x){ return x.r.codigo; })).size + ' productos · ' + nOC(F.l) + ' OC · ordenado por volumen de compra del proveedor · aplicación según el refrigerante del proyecto (R.PRY) · datos al ' + corte);
+    // Resumen por aplicación (amoníaco, freón, glicol…)
+    const A = aplUsd(F.l); let c0 = 1; ws.getCell(4, 1).value = 'Total ' + F.k; ws.getCell(5, 1).value = F.usd; ws.getCell(5, 1).numFmt = usdF;
+    ws.getCell(4, 1).font = { size:9, bold:true, color:{ argb:C.gris } }; ws.getCell(5, 1).font = { size:15, bold:true, color:{ argb:C.navy } };
+    c0 = 2; CMP_XLS_APL.forEach(function(a){ if(!A[a]) return; const h = ws.getCell(4, c0), v = ws.getCell(5, c0);
+      h.value = a; v.value = A[a]; v.numFmt = usdF; h.font = { size:9, bold:true, color:{ argb:CMP_XLS_APL_COL[a] } }; v.font = { size:13, bold:true, color:{ argb:CMP_XLS_APL_COL[a] } };
+      h.border = { top:{ style:'medium', color:{ argb:CMP_XLS_APL_COL[a] } } }; c0++; });
+    ws.getRow(5).height = 22;
+    cab(ws, 7, cols); ws.getCell(7, 1).fill = fill(C.navy); ws.getCell(7, 2).fill = fill(C.teal); ws.getCell(7, cApl).fill = fill(eq ? C.teal : C.navy2);
+    TQ.forEach(function(t, j){ if(!t) return; const k = cQ + TQ.slice(0, j).filter(Boolean).length * 2; [k, k + 1].forEach(function(c){ ws.getCell(7, c).fill = fill(j % 2 ? C.navy : C.navy2); }); });
+    filas.forEach(function(x, i){ const H = x.H, l = H.l.slice().sort(function(a, b){ return b.f - a.f; }), u = l[0], ult = l.find(function(z){ return z.cant > 0; }) || u;
+      const qv = []; TQ.forEach(function(t, j){ if(!t) return; const lq = H.l.filter(function(z){ return z.q === j + 1; }); qv.push(sum(lq, function(z){ return z.cant; }) || null, sum(lq) || null); });
+      const apl = [...new Set(H.l.map(function(z){ return z.apl; }).join(' / ').split(' / '))].join(' / '), prys = [...new Set([].concat.apply([], H.l.map(function(z){ return z.prys; })))];
+      const row = ws.getRow(8 + i);
+      row.values = [appImpNombre(x.G.k), H.usd, sum(H.l, function(z){ return z.cant; }), u.um, u.paisNom, u.r.codigo, u.r.producto || '', u.sub, apl].concat(qv,
+        [new Set(H.l.map(function(z){ return z.r.oc; })).size, ult.cant ? ult.usd / ult.cant : null, String(ult.r.oc || '').replace(/^000\d-0*/, '') + ' · ' + rqFecha(ult.f), prys.slice(0, 4).join(', ') + (prys.length > 4 ? ' +' + (prys.length - 4) : '')]);
+      row.eachCell({ includeEmpty:true }, function(c, k){ c.font = { size:10, color:{ argb:C.tinta } }; c.border = { bottom:bd, left:bd, right:bd, top:x.primero && i ? { style:'medium', color:{ argb:'FF9AA8B8' } } : bd };
+        c.alignment = { vertical:'middle', wrapText:k === 7, horizontal:k === 1 || k === 7 || k === 8 || k === 9 || k === NC ? 'left' : 'center' };
+        if(k >= cQ && k < cQ + nQ * 2){ c.numFmt = (k - cQ) % 2 ? usdF : qF; c.fill = fill(Math.floor((k - cQ) / 2) % 2 ? C.verdeq : C.azulq); } });
+      row.getCell(1).font = x.primero ? { size:10, bold:true, color:{ argb:C.navy } } : { size:10, color:{ argb:'FF8A97A6' } };
+      row.getCell(2).numFmt = usdF; row.getCell(2).font = { size:10, bold:true, color:{ argb:C.teal } }; row.getCell(3).numFmt = qF; row.getCell(6).numFmt = '@';
+      row.getCell(NC - 2).numFmt = '"US$ "#,##0.00;;"—"';
+      const a0 = H.l[0].apl0, ca = row.getCell(cApl); ca.font = { size:10, bold:true, color:{ argb:CMP_XLS_APL_COL[a0] || C.gris } }; if(eq) ca.fill = fill('FFEFF7F5'); });
+    // Total de la hoja
+    const tr = ws.getRow(8 + filas.length); tr.values = ['Total', F.usd, null, null, null, null, filas.length + ' filas', null, null].concat([].concat.apply([], TQ.map(function(t, j){ return t ? [null, sum(F.l.filter(function(z){ return z.q === j + 1; }))] : []; })), [nOC(F.l), null, null, null]);
+    tr.eachCell({ includeEmpty:true }, function(c, k){ c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.fill = fill(C.navy); c.border = caja; if(k === 2 || (k >= cQ && k < cQ + nQ * 2)) c.numFmt = usdF; });
+    [36, 14, 11, 7, 11, 14, 52, 24, eq ? 20 : 17].concat([].concat.apply([], TQ.filter(Boolean).map(function(){ return [9, 12]; })), [8, 13, 20, 30]).forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
+    ws.autoFilter = { from:{ row:7, column:1 }, to:{ row:7 + filas.length, column:NC } };
+  });
+  const buf = await wb.xlsx.writeBuffer();
+  descargarBlob(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Compras ' + Y + ' por producto y trimestre - Grupo Friopacking.xlsx');
+  appToast('Excel listo ✔ · Dashboard y ' + fams.length + ' hojas por tipo de producto');
+}
 function appComprasHtml(){
   const cod = APP_PC.persona || '', vF = appPcPersonaF();
   const st = APP_F.indicadores, e = escapeHtml, nom = function(c){ return (PD_PERSONAS[c] || c || '').split(' ')[0]; };
@@ -20242,7 +20384,7 @@ function appPendComprasHtml(soloLista, sinCaras){
   return (sinCaras ? '' : `<div class="m-filtros pc-per">${appCarasHtml('pcper', APP_PC.persona, [...personas.keys()].filter(Boolean).sort(function(a, b){ return nom(a).localeCompare(nom(b)); }).map(function(p){ return [p, p]; }))}</div>`)
     // Buscador general arriba (07.10.2026, Piero: "un buscador ahí general para todo, así se puede buscar
     // cualquier OC"): pendientes y también las ya entregadas, cerradas o anuladas.
-    + `<div class="m-buscar pc-buscar-gen"><input type="search" id="pcBusca" placeholder="🔍 Buscar cualquier OC (pendiente o entregada), pedido, req., código, producto, proveedor o cliente" value="${escapeHtml(APP_PC.q || '')}"><button type="button" class="pc-img-btn" data-pcimg="1" title="Reporte en imágenes de todos los estados (ZIP por carpetas)" aria-label="Reporte en imágenes"><svg viewBox="0 0 24 24"><path d="M6 2h8l5 5v15H6z" fill="#fff" stroke="#b9c8de" stroke-width=".8"/><path d="M14 2v5h5" fill="#dbe4f3"/><path d="M9 5.5h3M9 8h4" stroke="#b9c8de" stroke-width="1.2" stroke-linecap="round"/><rect x="2.5" y="10.5" width="14.5" height="10" rx="1.8" fill="#1fa594"/><circle cx="6.6" cy="13.7" r="1.4" fill="#fff"/><path d="M4.2 19.2l3.5-3.6 2.4 2.2 2.6-3 2.8 4.4z" fill="#fff"/></svg></button></div>`
+    + `<div class="m-buscar pc-buscar-gen"><input type="search" id="pcBusca" placeholder="🔍 Buscar cualquier OC (pendiente o entregada), pedido, req., código, producto, proveedor o cliente" value="${escapeHtml(APP_PC.q || '')}"><button type="button" class="pc-img-btn" data-pcimg="1" title="Reporte en imágenes de todos los estados (ZIP por carpetas)" aria-label="Reporte en imágenes"><svg viewBox="0 0 24 24"><path d="M6 2h8l5 5v15H6z" fill="#fff" stroke="#b9c8de" stroke-width=".8"/><path d="M14 2v5h5" fill="#dbe4f3"/><path d="M9 5.5h3M9 8h4" stroke="#b9c8de" stroke-width="1.2" stroke-linecap="round"/><rect x="2.5" y="10.5" width="14.5" height="10" rx="1.8" fill="#1fa594"/><circle cx="6.6" cy="13.7" r="1.4" fill="#fff"/><path d="M4.2 19.2l3.5-3.6 2.4 2.2 2.6-3 2.8 4.4z" fill="#fff"/></svg></button>${INV_XLS_BTN.replace('data-invxls="1"', 'data-cmpxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar Compras ' + appIndCorte().getUTCFullYear() + ' por producto y trimestre (Excel)').replace('aria-label="Exportar a Excel"', 'aria-label="Descargar Compras por producto y trimestre"')}</div>`
     + `<div class="m-resumen m-pl-tabs imp-tabs">${tile('venc')}${tile('luego')}${tile('ent')}${tile('ped')}</div>`
     + `<div id="pcLista">${lista}</div>`;
 }
@@ -23795,6 +23937,7 @@ function appClickInicio(e){
   if(b.dataset.pcsec){ APP_PC.sec = b.dataset.pcsec; APP_PC.q = ''; APP_PC.tope = 20; return appRenderInicio(); }
   if(b.dataset.pcmas){ APP_PC.tope += 30; return appRenderInicio(); }
   if(b.dataset.pcxls) return appPcExcel();
+  if(b.dataset.cmpxls) return cmpXlsDescargar();
   if(b.dataset.skufam !== undefined){ APP_PC.fam = b.dataset.skufam; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true); return; }
 
   if(b.dataset.impdf){ appImpPdf(); return; }
