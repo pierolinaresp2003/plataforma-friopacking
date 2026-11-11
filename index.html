@@ -18261,19 +18261,18 @@ function pmDurTxt(ini, hoy){ const a = new Date(ini), b = new Date(hoy); let m =
 //  En revisión: 1 d.h. desde el req. (Tiempo de Generación de Pedido) · Sin OC: 2 d.h. desde el pedido (Emisión de OC)
 //  OC en camino: la fecha pactada con el proveedor · Por despachar: 15 d.h. desde el req. (Despacho de Requerimiento)
 // Amarillo: se pasó por poco (hasta la tolerancia); rojo: se pasó más que eso. Lo que ya salió a obra no lleva alerta.
-const PM_ALERTA = { 0:{ desde:'fReq', meta:1, tol:2, par:'Tiempo de generación de pedido: 1 d.h. desde el requerimiento', van:'en revisión desde el requerimiento' },
-  1:{ desde:'fPedido', meta:2, tol:3, par:'Tiempo de emisión de OC: 2 d.h. desde el pedido a Compras', van:'sin OC desde el pedido' },
-  2:{ desde:'fCompromiso', meta:0, tol:5, par:'Fecha de entrega pactada con el proveedor', van:'de atraso' }, 3:{ desde:'fReq', meta:15, tol:5, par:'Tiempo de despacho: 15 d.h. desde el requerimiento hasta salir a obra', van:'desde el requerimiento sin salir a obra' } };
+const PM_ALERTA = { 0:{ desde:'fReq', meta:1, tol:2, par:'Meta: 1 d.h. para pasar el pedido a Compras' },
+  1:{ desde:'fPedido', meta:2, tol:3, par:'Meta: 2 d.h. para emitir la OC' },
+  2:{ desde:'fCompromiso', meta:0, tol:5, par:'Fecha pactada con el proveedor' }, 3:{ desde:'fReq', meta:15, tol:5, par:'Meta: 15 d.h. para salir a obra' } };
 function pmAlerta(r){ const A = PM_ALERTA[r._pm]; if(!A) return ''; const f0 = r[A.desde] || (r._pm === 1 ? r.fReq : null); if(!f0) return '';
   const d = busdayCount(f0, appIndCorte()) || 0, sobre = d - A.meta; if(sobre <= 0) return '';
-  const rojo = sobre > A.tol, e = escapeHtml, t = e([rojo ? 'Fuera del límite' : 'Se pasó por poco', 'Parámetro: ' + A.par + (r._pm === 2 ? ' (' + rqFecha(r.fCompromiso) + ')' : ''),
-    'Van: ' + (r._pm === 2 ? sobre : d) + ' d.h. ' + A.van + (r._pm === 2 ? '' : ' (' + sobre + ' sobre la meta)'), 'Amarillo hasta ' + A.tol + ' d.h. sobre ' + (r._pm === 2 ? 'la fecha' : 'la meta') + '; rojo, más de eso'].join('|'));
+  const rojo = sobre > A.tol, e = escapeHtml, t = e([r._pm === 2 ? sobre + ' d.h. de atraso' : 'Pasó la meta por ' + sobre + ' d.h.', A.par + (r._pm === 2 ? ': ' + rqFecha(r.fCompromiso) : '')].join('|'));
   return rojo ? `<i class="pm-al-ic rojo" data-altip="${t}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#d92d20"/><path d="M12 6.5v7" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1.5" fill="#fff"/></svg></i>`
     : `<i class="pm-al-ic amb" data-altip="${t}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#f2b632"/><path d="M12 6.2 18 16.8H6z" fill="#fff" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/><path d="M12 10.2v3.2" stroke="#b26a00" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15.1" r=".95" fill="#b26a00"/></svg></i>`; }
 document.addEventListener('pointerover', function(ev){ const g = ev.target.closest && ev.target.closest('[data-altip]'); let t = document.getElementById('pmAlTip');
   if(!g){ if(t) t.hidden = true; return; } if(!t){ t = document.createElement('div'); t.id = 'pmAlTip'; t.className = 'pm-altip'; document.body.appendChild(t); }
   const v = g.dataset.altip.split('|'), r = g.getBoundingClientRect(); t.className = 'pm-altip ' + (g.classList.contains('rojo') ? 'rojo' : 'amb');
-  t.innerHTML = `<b>${escapeHtml(v[0])}</b>${v.slice(1).map(function(x, i){ return `<span class="${i === 2 ? 'n' : ''}">${escapeHtml(x)}</span>`; }).join('')}`; t.hidden = false;
+  t.innerHTML = `<b>${escapeHtml(v[0])}</b>${v.slice(1).map(function(x, i){ return `<span>${escapeHtml(x)}</span>`; }).join('')}`; t.hidden = false;
   const w = t.offsetWidth, h = t.offsetHeight; t.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px'; t.style.top = (r.top - h - 10 < 8 ? r.bottom + 10 : r.top - h - 10) + 'px'; });
 // Lo que está en camino de un código: OC abiertas con su destino (cliente · PRY, o stock)
 function pmTransito(cod){ const e = escapeHtml, hoy = +appIndCorte(), M = new Map();
