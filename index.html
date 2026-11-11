@@ -2916,6 +2916,109 @@
     .ctw-r3 b{font-size:13.5px;font-weight:900;} .ctw-r3 b.nd{font-weight:700;} .ctw-modo{display:flex;align-items:center;gap:8px;} .ctw-modo b{font-size:12.5px;}
     .ctw-pie{position:absolute;left:32px;bottom:16px;font-size:11px;color:#5b6b7a;white-space:pre;}
 </style>
+<style id="fpDiseno">
+/* ===== Diseño 2026 · simple y minimalista (v330, 11.11.2026, Piero: "un enfoque nuevo a toda la plataforma, diseño simple y
+   minimalista con animaciones más modernas y prácticas, tal cual con las funciones que tiene ahora").
+   Es una capa de estilo encima de lo que ya había: no cambia ninguna función ni pantalla. Superficies claras, bordes finos,
+   sombras casi nulas, una sola tipografía (Inter), el azul de marca como acento y movimiento corto y suave (respeta
+   "reducir movimiento" del sistema). El reporte gerencial conserva su diseño (sigue la referencia del directorio). ===== */
+:root{
+  --bg:#f5f7fa; --card:#ffffff; --ink:#0f1b2d; --ink-soft:#5a6878; --muted:#8a97a6; --border:#e6ebf1;
+  --surface-2:#f0f3f7; --surface-3:#fafbfc; --th-bg:#f7f9fb; --row-hover:#f6f8fb; --surface-2-hover:#e8edf3;
+  --shadow:0 1px 2px rgba(16,24,40,.04);
+  --fp-sh2:0 10px 28px -10px rgba(16,24,40,.18), 0 2px 6px -2px rgba(16,24,40,.06);
+  --fp-ease:cubic-bezier(.2,.8,.2,1); --fp-r:14px; --fp-ring:0 0 0 3px rgba(26,156,134,.20);
+  --fp-glass:rgba(255,255,255,.82);
+}
+html[data-theme="dark"]{
+  --bg:#0b111b; --card:#121a26; --border:#222c3b; --surface-2:#18212f; --surface-3:#0f1621; --th-bg:#151e2b; --row-hover:#172131; --surface-2-hover:#1f2a3a;
+  --shadow:none; --fp-sh2:0 14px 34px -10px rgba(0,0,0,.65); --fp-ring:0 0 0 3px rgba(79,216,189,.22); --fp-glass:rgba(18,26,38,.82);
+}
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
+::selection{background:rgba(85,195,171,.28);}
+h1,h2,h3,.ini-hola b,.ini-card-tit{letter-spacing:-.01em;}
+
+/* --- Barra de arriba: clara, translúcida, con línea fina (antes azul sólida) --- */
+body:not(.vista-gerencial) .app-top{background:var(--card);background:var(--fp-glass);-webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);
+  color:var(--ink);box-shadow:none;border-bottom:1px solid var(--border);}
+body:not(.vista-gerencial) .app-top .app-tit span{opacity:1;color:var(--ink-soft);}
+body:not(.vista-gerencial) .app-top .app-atras, body:not(.vista-gerencial) .app-lado, body:not(.vista-gerencial) .app-carpeta, body:not(.vista-gerencial) .app-top .app-tema{
+  background:transparent;border:1px solid var(--border);color:var(--ink);border-radius:12px;transition:background .18s var(--fp-ease),border-color .18s,transform .15s var(--fp-ease);}
+body:not(.vista-gerencial) .app-top .app-atras:hover, body:not(.vista-gerencial) .app-lado:hover, body:not(.vista-gerencial) .app-carpeta:hover, body:not(.vista-gerencial) .app-top .app-tema:hover{background:var(--surface-2);}
+body:not(.vista-gerencial) .app-top .app-atras:active, body:not(.vista-gerencial) .app-carpeta:active{transform:scale(.94);}
+body:not(.vista-gerencial) .app-top .app-vista{background:var(--surface-2);border:1px solid var(--border);color:var(--ink);}
+body.app-pc:not(.vista-gerencial) .app-top{height:60px;}
+body.app-pc .app-toptabs{gap:2px;}
+body.app-pc .app-toptabs button{color:var(--ink-soft);height:38px;padding:0 13px;border-radius:10px;font-weight:700;font-size:13.5px;border:0;transition:background .18s var(--fp-ease),color .18s;}
+body.app-pc .app-toptabs button .i{font-size:16px;filter:grayscale(.35);opacity:.85;transition:filter .2s,opacity .2s;}
+body.app-pc .app-toptabs button:hover{background:var(--surface-2);color:var(--ink);}
+body.app-pc .app-toptabs button.on{background:var(--brand);color:#fff;}
+body.app-pc .app-toptabs button.on .i{filter:none;opacity:1;}
+html[data-theme="dark"] body.app-pc .app-toptabs button.on{background:#e7edf5;color:#0b111b;border:0;}
+
+/* --- Barra de abajo (celular): translúcida, con indicador del módulo activo --- */
+.app-tabbar{background:var(--card);background:var(--fp-glass);-webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);box-shadow:none;border-top:1px solid var(--border);}
+.app-tabbar button:not(.polar){position:relative;transition:color .2s var(--fp-ease);}
+.app-tabbar button:not(.polar)::after{content:"";position:absolute;top:-6px;left:50%;width:18px;height:3px;border-radius:0 0 3px 3px;background:var(--brand-2);transform:translateX(-50%) scaleX(0);transition:transform .28s var(--fp-ease);}
+.app-tabbar button.on:not(.polar)::after{transform:translateX(-50%) scaleX(1);}
+.app-tabbar button .i{transition:transform .28s var(--fp-ease),filter .2s,opacity .2s;}
+.app-tabbar button.on:not(.polar) .i{transform:translateY(-1px);}
+
+/* --- Tarjetas, filas y listas --- */
+.ini-card{border-radius:var(--fp-r);border-color:var(--border);box-shadow:var(--shadow);}
+.ini-card-tit{font-size:13.5px;}
+.m-fila{transition:background .15s var(--fp-ease),transform .15s var(--fp-ease);}
+.m-fila:hover{background:var(--row-hover);}
+.m-fila:active, .pm-c:not(.na):active, .sup-p:active{transform:scale(.985);}
+.sup-card{border-radius:var(--fp-r);border-color:var(--border);box-shadow:var(--shadow);transition:box-shadow .22s var(--fp-ease),transform .22s var(--fp-ease),border-color .22s;}
+.sup-card:hover{box-shadow:var(--fp-sh2);transform:translateY(-2px);}
+.m-tiles > *{transition:transform .2s var(--fp-ease),box-shadow .2s var(--fp-ease);}
+
+/* --- Campos: un solo estilo, foco con anillo suave --- */
+.m-buscar input, .ini-select, .pm-q, .gd-busca{border-radius:12px;border:1px solid var(--border);box-shadow:none;transition:border-color .15s var(--fp-ease),box-shadow .15s var(--fp-ease),background .15s;}
+.m-buscar input:focus, .ini-select:focus, .pm-q:focus, .gd-busca:focus{outline:0;border-color:var(--teal);box-shadow:var(--fp-ring);}
+.ini-chips button, .pm-ch{transition:background .15s var(--fp-ease),border-color .15s,color .15s,transform .15s var(--fp-ease);}
+.ini-chips button:active, .pm-ch:active{transform:scale(.96);}
+button:focus-visible, a:focus-visible{outline:2px solid var(--teal);outline-offset:2px;}
+
+/* --- Paneles (detalle que se abre): cabecera clara y entrada suave --- */
+body:not(.vista-gerencial) .oc-cab{background:var(--card);background:var(--fp-glass);-webkit-backdrop-filter:saturate(1.6) blur(16px);backdrop-filter:saturate(1.6) blur(16px);color:var(--ink);border-bottom:1px solid var(--border);}
+body:not(.vista-gerencial) .oc-cab .atras{background:var(--surface-2);border:1px solid var(--border);color:var(--ink);transition:background .15s,transform .15s var(--fp-ease);}
+body:not(.vista-gerencial) .oc-cab .atras:hover{background:var(--surface-2-hover);} body:not(.vista-gerencial) .oc-cab .atras:active{transform:scale(.94);}
+body:not(.vista-gerencial) .oc-cab .tx span{opacity:1;color:var(--ink-soft);}
+.app-oc.abierto{animation:fpPanel .34s var(--fp-ease);}
+body.app-pc .app-oc.abierto{animation:fpPanelPc .26s var(--fp-ease);}
+@keyframes fpPanel{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:none;}}
+@keyframes fpPanelPc{from{opacity:0;transform:translateY(8px) scale(.995);}to{opacity:1;transform:none;}}
+
+/* --- Menús y avisos --- */
+.mp{border-radius:16px;border-color:var(--border);box-shadow:var(--fp-sh2);transform-origin:top center;transition:opacity .18s var(--fp-ease),transform .22s var(--fp-ease);}
+.app-toast{border-radius:12px;box-shadow:var(--fp-sh2);}
+
+/* --- Movimiento al cambiar de pestaña: el contenido entra en cascada corta (en vez de deslizarse entero) --- */
+#section-inicio.tr-der, #section-inicio.tr-izq, body.app-pc #section-inicio.tr-der, body.app-pc #section-inicio.tr-izq{animation:none;}
+#section-inicio.tr-der > *, #section-inicio.tr-izq > *{animation:fpSube .34s var(--fp-ease) both;}
+#section-inicio.tr-der > *:nth-child(2), #section-inicio.tr-izq > *:nth-child(2){animation-delay:.03s;}
+#section-inicio.tr-der > *:nth-child(3), #section-inicio.tr-izq > *:nth-child(3){animation-delay:.06s;}
+#section-inicio.tr-der > *:nth-child(4), #section-inicio.tr-izq > *:nth-child(4){animation-delay:.09s;}
+#section-inicio.tr-der > *:nth-child(n+5), #section-inicio.tr-izq > *:nth-child(n+5){animation-delay:.12s;}
+#section-inicio.tr-entrada > *{animation:fpSube .5s var(--fp-ease) both;}
+@keyframes fpSube{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+/* --- Barras de desplazamiento finas en la PC --- */
+body.app-pc *{scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+body.app-pc ::-webkit-scrollbar{width:10px;height:10px;} body.app-pc ::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;border:3px solid transparent;background-clip:padding-box;}
+body.app-pc ::-webkit-scrollbar-thumb:hover{background-color:var(--muted);} body.app-pc ::-webkit-scrollbar-track{background:transparent;}
+
+/* --- Proyectos: cabecera del tablero en el azul de marca, celdas un poco más planas --- */
+.pm-wrap{border-radius:var(--fp-r);box-shadow:var(--shadow);}
+.pm-c{box-shadow:none;transition:filter .15s,transform .15s var(--fp-ease);}
+
+/* Quien pide menos movimiento en su sistema no ve animaciones */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;animation-delay:0s !important;transition-duration:.01ms !important;scroll-behavior:auto !important;}
+}
+</style>
 </head>
 <body>
 <div class="app-splash" id="appSplash" aria-hidden="true">
@@ -16127,7 +16230,7 @@ function appPcActivar(){
     }
   }
   const st = document.createElement('style'); st.id = 'appPcCss'; st.textContent = css + APP_PC_CSS;
-  document.head.appendChild(st);
+  const dz = document.getElementById('fpDiseno'); if(dz) document.head.insertBefore(st, dz); else document.head.appendChild(st);   // la capa de diseño 2026 va al final (v330)
   document.body.classList.add('app-pc');
 }
 // Pantalla de inicio para elegir el módulo (13.10.2026, Piero: "al iniciar el app debe haber como una pestaña
