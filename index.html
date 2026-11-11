@@ -17774,10 +17774,12 @@ function pmRf(t){ const k = sinAcentos(String(t || '').toUpperCase()).trim(); re
 function pmDatos(){
   rqPreparar(); const base = supSoloMios() ? (polarMisFilas() || []) : RQ.filas, c = APP_PM._d;
   if(c && c.base === base && c.n === base.length) return c;
-  const M = new Map(), hoy = +appIndCorte();
+  const M = new Map(), hoy = +appIndCorte(), anio = appIndCorte().getUTCFullYear();
   base.forEach(function(r){ const id = String(r.idProyecto || '').trim(); if(!id || /^SIN PROYECTO/i.test(id) || r.estadoCalc === 'Archivado') return;
-    const x = pryInfo(id); if(!x || !/^pendiente/i.test(x.e || '')) return;
-    let p = M.get(id); if(!p){ const cli = appImpNombre(x.cl || r.proyecto || '') || '—'; p = { id:id, x:x, cli:SUP_CLI_UNIR[cli] || cli, zona:pmZona(x.dep), rf:pmRf(x.rf), items:[], cat:{}, sup:new Map(), reqs:new Set(), ult:0 }; M.set(id, p); }
+    // Proyecto nuevo que todavía no está en R.PRY (11.11.2026, Piero: "cuando busco arona no sale"): entra si es un PRY con
+    // requerimientos de este año, sin zona ni refrigerante hasta que aparezca en R.PRY.
+    const x = pryInfo(id) || { n:'', sinPry:1 }; if(x.e ? !/^pendiente/i.test(x.e) : !(/^PRY/i.test(id) && r.fReq && new Date(+r.fReq).getUTCFullYear() === anio)) return; if(!x.e) x.sinPry = 1;
+    let p = M.get(id); if(!p){ const cli = appImpNombre(x.cl || r.proyecto || '') || '—'; p = { id:id, x:x, cli:SUP_CLI_UNIR[cli] || cli, zona:x.sinPry ? 'SIN' : pmZona(x.dep), rf:pmRf(x.rf), items:[], cat:{}, sup:new Map(), reqs:new Set(), ult:0 }; M.set(id, p); }
     p.items.push(r); (p.cat[pmCat(r)] = p.cat[pmCat(r)] || []).push(r); if(r.codRequerimiento) p.reqs.add(r.codRequerimiento);
     if(r.responsable) p.sup.set(r.responsable, (p.sup.get(r.responsable) || 0) + 1); if(r.fReq && +r.fReq > p.ult) p.ult = +r.fReq; });
   const l = [...M.values()];
@@ -17786,7 +17788,7 @@ function pmDatos(){
     p.ok = p.n[6]; p.pend = p.tot - p.ok; p.pct = p.tot ? p.ok / p.tot * 100 : 0;
     p.super = [...p.sup.entries()].sort(function(a, b){ return b[1] - a[1]; }).map(function(a){ return a[0]; })[0] || '';
     p.txt = polarNorm([p.id, p.cli, p.x.n, p.x.dep, p.x.rf, p.super].join(' ')); });
-  const zo = ['NORTE', 'CENTRO', 'SUR', 'OTRAS'];
+  const zo = ['NORTE', 'CENTRO', 'SUR', 'OTRAS', 'SIN'];
   l.sort(function(a, b){ return zo.indexOf(a.zona) - zo.indexOf(b.zona) || b.ult - a.ult; });
   APP_PM._d = { base:base, n:base.length, l:l };
   return APP_PM._d;
@@ -17805,12 +17807,11 @@ function pmTablaHtml(){
   const zonas = []; l.forEach(function(p){ const z = zonas[zonas.length - 1]; if(z && z.z === p.zona) z.n++; else zonas.push({ z:p.zona, n:1 }); });
   const cats = PM_CATS.filter(function(c){ return l.some(function(p){ return p.cat[c[0]]; }); }), fila = function(t, f, cls){ return `<tr class="${cls || ''}"><th scope="row">${t}</th>${l.map(function(p){ return `<td>${f(p)}</td>`; }).join('')}</tr>`; };
   const fecha = function(f){ return f ? `<b class="pm-f">${e(f.split('-').reverse().join('/'))}</b><small>${pmDias(f)}</small>` : '<span class="pm-g">—</span>'; };
-  return `<div class="pm-wrap"><table class="pm-t"><thead><tr><th class="pm-h0" rowspan="2">PROYECTO</th>${zonas.map(function(z){ return `<th class="pm-z" colspan="${z.n}"><span>📍 ${z.z === 'OTRAS' ? 'OTRAS ZONAS' : 'ZONA ' + z.z} · ${z.n} proyecto${z.n === 1 ? '' : 's'}</span></th>`; }).join('')}</tr>
-    <tr>${l.map(function(p){ return `<th class="pm-ph"><button type="button" data-pmpry="${e(p.id)}" title="Ver sus requerimientos"><b>${e(polarCorta(p.cli, 46))}</b><small>${e(polarCorta(p.x.n || '', 70))}</small><em>${e(p.id.replace(/^PRY\s?/, ''))}</em></button></th>`; }).join('')}</tr></thead><tbody>
+  return `<div class="pm-wrap"><table class="pm-t"><thead><tr><th class="pm-h0" rowspan="2">PROYECTO</th>${zonas.map(function(z){ return `<th class="pm-z" colspan="${z.n}"><span>📍 ${z.z === 'SIN' ? 'NUEVOS · AÚN SIN DATOS EN R.PRY' : z.z === 'OTRAS' ? 'OTRAS ZONAS' : 'ZONA ' + z.z} · ${z.n} proyecto${z.n === 1 ? '' : 's'}</span></th>`; }).join('')}</tr>
+    <tr>${l.map(function(p){ return `<th class="pm-ph"><button type="button" data-pmpry="${e(p.id)}" title="Ver sus requerimientos"><b>${e(polarCorta(p.cli, 46))}</b><small>${e(polarCorta(p.x.n || (p.x.sinPry ? 'Sin datos en R.PRY todavía' : ''), 70))}</small><em>${e(p.id.replace(/^PRY\s?/, ''))}</em></button></th>`; }).join('')}</tr></thead><tbody>
     ${fila('Refrigerante', function(p){ return p.rf ? `<span class="pm-rf ${p.rf[0]}">${e(p.rf[1])}</span>` : '<span class="pm-g">—</span>'; })}
     ${fila('Supervisor', function(p){ return p.super ? `<span class="pm-s">${e(polarCorta(titleCase(p.super), 30))}</span>` : '<span class="pm-g">—</span>'; })}
     ${fila('Departamento', function(p){ return `<span class="pm-s">${e(titleCase(p.x.dep || '—'))}</span>`; })}
-    ${fila('Inicio del proyecto', function(p){ return fecha(p.x.f); })}
     ${l.some(function(p){ return p.x.fc; }) ? fila('Cierre previsto', function(p){ return fecha(p.x.fc); }) : ''}
     ${fila('Requerimientos', function(p){ return `<b class="pm-f">${appN(p.reqs.size)} req. · ${appN(p.tot)} ítems</b><small>último ${p.ult ? rqFecha(new Date(p.ult)) : '—'}</small>`; }, 'pm-fin')}
     ${cats.map(function(c){ return fila(e(c[1]), function(p){ return pmCelda(p, c[0]); }, 'pm-cat'); }).join('')}
@@ -17831,7 +17832,7 @@ function appSupPryHtml(){
     <div class="pm-top"><div><h2 class="pm-h">Proyectos en curso</h2><small class="pm-sub">Estado de lo requerido por cada proyecto, por tipo de equipo y material · toca una celda para ver los ítems</small></div>
       <div class="pm-k"><span><b>${appN(l.length)}</b>proyectos</span><span><b>${appN(it - ok)}</b>ítems pendientes</span><span class="${sinOC ? 'oc' : ''}"><b>${appN(sinOC)}</b>sin OC</span><span class="${venc ? 'mal' : ''}"><b>${appN(venc)}</b>OC vencidas</span><span><b>${it ? Math.round(ok / it * 100) : 0}%</b>en obra</span></div></div>
     <div class="pm-fil"><input type="search" class="pm-q" data-pmq="1" placeholder="Buscar cliente, proyecto, supervisor…" value="${e(APP_PM.q)}">
-      <div class="pm-chs">${chip('pmzona', '', !APP_PM.zona, 'Todas las zonas')}${['NORTE', 'CENTRO', 'SUR', 'OTRAS'].filter(function(z){ return D.l.some(function(p){ return p.zona === z; }); }).map(function(z){ return chip('pmzona', z, APP_PM.zona === z, z === 'OTRAS' ? 'Otras' : z.charAt(0) + z.slice(1).toLowerCase(), cuenta(function(p){ return p.zona === z; })); }).join('')}</div>
+      <div class="pm-chs">${chip('pmzona', '', !APP_PM.zona, 'Todas las zonas')}${['NORTE', 'CENTRO', 'SUR', 'OTRAS', 'SIN'].filter(function(z){ return D.l.some(function(p){ return p.zona === z; }); }).map(function(z){ return chip('pmzona', z, APP_PM.zona === z, z === 'SIN' ? 'Nuevos' : z === 'OTRAS' ? 'Otras' : z.charAt(0) + z.slice(1).toLowerCase(), cuenta(function(p){ return p.zona === z; })); }).join('')}</div>
       <div class="pm-chs">${chip('pmrf', '', !APP_PM.rf, 'Todo refrigerante')}${Object.keys(PM_RF).map(function(k){ const r = PM_RF[k]; const n = cuenta(function(p){ return p.rf && p.rf[0] === r[0]; }); return n ? chip('pmrf', r[0], APP_PM.rf === r[0], r[1], n) : ''; }).join('')}</div>
       <label class="pm-tg"><input type="checkbox" data-pmpend="1"${APP_PM.pend ? ' checked' : ''}> Solo con pendientes</label></div>
     <div id="pmTabla">${pmTablaHtml()}</div>
@@ -21620,8 +21621,8 @@ function gxOCs(){ return appMemo('gxOCs', function(){ const m = new Map();
     if(pdOcAbierta(r)) g.abierta = true; g.n++; m.set(r.codOrden, g); });
   m.forEach(function(g){ const v = ocFechaVale(g.oc, g.comp ? new Date(g.comp + 'T12:00:00Z') : null); g.comp = v ? isoDay(v) : g.comp; });
   return [...m.values()]; }); }
-function gxEntregas(d, h){ return appMemo('gxEnt' + d + h, function(){ const hoy = isoDay(new Date()), o = { tot:[], ok:[], tarde:[], venc:[], plazo:[], dias:[] };
-  gxOCs().forEach(function(g){ if(!gxEn(g.comp, d, h)) return; const it = { a:'OC ' + gxCorto(g.oc) + (g.imp ? ' · importación' : ''), b:g.prov, c:'comprometida ' + g.comp.split('-').reverse().join('/') + (g.rec && !g.abierta ? ' · llegó ' + g.rec.split('-').reverse().join('/') : '') };
+function gxEntregas(d, h, org){ return appMemo('gxEnt' + d + h + (org || ''), function(){ const hoy = isoDay(new Date()), o = { tot:[], ok:[], tarde:[], venc:[], plazo:[], dias:[] };
+  gxOCs().forEach(function(g){ if(!gxEn(g.comp, d, h) || (org && (org === 'i') !== g.imp)) return; const it = { a:'OC ' + gxCorto(g.oc) + (g.imp ? ' · importación' : ''), b:g.prov, c:'comprometida ' + g.comp.split('-').reverse().join('/') + (g.rec && !g.abierta ? ' · llegó ' + g.rec.split('-').reverse().join('/') : '') };
     o.tot.push(it);
     if(!g.abierta && g.rec){ if(g.rec <= g.comp) o.ok.push(it); else { o.tarde.push(it); o.dias.push(busdayCount(new Date(g.comp + 'T12:00:00Z'), new Date(g.rec + 'T12:00:00Z')) || 0); } }
     else if(g.comp < hoy) o.venc.push(it); else o.plazo.push(it); });
@@ -21980,6 +21981,12 @@ const GD_K = {
   prov:{ n:'Cumplimiento de proveedores', fr:'gdcom', fmt:'pct', meta:function(){ return RPT_META.aTiempo; }, u:'% de OC entregadas en su fecha comprometida',
     val:function(r){ const o = gxEntregas(r.desde, r.hasta); return gxPct(o.ok.length, o.ok.length + o.tarde.length + o.venc.length); }, detT:'OC entregadas tarde o vencidas',
     det:function(r){ const o = gxEntregas(r.desde, r.hasta); return o.tarde.concat(o.venc); } },
+  provN:{ n:'Cumplimiento de proveedores nacionales', fr:'gdcom', fmt:'pct', meta:function(){ return RPT_META.aTiempo; }, u:'% de OC nacionales entregadas en su fecha comprometida',
+    val:function(r){ const o = gxEntregas(r.desde, r.hasta, 'n'); return gxPct(o.ok.length, o.ok.length + o.tarde.length + o.venc.length); }, detT:'OC nacionales tarde o vencidas',
+    det:function(r){ const o = gxEntregas(r.desde, r.hasta, 'n'); return o.tarde.concat(o.venc); } },
+  provI:{ n:'Cumplimiento de proveedores importados', fr:'gdcom', fmt:'pct', meta:function(){ return RPT_META.aTiempo; }, u:'% de OC importadas entregadas en su fecha comprometida',
+    val:function(r){ const o = gxEntregas(r.desde, r.hasta, 'i'); return gxPct(o.ok.length, o.ok.length + o.tarde.length + o.venc.length); }, detT:'OC importadas tarde o vencidas',
+    det:function(r){ const o = gxEntregas(r.desde, r.hasta, 'i'); return o.tarde.concat(o.venc); } },
   bkl:{ n:'SKU sin OC al cierre', fr:'gdcom', fmt:'n', bajo:1, u:'SKU pedidos a Compras todavía sin OC',
     val:function(r){ return gxFlujo(r.desde, r.hasta).bkl.length; }, detT:'SKU sin OC al cierre', det:function(r){ return gxFlujo(r.desde, r.hasta).bkl; } },
   desp:{ n:'Despacho de requerimientos a tiempo', fr:'gdalm', fmt:'pct', meta:function(){ return RPT_META.aTiempo; }, u:'% despachados en ≤ ' + gdInd('d6').meta + ' días hábiles',
@@ -22338,6 +22345,8 @@ const GD_DEF = {
   otd:['Ítems de requerimiento que salieron a obra dentro del plazo (15 días hábiles), aunque no hayan salido completos.', 'Ítems a tiempo (completos o incompletos) / ítems de requerimiento evaluados × 100', 'Reporte Maestro (fecha de requerimiento y de salida)', function(x){ return String(x.b || '').split(' · ').slice(1).join(' · ') || 'Sin cliente'; }, 'Por cliente'],
   emi:['Días hábiles desde que el pedido llega a Compras hasta que se emite la OC.', 'Promedio de días hábiles (fecha de OC − fecha de pedido)', 'Reporte Maestro y Pedidos sin requerimiento', 'dias', 'Distribución de días hábiles'],
   prov:['OC con fecha comprometida en el período que el proveedor entregó en esa fecha o antes.', 'OC entregadas a tiempo / OC con fecha comprometida en el período (entregadas + tarde + vencidas) × 100', 'Consulta de OC y recepciones del Reporte Maestro', 'b', 'Por proveedor'],
+  provN:['OC nacionales con fecha comprometida en el período que el proveedor entregó en esa fecha o antes.', 'OC nacionales a tiempo / OC nacionales con fecha en el período (entregadas + tarde + vencidas) × 100', 'Consulta de OC y recepciones del Reporte Maestro', 'b', 'Por proveedor'],
+  provI:['OC importadas con fecha comprometida en el período que llegaron en esa fecha o antes.', 'OC importadas a tiempo / OC importadas con fecha en el período (entregadas + tarde + vencidas) × 100', 'Consulta de OC y recepciones del Reporte Maestro', 'b', 'Por proveedor'],
   bkl:['SKU pedidos a Compras que al cierre del período todavía no tienen OC.', 'Conteo de SKU con pedido y sin OC a la fecha de cierre', 'Reporte Maestro y Pedidos sin requerimiento', 'dias', 'Antigüedad (días hábiles sin OC)'],
   desp:['Requerimientos atendidos desde almacén dentro de la meta de días hábiles.', 'Despachos dentro de la meta / despachos medidos × 100', 'Reporte Maestro (fecha de requerimiento y de salida)', 'dias', 'Distribución de días hábiles'],
   gen:['Pedidos a Compras generados dentro de la meta desde que llegó el requerimiento.', 'Pedidos generados dentro de la meta / pedidos medidos × 100', 'Reporte Maestro (fecha de requerimiento y de pedido)', 'dias', 'Distribución de días hábiles'],
@@ -22384,13 +22393,14 @@ function gdPct(a, b){ return b ? a / b * 100 : null; }
 function gdNorm(t){ return String(t || '').trim().toUpperCase().replace(/\s+/g, ' '); }
 function gdCorto(t){ return String(t || '').replace(/\b(S\.?A\.?C?\.?|S\.?R\.?L\.?|E\.?I\.?R\.?L\.?|SOCIEDAD ANONIMA( CERRADA)?|LIMITADA|LIMITED|CO\.?,?\s*LTD\.?|INC\.?)\b/gi, '').replace(/[.,\s]+$/, '').trim(); }
 // Proveedores en el acumulado: monto (OC) y cumplimiento de entrega
-function gdProvAcum(r){ return appMemo('gdProv' + r.desde + r.hasta, function(){ const hoy = isoDay(new Date()), m = new Map(), G = gxGasto(r.desde, r.hasta);
+// org (11.11.2026, Piero: "proveedores debe estar separado en nacional e importado"): 'n' / 'i' / todos
+function gdProvAcum(r, org){ return appMemo('gdProv' + r.desde + r.hasta + (org || ''), function(){ const hoy = isoDay(new Date()), m = new Map(), G = gxGasto(r.desde, r.hasta), og = org === 'i' ? 'Importado' : 'Nacional';
   const get = function(n){ const k = gdNorm(n); let x = m.get(k); if(!x){ x = { n:n || '—', monto:0, ok:0, tarde:0, venc:0, oc:new Set() }; m.set(k, x); } return x; };
-  G.prov.forEach(function(v, n){ get(n).monto += v.v; });
-  gxOCs().forEach(function(g){ if(!gxEn(g.comp, r.desde, r.hasta)) return; const x = get(g.prov); x.oc.add(g.oc);
+  let tot = 0; G.items.forEach(function(it){ if(org && it.og !== og) return; get(it.pv).monto += it.m; tot += it.m; });
+  gxOCs().forEach(function(g){ if(!gxEn(g.comp, r.desde, r.hasta) || (org && (org === 'i') !== g.imp)) return; const x = get(g.prov); x.oc.add(g.oc);
     if(!g.abierta && g.rec) (g.rec <= g.comp ? x.ok++ : x.tarde++); else if(g.comp < hoy) x.venc++; });
-  const L = [...m.values()].map(function(x){ x.ent = x.ok + x.tarde + x.venc; x.cum = gdPct(x.ok, x.ent); x.pm = gdPct(x.monto, G.tot) || 0; return x; });
-  return { L:L.sort(function(a, b){ return b.monto - a.monto; }), tot:G.tot }; }); }
+  const L = [...m.values()].map(function(x){ x.ent = x.ok + x.tarde + x.venc; x.cum = gdPct(x.ok, x.ent); x.pm = gdPct(x.monto, tot) || 0; return x; });
+  return { L:L.sort(function(a, b){ return b.monto - a.monto; }), tot:tot }; }); }
 function gdDiasDe(x){ const m = /(-?\d+(?:[.,]\d+)?)\s*d\.h\./.exec(String(x.c || '')); return x.d != null ? x.d : m ? parseFloat(m[1].replace(',', '.')) : null; }
 function gdHistDias(L, cortes){ cortes = cortes || [[0, 2, '0–2 d'], [3, 5, '3–5 d'], [6, 10, '6–10 d'], [11, 20, '11–20 d'], [21, 1e9, 'Más de 20 d']];
   const v = cortes.map(function(c){ return { n:c[2], v:0, c:c[0] > 10 ? 'mal' : c[0] > 5 ? 'ojo' : '' }; }); L.forEach(function(x){ const d = gdDiasDe(x); if(d == null) return; const i = cortes.findIndex(function(c){ return d >= c[0] && d <= c[1]; }); if(i !== -1) v[i].v++; });
@@ -22426,23 +22436,33 @@ const GD_TABS = {
           <button type="button" class="gd-tb" data-gd="vencidas">${gdIc('list')}<span>Ver OC vencidas</span></button>` }; }],
     // Proveedores en simple (11.11.2026, Piero: "esto de proveedores no se entiende la verdad"): sin burbujas. Cumplimiento mes a mes,
     // quiénes fallan más y a quién se le compra más, cada uno con su % a tiempo en palabras.
-    prov:['shield', 'Proveedores', function(P){ const A = gdProvAcum(P.A), M = gdProvAcum(P.M), meta = RPT_META.aTiempo, e = escapeHtml, top = A.L.slice(0, 3), c3 = top.reduce(function(a, x){ return a + x.pm; }, 0);
-      const ent = A.L.reduce(function(a, x){ return [a[0] + x.ok, a[1] + x.ent]; }, [0, 0]), cm = gdVal('prov', P.M), mal = M.L.reduce(function(a, x){ return a + x.tarde + x.venc; }, 0), entM = M.L.reduce(function(a, x){ return a + x.ent; }, 0);
+    // Nacional e importado por separado (11.11.2026, Piero: "debe estar separado en nacional e importado para tener claro el indicador").
+    prov:['shield', 'Proveedores', function(P){ const meta = RPT_META.aTiempo, e = escapeHtml, W = gdW(P), O = { n:'Nacionales', i:'Importados' };
       const est = function(x){ return x.ent ? gdEstado(x.cum, meta, false) : 'nd'; }, nom = function(x){ return gdCorto(x.n); };
-      const fallan = M.L.filter(function(x){ return x.tarde + x.venc > 0; }).sort(function(p, q){ return (q.tarde + q.venc) - (p.tarde + p.venc); }).slice(0, 8);
-      const masCompra = A.L.filter(function(x){ return x.monto > 0; }).slice(0, 10);
+      const cuenta = function(r, org){ const o = gxEntregas(r.desde, r.hasta, org); return { ok:o.ok.length, ent:o.ok.length + o.tarde.length + o.venc.length }; };
       const fila = function(x, i, conMonto){ const c = x.cum == null ? '—' : appN(x.cum, 0) + '%';
         return `<button type="button" class="gd-pv" data-gd="prov|${e(x.n)}"><span class="gd-pvn"><b>${i + 1}. ${e(nom(x))}</b><small>${conMonto ? rptFmt(x.monto, { sol:1 }) + ' · ' + appN(x.pm, 1) + '% de lo comprado' : appN(x.tarde) + ' tarde · ' + appN(x.venc) + ' vencidas sin llegar'}</small></span>
           <span class="gd-pvb"><i class="${est(x)}" style="width:${x.cum == null ? 0 : Math.max(2, x.cum).toFixed(0)}%"></i><em style="left:${meta}%"></em></span><span class="gd-pvv"><b>${c}</b><small>${x.ent ? x.ok + ' de ' + x.ent + ' OC a tiempo' : 'sin OC con fecha'}</small></span>${gdPill(est(x))}</button>`; };
-      return { h1:'Solo <em>' + gdFmt('prov', cm) + '</em> de las OC llegó en su fecha en ' + e(P.M.nom) + '; la meta es ' + meta + '%',
-        cards:gdBig('OC que llegaron en su fecha · ' + e(P.M.etq), gdFmt('prov', cm), appN(entM - mal) + ' de ' + appN(entM) + ' OC · ' + gdDelta('prov', cm, gdVal('prov', P.P), P.P.etq).replace(/<[^>]+>/g, ''))
-          + gdBig('En lo que va del año · ' + e(P.A.etq.toLowerCase()), rptFmt(gdPct(ent[0], ent[1]), { pct:1 }), appN(ent[0]) + ' de ' + appN(ent[1]) + ' OC llegaron en su fecha')
-          + gdBig('Lo que se compra a los 3 principales', appN(c3, 1) + '%', top.map(function(x){ return e(nom(x)); }).join(', ')),
-        cuerpo:`<div class="gd-g2 par">${gdPan('¿Mejora el cumplimiento de los proveedores?', '% de OC que llegaron en su fecha, mes a mes · la línea punteada es la meta', gdGraf('gdprov1', P, 'prov'))}
-          ${gdPan('Los que más fallan en ' + e(P.M.nom), 'Proveedores con más OC tarde o vencidas en el mes · la barra es su % a tiempo', fallan.length ? `<div class="gd-pvs">${fallan.map(function(x, i){ return fila(x, i, false); }).join('')}</div>` : '<div class="gd-vacio">✓ Ningún proveedor tuvo OC tarde o vencidas.</div>')}</div>
-          ${gdPan('A quién se le compra más y si cumple', 'Los 10 proveedores con más monto en ' + e(P.A.etq) + ' · la barra es su % de OC a tiempo (la marca es la meta ' + meta + '%) · toca uno para ver sus OC', `<div class="gd-pvs">${masCompra.map(function(x, i){ return fila(x, i, true); }).join('')}</div>`)}
+      const lista = function(L, conMonto, vacio){ return L.length ? `<div class="gd-pvs">${L.map(function(x, i){ return fila(x, i, conMonto); }).join('')}</div>` : `<div class="gd-vacio">${vacio}</div>`; };
+      const D = {}; ['n', 'i'].forEach(function(o){ const M = gdProvAcum(P.M, o), A = gdProvAcum(P.A, o);
+        D[o] = { M:M, A:A, cm:cuenta(P.M, o), ca:cuenta(P.A, o), v:gdVal(o === 'n' ? 'provN' : 'provI', P.M),
+          fallan:M.L.filter(function(x){ return x.tarde + x.venc > 0; }).sort(function(p, q){ return (q.tarde + q.venc) - (p.tarde + p.venc); }).slice(0, 6),
+          mas:A.L.filter(function(x){ return x.monto > 0; }).slice(0, 8) }; });
+      const card = function(o){ const x = D[o], k = o === 'n' ? 'provN' : 'provI';
+        return gdBig('OC ' + O[o].toLowerCase() + ' en su fecha · ' + e(P.M.etq), gdFmt(k, x.v), appN(x.cm.ok) + ' de ' + appN(x.cm.ent) + ' OC · ' + gdDelta(k, x.v, gdVal(k, P.P), P.P.etq).replace(/<[^>]+>/g, '') + ' · en el año ' + rptFmt(gdPct(x.ca.ok, x.ca.ent), { pct:1 })); };
+      const top = function(o){ const t = D[o].A.L.slice(0, 3); return appN(t.reduce(function(a, x){ return a + x.pm; }, 0), 1) + '% a ' + t.map(function(x){ return e(nom(x)); }).join(', '); };
+      const todos = gdProvAcum(P.A).L.map(function(x){ x.org = []; ['n', 'i'].forEach(function(o){ if(D[o].A.L.some(function(y){ return y.n === x.n && (y.monto > 0 || y.ent > 0); })) x.org.push(O[o].slice(0, -1)); }); return x; });
+      return { h1:'En ' + e(P.M.nom) + ' llegó en su fecha el <em>' + gdFmt('provN', D.n.v) + '</em> de las OC nacionales y el <em>' + gdFmt('provI', D.i.v) + '</em> de las importadas; la meta es ' + meta + '%',
+        cards:card('n') + card('i') + gdBig('Concentración de lo comprado · ' + e(P.A.etq.toLowerCase()), appN(gdPct(D.n.A.tot, D.n.A.tot + D.i.A.tot), 0) + '% nacional', 'Nacional: ' + top('n') + '<br>Importado: ' + top('i')),
+        cuerpo:`${gdPan('¿Mejora el cumplimiento de los proveedores?', '% de OC que llegaron en su fecha, mes a mes, nacional e importado · la línea punteada es la meta', rptCombo('gdprov1', W, { pct:1, w:900, h:RQ_MQ.matches ? 190 : 250, alt:'Cumplimiento nacional e importado',
+            lines:[{ k:'n', n:'Nacional', c:'var(--gd-b)', v:P.serie.map(function(x){ return gdVal('provN', x); }) }, { k:'i', n:'Importado', c:'var(--gd-t)', v:P.serie.map(function(x){ return gdVal('provI', x); }) }],
+            refs:[{ v:meta, c:'var(--gd-bad)', dash:'5 4', w:1.6, ley:'Meta ' + meta + '%' }] }))}
+          <div class="gd-g2 par">${gdPan('Nacionales que más fallan en ' + e(P.M.nom), 'Más OC tarde o vencidas en el mes · la barra es su % a tiempo', lista(D.n.fallan, false, '✓ Ningún proveedor nacional tuvo OC tarde o vencidas.'))}
+            ${gdPan('Importados que más fallan en ' + e(P.M.nom), 'Más OC tarde o vencidas en el mes · la barra es su % a tiempo', lista(D.i.fallan, false, '✓ Ningún proveedor importado tuvo OC tarde o vencidas.'))}</div>
+          <div class="gd-g2 par">${gdPan('A quién se le compra más · nacional', 'Más monto en ' + e(P.A.etq) + ' · la barra es su % de OC a tiempo (marca: meta ' + meta + '%) · toca uno para ver sus OC', lista(D.n.mas, true, 'Sin compras nacionales.'))}
+            ${gdPan('A quién se le compra más · importado', 'Más monto en ' + e(P.A.etq) + ' · la barra es su % de OC a tiempo (marca: meta ' + meta + '%) · toca uno para ver sus OC', lista(D.i.mas, true, 'Sin compras importadas.'))}</div>
           <h3 class="gd-h3">Acciones de mejora con proveedores</h3>${gdAccHtml('gdcom', 1)}
-          ${gdAcordeon('Detalle de todos los proveedores', gdTabla(['Proveedor', 'Monto', '% del monto', 'OC con fecha', 'A tiempo', 'Tarde', 'Vencidas', 'Cumplimiento', 'Estado'], A.L.slice(0, 60).map(function(x){ return [`<button type="button" class="gd-lnk" data-gd="prov|${e(x.n)}">${e(x.n)}</button>`, rptFmt(x.monto, { sol:1 }), appN(x.pm, 1) + '%', appN(x.ent), appN(x.ok), appN(x.tarde), appN(x.venc), x.cum == null ? '—' : appN(x.cum, 1) + '%', gdPill(est(x))]; }), [1, 2, 3, 4, 5, 6, 7]))}` }; }],
+          ${gdAcordeon('Detalle de todos los proveedores', gdTabla(['Proveedor', 'Origen', 'Monto', '% del monto', 'OC con fecha', 'A tiempo', 'Tarde', 'Vencidas', 'Cumplimiento', 'Estado'], todos.slice(0, 60).map(function(x){ return [`<button type="button" class="gd-lnk" data-gd="prov|${e(x.n)}">${e(x.n)}</button>`, e(x.org.join(' e ') || '—'), rptFmt(x.monto, { sol:1 }), appN(x.pm, 1) + '%', appN(x.ent), appN(x.ok), appN(x.tarde), appN(x.venc), x.cum == null ? '—' : appN(x.cum, 1) + '%', gdPill(est(x))]; }), [2, 3, 4, 5, 6, 7, 8]))}` }; }],
     flujo:['trend', 'Flujo de pedidos', function(P){ const F = gxFlujo(P.M.desde, P.M.hasta), H = gxFlujo(isoDay(P.corte), isoDay(P.corte)).bkl, tr = gdHistDias(H, [[0, 2, '0–2 días'], [3, 5, '3–5 días'], [6, 10, '6–10 días'], [11, 1e9, 'Más de 10 días']]);
       return { h1:'Entraron <em>' + appN(F.ent.length) + ' SKU</em> y salieron ' + appN(F.sal.length) + ' en OC; quedan ' + appN(F.bkl.length) + ' sin OC al cierre',
         cards:gdBig('SKU pedidos a Compras · ' + escapeHtml(P.M.etq), appN(F.ent.length), appN(F.entReq.length) + ' con requerimiento · ' + appN(F.entDir.length) + ' directos') + gdBig('SKU puestos en OC · ' + escapeHtml(P.M.etq), appN(F.sal.length), appN(F.ocL.length) + ' OC · ' + appN(F.salI.length) + ' SKU importados') + gdBig('SKU sin OC hoy', appN(H.length), 'pedidos que todavía esperan OC', 'AL CORTE'),
