@@ -3632,6 +3632,12 @@ button.pm-lx-f{cursor:pointer;} button.pm-lx-f:hover{border-color:#b9c6d8;} .pm-
 @media (max-width:1100px){ .cqc{grid-template-columns:1fr;} }
 @media (max-width:760px){ .cqc-sms{grid-template-columns:1fr;} .cqc-tr{grid-template-columns:1fr auto;} .cqc-tv{grid-column:2;} .cqc-tb{grid-column:1 / -1;grid-row:2;} }
 
+/* Inventario en Supervisor: solo stock (v372) */
+.iv-f-sd{grid-column:1 / -1;display:flex;gap:10px;font-size:11.5px;color:var(--ink-soft);} .iv-f-sd b{color:var(--ink);}
+.iv-sup .td-fila.iv-sf{grid-template-columns:42px minmax(0,1fr) 84px 70px 70px 84px 110px;} .iv-sf-t{text-align:right;} .iv-sf-t b{display:block;font-size:16px;font-weight:800;color:var(--ink);} .iv-sf-t small{font-size:11px;color:var(--ink-soft);}
+.iv-sup-tit{display:flex;align-items:center;gap:10px;margin:6px 0 12px;} .iv-sup-tit b{font-size:18px;font-weight:800;color:var(--ink);} .iv-sup-tit small{font-size:12.5px;color:var(--ink-soft);}
+@media (max-width:900px){ .iv-sup .td-fila.iv-sf{grid-template-columns:38px minmax(0,1fr) 64px;} .iv-sup .iv-sf-t{display:none;} }
+
 @media (prefers-reduced-motion: reduce){ .lz *, .app-bienv *, .pm *, .pmx *{animation:none !important;transition:none !important;} }
 </style>
 </head>
@@ -17679,17 +17685,22 @@ const INV_ZONAS = [
   { k:'zramp', t:'Zona de rampas', x:446, y:624, w:48, h:68, f:[] }
 ];
 const APP_INVZ = { z:'' };
+// Supervisor (12.11.2026, Piero: "solo debe salir la cantidad que tenemos, no datos de consumo"): el mapa y las tarjetas cuentan
+// códigos con stock (no US$, ni reposición, ni rotación) y al entrar a una familia sale la lista simple de stock por sede.
+function invSup(){ return APP.vista === 'super'; }
+function invMet(m){ return m ? (invSup() ? m.con : m.usd) : 0; }
+function invMetTxt(v){ return invSup() ? appN(v) + ' código' + (v === 1 ? '' : 's') : cqM(v); }
 function invZonaDe(fam){ return INV_ZONAS.find(function(z){ return z.f.indexOf(fam) !== -1; }) || null; }
 // Valor y códigos por familia (stock en Lurín + sedes × costo unitario del Reporte Almacén)
 function invFamResumen(){ return appMemo('invFamRes', function(){ const M = new Map();
-  appInvIndice().items.forEach(function(x){ const f = x.famU || 'OTROS', m = M.get(f) || { f:f, n:0, con:0, usd:0, rep:0, sinmov:0, lima:0 }; m.n++;
+  appInvIndice().items.forEach(function(x){ const f = x.famU || 'OTROS', m = M.get(f) || { f:f, n:0, con:0, usd:0, rep:0, sinmov:0, lima:0, cL:0, cI:0, cT:0 }; m.n++; if(x.r.lima > 0) m.cL++; if(x.r.ica > 0) m.cI++; if(x.r.trujillo > 0) m.cT++;
     if(x.tot > 0){ m.con++; m.usd += x.tot * (x.r.costoUnit || 0); m.lima += (x.r.lima || 0) * (x.r.costoUnit || 0); } if(x.e === 'reponer' || x.e === 'sin') m.rep++; if(x.e === 'sinmov') m.sinmov++; M.set(f, m); });
   return M; }); }
 function invSvgHtml(R){ const e = escapeHtml, sel = APP_INVZ.z;
-  const val = function(z){ return z.f.reduce(function(a, f){ const m = R.get(f); return a + (m ? m.usd : 0); }, 0); }, mx = Math.max.apply(null, [1].concat(INV_ZONAS.map(val)));
+  const val = function(z){ return z.f.reduce(function(a, f){ return a + invMet(R.get(f)); }, 0); }, mx = Math.max.apply(null, [1].concat(INV_ZONAS.map(val)));
   const zs = INV_ZONAS.map(function(z){ const v = val(z), con = z.f.length, op = con ? (0.18 + 0.62 * v / mx).toFixed(2) : 0, chica = z.w < 70 || z.h < 40;
-    return `<g class="iz${con ? ' con' : ''}${z.no ? ' no' : ''}${sel === z.k ? ' sel' : ''}"${con ? ` data-invz="${z.k}" tabindex="0"` : ''} data-tip="${e(z.t)}|${con ? cqM(v) + ' · ' + z.f.length + ' familia' + (z.f.length === 1 ? '' : 's') : z.no ? 'Sin stock (operación)' : 'Sin familias asignadas'}">
-      <rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="4" style="--o:${op}"/>${chica ? '' : `<text x="${z.x + 8}" y="${z.y + 17}" class="izt">${e(z.t)}</text>${z.s ? `<text x="${z.x + 8}" y="${z.y + 30}" class="izs">${e(z.s)}</text>` : ''}${con && v ? `<text x="${z.x + 8}" y="${z.y + z.h - 9}" class="izv">${e(cqM(v))}</text>` : ''}`}</g>`; }).join('');
+    return `<g class="iz${con ? ' con' : ''}${z.no ? ' no' : ''}${sel === z.k ? ' sel' : ''}"${con ? ` data-invz="${z.k}" tabindex="0"` : ''} data-tip="${e(z.t)}|${con ? invMetTxt(v) + ' · ' + z.f.length + ' familia' + (z.f.length === 1 ? '' : 's') : z.no ? 'Sin stock (operación)' : 'Sin familias asignadas'}">
+      <rect x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="4" style="--o:${op}"/>${chica ? '' : `<text x="${z.x + 8}" y="${z.y + 17}" class="izt">${e(z.t)}</text>${z.s ? `<text x="${z.x + 8}" y="${z.y + 30}" class="izs">${e(z.s)}</text>` : ''}${con && v ? `<text x="${z.x + 8}" y="${z.y + z.h - 9}" class="izv">${e(invMetTxt(v))}</text>` : ''}`}</g>`; }).join('');
   return `<div class="iv-mapa"><svg viewBox="0 0 590 730" role="img" aria-label="Layout del almacén de Lurín"><path class="iz-muro" d="M1 1H318V160H588V728H1Z"/>${zs}
     <path class="iz-pas" d="M296 160V726M386 160V726M290 330H300M290 474H300"/></svg><div class="iv-tip" id="ivTip" hidden></div>
     <div class="iv-ley"><span><i class="a"></i>Más valor guardado</span><span><i class="b"></i>Menos</span><span><i class="c"></i>Operación / sin stock</span></div></div>`; }
@@ -17698,7 +17709,7 @@ function invMapaHtml(R){
     <div class="iv3d" id="iv3d"><div class="iv3-etq"></div><div class="iv3-carga"><i></i>Armando el almacén en 3D…</div>
       <div class="iv3-ctl"><button type="button" data-iv3="girar" title="Girar 90°" aria-label="Girar 90°"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v5h-5"/></svg></button><button type="button" data-iv3="planta" title="Vista de planta">Planta</button><button type="button" data-iv3="reset" title="Vista 3D">3D</button><button type="button" data-iv3="mas" aria-label="Acercar">+</button><button type="button" data-iv3="menos" aria-label="Alejar">−</button></div></div>
     <div class="iv-tip" id="ivTip" hidden></div>
-    <div class="iv-ley"><span><i class="a"></i>Más valor guardado (racks más altos)</span><span><i class="b"></i>Menos</span><span><i class="c"></i>Operación / sin stock</span></div></div>`; }
+    <div class="iv-ley"><span><i class="a"></i>${invSup() ? 'Más códigos con stock' : 'Más valor guardado'} (racks más altos)</span><span><i class="b"></i>Menos</span><span><i class="c"></i>Operación / sin stock</span></div></div>`; }
 // ---- Vista 3D del almacén de Lurín (12.11.2026, Piero: "debe ser una vista 3D dinámica e interactiva") ----
 // Three.js (cdnjs) se carga solo al entrar a Inventario. Cada zona del plano es un bloque; las zonas con familias muestran racks
 // (o equipos en el patio) cuya altura sigue al valor guardado. Arrastrar gira, rueda / pellizco acerca, tocar una zona filtra.
@@ -17737,7 +17748,7 @@ function iv3Construir(R){
   // Pasillos (líneas punteadas del plano)
   const pas = new T.LineDashedMaterial({ color:P.borde, dashSize:6, gapSize:6 });
   [[296,160,296,726],[386,160,386,726]].forEach(function(s){ const l = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(iv3X(s[0]), .4, iv3Z(s[1])), new T.Vector3(iv3X(s[2]), .4, iv3Z(s[3]))]), pas); l.computeLineDistances(); g.add(l); });
-  const val = function(z){ return z.f.reduce(function(a, f){ const m = R.get(f); return a + (m ? m.usd : 0); }, 0); }, mx = Math.max.apply(null, [1].concat(INV_ZONAS.map(val)));
+  const val = function(z){ return z.f.reduce(function(a, f){ return a + invMet(R.get(f)); }, 0); }, mx = Math.max.apply(null, [1].concat(INV_ZONAS.map(val)));
   const cBajo = new T.Color(P.bajo), cAlto = new T.Color(P.alto), mLin = new T.LineBasicMaterial({ color:P.linea, transparent:true, opacity:.35 });
   const caja = function(z, w, h, d, x, y, zz, col, op){ const mat = new T.MeshStandardMaterial({ color:col, roughness:.55, metalness:.05, transparent:true, opacity:op || 1 });
     const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat); m.position.set(x, y, zz); m.castShadow = true; m.receiveShadow = true; m.userData = { z:z.k, base:col, op:op || 1 }; g.add(m); IV3.objs.push(m); return m; };
@@ -17775,7 +17786,7 @@ function iv3Pintar(){ if(!IV3.r || !IV3.el || !IV3.el.isConnected) return; const
   const caja = IV3.el.getBoundingClientRect(), W = caja.width, H = caja.height, capa = IV3.el.querySelector('.iv3-etq'); if(!capa) return;
   let html = ''; IV3.etq.forEach(function(e){ if(!(e.con || e.z.no) || (e.chica && e.z.k !== IV3.hov && e.z.k !== sel)) return; if(e.z.no && !(e.z.w > 70 && e.z.h > 60)) return;
     const p = e.p.clone().project(IV3.cam); if(p.z > 1) return; const x = (p.x + 1) / 2 * W, y = (1 - p.y) / 2 * H; if(x < -40 || x > W + 40 || y < -20 || y > H + 20) return;
-    html += `<span class="iv3-l${e.con ? ' con' : ''}${e.z.k === sel ? ' sel' : ''}" style="transform:translate(${x.toFixed(0)}px,${y.toFixed(0)}px)"><b>${escapeHtml(e.z.t)}</b>${e.con && e.v ? `<i>${escapeHtml(cqM(e.v))}</i>` : ''}</span>`; });
+    html += `<span class="iv3-l${e.con ? ' con' : ''}${e.z.k === sel ? ' sel' : ''}" style="transform:translate(${x.toFixed(0)}px,${y.toFixed(0)}px)"><b>${escapeHtml(e.z.t)}</b>${e.con && e.v ? `<i>${escapeHtml(invMetTxt(e.v))}</i>` : ''}</span>`; });
   capa.innerHTML = html; }
 function iv3Animar(a, ms, fin){ cancelAnimationFrame(IV3.anim); const ini = {}, t0 = performance.now(); Object.keys(a).forEach(function(k){ ini[k] = IV3[k]; });
   const paso = function(t){ const u = Math.min(1, (t - t0) / ms), e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
@@ -17786,7 +17797,7 @@ function iv3Pick(ev){ if(!IV3.r) return ''; const b = IV3.r.domElement.getBoundi
   rc.setFromCamera(m, IV3.cam); const h = rc.intersectObjects(IV3.objs, false)[0]; return h ? h.object.userData.z : ''; }
 function iv3Tip(ev, k){ const t = document.getElementById('ivTip'); if(!t) return; const z = k && INV_ZONAS.find(function(q){ return q.k === k; });
   if(!z){ t.hidden = true; return; } const e = IV3.etq.find(function(q){ return q.z === z; }), r = t.parentNode.getBoundingClientRect();
-  t.innerHTML = `<b>${escapeHtml(z.t)}</b><span>${z.f.length ? escapeHtml(cqM(e ? e.v : 0)) + ' · ' + z.f.length + ' familia' + (z.f.length === 1 ? '' : 's') + ' · toca para filtrar' : z.no ? 'Operación (sin stock)' : 'Sin familias asignadas'}</span>`; t.hidden = false;
+  t.innerHTML = `<b>${escapeHtml(z.t)}</b><span>${z.f.length ? escapeHtml(invMetTxt(e ? e.v : 0)) + ' · ' + z.f.length + ' familia' + (z.f.length === 1 ? '' : 's') + ' · toca para filtrar' : z.no ? 'Operación (sin stock)' : 'Sin familias asignadas'}</span>`; t.hidden = false;
   t.style.left = Math.min(r.width - 210, Math.max(0, ev.clientX - r.left + 14)) + 'px'; t.style.top = Math.max(0, ev.clientY - r.top + 14) + 'px'; }
 function iv3Eventos(cv){
   cv.addEventListener('pointerdown', function(ev){ cv.setPointerCapture(ev.pointerId); IV3.puntos.set(ev.pointerId, { x:ev.clientX, y:ev.clientY }); IV3.arr = { x:ev.clientX, y:ev.clientY, mov:0, d0:0 }; cancelAnimationFrame(IV3.anim);
@@ -17810,7 +17821,7 @@ function iv3Montar(){
   const el = document.getElementById('iv3d'); if(!el || el.dataset.ok) return; el.dataset.ok = '1';
   if(!iv3Hay()){ el.closest('.iv-mapa').outerHTML = invSvgHtml(invFamResumen()); return; }
   appCargarThree().then(function(){ if(!el.isConnected) return;
-    const R = invFamResumen(), clave = (iv3Oscuro() ? 'o' : 'c') + R.size;
+    const R = invFamResumen(), clave = (iv3Oscuro() ? 'o' : 'c') + (invSup() ? 's' : 'v') + R.size;
     if(!IV3.r){ IV3.r = new THREE.WebGLRenderer({ antialias:true, alpha:true }); IV3.r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); IV3.r.shadowMap.enabled = true; IV3.r.shadowMap.type = THREE.PCFSoftShadowMap;
       IV3.r.domElement.className = 'iv3-cv'; IV3.cam = new THREE.PerspectiveCamera(34, 1, 10, 5000); iv3Eventos(IV3.r.domElement);
       IV3.ro = new ResizeObserver(function(){ iv3Tamano(); }); }
@@ -17825,21 +17836,23 @@ document.addEventListener('click', function(ev){ const b = ev.target.closest && 
   else if(a === 'girar') iv3Animar({ th:IV3.th - Math.PI / 2 }, 1300);
   else if(a === 'mas') iv3Animar({ d:Math.max(420, IV3.d * .8) }, 500); else if(a === 'menos') iv3Animar({ d:Math.min(2000, IV3.d * 1.25) }, 500); });
 // Optimización: solo se mira el cambio de tema (antes se observaba todo el documento); el 3D se monta desde appInvFamilias
-new MutationObserver(function(){ if(IV3.r && IV3.el && IV3.el.isConnected){ const c = (iv3Oscuro() ? 'o' : 'c') + invFamResumen().size; if(c !== IV3.clave){ iv3Construir(invFamResumen()); IV3.clave = c; iv3Pintar(); } } })
+new MutationObserver(function(){ if(IV3.r && IV3.el && IV3.el.isConnected){ const c = (iv3Oscuro() ? 'o' : 'c') + (invSup() ? 's' : 'v') + invFamResumen().size; if(c !== IV3.clave){ iv3Construir(invFamResumen()); IV3.clave = c; iv3Pintar(); } } })
   .observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
 
 function appInvFamilias(){
   const e = escapeHtml, R = invFamResumen(), sel = APP_INVZ.z, Z = sel ? INV_ZONAS.find(function(z){ return z.k === sel; }) : null;
-  const fams = [...R.values()].filter(function(m){ return m.con || invFamTodos(m.f); }).sort(function(a, b){ return b.usd - a.usd || a.f.localeCompare(b.f, 'es'); });
+  const SUP = invSup(), fams = [...R.values()].filter(function(m){ return m.con || invFamTodos(m.f); }).sort(function(a, b){ return invMet(b) - invMet(a) || a.f.localeCompare(b.f, 'es'); });
   const ver = Z ? fams.filter(function(m){ return Z.f.indexOf(m.f) !== -1; }) : fams, tot = fams.reduce(function(a, m){ return a + m.usd; }, 0), lima = fams.reduce(function(a, m){ return a + m.lima; }, 0);
-  const n = function(k){ return fams.reduce(function(a, m){ return a + m[k]; }, 0); }, mxF = Math.max.apply(null, [1].concat(fams.map(function(m){ return m.usd; })));
+  const n = function(k){ return fams.reduce(function(a, m){ return a + m[k]; }, 0); }, mxF = Math.max.apply(null, [1].concat(fams.map(function(m){ return invMet(m); })));
   const tarjeta = function(m, i){ const z = invZonaDe(m.f);
     return `<button type="button" class="iv-f" data-invfam="${e(m.f)}" style="--i:${Math.min(i, 16)}"><span class="iv-f-t"><b>${e(m.f.charAt(0) + m.f.slice(1).toLowerCase())}</b><small>${z ? e(z.t) : 'Sin zona asignada'}</small></span>
-      <span class="iv-f-v"><b>${m.usd ? cqM(m.usd) : '—'}</b><small>${appN(m.con)} códigos con stock</small></span><span class="iv-f-bar"><i style="width:${(m.usd / mxF * 100).toFixed(1)}%"></i></span>
-      ${m.rep ? `<em class="iv-f-r" title="Códigos para reponer">${appN(m.rep)} por reponer</em>` : ''}</button>`; };
+      ${SUP ? `<span class="iv-f-v"><b>${appN(m.con)}</b><small>códigos con stock</small></span><span class="iv-f-bar"><i style="width:${(m.con / mxF * 100).toFixed(1)}%"></i></span><span class="iv-f-sd"><span>Lurín <b>${appN(m.cL)}</b></span><span>Ica <b>${appN(m.cI)}</b></span><span>Trujillo <b>${appN(m.cT)}</b></span></span>`
+        : `<span class="iv-f-v"><b>${m.usd ? cqM(m.usd) : '—'}</b><small>${appN(m.con)} códigos con stock</small></span><span class="iv-f-bar"><i style="width:${(m.usd / mxF * 100).toFixed(1)}%"></i></span>
+      ${m.rep ? `<em class="iv-f-r" title="Códigos para reponer">${appN(m.rep)} por reponer</em>` : ''}`}</button>`; };
   return `<div class="iv">
-    <div class="iv-head"><div class="iv-tot"><small>Almacén Lurín y sedes · valor del stock</small><b>${cqM(tot)}</b><span>Lurín: <b>${cqM(lima)}</b> · ${appN(n('con'))} códigos con stock</span></div>
-      <div class="iv-ks"><div class="iv-k"><b>${appN(fams.length)}</b><small>familias</small></div><div class="iv-k rep"><b>${appN(n('rep'))}</b><small>códigos por reponer</small></div><div class="iv-k mov"><b>${appN(n('sinmov'))}</b><small>sin movimiento (6 meses)</small></div></div></div>
+    ${SUP ? `<div class="iv-head"><div class="iv-tot"><small>Almacén Lurín y sedes · lo que tenemos</small><b>${appN(n('con'))}</b><span>códigos con stock en ${appN(fams.length)} familias</span></div>
+      <div class="iv-ks"><div class="iv-k"><b>${appN(n('cL'))}</b><small>con stock en Lurín</small></div><div class="iv-k"><b>${appN(n('cI'))}</b><small>con stock en Ica</small></div><div class="iv-k"><b>${appN(n('cT'))}</b><small>con stock en Trujillo</small></div></div></div>` : `<div class="iv-head"><div class="iv-tot"><small>Almacén Lurín y sedes · valor del stock</small><b>${cqM(tot)}</b><span>Lurín: <b>${cqM(lima)}</b> · ${appN(n('con'))} códigos con stock</span></div>
+      <div class="iv-ks"><div class="iv-k"><b>${appN(fams.length)}</b><small>familias</small></div><div class="iv-k rep"><b>${appN(n('rep'))}</b><small>códigos por reponer</small></div><div class="iv-k mov"><b>${appN(n('sinmov'))}</b><small>sin movimiento (6 meses)</small></div></div></div>`}
     <div class="iv-cuerpo">${invMapaHtml(R)}
       <div class="iv-lista"><div class="iv-lt">${Z ? `<span class="pmf-fil pend">${e(Z.t)} <b>${appN(ver.length)}</b><button type="button" data-invz="${Z.k}" aria-label="Quitar filtro">×</button></span>` : `<b>Familias</b><small>Toca una zona del plano para ver qué se guarda ahí</small>`}</div>
         <div class="iv-fs">${ver.map(tarjeta).join('') || '<div class="pmf-vacio">Esta zona no tiene familias asignadas.</div>'}</div></div></div></div>` + (setTimeout(iv3Montar, 0), '');
@@ -20767,7 +20780,15 @@ const APP_INV_PRIMEROS = 40;
 // VÁLVULAS CHECK (03.11.2026, Piero: "no salen en la familia" las juntas de 6", 8" y 10" porque no tienen stock).
 function invFamTodos(fam){ return fam === 'TUBERÍAS SCH' || fam === 'JUNTAS Y VÁLVULAS CHECK'; }
 function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ return (x.e !== 'nada' || invFamTodos(fam)) && x.famU === fam; }).map(function(x){ return x.r; }); }
+// Supervisor: solo lo que hay (stock por sede y en camino), sin Pareto, reposición ni consumo
+function invSupFila(x){ const r = x.r, e = escapeHtml, n = function(v, t, cls){ return `<span class="td-n k-${t === 'Lurín' ? 'l' : 'o'} ${v > 0 ? cls || 'si' : 'no'}"><b>${v > 0 ? appN(v, 2) : '—'}</b><small>${t}</small></span>`; };
+  return `<div class="rqm-card td-c td-fila iv-sf"><span class="td-fi">${iconForFamilia(sinAcentos(x.famU || ''))}</span><span class="td-ft"><b>${e(r.descripcion || r.codigo)}</b><small><span class="cod">${e(r.codigo)}</span> · ${e(r.unidad || '')}</small></span>
+    ${n(r.lima, 'Lurín', 'l')}${n(r.ica, 'Ica')}${n(r.trujillo, 'Trujillo')}${n(r.transito, 'En camino', 'c')}<span class="iv-sf-t"><b>${appN(x.tot, 2)}</b><small>${e(r.unidad || '')} en total</small></span></div>`; }
+function invSupLista(L, tit){ const l = L.filter(function(x){ return x.tot > 0 || x.r.transito > 0; }).sort(function(a, b){ return (b.r.lima || 0) - (a.r.lima || 0) || b.tot - a.tot; });
+  return `<div class="td rqm iv-sup">${tit || ''}${l.slice(0, 400).map(invSupFila).join('') || '<div class="pmf-vacio">Sin stock.</div>'}${l.length > 400 ? `<div class="td-res">Mostrando 400 de ${appN(l.length)}: busca por código o descripción para afinar.</div>` : ''}</div>`; }
 function appInvFamiliaHtml(){
+  if(invSup()){ const L = appInvIndice().items.filter(function(x){ return x.famU === APP_INV.fam; }), f = String(APP_INV.fam).toLowerCase();
+    return invSupLista(L, `<button type="button" class="m-volver" data-invfam="">‹ Todas las familias</button><div class="iv-sup-tit">${iconForFamilia(sinAcentos(APP_INV.fam))}<b>${escapeHtml(f.charAt(0).toUpperCase() + f.slice(1))}</b><small>${appN(L.filter(function(x){ return x.tot > 0; }).length)} códigos con stock</small></div>`); }
   return invParetoHtml({ label:APP_INV.fam, rows:appInvFamRows(APP_INV.fam) }, true);
 }
 function appInvKdxHtml(){   // el gráfico lo pone appInvKdxPintar después de poner el HTML (ver appRenderInicio)
@@ -20786,6 +20807,7 @@ function appInvLista(){
   if(!APP_INV.q && APP_INV.fam) return appInvFamiliaHtml();
   if(!APP_INV.q && !APP_INV.fam) return appInvFamilias();
   const l = appInvFiltrada();
+  if(invSup() && l.length) return invSupLista(l, APP_INV.q ? '' : `<button type="button" class="m-volver" data-invfam="">‹ Todas las familias</button>`);
   if(!l.length) return `<div class="ini-vacio">${APP_INV.q ? 'Ningún producto con "' + escapeHtml(APP_INV.q) + '".' : 'Nada en este grupo. ✅'}</div>`;
   setTimeout(appInvCompletar, 0);
   return (APP_INV.q ? '' : `<button type="button" class="m-volver" data-invfam="">‹ Todas las familias</button><div class="m-fam-tit">${iconForFamilia(sinAcentos(APP_INV.fam))} ${escapeHtml(APP_INV.fam)} <small>${appN(l.length)} productos</small></div>`)
