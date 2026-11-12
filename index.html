@@ -3621,6 +3621,9 @@ button.pm-lx-f{cursor:pointer;} button.pm-lx-f:hover{border-color:#b9c6d8;} .pm-
 .cqc-tv{text-align:right;} .cqc-tv b{display:block;font-size:14px;font-weight:800;color:var(--ink);} .cqc-tv small{font-size:11px;color:var(--ink-soft);margin-right:2px;}
 .cqc-q{display:block;width:100%;height:auto;} .cqc-hit{fill:transparent;} .cqc-col[data-cqcel]{cursor:pointer;} .cqc-col[data-cqcel]:hover .cqc-hit{fill:var(--surface-2);} .cqc-q rect{cursor:pointer;transition:opacity .2s;} .cqc-q rect:hover{opacity:.8;} .cqc-v{font:800 10px Inter,sans-serif;fill:var(--ink-soft);text-anchor:middle;} .cqc-v.a{fill:var(--ink);}
 .cqd-tp{font-weight:700;color:#0f7896;}
+.cqc-yt{display:inline-flex;gap:4px;background:var(--surface-2);border-radius:12px;padding:4px;} .cqc-yt button{border:0;background:none;font:800 13px Inter,sans-serif;color:var(--ink-soft);padding:7px 16px;border-radius:9px;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s;}
+.cqc-yt button.on{background:var(--card);color:var(--ink);box-shadow:0 4px 12px -6px rgba(16,24,40,.35);} .cqc-yt button:not(.on):hover{color:var(--ink);}
+.cqc-card > .cqc-ley{margin:-4px 0 6px;} .cqc-q rect[data-altip]{transform-origin:bottom;transform-box:fill-box;animation:cqcSube .7s var(--pz-ease) both;} @keyframes cqcSube{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 @media (max-width:1100px){ .cqc{grid-template-columns:1fr;} }
 @media (max-width:760px){ .cqc-sms{grid-template-columns:1fr;} .cqc-tr{grid-template-columns:1fr auto;} .cqc-tv{grid-column:2;} .cqc-tb{grid-column:1 / -1;grid-row:2;} }
 
@@ -17522,31 +17525,34 @@ function cqGraficosHtml(F){ const e = escapeHtml, A3 = CQ_APL.filter(function(a)
     const pts = function(s, y, cls){ return s.map(function(v, i){ return v ? `<circle cx="${X(i)}" cy="${Y(v)}" r="3.6" class="${cls}" data-altip="${a[1]} · ${MES[i]} ${y}|${cqM(v)}" data-tipc="neu"/>` : ''; }).join(''); };
     return `<div class="cqc-sm" style="--c:${a[2]}"><div class="cqc-h"><span><i></i>${a[1]}</span><b>${cqM(ta)}</b>${cqVar(ta, tbHasta)}</div><small>${F.yB} a la misma fecha: ${cqM(tbHasta)} · todo ${F.yB}: ${cqM(tb)}</small>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Compras por mes de ${a[1]}">${ejes}<path d="${linea(sb)}" class="cqc-lb"/><path d="${linea(sa)}" class="cqc-la"/>${pts(sb, F.yB, 'cqc-pb')}${pts(sa, F.yA, 'cqc-pa')}</svg></div>`; }).join('');
-  // Columnas verticales apiladas por aplicación: año anterior (claro) a la izquierda y actual a la derecha, en cada grupo
-  const columnas = function(G, alto, sel){ const n = G.length, QW = Math.max(520, n * 130), QH = alto, qpl = 44, qpb = 44, qpt = 22, gw = (QW - qpl - 10) / n, bw = Math.min(38, gw * .3);
-    const suma = function(z){ return z.reduce(function(s, y){ return s + y[1]; }, 0); }, mxQ = Math.max.apply(null, [1].concat([].concat.apply([], G.map(function(o){ return [suma(o.a), suma(o.b)]; })))), QY = function(v){ return (QH - qpb - qpt) * v / mxQ; };
-    const col = function(z, x, y, op, o){ let base = QH - qpb; return z.map(function(s){ if(!s[1]) return ''; const h = QY(s[1]); base -= h; return `<rect x="${x.toFixed(1)}" y="${(base + 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0, h - 2).toFixed(1)}" rx="3" fill="${s[0][2]}" opacity="${op}" data-altip="${o.lab} · ${s[0][1]} ${y}|${cqM(s[1])}" data-tipc="neu"/>`; }).join(''); };
+  function porApl(L){ return CQ_APL.map(function(a){ return [a, cqUsd(L, function(x){ return cqAplK(x) === a[0]; })]; }); }
+  // Barras agrupadas (12.11.2026, Piero: "glicol, amoníaco y freón uno al lado del otro, en barras, con tarjetas para ver 2025 y 2026"):
+  // en cada grupo una barra por aplicación del año elegido arriba con las tarjetas.
+  const yS = APP_CQ.cy === F.yB ? F.yB : F.yA, deAnio = function(o){ return yS === F.yA ? o.a : o.b; };
+  const APLs = CQ_APL.filter(function(a){ return a[0] !== 'otr' || [].concat(TGx(), QGx()).some(function(o){ return o.a.concat(o.b).some(function(z){ return z[0][0] === 'otr' && z[1]; }); }); });
+  const columnas = function(G, alto, sel){ const n = G.length, QW = Math.max(560, n * 150), QH = alto, qpl = 44, qpb = 42, qpt = 22, gw = (QW - qpl - 10) / n, nb = APLs.length, bw = Math.min(30, (gw - 26) / nb - 4);
+    const mxQ = Math.max.apply(null, [1].concat([].concat.apply([], G.map(function(o){ return deAnio(o).map(function(z){ return z[1]; }); })))), QY = function(v){ return (QH - qpb - qpt) * v / mxQ; };
     const eje = [0, .5, 1].map(function(f){ const v = mxQ * f, y = QH - qpb - QY(v); return `<line x1="${qpl}" x2="${QW - 6}" y1="${y}" y2="${y}" class="cqc-g"/><text x="${qpl - 6}" y="${y + 3}" class="cqc-y">${k$(v)}</text>`; }).join('');
-    const cols = G.map(function(o, i){ const cx = qpl + gw * i + gw / 2, ta = suma(o.a), tb = suma(o.b), xa = cx + 3, xb = cx - bw - 3;
-      return `<g class="cqc-col"${o.k ? ` data-cqcel="*|*|${o.k}"` : ''}><rect x="${(cx - gw / 2 + 4).toFixed(1)}" y="${qpt - 14}" width="${(gw - 8).toFixed(1)}" height="${QH - qpt - qpb + 14}" rx="10" class="cqc-hit"/>
-        ${col(o.b, xb, F.yB, .35, o)}${o.fut ? '' : col(o.a, xa, F.yA, 1, o)}
-        <text x="${xb + bw / 2}" y="${QH - qpb - QY(tb) - 5}" class="cqc-v">${tb ? k$(tb) : ''}</text>${o.fut ? '' : `<text x="${xa + bw / 2}" y="${QH - qpb - QY(ta) - 5}" class="cqc-v a">${ta ? k$(ta) : ''}</text>`}
-        <text x="${xb + bw / 2}" y="${QH - qpb + 13}" class="cqc-x s">${F.yB}</text><text x="${xa + bw / 2}" y="${QH - qpb + 13}" class="cqc-x s">${o.fut ? '' : F.yA}</text>
-        <text x="${cx}" y="${QH - qpb + 30}" class="cqc-x q">${o.lab}</text>${o.sub ? `<text x="${cx}" y="${QH - qpb + 42}" class="cqc-x s">${o.sub}</text>` : ''}</g>`; }).join('');
-    return `<svg class="cqc-q" viewBox="0 0 ${QW} ${QH}" role="img" aria-label="${sel}">${eje}${cols}</svg>`; };
+    const cols = G.map(function(o, i){ const cx = qpl + gw * i + gw / 2, x0 = cx - (nb * (bw + 4) - 4) / 2, Z = deAnio(o), tot = Z.reduce(function(s, z){ return s + z[1]; }, 0);
+      const bars = o.fut && yS === F.yA ? '' : APLs.map(function(a, j){ const z = Z.find(function(q){ return q[0][0] === a[0]; }), v = z ? z[1] : 0, h = QY(v), x = x0 + j * (bw + 4);
+        return v ? `<rect x="${x.toFixed(1)}" y="${(QH - qpb - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${a[2]}" data-altip="${o.lab} · ${a[1]} ${yS}|${cqM(v)}${tot ? ' · ' + Math.round(v / tot * 100) + '%' : ''}" data-tipc="neu"/><text x="${(x + bw / 2).toFixed(1)}" y="${(QH - qpb - h - 5).toFixed(1)}" class="cqc-v a">${k$(v)}</text>`
+          : `<rect x="${x.toFixed(1)}" y="${QH - qpb - 2}" width="${bw.toFixed(1)}" height="2" rx="1" fill="${a[2]}" opacity=".35"/>`; }).join('');
+      return `<g class="cqc-col"${o.k ? ` data-cqcel="*|*|${o.k}"` : ''}><rect x="${(cx - gw / 2 + 4).toFixed(1)}" y="${qpt - 14}" width="${(gw - 8).toFixed(1)}" height="${QH - qpt - qpb + 14}" rx="10" class="cqc-hit"/>${bars}
+        <text x="${cx}" y="${QH - qpb + 16}" class="cqc-x q">${o.lab}</text><text x="${cx}" y="${QH - qpb + 30}" class="cqc-x s">${o.fut && yS === F.yA ? 'aún no' : cqM(tot)}${o.na != null ? ' · ' + appN(Math.round(yS === F.yA ? o.na : o.nb)) + ' eq.' : ''}</text></g>`; }).join('');
+    return `<svg class="cqc-q" viewBox="0 0 ${QW} ${QH}" role="img" aria-label="${sel} ${yS}">${eje}${cols}</svg>`; };
+  const tarjetasAnio = `<div class="cqc-yt" role="tablist">${[F.yA, F.yB].map(function(y){ return `<button type="button" role="tab" class="${y === yS ? 'on' : ''}" data-cqcy="${y}">${y}</button>`; }).join('')}</div>`;
+  const leyB = `<div class="cqc-ley">${APLs.map(function(a){ return `<span><i style="background:${a[2]}"></i>${a[1]}</span>`; }).join('')}</div>`;
   // 2) Por tipo de equipo
-  const porApl = function(L){ return CQ_APL.map(function(a){ return [a, cqUsd(L, function(x){ return cqAplK(x) === a[0]; })]; }); };
-  const TG = CQ_TIPOS.map(function(t){ const la = F.L.filter(function(x){ return cqTipoEq(x) === t[0]; }), lb = F.LB.filter(function(x){ return cqTipoEq(x) === t[0]; });
-    return { k:t[0], lab:t[1].replace('Serpentín ', 'Serp. '), a:porApl(la), b:porApl(lb), n:la.reduce(function(s, x){ return s + (x.cant || 0); }, 0), ta:cqUsd(la, function(){ return true; }) }; })
-    .filter(function(o){ return o.a.some(function(z){ return z[1]; }) || o.b.some(function(z){ return z[1]; }); }).sort(function(a, b){ return b.ta - a.ta; });
-  TG.forEach(function(o){ o.sub = appN(Math.round(o.n)) + ' equipos ' + F.yA; });
+  function TGx(){ return TGx._v || (TGx._v = CQ_TIPOS.map(function(t){ const la = F.L.filter(function(x){ return cqTipoEq(x) === t[0]; }), lb = F.LB.filter(function(x){ return cqTipoEq(x) === t[0]; });
+    return { k:t[0], lab:t[1].replace('Serpentín ', 'Serp. '), a:porApl(la), b:porApl(lb), na:la.reduce(function(s, x){ return s + (x.cant || 0); }, 0), nb:lb.reduce(function(s, x){ return s + (x.cant || 0); }, 0), ta:cqUsd(la, function(){ return true; }) }; })
+    .filter(function(o){ return o.a.some(function(z){ return z[1]; }) || o.b.some(function(z){ return z[1]; }); }).sort(function(a, b){ return b.ta - a.ta; })); }
   // 3) Por trimestre
-  const QG = [1, 2, 3, 4].map(function(q){ const f = function(L){ return L.filter(function(x){ const m = mesDe(x); return m && Math.ceil(m / 3) === q; }); }; return { lab:'T' + q, a:porApl(f(F.L)), b:porApl(f(F.LB)), fut:(q - 1) * 3 + 1 > mesC }; });
+  function QGx(){ return QGx._v || (QGx._v = [1, 2, 3, 4].map(function(q){ const f = function(L){ return L.filter(function(x){ const m = mesDe(x); return m && Math.ceil(m / 3) === q; }); }; return { lab:'T' + q, a:porApl(f(F.L)), b:porApl(f(F.LB)), fut:(q - 1) * 3 + 1 > mesC }; })); }
   const ley = `<div class="cqc-ley">${A3.map(function(a){ return `<span><i style="background:${a[2]}"></i>${a[1]}</span>`; }).join('')}<span><i class="b"></i>${F.yB} (más claro / punteado)</span></div>`;
   return `<div class="cqc">
     <section class="cqc-card cqc-w"><header><div><h3>Tendencia mensual por aplicación</h3><small>US$ comprados cada mes · ${F.yA} en color, ${F.yB} punteado · misma escala en los tres</small></div>${ley}</header><div class="cqc-sms">${multiple}</div></section>
-    <section class="cqc-card"><header><div><h3>Por tipo de equipo</h3><small>Columnas apiladas por aplicación · izquierda ${F.yB} (claro), derecha ${F.yA} · toca un tipo para ver qué se compró</small></div></header>${TG.length ? columnas(TG, 260, 'Compras por tipo de equipo') : '<div class="pmf-vacio">Sin compras.</div>'}</section>
-    <section class="cqc-card"><header><div><h3>Por trimestre</h3><small>Columnas apiladas por aplicación · izquierda ${F.yB} (claro), derecha ${F.yA}</small></div></header>${columnas(QG, 260, 'Compras por trimestre')}</section></div>`; }
+    <section class="cqc-card"><header><div><h3>Por tipo de equipo · ${yS}</h3><small>US$ por aplicación, una barra al lado de la otra · toca un tipo para ver qué se compró</small></div>${tarjetasAnio}</header>${leyB}${TGx().length ? columnas(TGx(), 270, 'Compras por tipo de equipo') : '<div class="pmf-vacio">Sin compras.</div>'}</section>
+    <section class="cqc-card"><header><div><h3>Por trimestre · ${yS}</h3><small>US$ por aplicación, una barra al lado de la otra</small></div>${tarjetasAnio}</header>${leyB}${columnas(QGx(), 270, 'Compras por trimestre')}</section></div>`; }
 function cqHtml(){
   const e = escapeHtml;
   if(!GASTO_DATA || !GASTO_DATA.rows || !GASTO_DATA.rows.length) return '<div class="ini-card"><div class="ini-vacio">Carga Consulta.xlsx (o abre con los datos publicados) para ver las compras por origen.</div></div>';
@@ -17606,11 +17612,11 @@ function cqExcel(k){ const S = cqSel(k), v = S.v, F = S.F, L = S.L;
     Cantidad:x.cant, UM:x.um, 'US$':Math.round(x.usd * 100) / 100, 'Aplicación':x.apl0, Proyectos:x.prys.join(', ') }; }));
   ws['!cols'] = [{ wch:6 }, { wch:11 }, { wch:14 }, { wch:14 }, { wch:36 }, { wch:14 }, { wch:60 }, { wch:20 }, { wch:18 }, { wch:9 }, { wch:7 }, { wch:12 }, { wch:14 }, { wch:24 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Detalle'); XLSX.writeFile(wb, (F.g.t + ' - ' + (v[0] === '*' ? 'todos' : cqPaisNom(v[0])) + (v[1] === '*' ? '' : ' - ' + (CQ_APL.find(function(a){ return a[0] === v[1]; }) || [])[1]) + ' - ' + (F.cmp ? F.yA + ' vs ' + F.yB : APP_CQ.y === 'todo' ? 'todos los años' : APP_CQ.y) + '.xlsx').replace(/[\\/:*?"<>|]+/g, '-')); }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-cqg],[data-cqy],[data-cqver],[data-cqcel],[data-cqxls],[data-cqcmp]'); if(!b) return;
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-cqg],[data-cqy],[data-cqver],[data-cqcel],[data-cqxls],[data-cqcmp],[data-cqcy]'); if(!b) return;
   if(b.dataset.cqxls) return cqExcel(b.dataset.cqxls);
   if(b.dataset.cqcel) return cqDetalle(b.dataset.cqcel);
   if(b.dataset.cqg) APP_CQ.g = b.dataset.cqg; if(b.dataset.cqy){ APP_CQ.y = b.dataset.cqy === 'todo' ? 'todo' : +b.dataset.cqy; if(APP_CQ.y === 'todo') APP_CQ.cmp = false; }
-  if(b.dataset.cqver) APP_CQ.ver = b.dataset.cqver; if(b.dataset.cqcmp) APP_CQ.cmp = !APP_CQ.cmp;
+  if(b.dataset.cqcy) APP_CQ.cy = +b.dataset.cqcy; if(b.dataset.cqver) APP_CQ.ver = b.dataset.cqver; if(b.dataset.cqcmp) APP_CQ.cmp = !APP_CQ.cmp;
   appRenderInicio(); });
 // ---- Inventario con el layout del almacén de Lurín (12.11.2026, Piero: "considera el layout de Lurín para mejorar Inventario, minimalista") ----
 // Zonas del plano A-01 (Machápro, 05/2025), en un lienzo de 590 × 780 (el plano escalado). Cada familia del inventario tiene una zona
