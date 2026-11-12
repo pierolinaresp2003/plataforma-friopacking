@@ -3511,6 +3511,24 @@ html[data-theme="dark"] .con-fondo::before{opacity:.28;animation:none;}
 .cli-logo img{width:26px;height:26px;object-fit:contain;display:block;}
 .cli-logo.ini{background:hsl(var(--h) 70% 94%);color:hsl(var(--h) 55% 32%);border-color:hsl(var(--h) 45% 82%);font-size:13px;font-weight:800;letter-spacing:.02em;}
 
+/* Ítems del requerimiento en filas simples (v356) */
+.rqm .rqm-card.rqx-it{padding:0;border-radius:14px;overflow:hidden;contain-intrinsic-size:auto 64px;transition:box-shadow .25s,border-color .25s;}
+.rqm .rqm-card.rqx-it + .rqm-card.rqx-it{margin-top:-4px;}
+.rqx-fila{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:40px minmax(0,1fr) 92px 210px 78px 16px;gap:14px;align-items:center;padding:11px 16px;cursor:pointer;}
+.rqx-fila:hover{background:color-mix(in srgb,var(--surface-2) 55%,transparent);}
+.rqx-ic{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:18px;background:var(--surface-2);}
+.st-rev .rqx-ic{background:#efe9fd;} .st-com .rqx-ic{background:#fdf1dc;} .st-oc .rqx-ic{background:#e3edff;} .st-alm .rqx-ic{background:#ddf3ef;} .st-sal .rqx-ic{background:#e2f4e6;} .st-obra .rqx-ic{background:#dff3e4;} .st-arch .rqx-ic{background:#eef0f3;filter:grayscale(1);}
+.rqx-t{min-width:0;} .rqx-t b{display:block;font-size:14.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .rqx-t small{font:600 11.5px ui-monospace,Menlo,monospace;color:var(--ink-soft);}
+.rqx-q{text-align:right;font-size:12.5px;color:var(--ink-soft);white-space:nowrap;} .rqx-q b{font-size:16px;font-weight:800;color:var(--ink);margin-right:4px;}
+.rqx-st{display:grid;grid-template-columns:auto auto;justify-content:start;align-items:center;column-gap:6px;} .rqx-st b{font-size:13px;font-weight:800;} .rqx-st small{grid-column:1;font-size:12px;color:var(--ink-soft);} .rqx-st .pm-al-ic{grid-column:2;grid-row:1 / span 2;}
+.st-rev .rqx-st b{color:#5b3fb0;} .st-com .rqx-st b{color:#9a5b00;} .st-oc .rqx-st b{color:#1f4fd1;} .st-alm .rqx-st b{color:#0b6e63;} .st-sal .rqx-st b, .st-obra .rqx-st b{color:#15803d;} .st-arch .rqx-st b{color:#5a6878;}
+.rqx-sk{display:inline-flex;align-items:center;gap:5px;justify-self:start;border-radius:999px;padding:4px 10px 4px 7px;font-size:13px;} .rqx-sk.no{padding:0;} .rqx-sk svg{width:19px;height:19px;}
+.rqx-sk.ok{background:#e2f4e6;color:#15803d;} .rqx-sk.par{background:#fff1d6;color:#9a5b00;} .rqx-sk b{font-weight:800;}
+.rqx-flecha{width:16px;height:16px;color:var(--ink-soft);transition:transform .25s;} .rqx-it.ab .rqx-flecha{transform:rotate(90deg);}
+.rqx-det{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:0 16px 14px 70px;animation:pzSube .3s var(--pz-ease) both;} .rqx-det .rqm-sit{margin:0;align-self:start;} .rqx-det > :only-child{grid-column:1 / -1;}
+html[data-theme="dark"] .rqx-ic{background:#1c2636 !important;}
+@media (max-width:900px){ .rqx-fila{grid-template-columns:38px minmax(0,1fr) auto;gap:6px 12px;} .rqx-ic{grid-row:1 / span 2;} .rqx-q{grid-column:3;grid-row:1;} .rqx-st{grid-column:2;grid-row:2;} .rqx-sk{grid-column:3;grid-row:2;justify-self:end;} .rqx-flecha{display:none;} .rqx-det{grid-template-columns:1fr;padding:0 12px 12px;} .rqx-t b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:13.5px;} }
+
 @media (prefers-reduced-motion: reduce){ .lz *, .app-bienv *, .pm *, .pmx *{animation:none !important;transition:none !important;} }
 </style>
 </head>
@@ -4180,14 +4198,12 @@ const PRY_FONDOS = [['arandano', /AR[AÁ]NDAN|BLUEBERR|BERRIES|BERRY|HORTIFRUT|A
   ['palta', /PALTA|AVOCAD|\bHASS\b|WESTFALIA|MISSION/], ['citricos', /C[IÍ]TRIC|MANDARIN|NARANJ|LIM[OÓ]N|TANGELO|PROCITRUS|SUNFRUITS/]];
 function pryFondo(id, cli){ const x = pryInfo(id) || {}, t = String((x.n || '') + ' ' + (x.cl || '') + ' ' + (cli || '')).toUpperCase();
   const f = PRY_FONDOS.find(function(p){ return p[1].test(t); }); return ` con-fondo" style="--fondo:url('fotos/pry/${f ? f[0] : 'frio'}.jpg')`; }
-// Logo pequeño del cliente en las cabeceras (12.11.2026, Piero). Ícono oficial de su web cuando se ubicó (fotos/cli); si no, sus iniciales.
+// Logo pequeño del cliente en las cabeceras (12.11.2026, Piero). Ícono oficial de su web cuando se ubicó (fotos/cli); si no hay, nada.
 const CLI_LOGOS = [[/AGROBERRIES/, 'cli/agroberries.png'], [/DANPER/, 'cli/danper.png'], [/\bVIR[UÚ]\b/, 'cli/viru.png'], [/SUN ?FRUITS/, 'cli/sunfruits.png'], [/AGROVISION/, 'cli/agrovision.png'],
   [/COLDTAINER/, 'cli/coldtainer.png'], [/MEDLOG/, 'cli/medlog.png'], [/AXIONLOG/, 'cli/axionlog.png'], [/IMBAREX/, 'cli/imbarex.png'], [/\bAIB\b/, 'cli/aib.png'], [/FRIOPACKING|FRIOTEAM/, 'logo-friopacking.png']];
 function cliLogo(cli){ const t = String(cli || '').toUpperCase().trim(); if(!t || /^SIN PROYECTO|^TODOS/.test(t)) return '';
   const l = CLI_LOGOS.find(function(x){ return x[0].test(t); }); if(l) return `<span class="cli-logo"><img src="fotos/${l[1]}" alt="" loading="lazy"></span>`;
-  const w = t.replace(/[.,]/g, ' ').split(/\s+/).filter(function(x){ return x && !/^(S|A|C|SA|SAC|SRL|EIRL|SOCIEDAD|ANONIMA|CERRADA|DE|DEL|LA|LOS|EL|Y|CIA|EMPRESA|CORPORACION)$/.test(x); });
-  let h = 0; for(let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 360;
-  return `<span class="cli-logo ini" style="--h:${h}">${escapeHtml(((w[0] || t)[0] + (w[1] ? w[1][0] : (w[0] || t)[1] || '')).toUpperCase())}</span>`; }
+  return ''; }   // sin logo conocido: no se pone nada (12.11.2026, Piero)
 function pryTodos(){ return Object.assign({}, PRY_INFO_SNAP, PRY_INFO_PSR, PRY_INFO_RM); }
 // Solo coincidencia exacta: "Fecha" o "Estado" a secas no deben caer en FechaRequerimiento / EstadoPedido.
 function pryColumnas(h){
@@ -14782,18 +14798,25 @@ function rqVistaTarjetas(cont, filas){
       r.docSalida ? 'Salida ' + escapeHtml(r.docSalida) + (r.fSalida ? ' · ' + rqFecha(r.fSalida) : '') + (r.cantSalida != null ? ' · ' + n(r.cantSalida) + ' ' + escapeHtml(r.unidad || '') : '') + escapeHtml(rqDesde(r)) : '',
       r.docObra ? 'Obra ' + escapeHtml(r.docObra) + (r.fObra ? ' · ' + rqFecha(r.fObra) : '') : '',
     ].filter(Boolean);
-    return `<div class="rqm-card" data-i="${iTarjeta}" data-paso="${supPaso(r)}">
-      ${unSoloReq ? '' : `<div class="rqm-req"><span class="rqm-num">${escapeHtml(r.codRequerimiento)}</span> · ${rqFecha(r.fReq)} · ${rqTxt(r.proyecto)}</div>`}
-      <div class="rqm-dos"><div class="rqm-izq"><div class="rqm-top">
-        <button type="button" class="cod rq-cod" data-rqstock="${escapeHtml(r.idProducto)}" data-rqreq="${escapeHtml(r.codRequerimiento)}">${escapeHtml(r.idProducto)}</button>
-        <span class="rqm-cq"><b>${n(r.cantidad)}</b> ${rqTxt(r.unidad)}</span>
-      </div>
-      <div class="rqm-desc">${rqTxt(r.producto)}</div>
-      <div class="rqm-sit ${rqClaseSit(r)}">${rqSitHtml(r)}</div></div>
-      <div class="rqm-der">${rqCobHtml(r)}
-      ${(function(){ const q = [r.cantRecep > 0 ? ['Llegó al almacén', rqCant(r.cantRecep, refRecep)] : null, r.cantSalida > 0 ? ['Salió a obra', rqCant(r.cantSalida, r.cantidad)] : null, r.cantObra > 0 ? ['Recibido en obra', rqCant(r.cantObra, r.cantSalida)] : null].filter(Boolean);
-        return q.length ? `<div class="rqm-cants2">${q.map(function(x){ return `<span>${x[0]} <b>${x[1]}</b></span>`; }).join('')}</div>` : ''; })()}
-      ${rqPartesHtml(r)}</div></div>
+    // Fila simple (12.11.2026, Piero: "minimalista, que se entienda el estado actual y el stock como ícono"): un ícono del paso actual,
+    // el producto, la cantidad, dónde está con su dato clave y el stock disponible. Al tocar la fila se abre el detalle.
+    const k = supPaso(r), dh = function(f){ const d = f ? Math.max(0, busdayCount(f, appIndCorte()) || 0) : 0; return d ? d + ' d.h.' : 'hoy'; };
+    const ST = { rev:['📝', 'En revisión', 'hace ' + dh(r.fReq)], com:['🛒', 'En Compras', 'sin OC · ' + dh(r.fPedido || r.fReq)],
+      oc:['🚢', 'OC en camino', r.fCompromiso ? 'llega ' + rqFecha(r.fCompromiso) : 'sin fecha pactada'], alm:['🏬', 'En almacén', 'por despachar'],
+      sal:['🚚', 'Despachado', r.fSalida ? 'salió ' + rqFecha(r.fSalida) : ''], obra:['🏗️', 'En obra', r.fObra ? rqFecha(r.fObra) : ''], arch:['🗄️', 'Archivado', ''] }[k];
+    if(r._pm == null) r._pm = rqPasoEn(r);
+    const fx = k === 'rev' || k === 'com' ? rqFifoDe(r) : null, um = escapeHtml(r.unidad || ''), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
+    const sk = fx && fx.falta > 0 && fx.asig > 0 ? (fx.asig >= fx.falta - 0.001 ? ['ok', nn(fx.asig), 'Hay stock en Lurín para atender todo: ' + nn(fx.asig) + ' ' + um] : ['par', nn(fx.asig) + '/' + nn(fx.falta), 'Hay stock en Lurín para ' + nn(fx.asig) + ' de ' + nn(fx.falta) + ' ' + um]) : null;
+    return `<div class="rqm-card rqx-it st-${k}" data-i="${iTarjeta}" data-paso="${k}">
+      <button type="button" class="rqx-fila" data-rqxab="1" aria-expanded="false">
+        <span class="rqx-ic">${ST[0]}</span>
+        <span class="rqx-t"><b>${rqTxt(r.producto)}</b><small>${escapeHtml(r.idProducto)}${unSoloReq ? '' : ' · Req. ' + escapeHtml(String(r.codRequerimiento).replace(/^000\d-0*/, ''))}</small></span>
+        <span class="rqx-q"><b>${nn(r.cantidad)}</b>${um}</span>
+        <span class="rqx-st"><b>${ST[1]}</b>${ST[2] ? `<small>${escapeHtml(ST[2])}</small>` : ''}${pmAlerta(r)}</span>
+        <span class="rqx-sk ${sk ? sk[0] : 'no'}"${sk ? ` title="${escapeHtml(sk[2])}"` : ''}>${sk ? `<svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z" fill="currentColor" opacity=".18"/><path d="M3 7.5 12 12l9-4.5M12 12v9M3 7.5v9L12 21l9-4.5v-9L12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><b>${sk[1]}</b>` : ''}</span>
+        <svg class="rqx-flecha" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="rqx-det" hidden><div class="rqm-sit ${rqClaseSit(r)}">${rqSitHtml(r)}</div>${rqCobHtml(r)}${rqPartesHtml(r)}</div>
     </div>`;
   };
   const tarjetas = ver.map(tarjeta).join('');
@@ -15376,6 +15399,7 @@ document.addEventListener('click', function(e){
   if(rp){ rqPdfNativo(rp.dataset.reqpdf); return; }
   // Volver a la pantalla de la que se vino (14.10.2026, Piero: "falta una opción para retroceder").
   if(e.target.closest && e.target.closest('[data-rqvolver]')){ if(!appNavVolver()) appInicio(APP.vista === 'super' ? 'supreq' : undefined); return; }
+  const fxb = e.target.closest && e.target.closest('[data-rqxab]'); if(fxb && !e.target.closest('[data-altip]')){ const d = fxb.nextElementSibling, ab = d.hidden; d.hidden = !ab; fxb.setAttribute('aria-expanded', ab); fxb.parentNode.classList.toggle('ab', ab); return; }
   if(e.target.closest && e.target.closest('[data-rqarch]')){ const d = document.getElementById('rqArch'); if(d){ d.open = true; d.scrollIntoView({ block:'start', behavior:'smooth' }); } return; }
   const rps = e.target.closest ? e.target.closest('[data-rqpaso]') : null;
   if(rps){ rqFiltrarPaso(rps); return; }
