@@ -7032,9 +7032,9 @@ function almFiltrarSedesMotivos(wb){
     const iS = findCol(rows[h], ['SUCURSAL']), iM = findCol(rows[h], ['IDMOTIVO']);
     if(iS === -1 || iM === -1) return;
     const mot = new Set(d[2]);
-    if(/ingres/i.test(n) && !ALM_DEVOL_LEIDO){ const iA = findCol(rows[h], ['ALMACEN']), c = function(k){ return findCol(rows[h], [k]); }, iC = c('Código') !== -1 ? c('Código') : c('IDPRODUCTO'), iD = c('DSC_PRODUCTO'), iQ = c('Cantidad'), iF = c('Fecha'), iDo = c('DOCUMENTO'), iG = c('REM_PROVEEDOR3'), L = [];
-      rows.slice(h + 1).forEach(function(r){ if(!r || !/^I1[14]$/.test(String(r[iM] == null ? '' : r[iM]).replace(/\s+/g, '').toUpperCase())) return; const pr = pmDevPry(r[iA]); if(!pr) return;
-        L.push([pr, String(r[iC] || '').trim(), String(r[iD] || '').trim(), +r[iQ] || 0, r[iF] instanceof Date ? isoDay(r[iF]) : '', String(r[iDo] || '').trim(), iG === -1 ? '' : String(r[iG] || '').trim()]); });
+    if(/movimient/i.test(n) && !ALM_DEVOL_LEIDO){ const c = function(k){ return findCol(rows[h], [k]); }, iA = c('ALMACEN'), iC = c('IDPRODUCTO'), iD = c('DSC_PRODUCTO'), iQ = c('CANTIDAD'), iF = c('FECHA SALIDA'), iDo = c('DOCUMENTO'), iDs = c('SUCURSAL_DESTINO'), L = [];
+      rows.slice(h + 1).forEach(function(r){ const mo = String(!r || r[iM] == null ? '' : r[iM]).replace(/\s+/g, '').toUpperCase(); if(!/^S(02|80|81)$/.test(mo)) return; const pr = pmDevPry(r[iA]); if(!pr || (mo !== 'S02' && !/SUCURSAL/i.test(String(iDs === -1 ? '' : r[iDs] || '')))) return;
+        L.push([pr, String(r[iC] || '').trim(), String(r[iD] || '').trim(), +r[iQ] || 0, r[iF] instanceof Date ? isoDay(r[iF]) : '', String(r[iDo] || '').trim(), iDs === -1 ? '' : pmDevSede(r[iDs])]); });
       if(L.length) ALM_DEVOL_LEIDO = L; }
     const ok = rows.slice(h + 1).filter(function(r){ return r && sedeInternaKardex(r[iS]) && mot.has(String(r[iM] == null ? '' : r[iM]).replace(/\s+/g, '').toUpperCase()); });
     if(ok.length === rows.length - h - 1) return;
@@ -7051,7 +7051,7 @@ const ALM_COLS = new Set(['CODIGO','TRANSFERENCIA','CANTIDAD','FECHA','SUCURSAL'
   'OCOMPRA','CLIEPROV','IDPRODUCTO','DSC_PRODUCTO','PRECIOMEX','IMPORTEMEX','GRUPO','RESPONSABLE','TCAMBIO','REQUERIMIENTO','PRODUCTO',
   'FECHA SALIDA','DOCORDENPRODUCCION','TRANSPORTISTA','PLACA','SUCURSAL_DESTINO','DEST_DOCUMENTO','DOC_PROVEEDOR2','DOC_PROVEEDOR',
   'CONSUMIDOR','DSC_CONSUMIDOR','PROYECTO','MARCA','ALMACEN','REM_PROVEEDOR3']);
-let ALM_DEVOL_LEIDO = null;   // devoluciones de obra (I11 / I14) que se leen antes de filtrar las sedes y motivos
+let ALM_DEVOL_LEIDO = null;   // devoluciones de proyecto (salidas S02 de la hoja Movimientos) que se leen antes de filtrar las sedes y motivos
 async function almLeerReporteGrande(buf){
   if(typeof DecompressionStream === 'undefined') return null;
   const u8 = new Uint8Array(buf), dv = new DataView(buf);
@@ -7104,8 +7104,8 @@ async function almLeerReporteGrande(buf){
         const idx = {}, hdr = []; Object.keys(h).map(Number).sort(function(a, b){ return a - b; }).forEach(function(i){ if(ALM_COLS.has(h[i])){ idx[i] = hdr.length; hdr.push(celdas[i]); } });
         cols = { idx:idx, nm:{} }; Object.keys(idx).forEach(function(i){ cols.nm[h[i]] = i; }); iS = Object.keys(idx).find(function(i){ return h[i] === 'SUCURSAL'; }); iM = Object.keys(idx).find(function(i){ return h[i] === 'IDMOTIVO'; });
         aoa.push(hdr); return; }
-      if(esIng && iM !== undefined && /^I1[14]$/.test(String(celdas[iM] == null ? '' : celdas[iM]).replace(/\s+/g, '').toUpperCase())){ const v = function(n){ const i = cols.nm[n]; return i === undefined ? null : celdas[i]; }, pr = pmDevPry(v('ALMACEN'));
-        if(pr){ const f = v('FECHA'); (ALM_DEVOL_LEIDO = ALM_DEVOL_LEIDO || []).push([pr, String(v('CODIGO') || v('IDPRODUCTO') || '').trim(), String(v('DSC_PRODUCTO') || '').trim(), +v('CANTIDAD') || 0, f instanceof Date ? isoDay(f) : '', String(v('DOCUMENTO') || '').trim(), String(v('REM_PROVEEDOR3') || '').trim()]); } }
+      if(!esIng && iM !== undefined && /^S(02|80|81)$/.test(String(celdas[iM] == null ? '' : celdas[iM]).replace(/\s+/g, '').toUpperCase())){ const v = function(n){ const i = cols.nm[n]; return i === undefined ? null : celdas[i]; }, pr = pmDevPry(v('ALMACEN')), ds = String(v('SUCURSAL_DESTINO') || '');
+        if(pr && (/02$/.test(String(celdas[iM]).trim()) || /SUCURSAL/i.test(ds))){ const f = v('FECHA SALIDA'); (ALM_DEVOL_LEIDO = ALM_DEVOL_LEIDO || []).push([pr, String(v('PRODUCTO') || v('IDPRODUCTO') || '').trim(), String(v('DSC_PRODUCTO') || '').trim(), +v('CANTIDAD') || 0, f instanceof Date ? isoDay(f) : '', String(v('DOCUMENTO') || '').trim(), pmDevSede(v('SUCURSAL_DESTINO'))]); } }
       if(iS !== undefined && !sedeInternaKardex(celdas[iS])) return;
       if(iM !== undefined && !mot.has(String(celdas[iM] == null ? '' : celdas[iM]).replace(/\s+/g, '').toUpperCase())) return;
       const out = new Array(aoa[0].length).fill(null); Object.keys(celdas).forEach(function(i){ out[cols.idx[i]] = celdas[i]; }); aoa.push(out); };
@@ -19326,8 +19326,10 @@ function rqEstadoCorto(r){ const k = supPaso(r), dh = function(f){ const d = f ?
   return [k].concat({ rev:['En revisión', 'hace ' + dh(r.fReq)], com:['En Compras', 'sin OC · ' + dh(r.fPedido || r.fReq)],
     oc:['OC en camino', r.fCompromiso ? 'llega ' + rqFecha(r.fCompromiso) : 'sin fecha pactada'], alm:['En almacén', 'por despachar'],
     sal:['Despachado', r.fSalida ? 'salió ' + rqFecha(r.fSalida) : ''], obra:['En obra', r.fObra ? rqFecha(r.fObra) : ''], arch:['Archivado', ''] }[k]); }
-// Devoluciones de obra al almacén (ingresos I11 / I14 "devolución consumo" de la hoja Ingresos, por el almacén del PRY)
+// Devoluciones de proyecto al almacén: salidas S02 "Salida por devolución de proyecto" (y transferencias S80/S81 a una sucursal) de la hoja Movimientos, desde el almacén del PRY
+// hacia Lurín, Trujillo o Ica (12.11.2026, Piero: "para Bomarea sí hay devoluciones y no figuran"; antes se leía I11, que es otra cosa)
 function pmDevol(id){ const D = (ALMACEN_DATA && ALMACEN_DATA.devol) || []; return D.filter(function(d){ return d[0] === id; }).sort(function(a, b){ return String(b[4]).localeCompare(String(a[4])); }); }
+function pmDevSede(t){ const x = sinAcentos(String(t || '')).toUpperCase(); return /LURIN/.test(x) ? 'Lurín' : /TRUJILLO/.test(x) ? 'Trujillo' : /\bICA\b/.test(x) ? 'Ica' : titleCase(String(t || '').replace(/^SUCURSAL\s+/i, '').trim()); }
 function pmDevPry(t){ const m = /(PR[YD])\s*_?(\d{4})\s*-\s*(\d+)/i.exec(String(t || '')); return m ? m[1].toUpperCase() + m[2] + '-' + m[3].padStart(7, '0') : ''; }
 function pmIcoBtn(attr, svg, n, tit, cls){ return `<button type="button" class="rqm-ico pmx-ico ${cls || ''}${n ? '' : ' cero'}" ${attr} title="${tit}" aria-label="${tit}">${svg}<b>${appN(n)}</b></button>`; }
 const PM_SVG = { arch:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg>',
@@ -19345,9 +19347,9 @@ function pmListaAbrir(p, t){ const e = escapeHtml, nn = function(v){ return Numb
   if(t === 'arch'){ tit = 'Archivados'; L = (p.arch || []).slice().sort(function(a, b){ return (b.fReq || 0) - (a.fReq || 0); }).map(function(r){ return fila(rqTxt(r.producto), e(r.idProducto) + ' · Req. ' + e(String(r.codRequerimiento).replace(/^000\d-0*/, '')), `<b>${nn(r.cantidad)}</b> ${e(r.unidad || '')}`, rqFecha(r.fReq)); }); }
   else if(t === 'obra'){ tit = 'Recibidos en obra'; L = p.items.filter(function(r){ return r._pm === 6; }).sort(function(a, b){ return (b.fObra || b.fSalida || 0) - (a.fObra || a.fSalida || 0); })
     .map(function(r){ return fila(rqTxt(r.producto), e(r.idProducto) + ' · Req. ' + e(String(r.codRequerimiento).replace(/^000\d-0*/, '')) + (r.docObra ? ' · ' + e(r.docObra) : ''), `<b>${nn(r.cantObra || r.cantSalida || r.cantidad)}</b> ${e(r.unidad || '')}`, r.fObra ? rqFecha(r.fObra) : r.fSalida ? 'salió ' + rqFecha(r.fSalida) : '—', r.codOrden ? `data-oc="${e(r.codOrden)}"` : ''); }); }
-  else { tit = 'Devoluciones'; L = pmDevol(p.id).map(function(d){ return fila(e(d[2] || d[1]), e(d[1]) + (d[5] ? ' · ' + e(d[5]) : '') + (d[6] && d[6] !== '-' ? ' · guía ' + e(d[6]) : ''), `<b>${nn(d[3])}</b>`, d[4] ? rqFecha(new Date(d[4])) : '—'); }); }
+  else { tit = 'Devoluciones'; L = pmDevol(p.id).map(function(d){ return fila(e(d[2] || d[1]), e(d[1]) + (d[5] ? ' · ' + e(d[5]) : '') + (d[6] ? ' · a ' + e(d[6]) : ''), `<b>${nn(d[3])}</b>`, d[4] ? rqFecha(new Date(d[4])) : '—'); }); }
   const el = document.getElementById('appOC'), pila = (el._pila || []).concat([el.innerHTML]);
-  appListaAbrir(e(tit) + ' · ' + appN(L.length), e(p.cli + ' · ' + p.id), `<div class="pm-lx">${L.join('') || `<div class="pmf-vacio">${t === 'dev' && !(ALMACEN_DATA && ALMACEN_DATA.devol) ? 'Para ver las devoluciones vuelve a cargar Reporte Almacen.xlsx (se leen de la hoja Ingresos).' : 'No hay ítems aquí.'}</div>`}</div>`);
+  appListaAbrir(e(tit) + ' · ' + appN(L.length), e(p.cli + ' · ' + p.id), `<div class="pm-lx">${L.join('') || `<div class="pmf-vacio">${t === 'dev' && !(ALMACEN_DATA && ALMACEN_DATA.devol) ? 'Para ver las devoluciones vuelve a cargar Reporte Almacen.xlsx (se leen de la hoja Movimientos, motivo S02).' : 'No hay ítems aquí.'}</div>`}</div>`);
   el._pila = pila; }
 // Excel del estado del proyecto: Resumen + Pendientes + Recibidos en obra (+ Devoluciones si hay)
 async function pmExcel(id){ const p = pmDatos().l.find(function(x){ return x.id === id; }); if(!p) return; let X; try{ X = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
@@ -19374,7 +19376,7 @@ async function pmExcel(id){ const p = pmDatos().l.find(function(x){ return x.id 
     w.autoFilter = { from:{ row:hr, column:1 }, to:{ row:hr + L.length, column:12 } }; };
   const ord = function(a, b){ return pmCat(a).localeCompare(pmCat(b), 'es') || (a.fReq || 0) - (b.fReq || 0); };
   lista('Pendientes', p.items.filter(function(r){ return r._pm < 6; }).sort(ord), true); lista('En obra', p.items.filter(function(r){ return r._pm === 6; }).sort(ord));
-  if(dv.length){ const w = wb.addWorksheet('Devoluciones'); const hr = cab(w, [['Fecha', 11], ['Código', 15], ['Producto', 48], ['Cantidad', 10], ['Documento', 18], ['Guía', 18]]);
+  if(dv.length){ const w = wb.addWorksheet('Devoluciones'); const hr = cab(w, [['Fecha', 11], ['Código', 15], ['Producto', 48], ['Cantidad', 10], ['Documento', 18], ['Devuelto a', 14]]);
     dv.forEach(function(d){ const r = w.addRow([d[4] ? new Date(d[4]) : null, d[1], d[2], d[3], d[5], d[6]]); r.getCell(1).numFmt = 'dd/mm/yyyy'; }); w.autoFilter = { from:{ row:hr, column:1 }, to:{ row:hr + dv.length, column:6 } }; }
   const buf = await wb.xlsx.writeBuffer();
   descargarBlob(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Estado ' + p.id + ' ' + sinAcentos(p.cli).replace(/[\\/:*?"<>|]+/g, '-') + ' - Grupo Friopacking.xlsx');
