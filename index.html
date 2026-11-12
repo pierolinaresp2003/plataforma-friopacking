@@ -3621,6 +3621,11 @@ button.pm-lx-f{cursor:pointer;} button.pm-lx-f:hover{border-color:#b9c6d8;} .pm-
 .cqc-tv{text-align:right;} .cqc-tv b{display:block;font-size:14px;font-weight:800;color:var(--ink);} .cqc-tv small{font-size:11px;color:var(--ink-soft);margin-right:2px;}
 .cqc-q{display:block;width:100%;height:auto;} .cqc-hit{fill:transparent;} .cqc-col[data-cqcel]{cursor:pointer;} .cqc-col[data-cqcel]:hover .cqc-hit{fill:var(--surface-2);} .cqc-q rect{cursor:pointer;transition:opacity .2s;} .cqc-q rect:hover{opacity:.8;} .cqc-v{font:800 10px Inter,sans-serif;fill:var(--ink-soft);text-anchor:middle;} .cqc-v.a{fill:var(--ink);}
 .cqd-tp{font-weight:700;color:#0f7896;}
+.cqc-pn{font:800 9.5px Inter,sans-serif;fill:#fff;text-anchor:middle;dominant-baseline:auto;pointer-events:none;paint-order:stroke;stroke:rgba(0,0,0,.18);stroke-width:2px;} .cqc-pn.v{text-anchor:start;dominant-baseline:middle;}
+.cqc-pvs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;padding-top:12px;border-top:1px solid var(--border);} .cqc-pvs > small{width:100%;font-size:11.5px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
+.cqc-pv{position:relative;display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border-radius:12px;padding:7px 11px 10px;font-size:12.5px;overflow:hidden;cursor:default;} .cqc-pv b{font-weight:800;color:var(--ink);} .cqc-pv em{font-style:normal;font-weight:700;color:var(--ink);} .cqc-pv i{font-style:normal;font-size:11px;color:var(--ink-soft);}
+.cqc-pv-b{position:absolute;left:0;right:0;bottom:0;height:3px;display:flex;gap:1px;} .cqc-pv-b u{display:block;height:100%;}
+
 .cqc-yt{display:inline-flex;gap:4px;background:var(--surface-2);border-radius:12px;padding:4px;} .cqc-yt button{border:0;background:none;font:800 13px Inter,sans-serif;color:var(--ink-soft);padding:7px 16px;border-radius:9px;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s;}
 .cqc-yt button.on{background:var(--card);color:var(--ink);box-shadow:0 4px 12px -6px rgba(16,24,40,.35);} .cqc-yt button:not(.on):hover{color:var(--ink);}
 .cqc-card > .cqc-ley{margin:-4px 0 6px;} .cqc-q rect[data-altip]{transform-origin:bottom;transform-box:fill-box;animation:cqcSube .7s var(--pz-ease) both;} @keyframes cqcSube{from{transform:scaleY(0)}to{transform:scaleY(1)}}
@@ -17510,6 +17515,9 @@ function cqTipoEq(x){ if(x._te) return x._te; const t = cqNorm(x.r.producto); le
   else if(/\bCPG|\bIPG|\bEIC\b|\bEVC-|\bICE ?\d|\bCTE ?\d|\bEC\d{2}|\bBC\d{2}|\bCC-\d|\bGACV|\bHEA ?\d|\bGEA ?\d|\bT[AEG][NB][.\- ]|\bTEL[.\-]|\bAZL/.test(t)) k = 'cub';
   else k = 'cub';   // equipo con carcasa sin serie conocida: cúbico, el más común
   return (x._te = k); }
+function cqProvCorto(n){ const t = sinAcentos(String(n || '')).toUpperCase();
+  const M = [[/HISPANIA/, 'Hispania'], [/THERMOFIN/, 'Thermofin'], [/HENGCHANG/, 'Hengchang'], [/MODINE/, 'Modine'], [/FB-?LATAM/, 'FB-Latam'], [/KOBOL/, 'Kobol'], [/GUNTNER/, 'Güntner'], [/CENTRO DEL FRIO/, 'Centro del Frío'], [/DANVAL/, 'Danval'], [/AOLAN/, 'Aolan'], [/A\.?B\.? ?IMPORTACIONES/, 'AB Importaciones'], [/EVAPCO/, 'Evapco'], [/KRAMER/, 'Kramer'], [/BOHN/, 'Bohn']];
+  const m = M.find(function(x){ return x[0].test(t); }); if(m) return m[1]; const w = (appImpNombre(n) || n || '—').split(/\s+/)[0]; return w.charAt(0) + w.slice(1).toLowerCase(); }
 function cqUsd(L, f){ return L.reduce(function(a, x){ return f(x) ? a + x.usd : a; }, 0); }
 function cqGraficosHtml(F){ const e = escapeHtml, A3 = CQ_APL.filter(function(a){ return a[0] !== 'otr'; }), mesC = appIndCorte().getUTCMonth() + 1, M = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
   const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'], mesDe = function(x){ return +(x.r.mes || (x.f ? new Date(x.f).getUTCMonth() + 1 : 0)); };
@@ -17525,22 +17533,35 @@ function cqGraficosHtml(F){ const e = escapeHtml, A3 = CQ_APL.filter(function(a)
     const pts = function(s, y, cls){ return s.map(function(v, i){ return v ? `<circle cx="${X(i)}" cy="${Y(v)}" r="3.6" class="${cls}" data-altip="${a[1]} · ${MES[i]} ${y}|${cqM(v)}" data-tipc="neu"/>` : ''; }).join(''); };
     return `<div class="cqc-sm" style="--c:${a[2]}"><div class="cqc-h"><span><i></i>${a[1]}</span><b>${cqM(ta)}</b>${cqVar(ta, tbHasta)}</div><small>${F.yB} a la misma fecha: ${cqM(tbHasta)} · todo ${F.yB}: ${cqM(tb)}</small>
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Compras por mes de ${a[1]}">${ejes}<path d="${linea(sb)}" class="cqc-lb"/><path d="${linea(sa)}" class="cqc-la"/>${pts(sb, F.yB, 'cqc-pb')}${pts(sa, F.yA, 'cqc-pa')}</svg></div>`; }).join('');
-  function porApl(L){ return CQ_APL.map(function(a){ return [a, cqUsd(L, function(x){ return cqAplK(x) === a[0]; })]; }); }
+  // [aplicación, US$, proveedores [[nombre, US$, país]] de mayor a menor]
+  function porApl(L){ return CQ_APL.map(function(a){ const P = new Map(); let t = 0; L.forEach(function(x){ if(cqAplK(x) !== a[0]) return; t += x.usd; const k = x.r.proveedor || '—', q = P.get(k) || [k, 0, x.pais]; q[1] += x.usd; P.set(k, q); });
+    return [a, t, [...P.values()].sort(function(p, q){ return q[1] - p[1]; })]; }); }
   // Barras agrupadas (12.11.2026, Piero: "glicol, amoníaco y freón uno al lado del otro, en barras, con tarjetas para ver 2025 y 2026"):
   // en cada grupo una barra por aplicación del año elegido arriba con las tarjetas.
   const yS = APP_CQ.cy === F.yB ? F.yB : F.yA, deAnio = function(o){ return yS === F.yA ? o.a : o.b; };
   const APLs = CQ_APL.filter(function(a){ return a[0] !== 'otr' || [].concat(TGx(), QGx()).some(function(o){ return o.a.concat(o.b).some(function(z){ return z[0][0] === 'otr' && z[1]; }); }); });
-  const columnas = function(G, alto, sel){ const n = G.length, QW = Math.max(560, n * 150), QH = alto, qpl = 44, qpb = 42, qpt = 22, gw = (QW - qpl - 10) / n, nb = APLs.length, bw = Math.min(30, (gw - 26) / nb - 4);
+  const columnas = function(G, alto, sel){ const n = G.length, QW = 1240, QH = alto, qpl = 48, qpb = 44, qpt = 24, gw = (QW - qpl - 10) / n, nb = APLs.length, bw = Math.min(64, (gw - 24) / nb - 6);
     const mxQ = Math.max.apply(null, [1].concat([].concat.apply([], G.map(function(o){ return deAnio(o).map(function(z){ return z[1]; }); })))), QY = function(v){ return (QH - qpb - qpt) * v / mxQ; };
     const eje = [0, .5, 1].map(function(f){ const v = mxQ * f, y = QH - qpb - QY(v); return `<line x1="${qpl}" x2="${QW - 6}" y1="${y}" y2="${y}" class="cqc-g"/><text x="${qpl - 6}" y="${y + 3}" class="cqc-y">${k$(v)}</text>`; }).join('');
-    const cols = G.map(function(o, i){ const cx = qpl + gw * i + gw / 2, x0 = cx - (nb * (bw + 4) - 4) / 2, Z = deAnio(o), tot = Z.reduce(function(s, z){ return s + z[1]; }, 0);
-      const bars = o.fut && yS === F.yA ? '' : APLs.map(function(a, j){ const z = Z.find(function(q){ return q[0][0] === a[0]; }), v = z ? z[1] : 0, h = QY(v), x = x0 + j * (bw + 4);
-        return v ? `<rect x="${x.toFixed(1)}" y="${(QH - qpb - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${a[2]}" data-altip="${o.lab} · ${a[1]} ${yS}|${cqM(v)}${tot ? ' · ' + Math.round(v / tot * 100) + '%' : ''}" data-tipc="neu"/><text x="${(x + bw / 2).toFixed(1)}" y="${(QH - qpb - h - 5).toFixed(1)}" class="cqc-v a">${k$(v)}</text>`
-          : `<rect x="${x.toFixed(1)}" y="${QH - qpb - 2}" width="${bw.toFixed(1)}" height="2" rx="1" fill="${a[2]}" opacity=".35"/>`; }).join('');
+    const cols = G.map(function(o, i){ const cx = qpl + gw * i + gw / 2, x0 = cx - (nb * (bw + 6) - 6) / 2, Z = deAnio(o), tot = Z.reduce(function(s, z){ return s + z[1]; }, 0);
+      // Cada barra va dividida por proveedor (tonos de la misma aplicación, de mayor a menor) con su nombre adentro cuando cabe
+      const bars = o.fut && yS === F.yA ? '' : APLs.map(function(a, j){ const z = Z.find(function(q){ return q[0][0] === a[0]; }), v = z ? z[1] : 0, h = QY(v), x = x0 + j * (bw + 6);
+        if(!v) return `<rect x="${x.toFixed(1)}" y="${QH - qpb - 2}" width="${bw.toFixed(1)}" height="2" rx="1" fill="${a[2]}" opacity=".35"/>`;
+        let base = QH - qpb;
+        const seg = z[2].map(function(pv, k){ const hh = QY(pv[1]); base -= hh; const nom = cqProvCorto(pv[0]), op = Math.max(.42, 1 - k * .2);
+          return `<rect x="${x.toFixed(1)}" y="${base.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(.5, hh - (k < z[2].length - 1 ? 1.5 : 0)).toFixed(1)}" rx="${k === z[2].length - 1 ? 4 : 1.5}" fill="${a[2]}" opacity="${op.toFixed(2)}" data-altip="${escapeHtml(appImpNombre(pv[0]) || pv[0])} · ${a[1]}|${o.lab} ${yS}: ${cqM(pv[1])} · ${Math.round(pv[1] / v * 100)}% de la barra" data-tipc="neu"/>`
+            + (function(){ const largo = nom.length * 5.7 + 8, cx2 = x + bw / 2;   // el nombre completo: horizontal si cabe, si no vertical; si tampoco cabe, solo en el recuadro al pasar el mouse
+            if(largo <= bw && hh >= 15) return `<text x="${cx2.toFixed(1)}" y="${(base + Math.min(hh / 2, 13) + 3.5).toFixed(1)}" class="cqc-pn">${escapeHtml(nom)}</text>`;
+            if(largo <= hh && bw >= 16) return `<text x="${cx2.toFixed(1)}" y="${(base + 6).toFixed(1)}" class="cqc-pn v" transform="rotate(90 ${cx2.toFixed(1)} ${(base + 6).toFixed(1)})">${escapeHtml(nom)}</text>`;
+            return ''; })(); }).join('');
+        return seg + `<text x="${(x + bw / 2).toFixed(1)}" y="${(QH - qpb - h - 6).toFixed(1)}" class="cqc-v a">${k$(v)}</text>`; }).join('');
       return `<g class="cqc-col"${o.k ? ` data-cqcel="*|*|${o.k}"` : ''}><rect x="${(cx - gw / 2 + 4).toFixed(1)}" y="${qpt - 14}" width="${(gw - 8).toFixed(1)}" height="${QH - qpt - qpb + 14}" rx="10" class="cqc-hit"/>${bars}
         <text x="${cx}" y="${QH - qpb + 16}" class="cqc-x q">${o.lab}</text><text x="${cx}" y="${QH - qpb + 30}" class="cqc-x s">${o.fut && yS === F.yA ? 'aún no' : cqM(tot)}${o.na != null ? ' · ' + appN(Math.round(yS === F.yA ? o.na : o.nb)) + ' eq.' : ''}</text></g>`; }).join('');
     return `<svg class="cqc-q" viewBox="0 0 ${QW} ${QH}" role="img" aria-label="${sel} ${yS}">${eje}${cols}</svg>`; };
   const tarjetasAnio = `<div class="cqc-yt" role="tablist">${[F.yA, F.yB].map(function(y){ return `<button type="button" role="tab" class="${y === yS ? 'on' : ''}" data-cqcy="${y}">${y}</button>`; }).join('')}</div>`;
+  const provHtml = function(G){ const P = new Map(); G.forEach(function(o){ if(o.fut && yS === F.yA) return; deAnio(o).forEach(function(z){ z[2].forEach(function(pv){ const q = P.get(pv[0]) || { n:pv[0], t:0, pais:pv[2], a:{} }; q.t += pv[1]; q.a[z[0][0]] = (q.a[z[0][0]] || 0) + pv[1]; P.set(pv[0], q); }); }); });
+    const L = [...P.values()].sort(function(a, b){ return b.t - a.t; }), T = L.reduce(function(s, q){ return s + q.t; }, 0); if(!L.length) return '';
+    return `<div class="cqc-pvs"><small>Proveedores en ${yS}</small>${L.map(function(q){ return `<span class="cqc-pv" data-altip="${escapeHtml(appImpNombre(q.n) || q.n)}|${CQ_APL.filter(function(a){ return q.a[a[0]]; }).map(function(a){ return a[1] + ': ' + cqM(q.a[a[0]]); }).join('|')}" data-tipc="neu">${cqBandera(q.pais, 18)}<b>${escapeHtml(cqProvCorto(q.n))}</b><em>${cqM(q.t)}</em><i>${Math.round(q.t / (T || 1) * 100)}%</i><span class="cqc-pv-b">${CQ_APL.map(function(a){ return q.a[a[0]] ? `<u style="flex:${q.a[a[0]]};background:${a[2]}"></u>` : ''; }).join('')}</span></span>`; }).join('')}</div>`; };
   const leyB = `<div class="cqc-ley">${APLs.map(function(a){ return `<span><i style="background:${a[2]}"></i>${a[1]}</span>`; }).join('')}</div>`;
   // 2) Por tipo de equipo
   function TGx(){ return TGx._v || (TGx._v = CQ_TIPOS.map(function(t){ const la = F.L.filter(function(x){ return cqTipoEq(x) === t[0]; }), lb = F.LB.filter(function(x){ return cqTipoEq(x) === t[0]; });
@@ -17551,8 +17572,8 @@ function cqGraficosHtml(F){ const e = escapeHtml, A3 = CQ_APL.filter(function(a)
   const ley = `<div class="cqc-ley">${A3.map(function(a){ return `<span><i style="background:${a[2]}"></i>${a[1]}</span>`; }).join('')}<span><i class="b"></i>${F.yB} (más claro / punteado)</span></div>`;
   return `<div class="cqc">
     <section class="cqc-card cqc-w"><header><div><h3>Tendencia mensual por aplicación</h3><small>US$ comprados cada mes · ${F.yA} en color, ${F.yB} punteado · misma escala en los tres</small></div>${ley}</header><div class="cqc-sms">${multiple}</div></section>
-    <section class="cqc-card"><header><div><h3>Por tipo de equipo · ${yS}</h3><small>US$ por aplicación, una barra al lado de la otra · toca un tipo para ver qué se compró</small></div>${tarjetasAnio}</header>${leyB}${TGx().length ? columnas(TGx(), 270, 'Compras por tipo de equipo') : '<div class="pmf-vacio">Sin compras.</div>'}</section>
-    <section class="cqc-card"><header><div><h3>Por trimestre · ${yS}</h3><small>US$ por aplicación, una barra al lado de la otra</small></div>${tarjetasAnio}</header>${leyB}${columnas(QGx(), 270, 'Compras por trimestre')}</section></div>`; }
+    <section class="cqc-card cqc-w"><header><div><h3>Por tipo de equipo · ${yS}</h3><small>US$ por aplicación, una barra al lado de la otra; cada barra dividida por proveedor · toca un tipo para ver qué se compró</small></div>${tarjetasAnio}</header>${leyB}${TGx().length ? columnas(TGx(), 360, 'Compras por tipo de equipo') + provHtml(TGx()) : '<div class="pmf-vacio">Sin compras.</div>'}</section>
+    <section class="cqc-card cqc-w"><header><div><h3>Por trimestre · ${yS}</h3><small>US$ por aplicación, una barra al lado de la otra; cada barra dividida por proveedor</small></div>${tarjetasAnio}</header>${leyB}${columnas(QGx(), 360, 'Compras por trimestre')}${provHtml(QGx())}</section></div>`; }
 function cqHtml(){
   const e = escapeHtml;
   if(!GASTO_DATA || !GASTO_DATA.rows || !GASTO_DATA.rows.length) return '<div class="ini-card"><div class="ini-vacio">Carga Consulta.xlsx (o abre con los datos publicados) para ver las compras por origen.</div></div>';
