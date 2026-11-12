@@ -3536,7 +3536,7 @@ html[data-theme="dark"] .rqx-ic{background:#1c2636 !important;}
 
 /* Ficha del proyecto: íconos, listas y buscador (v358) */
 .pmx-head > .rqx-der{align-self:center;} .rqx-exp .pmx-ico{width:auto;padding:0 10px;gap:5px;grid-auto-flow:column;font:800 13px Inter,sans-serif;} .rqx-exp .pmx-ico svg{width:18px;height:18px;}
-.pmx-ico.arch{color:#5a6878;} .pmx-ico.comp{color:#b4231a;background:#fde8e6 !important;} .pmx-ico.comp span{font-weight:700;font-size:12px;} .pmx-ico.comp.sel{box-shadow:0 0 0 2px #b4231a;} .pmx-ico.obra{color:#15803d;} .pmx-ico.dev{color:#b4231a;} .pmx-ico.cero{opacity:.55;}
+.pmx-ico.arch{color:#5a6878;} #supLista > .sup-sku{grid-column:1 / -1;display:flex;flex-direction:column;gap:8px;} .rqm-lista{display:flex;flex-direction:column;gap:8px;} .pmx-ico.comp{color:#b4231a;background:#fde8e6 !important;} .pmx-ico.comp span{font-weight:700;font-size:12px;} .pmx-ico.comp.sel{box-shadow:0 0 0 2px #b4231a;} .pmx-ico.obra{color:#15803d;} .pmx-ico.dev{color:#b4231a;} .pmx-ico.cero{opacity:.55;}
 .rqx-exp .rqm-ico{transition:transform .15s,box-shadow .2s;} .rqx-exp .rqm-ico:hover{transform:translateY(-1px);box-shadow:0 8px 18px -12px rgba(16,24,40,.5);}
 .pm-lx{display:flex;flex-direction:column;gap:6px;} .pm-lx-f{all:unset;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) 110px 120px;gap:14px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 16px;}
 button.pm-lx-f{cursor:pointer;} button.pm-lx-f:hover{border-color:#b9c6d8;} .pm-lx-f .t b{display:block;font-size:14px;font-weight:700;color:var(--ink);} .pm-lx-f .t small{font-size:11.5px;color:var(--ink-soft);}
@@ -14821,40 +14821,7 @@ function rqVistaTarjetas(cont, filas){
 
   const listosVer = listos;
   RQ.tarjetas = ver.concat(listosVer, archivados);
-  const tarjeta = function(r, iTarjeta){
-    const refRecep = r.cantPedido != null ? r.cantPedido : r.cantOrden;
-    const docs = [
-      r.codOrden ? 'OC ' + escapeHtml(r.codOrden) + (r.ocsExtra ? ' · ' + r.ocsExtra.map(escapeHtml).join(' · ') : '') : '',
-      r.docSalida ? 'Salida ' + escapeHtml(r.docSalida) + (r.fSalida ? ' · ' + rqFecha(r.fSalida) : '') + (r.cantSalida != null ? ' · ' + n(r.cantSalida) + ' ' + escapeHtml(r.unidad || '') : '') + escapeHtml(rqDesde(r)) : '',
-      r.docObra ? 'Obra ' + escapeHtml(r.docObra) + (r.fObra ? ' · ' + rqFecha(r.fObra) : '') : '',
-    ].filter(Boolean);
-    // Fila simple (12.11.2026, Piero: "minimalista, que se entienda el estado actual y el stock como ícono"): un ícono del paso actual,
-    // el producto, la cantidad, dónde está con su dato clave y el stock disponible. Al tocar la fila se abre el detalle.
-    const ST = rqEstadoCorto(r), k = ST[0];
-    if(r._pm == null) r._pm = rqPasoEn(r);
-    const fx = k === 'rev' || k === 'com' ? rqFifoDe(r) : null, um = escapeHtml(r.unidad || ''), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
-    const sk = fx && fx.falta > 0 && fx.asig > 0 ? (fx.asig >= fx.falta - 0.001 ? ['ok', nn(fx.asig), 'Hay stock en Lurín para atender todo: ' + nn(fx.asig) + ' ' + um] : ['par', nn(fx.asig) + '/' + nn(fx.falta), 'Hay stock en Lurín para ' + nn(fx.asig) + ' de ' + nn(fx.falta) + ' ' + um]) : null;
-    // Sin stock libre y todavía en revisión: ícono de carrito para pasarlo a Compras (12.11.2026, Piero)
-    const aCompras = !!rqPasaCompras(r);
-    return `<div class="rqm-card rqx-it st-${k}" data-i="${iTarjeta}" data-paso="${k}"${aCompras ? ' data-comp="1"' : ''}>
-      <button type="button" class="rqx-fila" data-rqxab="1" aria-expanded="false">
-        <span class="rqx-t"><b>${rqTxt(r.producto)}</b><small>${escapeHtml(r.idProducto)}${unSoloReq ? '' : ' · Req. ' + escapeHtml(String(r.codRequerimiento).replace(/^000\d-0*/, ''))}</small></span>
-        <span class="rqx-q"><b>${nn(r.cantidad)}</b>${um}</span>
-        <span class="rqx-st"><b>${ST[1]}</b>${ST[2] ? `<small>${escapeHtml(ST[2])}</small>` : ''}${pmAlerta(r)}</span>
-        <span class="rqx-sk ${sk ? sk[0] : aCompras ? 'comp' : 'no'}"${sk ? ` title="${escapeHtml(sk[2])}"` : aCompras ? ` title="Sin stock libre: pasar ${nn(fx.falta)} ${um} a Compras"` : ''}>${sk ? `<svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z" fill="currentColor" opacity=".18"/><path d="M3 7.5 12 12l9-4.5M12 12v9M3 7.5v9L12 21l9-4.5v-9L12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><b>${sk[1]}</b>` : aCompras ? `${RQ_SVG_CARRO}<b>${nn(fx.falta)}</b>` : ''}</span>
-        <svg class="rqx-flecha" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <div class="rqx-det" hidden>${(function(){   // Solo lo que ya pasó, en fichas cortas; la OC abre su detalle (12.11.2026, Piero: "sin los textos de fondo azul")
-        const c = function(v){ return escapeHtml(String(v || '').replace(/^000\d-0*/, '')); }, f = function(ic, t, v, sub, attr){ return `<${attr ? 'button type="button" ' + attr : 'div'} class="rqx-h${attr ? ' clic' : ''}"><span><small>${t}</small><b>${v}</b>${sub ? `<em>${sub}</em>` : ''}</span>${attr ? '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' : '</div>'}`; };
-        const h = [f('📝', 'Requerimiento', rqFecha(r.fReq), escapeHtml(titleCase(polarCorta(r.responsable || '', 26))))];
-        if(r.codPedido) h.push(f('🛒', 'Pedido', c(r.codPedido), r.fPedido ? rqFecha(r.fPedido) : ''));
-        if(r.codOrden) h.push(f('🧾', 'OC ' + c(r.codOrden), escapeHtml(polarCorta(appImpNombre(r.proveedor || '') || r.proveedor || '—', 24)), r.fCompromiso && !(r.cantRecep > 0) ? 'llega ' + rqFecha(r.fCompromiso) : r.fOrden ? 'emitida ' + rqFecha(r.fOrden) : '', `data-rqoc="${escapeHtml(r.codOrden)}" title="Ver la OC"`));
-        if(r.cantRecep > 0) h.push(f('🏬', 'Llegó al almacén', nn(r.cantRecep) + ' ' + um, r.fRecep ? rqFecha(r.fRecep) : ''));
-        if(r.fSalida || r.cantSalida > 0) h.push(f('🚚', 'Salió a obra', nn(r.cantSalida) + ' ' + um, [r.fSalida ? rqFecha(r.fSalida) : '', r.docSalida ? 'guía ' + escapeHtml(r.docSalida) : ''].filter(Boolean).join(' · ')));
-        if(r.fObra || r.cantObra > 0) h.push(f('🏗️', 'Recibido en obra', nn(r.cantObra) + ' ' + um, r.fObra ? rqFecha(r.fObra) : ''));
-        return `<div class="rqx-hs">${h.join('')}</div>`; })()}${rqCobHtml(r)}${rqPartesHtml(r)}</div>
-    </div>`;
-  };
+  const tarjeta = function(r, iTarjeta){ return rqFilaHtml(r, iTarjeta, unSoloReq ? 0 : 1); };
   const tarjetas = ver.map(tarjeta).join('');
 
   // Lo que ya se envió: plegado, con la misma tarjeta y los mismos círculos de arriba (29.09.2026, Piero).
@@ -15435,7 +15402,8 @@ document.addEventListener('click', function(e){
   if(rp){ rqPdfNativo(rp.dataset.reqpdf); return; }
   // Volver a la pantalla de la que se vino (14.10.2026, Piero: "falta una opción para retroceder").
   if(e.target.closest && e.target.closest('[data-rqvolver]')){ if(!appNavVolver()) appInicio(APP.vista === 'super' ? 'supreq' : undefined); return; }
-  const roc = e.target.closest && e.target.closest('[data-rqoc]'); if(roc){ appOCAbrir(roc.dataset.rqoc); return; }
+  const roc = e.target.closest && e.target.closest('[data-rqoc]'); if(roc){ const el = document.getElementById('appOC'); if(el && el.contains(roc)){ (el._pila = el._pila || []).push(el.innerHTML); appOCAbrir(roc.dataset.rqoc, true); } else appOCAbrir(roc.dataset.rqoc); return; }
+  const rrq = e.target.closest && e.target.closest('[data-ocreq]'); if(rrq && !rrq.closest('#appOC')){ appAbrirReq(rrq.dataset.ocreq); return; }
   const fxb = e.target.closest && e.target.closest('[data-rqxab]'); if(fxb && !e.target.closest('[data-altip]')){ const d = fxb.nextElementSibling, ab = d.hidden; d.hidden = !ab; fxb.setAttribute('aria-expanded', ab); fxb.parentNode.classList.toggle('ab', ab); return; }
   const rcp = e.target.closest && e.target.closest('[data-rqcomp]');
   if(rcp){ const rqm = rcp.closest('.rqm'); if(!rqm) return; const on = rqm.dataset.fil !== 'comp'; if(on) rqm.dataset.fil = 'comp'; else delete rqm.dataset.fil;
@@ -18933,8 +18901,15 @@ function supResumenHtml(l){
       return `<button type="button" class="pmx-k ${n ? K[p[0]][0] : ''}${APP_SUP.paso === p[0] ? ' sel' : ''}" data-suppaso="${p[0]}" title="Ver los req. con ítems ${K[p[0]][1]}"><b>${appN(n)}</b><small>${K[p[0]][1]}</small></button>`; }).join('')}</div></div></div>`;
 }
 document.addEventListener('click', function(ev){ if(ev.target.closest && ev.target.closest('[data-supcomp]')) rqComprasLista(supResumenHtml._comp || []); });
+// Con un paso elegido (p. ej. "en almacén") la lista muestra los SKU de ese paso, no las tarjetas de req. (12.11.2026, Piero)
+function supSkuItems(l){ const k = APP_SUP.paso, L = []; l.forEach(function(g){ g.items.forEach(function(r){ if(supPaso(r) === k) L.push(r); }); });
+  return L.sort(function(a, b){ return (a.fReq || 0) - (b.fReq || 0); }); }
+function supSkuFilas(L, desde, n){ const cr = APP_SUP.cli || APP_SUP.pry ? 1 : 2; return L.slice(desde, desde + n).map(function(r, i){ return rqFilaHtml(r, desde + i, cr); }).join(''); }
 function appSupMas(){
   const c = document.getElementById('supLista'), m = document.getElementById('supMas'); if(!c || !m) return;
+  if(APP_SUP.paso){ const L = supSkuItems(supConPaso(supFiltrados())), box = c.querySelector('.rqm-lista'), n = box ? box.children.length : 0;
+    if(box && n < L.length) box.insertAdjacentHTML('beforeend', supSkuFilas(L, n, 40)); if(!box || n + 40 >= L.length){ m.remove(); return; }
+    requestAnimationFrame(function(){ const r = m.getBoundingClientRect(); if(m.isConnected && r.top < window.innerHeight + 900) appSupMas(); }); return; }
   const l = supConPaso(supFiltrados()), n = c.querySelectorAll('.sup-card').length;
   if(n < l.length) m.insertAdjacentHTML('beforebegin', l.slice(n, n + 30).map(supCard).join(''));
   if(n + 30 >= l.length){ m.remove(); return; }
@@ -19219,10 +19194,38 @@ const PM_EST_F = { '':['Pendientes', 'pendientes', 'pend', ''], '0':['En revisi�
 // En revisión y sin stock libre en Lurín (ni en camino): debería pasar a Compras (12.11.2026, Piero)
 function rqPasaCompras(r){ if(supPaso(r) !== 'rev') return null; const x = rqFifoDe(r); return x && x.falta > 0 && !(x.asig > 0) && !(x.camQ > 0) ? x : null; }
 const RQ_SVG_CARRO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.4 11.2h11.3l2-8H6.3"/></svg>';
+// Fila de un ítem del requerimiento (también en la lista "Para pasar a Compras"). conReq: 1 = muestra el N° de req., 2 = además el cliente.
+function rqFilaHtml(r, i, conReq){
+  // Fila simple (12.11.2026, Piero: "minimalista, que se entienda el estado actual y el stock como ícono"): un ícono del paso actual,
+  // el producto, la cantidad, dónde está con su dato clave y el stock disponible. Al tocar la fila se abre el detalle.
+  const ST = rqEstadoCorto(r), k = ST[0];
+  if(r._pm == null) r._pm = rqPasoEn(r);
+  const fx = k === 'rev' || k === 'com' ? rqFifoDe(r) : null, um = escapeHtml(r.unidad || ''), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
+  const sk = fx && fx.falta > 0 && fx.asig > 0 ? (fx.asig >= fx.falta - 0.001 ? ['ok', nn(fx.asig), 'Hay stock en Lurín para atender todo: ' + nn(fx.asig) + ' ' + um] : ['par', nn(fx.asig) + '/' + nn(fx.falta), 'Hay stock en Lurín para ' + nn(fx.asig) + ' de ' + nn(fx.falta) + ' ' + um]) : null;
+  // Sin stock libre y todavía en revisión: ícono de carrito para pasarlo a Compras (12.11.2026, Piero)
+  const aCompras = !!rqPasaCompras(r);
+  return `<div class="rqm-card rqx-it st-${k}" data-i="${i}" data-paso="${k}"${aCompras ? ' data-comp="1"' : ''}>
+    <button type="button" class="rqx-fila" data-rqxab="1" aria-expanded="false">
+      <span class="rqx-t"><b>${rqTxt(r.producto)}</b><small>${escapeHtml(r.idProducto)}${conReq ? ' · Req. ' + escapeHtml(String(r.codRequerimiento).replace(/^000\d-0*/, '')) : ''}${conReq === 2 ? ' · ' + escapeHtml(polarCorta(SUP_CLI_UNIR[appImpNombre(r.proyecto || '') || r.proyecto] || appImpNombre(r.proyecto || '') || r.proyecto || '', 40)) : ''}</small></span>
+      <span class="rqx-q"><b>${nn(r.cantidad)}</b>${um}</span>
+      <span class="rqx-st"><b>${ST[1]}</b>${ST[2] ? `<small>${escapeHtml(ST[2])}</small>` : ''}${pmAlerta(r)}</span>
+      <span class="rqx-sk ${sk ? sk[0] : aCompras ? 'comp' : 'no'}"${sk ? ` title="${escapeHtml(sk[2])}"` : aCompras ? ` title="Sin stock libre: pasar ${nn(fx.falta)} ${um} a Compras"` : ''}>${sk ? `<svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z" fill="currentColor" opacity=".18"/><path d="M3 7.5 12 12l9-4.5M12 12v9M3 7.5v9L12 21l9-4.5v-9L12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><b>${sk[1]}</b>` : aCompras ? `${RQ_SVG_CARRO}<b>${nn(fx.falta)}</b>` : ''}</span>
+      <svg class="rqx-flecha" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="rqx-det" hidden>${(function(){   // Solo lo que ya pasó, en fichas cortas; la OC abre su detalle (12.11.2026, Piero: "sin los textos de fondo azul")
+      const c = function(v){ return escapeHtml(String(v || '').replace(/^000\d-0*/, '')); }, f = function(ic, t, v, sub, attr){ return `<${attr ? 'button type="button" ' + attr : 'div'} class="rqx-h${attr ? ' clic' : ''}"><span><small>${t}</small><b>${v}</b>${sub ? `<em>${sub}</em>` : ''}</span>${attr ? '<svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' : '</div>'}`; };
+      const h = [f('📝', conReq ? 'Req. ' + c(r.codRequerimiento) : 'Requerimiento', rqFecha(r.fReq), escapeHtml(titleCase(polarCorta(r.responsable || '', 26))), conReq ? `data-ocreq="${escapeHtml(r.codRequerimiento)}" title="Abrir el requerimiento"` : '')];
+      if(r.codPedido) h.push(f('🛒', 'Pedido', c(r.codPedido), r.fPedido ? rqFecha(r.fPedido) : ''));
+      if(r.codOrden) h.push(f('🧾', 'OC ' + c(r.codOrden), escapeHtml(polarCorta(appImpNombre(r.proveedor || '') || r.proveedor || '—', 24)), r.fCompromiso && !(r.cantRecep > 0) ? 'llega ' + rqFecha(r.fCompromiso) : r.fOrden ? 'emitida ' + rqFecha(r.fOrden) : '', `data-rqoc="${escapeHtml(r.codOrden)}" title="Ver la OC"`));
+      if(r.cantRecep > 0) h.push(f('🏬', 'Llegó al almacén', nn(r.cantRecep) + ' ' + um, r.fRecep ? rqFecha(r.fRecep) : ''));
+      if(r.fSalida || r.cantSalida > 0) h.push(f('🚚', 'Salió a obra', nn(r.cantSalida) + ' ' + um, [r.fSalida ? rqFecha(r.fSalida) : '', r.docSalida ? 'guía ' + escapeHtml(r.docSalida) : ''].filter(Boolean).join(' · ')));
+      if(r.fObra || r.cantObra > 0) h.push(f('🏗️', 'Recibido en obra', nn(r.cantObra) + ' ' + um, r.fObra ? rqFecha(r.fObra) : ''));
+      return `<div class="rqx-hs">${h.join('')}</div>`; })()}${rqCobHtml(r)}${rqPartesHtml(r)}</div>
+  </div>`;
+}
 function rqComprasLista(L){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   L = L.slice().sort(function(a, b){ return (a.fReq || 0) - (b.fReq || 0); });
-  appListaAbrir('Para pasar a Compras · ' + appN(L.length), 'En revisión y sin stock libre en Lurín', `<div class="pm-lx">${L.map(function(r){ const c = appImpNombre(r.proyecto || '') || r.proyecto || '';
-    return `<button type="button" class="pm-lx-f" data-ocreq="${e(r.codRequerimiento)}"><span class="t"><b>${rqTxt(r.producto)}</b><small>${e(r.idProducto)} · Req. ${e(String(r.codRequerimiento).replace(/^000\d-0*/, ''))} · ${e(polarCorta(SUP_CLI_UNIR[c] || c, 40))}</small></span><span class="q"><b>${nn(r.cantidad)}</b> ${e(r.unidad || '')}</span><span class="d">${e(rqEstadoCorto(r)[2])}</span></button>`; }).join('')}</div>`); }
+  appListaAbrir('Para pasar a Compras · ' + appN(L.length), 'En revisión y sin stock libre en Lurín · toca un ítem para ver el detalle', `<div class="rqm rqm-lista">${L.map(function(r, i){ return rqFilaHtml(r, i, 2); }).join('')}</div>`); }
 function rqEstadoCorto(r){ const k = supPaso(r), dh = function(f){ const d = f ? Math.max(0, busdayCount(f, appIndCorte()) || 0) : 0; return d ? d + ' d.h.' : 'hoy'; };
   return [k].concat({ rev:['En revisión', 'hace ' + dh(r.fReq)], com:['En Compras', 'sin OC · ' + dh(r.fPedido || r.fReq)],
     oc:['OC en camino', r.fCompromiso ? 'llega ' + rqFecha(r.fCompromiso) : 'sin fecha pactada'], alm:['En almacén', 'por despachar'],
@@ -19456,7 +19459,8 @@ function appSupReqHtml(){
     <div class="sup-fil">${ac('cli', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>', 'Cliente', APP_SUP.cli)}${ac('pry', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>', 'PRY o proyecto', pryTxt)}</div>
     ${supResumenHtml(l0)}
     <div class="m-buscar pc-buscar-gen"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}">${INV_XLS_BTN.replace('data-invxls="1"', 'data-supxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el estado de los productos de lo filtrado')}</div>
-    <div id="supLista">${l.slice(0, n0).map(supCard).join('')}${l.length > n0 ? '<div class="sup-mas" id="supMas"></div>' : ''}${l.length ? '' : `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
+    <div id="supLista">${APP_SUP.paso ? (function(){ const L = supSkuItems(l); return `<div class="rqm rqm-lista sup-sku">${supSkuFilas(L, 0, 40)}</div>${L.length > 40 ? '<div class="sup-mas" id="supMas"></div>' : ''}`; })()
+      : l.slice(0, n0).map(supCard).join('') + (l.length > n0 ? '<div class="sup-mas" id="supMas"></div>' : '')}${l.length ? '' : `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : 'No hay requerimientos con ese filtro.'}</div></div>`}</div></div>`;
 }
 // Excel del Supervisor con el mismo formato que el status de Compras pendientes (03.11.2026, Piero): hoja 1 con el resumen
 // (KPIs, dónde están los ítems y una fila por req. con su avance), hoja 2 con cada producto, su estado en color y cómo va.
