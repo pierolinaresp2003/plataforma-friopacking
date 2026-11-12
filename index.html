@@ -17555,15 +17555,13 @@ function cqGraficosHtml(F){ const e = escapeHtml, A3 = CQ_APL.filter(function(a)
         let base = QH - qpb;
         const seg = z[2].map(function(pv, k){ const hh = QY(pv[1]); base -= hh; const nom = cqProvCorto(pv[0]), op = Math.max(.42, 1 - k * .2);
           return `<rect x="${x.toFixed(1)}" y="${base.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(.5, hh - (k < z[2].length - 1 ? 1.5 : 0)).toFixed(1)}" rx="${k === z[2].length - 1 ? 4 : 1.5}" fill="${a[2]}" opacity="${op.toFixed(2)}" data-altip="${escapeHtml(appImpNombre(pv[0]) || pv[0])} · ${a[1]}|${o.lab} ${yS}: ${cqM(pv[1])} · ${Math.round(pv[1] / v * 100)}% de la barra" data-tipc="neu"/>`
-            + (z[2].length === 1 && h < 30 ? '' : (function(){ const cx2 = x + bw / 2, val = cqDos(pv[1]), pc = Math.round(pv[1] / v * 100) + '%', L = function(t){ return t.length * 5.8 + 10; }, e2 = escapeHtml, X = cx2.toFixed(1);
-            // nombre, monto (2 cifras) y % de la barra: en 3 o 2 renglones si cabe a lo ancho; si no, en vertical; si el tramo es muy chico, solo al pasar el mouse
+            + (z[2].length === 1 && h < 30 ? '' : (function(){ const cx2 = x + bw / 2, val = cqDos(pv[1]), L = function(t){ return t.length * 5.8 + 10; }, e2 = escapeHtml, X = cx2.toFixed(1);
+            // nombre y monto (2 cifras), sin % (12.11.2026, Piero): en 2 renglones si cabe a lo ancho; si no, en vertical; si el tramo es muy chico, solo al pasar el mouse
             const vy = (base + 7).toFixed(1), vert = function(t){ return `<text x="${X}" y="${vy}" class="cqc-pn v" transform="rotate(90 ${X} ${vy})">${t}</text>`; };
-            if(L(nom) <= bw && hh >= 44) return `<text x="${X}" y="${(base + 14).toFixed(1)}" class="cqc-pn">${e2(nom)}</text><text x="${X}" y="${(base + 27).toFixed(1)}" class="cqc-pn n">${val}</text><text x="${X}" y="${(base + 39).toFixed(1)}" class="cqc-pn n">${pc}</text>`;
-            if(L(nom) <= bw && L(val + ' · ' + pc) <= bw && hh >= 30) return `<text x="${X}" y="${(base + 13).toFixed(1)}" class="cqc-pn">${e2(nom)}</text><text x="${X}" y="${(base + 25).toFixed(1)}" class="cqc-pn n">${val} · ${pc}</text>`;
-            if(L(nom + ' · ' + val + ' · ' + pc) <= hh && bw >= 16) return vert(`${e2(nom)} <tspan class="n">${val} · ${pc}</tspan>`);
-            if(L(nom + ' ' + val + ' ' + pc) <= bw && hh >= 15) return `<text x="${X}" y="${(base + Math.min(hh / 2, 13) + 3.5).toFixed(1)}" class="cqc-pn">${e2(nom)} <tspan class="n">${val} · ${pc}</tspan></text>`;
+            if(L(nom) <= bw && hh >= 30) return `<text x="${X}" y="${(base + 13).toFixed(1)}" class="cqc-pn">${e2(nom)}</text><text x="${X}" y="${(base + 25).toFixed(1)}" class="cqc-pn n">${val}</text>`;
+            if(L(nom + ' ' + val) <= bw && hh >= 15) return `<text x="${X}" y="${(base + Math.min(hh / 2, 13) + 3.5).toFixed(1)}" class="cqc-pn">${e2(nom)} <tspan class="n">${val}</tspan></text>`;
             if(L(nom + ' · ' + val) <= hh && bw >= 16) return vert(`${e2(nom)} <tspan class="n">${val}</tspan>`);
-            if(L(nom) <= bw && hh >= 18) return `<text x="${X}" y="${(base + Math.min(hh / 2, 13) + 3.5).toFixed(1)}" class="cqc-pn">${e2(nom)} <tspan class="n">${L(nom + ' ' + val) <= bw ? val : ''}</tspan></text>`;
+            if(L(nom) <= bw && hh >= 15) return `<text x="${X}" y="${(base + Math.min(hh / 2, 13) + 3.5).toFixed(1)}" class="cqc-pn">${e2(nom)}</text>`;
             if(L(nom) <= hh && bw >= 16) return vert(e2(nom));
             return ''; })()); }).join('');
         // barra baja de un solo proveedor: el nombre va encima del monto
