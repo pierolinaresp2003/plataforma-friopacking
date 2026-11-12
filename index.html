@@ -3328,6 +3328,57 @@ body.app-pc .imp-linea{gap:8px;}
 @media (max-width:900px){ .sup .sup-res.sup-head, .rqm .rqm-cab.rqx-head{grid-template-columns:auto minmax(0,1fr);} .sup-head .pmx-ks, .rqx-head .pmx-ks{grid-column:1 / -1;} .rqx-exp{grid-column:1 / -1;} .sup-head > div:nth-child(3){display:none;} }
 @media (max-width:600px){ .sup .sup-res.sup-head, .rqm .rqm-cab.rqx-head{grid-template-columns:1fr;padding:16px;} .sup-head .pmx-dona, .rqx-head .pmx-dona{justify-self:start;} }
 
+/* Distribución en pantallas medianas: los días de proyecto bajan junto al nombre y los indicadores quedan a la derecha */
+@media (min-width:901px) and (max-width:1320px){
+  .pmx-head:not(.sup-head):not(.rqx-head){grid-template-columns:auto minmax(0,1fr) minmax(250px,auto);row-gap:6px;}
+  .pmx-head:not(.sup-head):not(.rqx-head) .pmx-dona{grid-row:1 / span 2;} .pmx-head:not(.sup-head):not(.rqx-head) .pmx-ks{grid-column:3;grid-row:1 / span 2;}
+  .pmx-head:not(.sup-head):not(.rqx-head) .pmx-dur{grid-column:2;grid-row:2;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:4px 10px;text-align:left;padding:0;}
+  .pmx-dur b{font-size:30px;} .pmx-dur small{max-width:none;}
+  .rqm .rqm-cab.rqx-head{grid-template-columns:auto minmax(0,1fr) minmax(250px,auto);} .rqx-head .rqx-exp{grid-column:2;grid-row:2;} .rqx-head .pmx-ks{grid-column:3;grid-row:1 / span 2;} .rqx-head .pmx-dona{grid-row:1 / span 2;}
+}
+@media (max-width:1320px){
+  .pm-dt-todo .pm-dp{min-width:190px;} .pm-dt-todo .pm-dsf{width:110px;min-width:100px;} .pm-dfam{width:110px;min-width:110px;}
+  .pm-dt-todo th, .pm-dt-todo td{padding-left:6px;padding-right:6px;} .pm-dt-todo .pm-dn, .pm-dt-todo th.n{width:46px;}
+  .pm-dt-todo{table-layout:fixed;width:100%;} .pm-dt-todo th:nth-child(1){width:112px;} .pm-dt-todo th:nth-child(2){width:106px;} .pm-dt-todo th:nth-child(4){width:42px;} .pm-dt-todo th:nth-child(5){width:48px;}
+  .pm-dt-todo th:nth-child(6){width:122px;} .pm-dt-todo th:nth-child(n+7):nth-child(-n+10){width:54px;white-space:normal;font-size:9.5px;letter-spacing:0;padding-left:2px;padding-right:2px;text-align:center;} .pm-dt-todo th:nth-child(11){width:118px;} .pm-dt-todo td{overflow:hidden;} .pm-dt-todo .pm-dp, .pm-dt-todo .pm-dfam, .pm-dt-todo .pm-dsf{min-width:0;width:auto;}
+  .pm-dtr button{padding:3px 2px;} .pm-dt-todo .pm-c.mini{white-space:normal;}
+  .pm-dt .pm-de{width:112px;} .pm-de-in{flex-direction:column;align-items:flex-start;gap:4px;} .pm-resp{flex-direction:row;gap:5px;} .pm-resp img, .pm-resp i{width:24px;height:24px;}
+}
+/* ===== Interacción moderna (v350, 12.11.2026, Piero: "animaciones modernas y dinámicas al pasar el mouse o al hacer clic") =====
+   Onda al tocar, leve elevación al pasar el mouse, presión al hacer clic, barras que se llenan y números que cuentan. */
+.fx-rip{position:absolute;border-radius:50%;pointer-events:none;background:currentColor;opacity:.16;transform:scale(0);animation:fxRip .6s cubic-bezier(.2,.8,.2,1) forwards;z-index:0;}
+@keyframes fxRip{to{transform:scale(1);opacity:0;}}
+.pmx-k, .sup-c2, .pmm-card, .imp-card, .pz-mod, .pmf-ir, .pm-ch, .pmx-tabs button, .tlh-card, .rq-cob, .pm-dtr button, .rqm-paso, .pmf-fil button, .pm-rf-b, .pmm-fbtn, .pmt-f, .cara, .imp-tabs.m-pl-tabs button{position:relative;overflow:hidden;}
+.pmx-tabs button{overflow:visible;}
+/* Presión al hacer clic */
+.pmx-k:active, .sup-c2:active, .pmm-card:active, .imp-card:active, .pmf-ir:active, .pm-ch:active, .tlh-card:active, .rq-cob:active, .pmm-fbtn:active, .pm-rf-b:active, .imp-tabs.m-pl-tabs button:active, .cara:active{transform:scale(.975) !important;transition-duration:.08s;}
+/* Elevación al pasar el mouse */
+.pm-ch{transition:transform .2s var(--pz-ease),box-shadow .2s,background .2s,color .2s;} .pm-ch:hover{transform:translateY(-1px);box-shadow:0 6px 14px -10px rgba(16,24,40,.45);}
+.pmm-card{transition:background .2s,transform .25s var(--pz-ease);} .pmm-card:hover{transform:translateX(3px);}
+.pmt-f{transition:transform .25s var(--pz-ease),box-shadow .25s,border-color .25s;} .pmt-f:hover{transform:translateY(-2px);border-color:#cfd8e3;box-shadow:0 14px 30px -22px rgba(16,24,40,.4);}
+.rq-cob{transition:transform .25s var(--pz-ease),box-shadow .25s,background .2s;} .rq-cob:hover{transform:translateY(-1px);box-shadow:0 12px 26px -20px rgba(16,24,40,.45);}
+.rq-cob-t{transition:transform .2s var(--pz-ease);} .rq-cob:hover .rq-cob-t{transform:translateY(-1px);}
+.pm-resp img, .pm-resp i, .sup-c2 .pm-dona, .pmm-card .pm-dona{transition:transform .3s var(--pz-ease);} .pm-dt tr:hover .pm-resp img, .pm-dt tr:hover .pm-resp i{transform:scale(1.1);}
+.sup-c2:hover .pm-dona, .pmm-card:hover .pm-dona{transform:rotate(-8deg) scale(1.05);}
+.pm-al-ic{transition:transform .2s var(--pz-ease);} .pm-al-ic:hover{transform:scale(1.25);}
+.pmx-dona .pm-dona{transition:transform .35s var(--pz-ease);} .pmx-head:hover .pmx-dona .pm-dona{transform:scale(1.03);}
+/* Filas de las tablas: se marcan al pasar */
+.pm-dt tbody td{transition:background .15s;} .pm-dt-todo tbody tr:hover td:not(.pm-dfam):not(.pm-dsf){background:#f3f7fc;} .pm-dt-todo tbody tr:hover td.pm-dn.si{background:#e2f3ef;}
+html[data-theme="dark"] .pm-dt-todo tbody tr:hover td:not(.pm-dfam):not(.pm-dsf){background:#152031;}
+/* Pestañas con la línea que se desliza */
+.pmx-tabs button{border-bottom-color:transparent !important;} .pmx-tabs button::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;background:#0a1e64;transform:scaleX(0);transform-origin:center;transition:transform .3s var(--pz-ease);}
+.pmx-tabs button.on::after{transform:scaleX(1);} .pmx-tabs button:hover::after{transform:scaleX(.35);} .pmx-tabs button.on:hover::after{transform:scaleX(1);}
+html[data-theme="dark"] .pmx-tabs button::after{background:#9cc8ff;}
+#pmxCuerpo > *{animation:pzSube .3s var(--pz-ease) both;}
+/* Barras que se llenan */
+.pmf-p i, .pmm-bar i, .pm-bar i, .rq-cob-bar i, .rqm-prog-top em, .sup-bar em{transform-origin:left center;animation:fxBarra .9s var(--pz-ease) both;}
+@keyframes fxBarra{from{transform:scaleX(0);}}
+/* Barra de pestañas de arriba */
+body.app-pc .app-toptabs button{transition:background .2s,color .2s,transform .2s var(--pz-ease);} body.app-pc .app-toptabs button:hover{transform:translateY(-1px);} body.app-pc .app-toptabs button:active{transform:scale(.96);}
+/* Foco visible para teclado */
+.pmx-k:focus-visible, .sup-c2:focus-visible, .pmm-card:focus-visible, .imp-card:focus-visible, .pm-ch:focus-visible, .pmf-ir:focus-visible{outline:2px solid #1a9c86;outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){ .fx-rip{display:none;} .pmf-p i, .pmm-bar i, .pm-bar i, .rq-cob-bar i, .rqm-prog-top em, .sup-bar em, #pmxCuerpo > *{animation:none !important;} }
+
 @media (prefers-reduced-motion: reduce){ .lz *, .app-bienv *, .pm *, .pmx *{animation:none !important;transition:none !important;} }
 </style>
 </head>
@@ -17090,6 +17141,21 @@ async function cmpXlsDescargar(){
   descargarBlob(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Compras ' + Y + ' por producto y trimestre - Grupo Friopacking.xlsx');
   appToast('Excel listo ✔ · Dashboard y ' + fams.length + ' hojas por tipo de producto');
 }
+
+// Onda al tocar y números que cuentan (v350, 12.11.2026, Piero: "animaciones modernas y dinámicas")
+const FX_SEL = '.pmx-k,.sup-c2,.pmm-card,.imp-card,.pz-mod,.pmf-ir,.pm-ch,.pmx-tabs button,.tlh-card,.rq-cob,.pm-dtr button,.pmf-fil button,.pm-rf-b,.pmm-fbtn,.pmt-f,.cara,.imp-tabs.m-pl-tabs button';
+const FX_QUIETO = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches:false };
+document.addEventListener('pointerdown', function(ev){ if(FX_QUIETO.matches || ev.button > 0) return; const el = ev.target.closest && ev.target.closest(FX_SEL); if(!el) return;
+  const r = el.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2.2, s = document.createElement('span'); s.className = 'fx-rip';
+  s.style.width = s.style.height = d + 'px'; s.style.left = (ev.clientX - r.left - d / 2) + 'px'; s.style.top = (ev.clientY - r.top - d / 2) + 'px'; el.appendChild(s); setTimeout(function(){ s.remove(); }, 650); }, { passive:true });
+// Los números grandes (indicadores, días de proyecto, totales) cuentan desde 0 al aparecer
+function fxContar(raiz){ if(FX_QUIETO.matches || !raiz || !raiz.querySelectorAll) return;
+  raiz.querySelectorAll('.pmx-k b,.pmx-dur b,.pmx-dona-n b,.pm-dfam-n strong,.pmf-tit > b,.tlh-dur b,.imp-tabs.m-pl-tabs button b,.pz-n b').forEach(function(b){ if(b._fx) return; b._fx = 1;
+    const t = b.textContent.trim(), m = t.match(/^([\d.,]+)(%?)$/); if(!m) return; const v = +m[1].replace(/,/g, ''); if(!(v > 1) || v > 1e7) return;
+    const dec = /\.\d/.test(m[1]) ? 1 : 0, t0 = performance.now(), dur = 650;
+    (function paso(now){ const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3), x = v * e; if(!b.isConnected) return;
+      b.textContent = (dec ? x.toFixed(1) : Math.round(x).toLocaleString('en-US')) + m[2]; if(k < 1) requestAnimationFrame(paso); else b.textContent = t; })(t0); }); }
+if(window.MutationObserver) new MutationObserver(function(ms){ if(FX_QUIETO.matches) return; ms.forEach(function(m){ m.addedNodes.forEach(function(n){ if(n.nodeType === 1 && n.childElementCount) fxContar(n); }); }); }).observe(document.documentElement, { childList:true, subtree:true });
 function appComprasHtml(){
   const cod = APP_PC.persona || '', vF = appPcPersonaF();
   const st = APP_F.indicadores, e = escapeHtml, nom = function(c){ return (PD_PERSONAS[c] || c || '').split(' ')[0]; };
