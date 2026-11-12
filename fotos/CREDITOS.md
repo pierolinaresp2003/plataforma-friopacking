@@ -24,3 +24,7 @@ Fotografías de Wikimedia Commons (licencias libres; autor y licencia exactos en
 | pry/palta.jpg | Palta | commons.wikimedia.org/wiki/File:Hass_avocados_Tauranga_20230621_150232.jpg |
 | pry/citricos.jpg | Cítricos | commons.wikimedia.org/wiki/File:Mandarin_Oranges_(Citrus_Reticulata).jpg |
 | pry/frio.jpg | Resto (genérica de almacén) | commons.wikimedia.org/wiki/File:Antarctica_Frozen_Food_Warehouse.jpg |
+
+## Logos de clientes (fotos/cli, v355)
+
+Íconos públicos de las webs de cada cliente (favicon), solo para identificarlos en las cabeceras. Clientes sin ícono muestran sus iniciales.
