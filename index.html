@@ -3411,7 +3411,24 @@ body.app-pc .app-toptabs button{transition:background .2s,color .2s,transform .2
 .cq-c:hover{transform:scale(1.04);box-shadow:0 10px 24px -14px color-mix(in srgb, var(--c) 70%, transparent);} .cq-c b{font-size:15px;font-weight:800;} .cq-c small{font-size:10.5px;color:var(--ink-soft);}
 .cq-c.tot{background:var(--surface-2);min-height:40px;} .cq-0{color:var(--muted);}
 .cq-mat tfoot th, .cq-mat tfoot td{background:var(--surface-2);font-weight:800;} .cq-mat tfoot th{text-align:left;padding-left:14px;}
-.cq-nota{margin:0;font-size:12px;color:var(--muted);}
+.cq-nota{margin:0;font-size:12px;color:var(--muted);} .cqd-src{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:2px;}
+/* Comparación de años (v352) */
+.cq-v{display:inline-flex;align-items:center;font-style:normal;font-size:11px;font-weight:800;border-radius:999px;padding:1px 7px;background:var(--surface-2);color:var(--ink-soft);white-space:nowrap;vertical-align:middle;}
+.cq-v.up{background:#e3f4ea;color:#1e7a3c;} .cq-v.dn{background:#fde8e6;color:#b42318;} .cq-v.nuevo{background:#e6eefb;color:#1f56b8;}
+.cq-g-cmp{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);}
+.cq-tot-b{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);margin:2px 0 4px;} .cq-tot-b b{display:inline;font-size:16px;margin:0;color:#7a8696;letter-spacing:0;}
+.cq-k span .cq-v{margin-left:4px;}
+.cq-tb.b{margin-top:2px;} .cq-tb.b i{background:#aab6c4;}
+.cq-c.cmp{min-height:68px;gap:1px;} .cq-c.cmp small{color:var(--ink-soft);} .cq-c.cmp .cq-v{margin-top:2px;}
+.cq-t b .cq-v{margin-left:4px;}
+.cq-ley{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--ink-soft);} .cq-ley span{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--ink);}
+.cq-ley i{display:inline-block;width:18px;height:6px;border-radius:99px;background:#0a1e64;} .cq-ley i.b{background:#aab6c4;}
+.cq-cmpb{display:inline-flex;align-items:center;gap:6px;} .cq-cmpb svg{width:15px;height:15px;}
+.cqd-k .cqd-big.b b{color:#7a8696;} .cqd-k .cq-v{font-size:14px;padding:3px 10px;}
+.cqd-pvb i.b em{background:#aab6c4;}
+.cqd-t tr.cqd-b td{background:#f7f8fa;color:var(--ink-soft);} .cqd-t tr.cqd-b .cqd-u{color:#7a8696;}
+html[data-theme="dark"] .cqd-t tr.cqd-b td{background:#121a26;}
+
 .cq-mat tbody th{text-align:left;width:250px;} .cq-mat thead th:nth-child(2){width:170px;} .cq-p span{text-align:left;}
 .cqd .pm-dw{overflow-x:auto;} .cqd-t td{white-space:normal;vertical-align:middle;} .cqd-t .cqd-f, .cqd-t .cqd-q, .cqd-t .cqd-u{white-space:nowrap;} .cqd-t .cqd-pv{max-width:200px;} .cqd-t .cqd-p{min-width:260px;} .cqd-t .cqd-a{min-width:150px;}
 .cqd-pvs{grid-template-columns:repeat(auto-fill,minmax(360px,1fr));}
@@ -17058,7 +17075,31 @@ function appFEnAnios(st){ const r = appFRango(st); if(!r) return function(){ ret
 const CMP_XLS_APL = ['Amoníaco', 'Freón', 'Glicol', 'CO₂', 'Otros', 'Stock / sin proyecto', 'Sin dato'];
 const CMP_XLS_APL_COL = { 'Amoníaco':'FF1E6FB8', 'Freón':'FF0E8A7C', 'Glicol':'FF7C5CC4', 'CO₂':'FF5A6878', 'Otros':'FF8A97A6', 'Stock / sin proyecto':'FFB26A00', 'Sin dato':'FFA0AAB6' };
 function cmpAplDesc(t){ t = sinAcentos(String(t || '').toUpperCase());
-  return /\bNH3\b|AMONIACO|R-?717\b/.test(t) ? 'Amoníaco' : /GLICOL|GLYCOL|PROPILENGLICOL/.test(t) ? 'Glicol' : /\bCO2\b|R-?744\b/.test(t) ? 'CO₂' : /FREON|\bR-?(22|134A?|404A?|407[A-F]?|410A?|448A?|449A?|452A?|507A?|513A?|1234[A-Z]*)\b/.test(t) ? 'Freón' : ''; }
+  return /\bNH3\b|AMONIACO|R-?717\b/.test(t) ? 'Amoníaco' : /GLICOL|GLYCOL|PROPILENGLICOL/.test(t) ? 'Glicol' : /\bCO2\b|R-?744\b/.test(t) ? 'CO₂' : /FREON|\bR-?(22|32|134A?|404A?|407[A-F]?|410A?|448A?|449A?|452A?|507A?|513A?|1234[A-Z]*)\b/.test(t) ? 'Freón' : ''; }
+// Refrigerante por el equipo mismo (12.11.2026, Piero: "los sin definir, encuéntrales si son de freón, glicol o amoníaco"): primero lo que
+// dice la descripción (NH3, glicol, R404A…) y luego el modelo o la marca, según los catálogos de los fabricantes:
+//  · Compresores Frick RWF/RXF/RWB, Sabroe SMC, Mycom (Mayekawa) N…V/N…M y tornillos abiertos Snowman (SRM, SNA, SAA, chiller CW) → amoníaco
+//  · Compresores semiherméticos / herméticos / scroll (Bitzer, Copeland, Snowman SRS…) → freón
+//  · Hengchang: sufijo -SAA / -SAS → amoníaco, -SAP / -SAG → glicol · Thermofin: T?N / serpentín N-.. → amoníaco, T?B → glicol (salmuera)
+//  · Alfa Laval de placas con junta (TK/MK BWFG) → glicol · Evapco Thermal-Pak inox → amoníaco
+//  · Evaporadores comerciales de cobre (Hispania HEA / H?N, Modine ICE / IDE / CTE, Kobol, FB, Güntner GACV, DX, Mipal, Bohn, Intarcon) → freón
+function cmpAplModelo(t, prov){ t = sinAcentos(String(t || '').toUpperCase()); prov = sinAcentos(String(prov || '').toUpperCase());
+  const d = cmpAplDesc(t); if(d) return [d, 'descripción'];
+  const A = 'Amoníaco', G = 'Glicol', F = 'Freón', mo = 'modelo';
+  if(/SEMI ?-?HERM|HERMETIC|SCROLL|BITZER|COPELAND|MANEUROP|DORIN|REFCOMP|FRASCOLD|\bSRS\d/.test(t)) return [F, mo];
+  if(/\bRWF|\bRXF|\bRWB|SABROE|\bSMC ?\d|MYCOM|\bN\d{3}V|\bN[4-8]M\b|GRASSO/.test(t) || (/MAYEKAWA/.test(prov) && /COMPRES/.test(t))) return [A, mo];
+  if(/SNOWMAN/.test(prov) && /\b(SRM|S2?NA|SAA)\d|OPEN SCREW|\bCW\d/.test(t)) return [A, mo];
+  const hc = t.match(/-SA([APGS])\b/); if(hc) return [hc[1] === 'A' || hc[1] === 'S' ? A : G, mo];
+  if(/THERMOFIN/.test(prov)){ if(/\bT[A-Z]{0,2}B[\s.-]/.test(t)) return [G, mo]; if(/\bT[A-Z]{0,2}N[\s.-]|\bN-?\d{2}-\d{3}/.test(t)) return [A, mo]; }
+  if(/ALFA LAVAL/.test(prov) && /PLACAS|BWF/.test(t)) return [G, mo];
+  if(/EVAPCO/.test(prov) && /INOX|THERMAL ?PAK/.test(t)) return [A, mo];
+  if(/HISPANIA|MIPAL|BOHN|INTARCON|CENTRO DEL FRIO|HEATCRAFT|KRAMER/.test(prov) || /\bDX[-\s]|\bHEA \d|\bH\dN-\d/.test(t)) return [F, mo];
+  if(/MODINE/.test(prov) && /\bIC[EN]|\bIDE/.test(t)) return [F, mo];
+  if(/MODINE/.test(prov) && /\bCTE/.test(t)) return [F, mo];
+  if(/\bSP\dH\d|\b\d[A-Z]{2}-\d{2}Y\b/.test(t)) return [F, mo];   // semiherméticos de pistón (6FE-50Y, SP6H…)
+  if(/KOBOL|FB-?LATAM/.test(prov) || /\bEVC-|\bCE-GC-/.test(t)) return [F, mo];   // evaporadores comerciales de cobre
+  if(/GUNTNER/.test(prov) && /\bGACV\b/.test(t) && !/\bS-GACV/.test(t)) return [F, mo];   // Güntner GACV (la versión para NH3 es S-GACV)
+  return null; }
 function cmpXlsDatos(Y){
   const TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75, hoy = appIndCorte(), mesCorte = hoy.getUTCFullYear() === Y ? hoy.getUTCMonth() + 1 : 12;
   // OC + código → proyectos (para la aplicación) y unidad de medida
@@ -17071,15 +17112,19 @@ function cmpXlsDatos(Y){
   const famNom = function(c){ c = String(c || 'OTROS'); return c.charAt(0) + c.slice(1).toLowerCase(); };
   const L = ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){ return r.anio === Y && r.codigo; }).map(function(r){
     const q = Math.min(4, Math.ceil((r.mes || 1) / 3)), usd = (r.montoPEN || 0) / TC, pr = { idProducto:r.codigo, producto:r.producto || '' }, fam = pmCat(pr);
-    const ps = [...(pry.get(nk(r.oc) + '|' + r.codigo) || [])], dsc = cmpAplDesc(r.producto);
-    // Primero el refrigerante de los proyectos; si la compra no tiene proyecto, el que dice la descripción (NH3, glicol, R404A…)
-    let apls = [...new Set(ps.map(aplDe))].sort(function(a, b){ return CMP_XLS_APL.indexOf(a) - CMP_XLS_APL.indexOf(b); });
-    if(dsc && (!apls.length || apls.every(function(a){ return a === 'Stock / sin proyecto' || a === 'Sin dato'; }))) apls = [dsc];
+    const ps = [...(pry.get(nk(r.oc) + '|' + r.codigo) || [])], mod = cmpAplModelo(r.producto, r.proveedor);
+    // Primero lo que dice el propio equipo (descripción o modelo: un enfriador de glicol sigue siendo de glicol aunque el proyecto sea de
+    // amoníaco); si no se sabe por el equipo, el refrigerante del proyecto. Lo que queda sin definir se completa luego por el mismo código.
+    let apls = mod ? [mod[0]] : [...new Set(ps.map(aplDe))].sort(function(a, b){ return CMP_XLS_APL.indexOf(a) - CMP_XLS_APL.indexOf(b); }), src = mod ? mod[1] : '';
+    if(!mod && apls.some(function(a){ return a !== 'Stock / sin proyecto' && a !== 'Sin dato'; })) src = 'proyecto';
     const pais = pmPais(r.proveedor, r.oc) || (r.origen === 'importado' ? '' : 'pe');
-    return { r:r, q:q, usd:usd, cant:+r.cantidad || 0, fam:famNom(fam), sub:pmSubfam(fam, pr), apl:apls.length ? apls.join(' / ') : (r.origen === 'importado' ? 'Sin dato' : 'Stock / sin proyecto'), apl0:apls[0] || (r.origen === 'importado' ? 'Sin dato' : 'Stock / sin proyecto'),
+    return { r:r, q:q, usd:usd, cant:+r.cantidad || 0, fam:famNom(fam), sub:pmSubfam(fam, pr), apl:apls.length ? apls.join(' / ') : (r.origen === 'importado' ? 'Sin dato' : 'Stock / sin proyecto'), apl0:apls[0] || (r.origen === 'importado' ? 'Sin dato' : 'Stock / sin proyecto'), aplSrc:src,
       prys:ps.filter(function(x){ return x && x !== 'SIN'; }), pais:pais, org:pais === 'pe' || (!pais && r.origen !== 'importado') ? 'Nacional' : pais === 'cn' ? 'Importación China' : 'Importación (otros países)',
       paisNom:pais ? (PM_PAIS_NOM[pais] || pais.toUpperCase()) : (r.origen === 'importado' ? 'Exterior' : 'Perú'), f:new Date(Date.UTC(r.anio, (r.mes || 1) - 1, r.dia || 1)), um:um.get(r.codigo) || '' };
   });
+  // Sin definir → si el mismo código se compró para un proyecto o tiene el refrigerante en el modelo, se usa ese
+  const porCod = new Map(); L.forEach(function(x){ if(x.aplSrc && CMP_XLS_APL.indexOf(x.apl0) < 4){ const m = porCod.get(x.r.codigo) || {}; m[x.apl0] = (m[x.apl0] || 0) + 1; porCod.set(x.r.codigo, m); } });
+  L.forEach(function(x){ if(x.aplSrc) return; const m = porCod.get(x.r.codigo); if(!m) return; const a = Object.keys(m).sort(function(p, q){ return m[q] - m[p]; })[0]; x.apl0 = a; x.apl = a; x.aplSrc = 'mismo código'; });
   return { Y:Y, L:L, mesCorte:mesCorte, TC:TC };
 }
 async function cmpXlsDescargar(){
@@ -17216,75 +17261,92 @@ const CQ_GRUPOS = [
   { k:'comp', t:'Compresores y chiller', f:function(x){ const d = (x.r.producto || '') + ' ' + x.sub; return /CHILLER/i.test(d) || (x.fam === 'Compresores y motores' && /COMPRES|TORNILLO|RECIPROC|SCROLL|SEMIHERM/i.test(d)); } }
 ];
 const CQ_APL = [['amo', 'Amoníaco', '#1e6fb8'], ['gli', 'Glicol', '#7c5cc4'], ['fre', 'Freón', '#0e8a7c'], ['otr', 'Sin definir', '#8a97a6']];
-const APP_CQ = { g:'evap', y:0, ver:'todo' };
+const APP_CQ = { g:'evap', y:0, ver:'todo', cmp:false };
 function cqAplK(x){ return x.apl0 === 'Amoníaco' ? 'amo' : x.apl0 === 'Glicol' ? 'gli' : x.apl0 === 'Freón' ? 'fre' : 'otr'; }
 function cqM(v){ v = v || 0; return v >= 1e6 ? 'US$ ' + (v / 1e6).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' M' : v >= 1e3 ? 'US$ ' + Math.round(v / 1e3).toLocaleString('es-PE') + ' mil' : v > 0 ? 'US$ ' + Math.round(v).toLocaleString('es-PE') : '—'; }
 function cqBandera(a, t){ return a ? `<img class="pm-fl" src="https://flagcdn.com/w40/${a}.png" srcset="https://flagcdn.com/w80/${a}.png 2x" width="${t || 22}" height="${Math.round((t || 22) * .75)}" alt="" loading="lazy" onerror="this.style.display='none'">` : '<span class="pm-fl x">IMP</span>'; }
 function cqDatos(y){ return appMemo('cq' + y + '|' + ((GASTO_DATA && GASTO_DATA.rows) || []).length + '|' + RQ.filas.length, function(){ rqPreparar();
   const ys = y ? [y] : [...new Set(((GASTO_DATA && GASTO_DATA.rows) || []).map(function(r){ return r.anio; }))].filter(Boolean).sort();
-  return [].concat.apply([], ys.map(function(a){ return cmpXlsDatos(a).L; })); }); }
+  return [].concat.apply([], ys.map(function(a){ return cmpXlsDatos(a).L.map(function(x){ x.anio = a; return x; }); })); }); }
 function cqAnios(){ return [...new Set(((GASTO_DATA && GASTO_DATA.rows) || []).map(function(r){ return r.anio; }))].filter(Boolean).sort(function(a, b){ return b - a; }); }
-function cqFiltrar(){ const g = CQ_GRUPOS.find(function(x){ return x.k === APP_CQ.g; }) || CQ_GRUPOS[0]; if(!APP_CQ.y) APP_CQ.y = appIndCorte().getUTCFullYear();
-  const L = cqDatos(APP_CQ.y === 'todo' ? 0 : APP_CQ.y).filter(g.f).filter(function(x){ return APP_CQ.ver !== 'imp' || x.pais !== 'pe'; }); return { g:g, L:L }; }
+function cqGrupo(){ return CQ_GRUPOS.find(function(x){ return x.k === APP_CQ.g; }) || CQ_GRUPOS[0]; }
+function cqLineas(g, y){ return cqDatos(y === 'todo' ? 0 : y).filter(g.f).filter(function(x){ return APP_CQ.ver !== 'imp' || x.pais !== 'pe'; }); }
+// Año elegido y, al comparar, el año anterior (12.11.2026, Piero: "hazme también 2025, tipo una comparación")
+function cqFiltrar(){ const g = cqGrupo(); APP_CQ.y = appIndCorte().getUTCFullYear(); APP_CQ.cmp = true;   // solo el año en curso contra el anterior (12.11.2026, Piero: "solo 2025 y 2026 como comparación")
+  const cmp = true, yB = APP_CQ.y - 1;
+  return { g:g, L:cqLineas(g, APP_CQ.y), LB:cmp ? cqLineas(g, yB) : [], cmp:cmp, yA:APP_CQ.y, yB:yB }; }
 function cqPaisK(x){ return x.pais || 'xx'; }
 function cqPaisNom(k){ return k === 'xx' ? 'Importado (país sin registrar)' : k === 'pe' ? 'Perú (nacional)' : (PM_PAIS_NOM[k] || k.toUpperCase()); }
+function cqAgr(L){ const P = new Map(), A = { amo:0, gli:0, fre:0, otr:0 }; let t = 0;
+  L.forEach(function(x){ const k = cqPaisK(x), a = cqAplK(x); const p = P.get(k) || { k:k, t:0, a:{ amo:0, gli:0, fre:0, otr:0 }, n:new Set() }; p.t += x.usd; p.a[a] += x.usd; p.n.add(x.r.oc); P.set(k, p); A[a] += x.usd; t += x.usd; });
+  return { P:P, A:A, t:t, oc:new Set(L.map(function(x){ return x.r.oc; })).size, pv:new Set(L.map(function(x){ return x.r.proveedor; })).size, imp:L.filter(function(x){ return x.pais !== 'pe'; }).reduce(function(s, x){ return s + x.usd; }, 0) }; }
+// Variación A vs B como chip (sube en verde, baja en rojo)
+function cqVar(a, b){ if(!b && !a) return ''; if(!b) return '<em class="cq-v nuevo">nuevo</em>'; const p = Math.round((a - b) / b * 100);
+  return `<em class="cq-v ${p > 0 ? 'up' : p < 0 ? 'dn' : ''}">${p > 0 ? '▲ +' : p < 0 ? '▼ ' : ''}${p}%</em>`; }
 function cqHtml(){
   const e = escapeHtml;
   if(!GASTO_DATA || !GASTO_DATA.rows || !GASTO_DATA.rows.length) return '<div class="ini-card"><div class="ini-vacio">Carga Consulta.xlsx (o abre con los datos publicados) para ver las compras por origen.</div></div>';
-  const F = cqFiltrar(), L = F.L, tot = L.reduce(function(a, x){ return a + x.usd; }, 0), yTxt = APP_CQ.y === 'todo' ? 'todos los años' : String(APP_CQ.y);
-  // Tarjetas de los grupos (con su total y el reparto por aplicación)
-  const grupos = CQ_GRUPOS.map(function(g){ const l = cqDatos(APP_CQ.y === 'todo' ? 0 : APP_CQ.y).filter(g.f).filter(function(x){ return APP_CQ.ver !== 'imp' || x.pais !== 'pe'; }), t = l.reduce(function(a, x){ return a + x.usd; }, 0);
+  const F = cqFiltrar(), X = cqAgr(F.L), XB = F.cmp ? cqAgr(F.LB) : null, yTxt = APP_CQ.y === 'todo' ? 'todos los años' : String(APP_CQ.y), C = F.cmp;
+  const grupos = CQ_GRUPOS.map(function(g){ const l = cqLineas(g, APP_CQ.y), t = l.reduce(function(a, x){ return a + x.usd; }, 0), tb = C ? cqLineas(g, F.yB).reduce(function(a, x){ return a + x.usd; }, 0) : 0;
     const A = CQ_APL.map(function(a){ return [a, l.filter(function(x){ return cqAplK(x) === a[0]; }).reduce(function(s, x){ return s + x.usd; }, 0)]; });
-    return `<button type="button" class="cq-g${g.k === F.g.k ? ' on' : ''}" data-cqg="${g.k}"><small>${e(g.t)}</small><b>${cqM(t)}</b><span class="cq-g-bar">${A.map(function(z){ return z[1] ? `<i style="flex:${z[1]};background:${z[0][2]}" title="${z[0][1]}: ${cqM(z[1])}"></i>` : ''; }).join('')}</span></button>`; }).join('');
-  // Matriz país × aplicación
-  const P = new Map(); L.forEach(function(x){ const k = cqPaisK(x); const p = P.get(k) || { k:k, t:0, a:{ amo:0, gli:0, fre:0, otr:0 }, n:new Set() }; p.t += x.usd; p.a[cqAplK(x)] += x.usd; p.n.add(x.r.oc); P.set(k, p); });
-  const filas = [...P.values()].sort(function(a, b){ return (a.k === 'pe') - (b.k === 'pe') || b.t - a.t; }), mx = Math.max.apply(null, [1].concat(filas.map(function(p){ return Math.max(p.a.amo, p.a.gli, p.a.fre, p.a.otr); }))), mxT = Math.max.apply(null, [1].concat(filas.map(function(p){ return p.t; })));
-  const At = { amo:0, gli:0, fre:0, otr:0 }; filas.forEach(function(p){ Object.keys(At).forEach(function(k){ At[k] += p.a[k]; }); });
-  const imp = filas.filter(function(p){ return p.k !== 'pe'; }).reduce(function(a, p){ return a + p.t; }, 0);
-  const celda = function(p, a){ const v = p.a[a[0]]; return `<td>${v ? `<button type="button" class="cq-c" data-cqcel="${p.k}|${a[0]}" style="--h:${(0.08 + 0.5 * v / mx).toFixed(2)};--c:${a[2]}" title="Ver el detalle"><b>${cqM(v)}</b><small>${appN(Math.round(v / (p.t || 1) * 100))}% del país</small></button>` : '<span class="cq-0">—</span>'}</td>`; };
-  const fila = function(p, i){ return `<tr style="--i:${Math.min(i, 14)}"${p.k === 'pe' ? ' class="cq-pe"' : ''}><th scope="row"><button type="button" class="cq-p" data-cqcel="${p.k}|*">${p.k === 'xx' ? '<span class="pm-fl x">IMP</span>' : cqBandera(p.k, 26)}<span><b>${e(cqPaisNom(p.k))}</b><small>${appN(p.n.size)} OC</small></span></button></th>
-      <td class="cq-t"><button type="button" data-cqcel="${p.k}|*"><b>${cqM(p.t)}</b><span class="cq-tb"><i style="width:${(p.t / mxT * 100).toFixed(1)}%"></i></span><small>${tot ? Math.round(p.t / tot * 100) : 0}% del total</small></button></td>${CQ_APL.map(function(a){ return celda(p, a); }).join('')}</tr>`; };
+    return `<button type="button" class="cq-g${g.k === F.g.k ? ' on' : ''}" data-cqg="${g.k}"><small>${e(g.t)}</small><b>${cqM(t)}</b>${C ? `<span class="cq-g-cmp">${F.yB}: ${cqM(tb)} ${cqVar(t, tb)}</span>` : ''}<span class="cq-g-bar">${A.map(function(z){ return z[1] ? `<i style="flex:${z[1]};background:${z[0][2]}" title="${z[0][1]}: ${cqM(z[1])}"></i>` : ''; }).join('')}</span></button>`; }).join('');
+  const keys = [...new Set([...X.P.keys()].concat(XB ? [...XB.P.keys()] : []))], vacio = { t:0, a:{ amo:0, gli:0, fre:0, otr:0 }, n:new Set() };
+  const filas = keys.map(function(k){ return { k:k, A:X.P.get(k) || Object.assign({ k:k }, vacio), B:XB ? XB.P.get(k) || vacio : null }; })
+    .sort(function(a, b){ return (a.k === 'pe') - (b.k === 'pe') || b.A.t - a.A.t || (b.B ? b.B.t : 0) - (a.B ? a.B.t : 0); });
+  const mx = Math.max.apply(null, [1].concat(filas.map(function(p){ return Math.max(p.A.a.amo, p.A.a.gli, p.A.a.fre, p.A.a.otr); }))), mxT = Math.max.apply(null, [1].concat(filas.map(function(p){ return Math.max(p.A.t, p.B ? p.B.t : 0); })));
+  const celda = function(p, a){ const v = p.A.a[a[0]], vb = p.B ? p.B.a[a[0]] : 0; if(!v && !vb) return '<td><span class="cq-0">—</span></td>';
+    return `<td><button type="button" class="cq-c${C ? ' cmp' : ''}" data-cqcel="${p.k}|${a[0]}" style="--h:${(0.08 + 0.5 * v / mx).toFixed(2)};--c:${a[2]}" title="Ver el detalle"><b>${v ? cqM(v) : '—'}</b>${C ? `<small>${F.yB}: ${vb ? cqM(vb) : '—'}</small>${cqVar(v, vb)}` : `<small>${appN(Math.round(v / (p.A.t || 1) * 100))}% del país</small>`}</button></td>`; };
+  const fila = function(p, i){ const n = p.A.n.size + (p.B ? p.B.n.size : 0);
+    return `<tr style="--i:${Math.min(i, 14)}"${p.k === 'pe' ? ' class="cq-pe"' : ''}><th scope="row"><button type="button" class="cq-p" data-cqcel="${p.k}|*">${p.k === 'xx' ? '<span class="pm-fl x">IMP</span>' : cqBandera(p.k, 26)}<span><b>${e(cqPaisNom(p.k))}</b><small>${C ? appN(p.A.n.size) + ' OC en ' + F.yA + ' · ' + appN(p.B.n.size) + ' en ' + F.yB : appN(n) + ' OC'}</small></span></button></th>
+      <td class="cq-t"><button type="button" data-cqcel="${p.k}|*"><b>${p.A.t ? cqM(p.A.t) : '—'}${C ? ' ' + cqVar(p.A.t, p.B.t) : ''}</b><span class="cq-tb"><i style="width:${(p.A.t / mxT * 100).toFixed(1)}%"></i></span>${C ? `<span class="cq-tb b"><i style="width:${(p.B.t / mxT * 100).toFixed(1)}%"></i></span><small>${F.yB}: ${p.B.t ? cqM(p.B.t) : '—'}</small>` : `<small>${X.t ? Math.round(p.A.t / X.t * 100) : 0}% del total</small>`}</button></td>${CQ_APL.map(function(a){ return celda(p, a); }).join('')}</tr>`; };
   const chip = function(attr, v, sel, t){ return `<button type="button" class="pm-ch${sel ? ' sel' : ''}" data-${attr}="${v}">${t}</button>`; };
+  const kpi = function(a){ const v = X.A[a[0]], vb = XB ? XB.A[a[0]] : 0;
+    return `<button type="button" class="cq-k" data-cqcel="*|${a[0]}" style="--c:${a[2]}"${v || vb ? '' : ' disabled'}><i></i><small>${a[1]}</small><b>${cqM(v)}</b><span>${C ? F.yB + ': ' + cqM(vb) + ' ' + cqVar(v, vb) : (X.t ? Math.round(v / X.t * 100) : 0) + '%'}</span></button>`; };
   return `<div class="cq">
-    <div class="cq-top"><div><h2>Equipos por origen y aplicación</h2><small>Compras de ${e(yTxt)} por país del proveedor y refrigerante del proyecto · toca un monto para ver lo que se compró</small></div>
-      <div class="cq-fil"><div class="pm-chs">${cqAnios().slice(0, 4).map(function(y){ return chip('cqy', y, APP_CQ.y === y, y); }).join('')}${chip('cqy', 'todo', APP_CQ.y === 'todo', 'Todos')}</div>
-        <div class="pm-chs">${chip('cqver', 'todo', APP_CQ.ver !== 'imp', 'Nacional e importado')}${chip('cqver', 'imp', APP_CQ.ver === 'imp', 'Solo importado')}</div></div></div>
+    <div class="cq-top"><div><h2>Equipos por origen y aplicación</h2><small>${C ? `Compras de ${F.yA} comparadas con ${F.yB}` : `Compras de ${e(yTxt)}`} por país del proveedor y aplicación (amoníaco, glicol o freón) · toca un monto para ver lo que se compró</small></div>
+      <div class="cq-fil"><div class="pm-chs">${chip('cqver', 'todo', APP_CQ.ver !== 'imp', 'Nacional e importado')}${chip('cqver', 'imp', APP_CQ.ver === 'imp', 'Solo importado')}</div></div></div>
     <div class="cq-gs">${grupos}</div>
-    <div class="cq-head"><div class="cq-tot"><small>${e(F.g.t)} · ${e(yTxt)}</small><b>${cqM(tot)}</b><span>${appN(new Set(L.map(function(x){ return x.r.oc; })).size)} OC · ${appN(new Set(L.map(function(x){ return x.r.proveedor; })).size)} proveedores · ${tot ? Math.round(imp / tot * 100) : 0}% importado</span></div>
-      <div class="cq-ks">${CQ_APL.map(function(a){ return `<button type="button" class="cq-k" data-cqcel="*|${a[0]}" style="--c:${a[2]}"${At[a[0]] ? '' : ' disabled'}><i></i><small>${a[1]}</small><b>${cqM(At[a[0]])}</b><span>${tot ? Math.round(At[a[0]] / tot * 100) : 0}%</span></button>`; }).join('')}</div></div>
+    <div class="cq-head${C ? ' cmp' : ''}"><div class="cq-tot"><small>${e(F.g.t)} · ${C ? F.yA : e(yTxt)}</small><b>${cqM(X.t)}</b>${C ? `<span class="cq-tot-b">${F.yB}: <b>${cqM(XB.t)}</b> ${cqVar(X.t, XB.t)}</span>` : ''}<span>${appN(X.oc)} OC · ${appN(X.pv)} proveedores · ${X.t ? Math.round(X.imp / X.t * 100) : 0}% importado</span></div>
+      <div class="cq-ks">${CQ_APL.map(kpi).join('')}</div></div>
+    ${C ? `<div class="cq-ley"><span><i class="a"></i>${F.yA}</span><span><i class="b"></i>${F.yB}</span><small>Cada celda: arriba ${F.yA}, abajo ${F.yB} y la variación</small></div>` : ''}
     ${filas.length ? `<div class="cq-mw"><table class="cq-mat"><thead><tr><th>País del proveedor</th><th>Total</th>${CQ_APL.map(function(a){ return `<th style="--c:${a[2]}"><i></i>${a[1]}</th>`; }).join('')}</tr></thead>
-      <tbody>${filas.map(fila).join('')}</tbody><tfoot><tr><th>Total</th><td class="cq-t"><button type="button" data-cqcel="*|*"><b>${cqM(tot)}</b></button></td>${CQ_APL.map(function(a){ return `<td>${At[a[0]] ? `<button type="button" class="cq-c tot" data-cqcel="*|${a[0]}"><b>${cqM(At[a[0]])}</b></button>` : '<span class="cq-0">—</span>'}</td>`; }).join('')}</tr></tfoot></table></div>`
+      <tbody>${filas.map(fila).join('')}</tbody><tfoot><tr><th>Total</th><td class="cq-t"><button type="button" data-cqcel="*|*"><b>${cqM(X.t)}${C ? ' ' + cqVar(X.t, XB.t) : ''}</b>${C ? `<small>${F.yB}: ${cqM(XB.t)}</small>` : ''}</button></td>${CQ_APL.map(function(a){ const v = X.A[a[0]], vb = XB ? XB.A[a[0]] : 0; return `<td>${v || vb ? `<button type="button" class="cq-c tot" data-cqcel="*|${a[0]}"><b>${cqM(v)}</b>${C ? `<small>${F.yB}: ${cqM(vb)}</small>${cqVar(v, vb)}` : ''}</button>` : '<span class="cq-0">—</span>'}</td>`; }).join('')}</tr></tfoot></table></div>`
       : '<div class="ini-card"><div class="ini-vacio">No hay compras de este grupo en el período.</div></div>'}
-    <p class="cq-nota">La aplicación sale del refrigerante del proyecto (R.PRY); si la compra no tiene proyecto, de la descripción (NH3, glicol, R404A…). "Sin definir" = compra para stock o sin dato. Montos en US$ al TC de la plataforma.</p></div>`;
+    <p class="cq-nota">Aplicación: primero por el equipo (descripción o modelo del fabricante: Frick, Mycom, Snowman, Hengchang, Thermofin, Alfa Laval…), luego por el refrigerante del proyecto (R.PRY) y, si no, por otra compra del mismo código. "Sin definir" = no se pudo saber. Montos en US$ al TC de la plataforma.</p></div>`;
 }
-// Detalle de un monto: lo que se compró, con KPIs, proveedores y cada línea de OC
-function cqDetalle(k){ const e = escapeHtml, v = k.split('|'), F = cqFiltrar(), yTxt = APP_CQ.y === 'todo' ? 'todos los años' : String(APP_CQ.y);
-  const L = F.L.filter(function(x){ return (v[0] === '*' || cqPaisK(x) === v[0]) && (v[1] === '*' || cqAplK(x) === v[1]); }).sort(function(a, b){ return b.f - a.f || b.usd - a.usd; });
-  if(!L.length) return; const A = CQ_APL.find(function(a){ return a[0] === v[1]; }), tot = L.reduce(function(a, x){ return a + x.usd; }, 0);
+function cqSel(k){ const v = k.split('|'), F = cqFiltrar(), f = function(x){ return (v[0] === '*' || cqPaisK(x) === v[0]) && (v[1] === '*' || cqAplK(x) === v[1]); };
+  return { v:v, F:F, L:F.L.concat(F.LB).filter(f).sort(function(a, b){ return b.f - a.f || b.usd - a.usd; }) }; }
+// Detalle de un monto: lo que se compró, con KPIs (y la comparación por año), proveedores y cada línea de OC
+function cqDetalle(k){ const e = escapeHtml, S = cqSel(k), v = S.v, F = S.F, L = S.L, C = F.cmp, yTxt = C ? F.yA + ' y ' + F.yB : APP_CQ.y === 'todo' ? 'todos los años' : String(APP_CQ.y);
+  if(!L.length) return; const A = CQ_APL.find(function(a){ return a[0] === v[1]; }), sum = function(l){ return l.reduce(function(a, x){ return a + x.usd; }, 0); };
+  const LA = C ? L.filter(function(x){ return x.anio === F.yA; }) : L, LBb = C ? L.filter(function(x){ return x.anio === F.yB; }) : [], tA = sum(LA), tB = sum(LBb);
   const tit = (v[0] === '*' ? 'Todos los países' : cqPaisNom(v[0])) + (A ? ' · ' + A[1] : '');
-  const prov = new Map(); L.forEach(function(x){ const p = prov.get(x.r.proveedor) || { n:x.r.proveedor, t:0, pais:x.pais }; p.t += x.usd; prov.set(x.r.proveedor, p); });
-  const PV = [...prov.values()].sort(function(a, b){ return b.t - a.t; });
+  const prov = new Map(); L.forEach(function(x){ const p = prov.get(x.r.proveedor) || { n:x.r.proveedor, t:0, a:0, b:0, pais:x.pais }; p.t += x.usd; if(!C || x.anio === F.yA) p.a += x.usd; else p.b += x.usd; prov.set(x.r.proveedor, p); });
+  const PV = [...prov.values()].sort(function(a, b){ return b.t - a.t; }), mxP = Math.max.apply(null, [1].concat(PV.map(function(p){ return Math.max(p.a, p.b); })));
   const cliDe = function(id){ const x = pryInfo(id); return x ? (appImpNombre(x.cl || '') || '') : ''; };
   const filas = L.map(function(x, i){ const pr = x.prys.slice(0, 2);
-    return `<tr style="--i:${Math.min(i, 20)}"><td class="cqd-f">${rqFecha(x.f)}</td><td><button type="button" class="pm-oc" data-oc="${e(x.r.oc)}">${cqBandera(x.pais, 18)}OC ${e(String(x.r.oc || '').replace(/^000\d-0*/, ''))}</button></td>
+    return `<tr style="--i:${Math.min(i, 20)}"${C && x.anio === F.yB ? ' class="cqd-b"' : ''}><td class="cqd-f">${rqFecha(x.f)}</td><td><button type="button" class="pm-oc" data-oc="${e(x.r.oc)}">${cqBandera(x.pais, 18)}OC ${e(String(x.r.oc || '').replace(/^000\d-0*/, ''))}</button></td>
       <td class="cqd-pv">${e(polarCorta(appImpNombre(x.r.proveedor || ''), 34))}</td><td class="cqd-p"><b>${e(x.r.producto || '')}</b><small>${e(x.r.codigo)} · ${e(x.sub)}</small></td>
-      <td class="cqd-q">${appN(x.cant, 2)}${x.um ? ' <small>' + e(x.um.toLowerCase()) + '</small>' : ''}</td><td class="cqd-u">${cqM(x.usd).replace(' M', ' M')}</td>
-      <td class="cqd-a"><span class="cqd-ap" style="--c:${(CQ_APL.find(function(a){ return a[0] === cqAplK(x); }) || CQ_APL[3])[2]}">${e(x.apl0)}</span>${pr.length ? `<small>${pr.map(function(id){ return e(id) + (cliDe(id) ? ' · ' + e(polarCorta(cliDe(id), 26)) : ''); }).join('<br>')}</small>` : ''}</td></tr>`; }).join('');
+      <td class="cqd-q">${appN(x.cant, 2)}${x.um ? ' <small>' + e(x.um.toLowerCase()) + '</small>' : ''}</td><td class="cqd-u">${cqM(x.usd)}</td>
+      <td class="cqd-a"><span class="cqd-ap" style="--c:${(CQ_APL.find(function(a){ return a[0] === cqAplK(x); }) || CQ_APL[3])[2]}">${e(x.apl0)}</span>${x.aplSrc ? `<em class="cqd-src">según ${e(x.aplSrc)}</em>` : ''}${pr.length ? `<small>${pr.map(function(id){ return e(id) + (cliDe(id) ? ' · ' + e(polarCorta(cliDe(id), 26)) : ''); }).join('<br>')}</small>` : ''}</td></tr>`; }).join('');
   appListaAbrir(e(tit), e(F.g.t + ' · ' + yTxt), `<div class="cqd">
-    <div class="cqd-k"><div class="cqd-big"><small>Comprado</small><b>${cqM(tot)}</b></div><div><small>OC</small><b>${appN(new Set(L.map(function(x){ return x.r.oc; })).size)}</b></div><div><small>Proveedores</small><b>${appN(PV.length)}</b></div><div><small>Equipos / unidades</small><b>${appN(L.reduce(function(a, x){ return a + x.cant; }, 0))}</b></div>
+    <div class="cqd-k">${C ? `<div class="cqd-big"><small>Comprado en ${F.yA}</small><b>${cqM(tA)}</b></div><div class="cqd-big b"><small>Comprado en ${F.yB}</small><b>${cqM(tB)}</b></div><div><small>Variación</small><b>${cqVar(tA, tB) || '—'}</b></div>`
+      : `<div class="cqd-big"><small>Comprado</small><b>${cqM(tA)}</b></div>`}<div><small>OC</small><b>${appN(new Set(L.map(function(x){ return x.r.oc; })).size)}</b></div><div><small>Proveedores</small><b>${appN(PV.length)}</b></div><div><small>Equipos / unidades</small><b>${appN(L.reduce(function(a, x){ return a + x.cant; }, 0))}</b></div>
       <button type="button" class="pmf-ir cqd-xls" data-cqxls="${e(k)}">Descargar Excel</button></div>
-    <div class="cqd-pvs">${PV.slice(0, 6).map(function(p){ return `<div class="cqd-pvb"><span>${cqBandera(p.pais, 18)}<b>${e(polarCorta(appImpNombre(p.n), 38))}</b></span><i><em style="width:${(p.t / PV[0].t * 100).toFixed(1)}%"></em></i><small>${cqM(p.t)}</small></div>`; }).join('')}</div>
+    <div class="cqd-pvs">${PV.slice(0, 8).map(function(p){ return `<div class="cqd-pvb"><span>${cqBandera(p.pais, 18)}<b>${e(polarCorta(appImpNombre(p.n), 38))}</b></span><small>${C ? cqM(p.a) + ' · ' + F.yB + ': ' + cqM(p.b) : cqM(p.t)}</small><i><em style="width:${(p.a / mxP * 100).toFixed(1)}%"></em></i>${C ? `<i class="b"><em style="width:${(p.b / mxP * 100).toFixed(1)}%"></em></i>` : ''}</div>`; }).join('')}</div>
+    ${C ? `<div class="cq-ley"><span><i class="a"></i>${F.yA}</span><span><i class="b"></i>${F.yB}</span><small>Las líneas de ${F.yB} van en gris</small></div>` : ''}
     <div class="pm-dw"><table class="pm-dt cqd-t"><thead><tr><th>Fecha</th><th>OC</th><th>Proveedor</th><th>Producto</th><th class="n">Cant.</th><th class="n">US$</th><th>Aplicación · proyecto</th></tr></thead><tbody>${filas}</tbody></table></div></div>`);
   const oc = document.getElementById('appOC'); if(oc) oc.classList.add('ancho'); }
-function cqExcel(k){ const v = k.split('|'), F = cqFiltrar(); const L = F.L.filter(function(x){ return (v[0] === '*' || cqPaisK(x) === v[0]) && (v[1] === '*' || cqAplK(x) === v[1]); }).sort(function(a, b){ return b.f - a.f; });
-  const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(L.map(function(x){ return { Fecha:isoDay(x.f), OC:x.r.oc, 'País':cqPaisNom(cqPaisK(x)), Proveedor:appImpNombre(x.r.proveedor || ''), 'Código':x.r.codigo, Producto:x.r.producto, Subfamilia:x.sub,
+function cqExcel(k){ const S = cqSel(k), v = S.v, F = S.F, L = S.L;
+  const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(L.map(function(x){ return { 'Año':x.anio, Fecha:isoDay(x.f), OC:x.r.oc, 'País':cqPaisNom(cqPaisK(x)), Proveedor:appImpNombre(x.r.proveedor || ''), 'Código':x.r.codigo, Producto:x.r.producto, Subfamilia:x.sub,
     Cantidad:x.cant, UM:x.um, 'US$':Math.round(x.usd * 100) / 100, 'Aplicación':x.apl0, Proyectos:x.prys.join(', ') }; }));
-  ws['!cols'] = [{ wch:11 }, { wch:14 }, { wch:14 }, { wch:36 }, { wch:14 }, { wch:60 }, { wch:18 }, { wch:9 }, { wch:7 }, { wch:12 }, { wch:14 }, { wch:24 }];
-  XLSX.utils.book_append_sheet(wb, ws, 'Detalle'); XLSX.writeFile(wb, (F.g.t + ' - ' + (v[0] === '*' ? 'todos' : cqPaisNom(v[0])) + (v[1] === '*' ? '' : ' - ' + (CQ_APL.find(function(a){ return a[0] === v[1]; }) || [])[1]) + ' - ' + (APP_CQ.y === 'todo' ? 'todos los años' : APP_CQ.y) + '.xlsx').replace(/[\\/:*?"<>|]+/g, '-')); }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-cqg],[data-cqy],[data-cqver],[data-cqcel],[data-cqxls]'); if(!b) return;
+  ws['!cols'] = [{ wch:6 }, { wch:11 }, { wch:14 }, { wch:14 }, { wch:36 }, { wch:14 }, { wch:60 }, { wch:18 }, { wch:9 }, { wch:7 }, { wch:12 }, { wch:14 }, { wch:24 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Detalle'); XLSX.writeFile(wb, (F.g.t + ' - ' + (v[0] === '*' ? 'todos' : cqPaisNom(v[0])) + (v[1] === '*' ? '' : ' - ' + (CQ_APL.find(function(a){ return a[0] === v[1]; }) || [])[1]) + ' - ' + (F.cmp ? F.yA + ' vs ' + F.yB : APP_CQ.y === 'todo' ? 'todos los años' : APP_CQ.y) + '.xlsx').replace(/[\\/:*?"<>|]+/g, '-')); }
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-cqg],[data-cqy],[data-cqver],[data-cqcel],[data-cqxls],[data-cqcmp]'); if(!b) return;
   if(b.dataset.cqxls) return cqExcel(b.dataset.cqxls);
   if(b.dataset.cqcel) return cqDetalle(b.dataset.cqcel);
-  if(b.dataset.cqg) APP_CQ.g = b.dataset.cqg; if(b.dataset.cqy) APP_CQ.y = b.dataset.cqy === 'todo' ? 'todo' : +b.dataset.cqy; if(b.dataset.cqver) APP_CQ.ver = b.dataset.cqver;
+  if(b.dataset.cqg) APP_CQ.g = b.dataset.cqg; if(b.dataset.cqy){ APP_CQ.y = b.dataset.cqy === 'todo' ? 'todo' : +b.dataset.cqy; if(APP_CQ.y === 'todo') APP_CQ.cmp = false; }
+  if(b.dataset.cqver) APP_CQ.ver = b.dataset.cqver; if(b.dataset.cqcmp) APP_CQ.cmp = !APP_CQ.cmp;
   appRenderInicio(); });
 function appComprasHtml(){
   const cod = APP_PC.persona || '', vF = appPcPersonaF();
