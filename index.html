@@ -3621,7 +3621,7 @@ button.pm-lx-f{cursor:pointer;} button.pm-lx-f:hover{border-color:#b9c6d8;} .pm-
 .cqc-tv{text-align:right;} .cqc-tv b{display:block;font-size:14px;font-weight:800;color:var(--ink);} .cqc-tv small{font-size:11px;color:var(--ink-soft);margin-right:2px;}
 .cqc-q{display:block;width:100%;height:auto;} .cqc-hit{fill:transparent;} .cqc-col[data-cqcel]{cursor:pointer;} .cqc-col[data-cqcel]:hover .cqc-hit{fill:var(--surface-2);} .cqc-q rect{cursor:pointer;transition:opacity .2s;} .cqc-q rect:hover{opacity:.8;} .cqc-v{font:800 10px Inter,sans-serif;fill:var(--ink-soft);text-anchor:middle;} .cqc-v.a{fill:var(--ink);}
 .cqd-tp{font-weight:700;color:#0f7896;}
-.cqc-pn{font:800 9.5px Inter,sans-serif;fill:#fff;text-anchor:middle;dominant-baseline:auto;pointer-events:none;paint-order:stroke;stroke:rgba(0,0,0,.18);stroke-width:2px;} .cqc-pn.v{text-anchor:start;dominant-baseline:middle;}
+.cqc-pn{font:800 9.5px Inter,sans-serif;fill:#fff;text-anchor:middle;dominant-baseline:auto;pointer-events:none;paint-order:stroke;stroke:rgba(0,0,0,.18);stroke-width:2px;} .cqc-pn.v{text-anchor:start;dominant-baseline:middle;} .cqc-pn.n, .cqc-pn .n{font-weight:600;opacity:.92;}
 .cqc-pvs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;padding-top:12px;border-top:1px solid var(--border);} .cqc-pvs > small{width:100%;font-size:11.5px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
 .cqc-pv{position:relative;display:inline-flex;align-items:center;gap:7px;background:var(--surface-2);border-radius:12px;padding:7px 11px 10px;font-size:12.5px;overflow:hidden;cursor:default;} .cqc-pv b{font-weight:800;color:var(--ink);} .cqc-pv em{font-style:normal;font-weight:700;color:var(--ink);} .cqc-pv i{font-style:normal;font-size:11px;color:var(--ink-soft);}
 .cqc-pv-b{position:absolute;left:0;right:0;bottom:0;height:3px;display:flex;gap:1px;} .cqc-pv-b u{display:block;height:100%;}
@@ -17515,6 +17515,8 @@ function cqTipoEq(x){ if(x._te) return x._te; const t = cqNorm(x.r.producto); le
   else if(/\bCPG|\bIPG|\bEIC\b|\bEVC-|\bICE ?\d|\bCTE ?\d|\bEC\d{2}|\bBC\d{2}|\bCC-\d|\bGACV|\bHEA ?\d|\bGEA ?\d|\bT[AEG][NB][.\- ]|\bTEL[.\-]|\bAZL/.test(t)) k = 'cub';
   else k = 'cub';   // equipo con carcasa sin serie conocida: cúbico, el más común
   return (x._te = k); }
+// Monto corto con 2 cifras significativas: 45k, 250k, 1.2M (12.11.2026, Piero: "valor por empresa, 2 cifras no más")
+function cqDos(v){ v = v || 0; if(v >= 1e6) return (+(v / 1e6).toPrecision(2)) + 'M'; if(v >= 1e3) return (+(v / 1e3).toPrecision(2)) + 'k'; return Math.round(v) + ''; }
 function cqProvCorto(n){ const t = sinAcentos(String(n || '')).toUpperCase();
   const M = [[/HISPANIA/, 'Hispania'], [/THERMOFIN/, 'Thermofin'], [/HENGCHANG/, 'Hengchang'], [/MODINE/, 'Modine'], [/FB-?LATAM/, 'FB-Latam'], [/KOBOL/, 'Kobol'], [/GUNTNER/, 'Güntner'], [/CENTRO DEL FRIO/, 'Centro del Frío'], [/DANVAL/, 'Danval'], [/AOLAN/, 'Aolan'], [/A\.?B\.? ?IMPORTACIONES/, 'AB Importaciones'], [/EVAPCO/, 'Evapco'], [/KRAMER/, 'Kramer'], [/BOHN/, 'Bohn']];
   const m = M.find(function(x){ return x[0].test(t); }); if(m) return m[1]; const w = (appImpNombre(n) || n || '—').split(/\s+/)[0]; return w.charAt(0) + w.slice(1).toLowerCase(); }
@@ -17550,9 +17552,14 @@ function cqGraficosHtml(F){ const e = escapeHtml, A3 = CQ_APL.filter(function(a)
         let base = QH - qpb;
         const seg = z[2].map(function(pv, k){ const hh = QY(pv[1]); base -= hh; const nom = cqProvCorto(pv[0]), op = Math.max(.42, 1 - k * .2);
           return `<rect x="${x.toFixed(1)}" y="${base.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(.5, hh - (k < z[2].length - 1 ? 1.5 : 0)).toFixed(1)}" rx="${k === z[2].length - 1 ? 4 : 1.5}" fill="${a[2]}" opacity="${op.toFixed(2)}" data-altip="${escapeHtml(appImpNombre(pv[0]) || pv[0])} · ${a[1]}|${o.lab} ${yS}: ${cqM(pv[1])} · ${Math.round(pv[1] / v * 100)}% de la barra" data-tipc="neu"/>`
-            + (function(){ const largo = nom.length * 5.7 + 8, cx2 = x + bw / 2;   // el nombre completo: horizontal si cabe, si no vertical; si tampoco cabe, solo en el recuadro al pasar el mouse
-            if(largo <= bw && hh >= 15) return `<text x="${cx2.toFixed(1)}" y="${(base + Math.min(hh / 2, 13) + 3.5).toFixed(1)}" class="cqc-pn">${escapeHtml(nom)}</text>`;
-            if(largo <= hh && bw >= 16) return `<text x="${cx2.toFixed(1)}" y="${(base + 6).toFixed(1)}" class="cqc-pn v" transform="rotate(90 ${cx2.toFixed(1)} ${(base + 6).toFixed(1)})">${escapeHtml(nom)}</text>`;
+            + (function(){ const cx2 = x + bw / 2, val = cqDos(pv[1]), L = function(t){ return t.length * 5.7 + 8; }, e2 = escapeHtml;   // nombre y valor (2 cifras): horizontal si cabe, si no vertical
+            if(L(nom) <= bw && hh >= 30) return `<text x="${cx2.toFixed(1)}" y="${(base + 13).toFixed(1)}" class="cqc-pn">${e2(nom)}</text><text x="${cx2.toFixed(1)}" y="${(base + 25).toFixed(1)}" class="cqc-pn n">${val}</text>`;
+            const vt = nom + ' · ' + val;
+            if(L(vt) <= hh && bw >= 16) return `<text x="${cx2.toFixed(1)}" y="${(base + 6).toFixed(1)}" class="cqc-pn v" transform="rotate(90 ${cx2.toFixed(1)} ${(base + 6).toFixed(1)})">${e2(nom)} <tspan class="n">${val}</tspan></text>`;
+            if(L(nom + ' ' + val) <= bw && hh >= 15) return `<text x="${cx2.toFixed(1)}" y="${(base + Math.min(hh / 2, 13) + 3.5).toFixed(1)}" class="cqc-pn">${e2(nom)} <tspan class="n">${val}</tspan></text>`;
+            if(L(nom) <= hh && bw >= 16) return `<text x="${cx2.toFixed(1)}" y="${(base + 6).toFixed(1)}" class="cqc-pn v" transform="rotate(90 ${cx2.toFixed(1)} ${(base + 6).toFixed(1)})">${e2(nom)}</text>`;
+            if(L(nom) <= bw && hh >= 15) return `<text x="${cx2.toFixed(1)}" y="${(base + Math.min(hh / 2, 13) + 3.5).toFixed(1)}" class="cqc-pn">${e2(nom)}</text>`;
+            if(L(val) <= bw && hh >= 13) return `<text x="${cx2.toFixed(1)}" y="${(base + Math.min(hh / 2, 12) + 3.5).toFixed(1)}" class="cqc-pn n">${val}</text>`;
             return ''; })(); }).join('');
         return seg + `<text x="${(x + bw / 2).toFixed(1)}" y="${(QH - qpb - h - 6).toFixed(1)}" class="cqc-v a">${k$(v)}</text>`; }).join('');
       return `<g class="cqc-col"${o.k ? ` data-cqcel="*|*|${o.k}"` : ''}><rect x="${(cx - gw / 2 + 4).toFixed(1)}" y="${qpt - 14}" width="${(gw - 8).toFixed(1)}" height="${QH - qpt - qpb + 14}" rx="10" class="cqc-hit"/>${bars}
