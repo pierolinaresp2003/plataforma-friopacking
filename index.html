@@ -3414,7 +3414,7 @@ body.app-pc .app-toptabs button{transition:background .2s,color .2s,transform .2
 .cq-nota{margin:0;font-size:12px;color:var(--muted);} .cqd-src{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:2px;}
 /* Comparación de años (v352) */
 .cq-v{display:inline-flex;align-items:center;font-style:normal;font-size:11px;font-weight:800;border-radius:999px;padding:1px 7px;background:var(--surface-2);color:var(--ink-soft);white-space:nowrap;vertical-align:middle;}
-.cq-v.up{background:#e3f4ea;color:#1e7a3c;} .cq-v.dn{background:#fde8e6;color:#b42318;} .cq-v.nuevo{background:#e6eefb;color:#1f56b8;}
+.cq-v.up{background:#fde8e6;color:#b42318;} .cq-v.dn{background:#e3f4ea;color:#1e7a3c;}   /* en gasto, bajar es bueno (verde) y subir es malo (rojo) */ .cq-v.nuevo{background:#e6eefb;color:#1f56b8;}
 .cq-g-cmp{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);}
 .cq-tot-b{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);margin:2px 0 4px;} .cq-tot-b b{display:inline;font-size:16px;margin:0;color:#7a8696;letter-spacing:0;}
 .cq-k span .cq-v{margin-left:4px;}
@@ -17086,7 +17086,7 @@ function cmpAplDesc(t){ t = sinAcentos(String(t || '').toUpperCase());
 function cmpAplModelo(t, prov){ t = sinAcentos(String(t || '').toUpperCase()); prov = sinAcentos(String(prov || '').toUpperCase());
   const d = cmpAplDesc(t); if(d) return [d, 'descripción'];
   const A = 'Amoníaco', G = 'Glicol', F = 'Freón', mo = 'modelo';
-  if(/SEMI ?-?HERM|HERMETIC|SCROLL|BITZER|COPELAND|MANEUROP|DORIN|REFCOMP|FRASCOLD|\bSRS\d/.test(t)) return [F, mo];
+  if(/SEMI ?-?HERM|HERMETIC|SCROLL|BITZER|COPELAND|MANEUROP|DORIN|REFCOMP|FRASCOLD|\bSRS\d|\bNSWL\d|\bMTZ\d/.test(t)) return [F, mo];
   if(/\bRWF|\bRXF|\bRWB|SABROE|\bSMC ?\d|MYCOM|\bN\d{3}V|\bN[4-8]M\b|GRASSO/.test(t) || (/MAYEKAWA/.test(prov) && /COMPRES/.test(t))) return [A, mo];
   if(/SNOWMAN/.test(prov) && /\b(SRM|S2?NA|SAA)\d|OPEN SCREW|\bCW\d/.test(t)) return [A, mo];
   const hc = t.match(/-SA([APGS])\b/); if(hc) return [hc[1] === 'A' || hc[1] === 'S' ? A : G, mo];
@@ -17256,9 +17256,27 @@ if(window.MutationObserver) new MutationObserver(function(ms){ if(FX_QUIETO.matc
 // ---- Compras → Equipos por origen (12.11.2026, Piero: "qué he comprado en China / Argentina / otros países de evaporadores y enfriadores
 // de amoníaco, glicol y freón, y de compresores y chiller; cuántos millones, y al tocar los millones el detalle de lo que se compró").
 // Matriz país × aplicación por grupo de equipos; cada monto abre su detalle. Para sumar más productos basta con agregar un grupo aquí.
+// Qué es cada equipo, por la descripción misma (12.11.2026, Piero: "no te bases en las familias de la data, puede estar mal; solo
+// evaporadores y enfriadores, y compresores y chiller, no cosas relacionadas"). Se mira con qué palabra empieza la descripción: un
+// repuesto o accesorio ("motor para evaporador", "resistencia de cárter", "kit de compresor") empieza con otra palabra y queda fuera.
+function cqNorm(t){ return sinAcentos(String(t || '').toUpperCase()).replace(/\s+/g, ' ').trim(); }
+const CQ_EVAP_MARCAS = /HENGCHANG|THERMOFIN|GUNTNER|MODINE|KOBOL|FB-?LATAM|HISPANIA|KRAMER|FRIGA|LU-?VE|CENTAURO|ECO ?FRIG|AOLAN/;
+const CQ_NO_EQUIPO = /\b(PARA|DE|DEL) (EVAPORADOR|ENFRIADOR|COMPRESOR|CHILLER)|REPUESTO|\bKIT\b|VENTILADOR|\bASPA|HELICE|RESISTENCIA|BANDEJA|VALVULA|SENSOR|TERMOSTATO|PRESOSTATO|FILTRO|ACEITE|\bSELLO|EMPAQUE|\bJUNTA|RETEN\b|RODAMIENTO|COJINETE|PISTON|ANILLO|SOLENOIDE|TARJETA|CONTACTOR|CAPACITOR|CARTER|SOPORTE|ANTIVIBRADOR|MANOMETRO|\bVISOR|BOBINA|\bTAPA\b|PERNO|TORNILLO DE|ABRAZADERA|GUARDA|REJILLA|DIFUSOR|CORTINA|MANGUERA/;
+function cqTipo(x){ const t = cqNorm(x.r.producto), pv = cqNorm(x.r.proveedor);
+  if(/^(COMPRESOR|COMPRESSOR) DE AIRE|AIRE COMPRIMIDO|\bPSI\b/.test(t) || /KAESER|ATLAS COPCO|INGERSOLL|SULLAIR/.test(pv)) return '';   // compresores de aire
+  // Compresores y chiller: unidad compresora, compresor, motocompresor, rack de compresores, chiller y enfriador de líquido (agua/glicol)
+  if(/^(CHILLER|ENFRIADOR(A)? DE (LIQUIDO|AGUA|GLICOL)|ENFRIADORA DE AGUA)/.test(t)) return 'comp';
+  if(/^(UNIDAD (DE )?COMPRESORA|UNIDAD COMPRESOR|UNIDADES COMPRESORAS|COMPRESOR\b|COMPRESSOR\b|MOTOCOMPRESOR|MOTO COMPRESOR|RACK (CON |DE )?\d* ?(UNIDADES COMPRESORAS|COMPRESORES))/.test(t)) return 'comp';
+  // Evaporadores y enfriadores de aire (incluye su serpentín o batería de enfriamiento); sin aire acondicionado ni condensadores
+  if(/CONDENS|^UNIDAD COND|\bCOND\. |\bPARED\b|SPLIT|BTU|FAN ?COIL|ACEITE|TORRE DE ENFRIAMIENTO|INTERCAMBIADOR/.test(t) || /EVAPCO/.test(pv)) return '';
+  if(/^(EVAPORADOR|EVPORADOR|EVAP\.? |ENFRIADOR(ES)? |UNIT ?COOLER|AIR ?COOLER)/.test(t)) return 'evap';
+  if(/^(SERPENTIN|SERPETIN|BATERIA)/.test(t) && !/\b\d+ ?AH\b|\bUPS\b|LITIO|ALCALIN|RECARGABLE|\bPILA|\d+ ?V(DC|CC)?\b(?!\/)/.test(t.replace(/\d+ ?V\/\d/g, ''))) return 'evap';
+  if(/^(N-?\d{2}-\d{3}|C\d{2}[.-]\d|ZFQ-)/.test(t) && /THERMOFIN|HENGCHANG/.test(pv)) return 'evap';   // serpentín / batería con solo el modelo
+  if(CQ_EVAP_MARCAS.test(pv) && !CQ_NO_EQUIPO.test(t) && /\bKW\b|M²|M2\b|ALETA|\bC\d+[.-]|\bMOD/.test(t)) return 'evap';
+  return ''; }
 const CQ_GRUPOS = [
-  { k:'evap', t:'Evaporadores y enfriadores', f:function(x){ return x.fam === 'Evaporadores y enfriadores'; } },
-  { k:'comp', t:'Compresores y chiller', f:function(x){ const d = (x.r.producto || '') + ' ' + x.sub; return /CHILLER/i.test(d) || (x.fam === 'Compresores y motores' && /COMPRES|TORNILLO|RECIPROC|SCROLL|SEMIHERM/i.test(d)); } }
+  { k:'evap', t:'Evaporadores y enfriadores', f:function(x){ return (x._cq !== undefined ? x._cq : (x._cq = cqTipo(x))) === 'evap'; } },
+  { k:'comp', t:'Compresores y chiller', f:function(x){ return (x._cq !== undefined ? x._cq : (x._cq = cqTipo(x))) === 'comp'; } }
 ];
 const CQ_APL = [['amo', 'Amoníaco', '#1e6fb8'], ['gli', 'Glicol', '#7c5cc4'], ['fre', 'Freón', '#0e8a7c'], ['otr', 'Sin definir', '#8a97a6']];
 const APP_CQ = { g:'evap', y:0, ver:'todo', cmp:false };
@@ -17280,7 +17298,7 @@ function cqPaisNom(k){ return k === 'xx' ? 'Importado (país sin registrar)' : k
 function cqAgr(L){ const P = new Map(), A = { amo:0, gli:0, fre:0, otr:0 }; let t = 0;
   L.forEach(function(x){ const k = cqPaisK(x), a = cqAplK(x); const p = P.get(k) || { k:k, t:0, a:{ amo:0, gli:0, fre:0, otr:0 }, n:new Set() }; p.t += x.usd; p.a[a] += x.usd; p.n.add(x.r.oc); P.set(k, p); A[a] += x.usd; t += x.usd; });
   return { P:P, A:A, t:t, oc:new Set(L.map(function(x){ return x.r.oc; })).size, pv:new Set(L.map(function(x){ return x.r.proveedor; })).size, imp:L.filter(function(x){ return x.pais !== 'pe'; }).reduce(function(s, x){ return s + x.usd; }, 0) }; }
-// Variación A vs B como chip (sube en verde, baja en rojo)
+// Variación A vs B como chip: en gasto, si baja es bueno (verde) y si sube, rojo (12.11.2026, Piero)
 function cqVar(a, b){ if(!b && !a) return ''; if(!b) return '<em class="cq-v nuevo">nuevo</em>'; const p = Math.round((a - b) / b * 100);
   return `<em class="cq-v ${p > 0 ? 'up' : p < 0 ? 'dn' : ''}">${p > 0 ? '▲ +' : p < 0 ? '▼ ' : ''}${p}%</em>`; }
 function cqHtml(){
