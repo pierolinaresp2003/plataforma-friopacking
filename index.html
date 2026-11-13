@@ -3695,7 +3695,7 @@ html[data-theme="dark"] .pz::before{opacity:.08;} html[data-theme="dark"] .pz-mo
 .hj-seg button.on{background:#0a1e64;color:#fff;} .hj-at button.ok.on{background:#15803d;} .hj-at button.pc.on{background:#b4231a;} .hj-at button.par.on{background:#b26a00;}
 .hj-seg input{width:54px;height:28px;box-sizing:border-box;border:1px solid var(--border);border-radius:7px;font:700 13px Inter,sans-serif;text-align:center;color:var(--ink);background:var(--surface-2);}
 .hj-m{justify-self:end;font:700 15px 'Segoe Print','Bradley Hand',cursive;white-space:nowrap;color:#0a1e64;} .hj-m.ok{color:#15803d;} .hj-m.pc{color:#b4231a;} .hj-m.par{color:#b26a00;}
-.hj-pie{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:end;} .hj-ver{font-size:12.5px;font-weight:700;border-radius:10px;padding:8px 12px;background:var(--surface-2);color:var(--ink);} .hj-ver.ok{background:#e2f4e6;color:#15803d;} .hj-ver.mal{background:#fde8e6;color:#b4231a;} .hj-ver.nose{background:#fff1d6;color:#9a5b00;} .hj-ver label{display:flex;align-items:center;gap:6px;margin-top:6px;color:var(--ink);font-weight:700;}
+.hj-pie{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:end;} .hj-f.ia .hj-m::before{content:'✍ ';font-size:12px;} .hj-f.dud{background:#fff6e0;box-shadow:inset 0 0 0 2px #f2b84b;} .hj-ver{font-size:12.5px;font-weight:700;border-radius:10px;padding:8px 12px;background:var(--surface-2);color:var(--ink);} .hj-ver.ok{background:#e2f4e6;color:#15803d;} .hj-ver.mal{background:#fde8e6;color:#b4231a;} .hj-ver.nose{background:#fff1d6;color:#9a5b00;} .hj-ver label{display:flex;align-items:center;gap:6px;margin-top:6px;color:var(--ink);font-weight:700;}
 @media (max-width:700px){ .hj-f{grid-template-columns:30px minmax(0,1fr) auto;} .hj-q{grid-column:3;grid-row:1;} .hj-alm{grid-column:2;grid-row:2;justify-self:start;} .hj-at{grid-column:2;grid-row:3;justify-self:start;} .hj-m{grid-column:3;grid-row:2 / span 2;} .hj-pie{grid-template-columns:1fr;} } .rqx-sk.cam{background:#e0f2fe;color:#0369a1;} .rqx-alt{display:inline-flex;gap:4px;} .rqx-alt button{width:30px;height:30px;border-radius:9px;border:1px solid var(--border);background:var(--card);color:#1f4fd1;display:grid;place-items:center;cursor:pointer;transition:transform .15s,background .2s;} .rqx-alt button.wa{color:#1da851;} .rqx-alt button:hover{transform:translateY(-1px);background:var(--surface-2);} .rqx-alt svg{width:16px;height:16px;}
 .rsv-blq{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
 .rsv-it{display:flex;align-items:center;gap:10px;background:#ddf3ef;border-radius:12px;padding:8px 12px;} .rsv-it b{display:block;font-size:13px;color:#0b4f47;} .rsv-it small{font-size:11.5px;color:#0b6e63;} .rsv-lock{font-size:16px;}
@@ -19522,6 +19522,14 @@ function rsvModal(html){ rsvCerrar(); document.body.insertAdjacentHTML('beforeen
 function rsvCerrar(){ const f = document.getElementById('rsvFondo'); if(f) f.remove(); }
 // Verificación de la hoja (13.11.2026, Piero: "la foto no corresponde con lo que se ha reservado"): se lee el texto IMPRESO de la
 // foto (N° de requerimiento y códigos) con OCR en el navegador; si es de otro requerimiento no deja registrar.
+// Lectura de lo escrito a mano (L/T/I, OK/PC, (N)) con IA de visión: Apps Script "hoja-ia.gs" (guarda la API key). Sin URL,
+// la app solo verifica el N° de req. con el OCR y las marcas se ponen con los botones.
+const HOJA_IA_URL = 'https://script.google.com/macros/s/AKfycbzGCLFqejN3qPRsJ1nwatq4UGUU7Th5sL79nUk50dQwokbSohBdqVyiYQLrL6VxOUJnlw/exec';   // pegar acá la URL /exec del Apps Script hoja-ia (ver hoja-ia.gs)
+const HOJA_IA_CLAVE = 'friopacking-2026';
+async function hojaIA(foto, cod, L){
+  const r = await fetch(HOJA_IA_URL, { method:'POST', body:JSON.stringify({ clave:HOJA_IA_CLAVE, req:cod, imagen:String(foto).split(',')[1],
+    items:L.map(function(a){ return { codigo:a.r.idProducto, descripcion:a.r.producto || '', cantidad:a.r.cantidad, um:a.r.unidad || '' }; }) }) });
+  const j = await r.json(); if(!j || j.error || !j.ok) throw new Error((j && j.error) || 'IA'); return j; }
 let APP_OCR = null;
 function appCargarOcr(){
   if(window.Tesseract) return Promise.resolve(window.Tesseract);
@@ -19583,7 +19591,7 @@ function rsvAbrirReq(cod){ const e = escapeHtml, nn = function(v){ return Number
   f.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-hja],[data-hjt]'); if(!b) return; const i = +b.closest('[data-hj]').dataset.hj, a = L[i];
     if(b.dataset.hja) a.m.a = b.dataset.hja;
     else { a.m.t = b.dataset.hjt; if(a.m.t === 'par' && !(a.m.n > 0)){ a.m.n = Math.min(a.f, a.lb[a.m.a]) || ''; f.querySelector('[data-hj="' + i + '"] [data-hjn]').value = a.m.n; } }
-    pinta(i); if(a.m.t === 'par') f.querySelector('[data-hj="' + i + '"] [data-hjn]').focus(); });
+    pinta(i); f.querySelector('[data-hj="' + i + '"]').classList.remove('dud'); if(a.m.t === 'par') f.querySelector('[data-hj="' + i + '"] [data-hjn]').focus(); });
   f.addEventListener('input', function(ev){ if(!ev.target.dataset || !ev.target.dataset.hjn) return; const i = +ev.target.closest('[data-hj]').dataset.hj; L[i].m.n = +ev.target.value; pinta(i); });
   resumen();
   const num = String(cod).replace(/^\d+-0*/, ''), todos = new Set((RQ.filas || []).filter(function(r){ return r.codRequerimiento === cod; }).map(function(r){ return String(r.idProducto); }));
@@ -19591,7 +19599,19 @@ function rsvAbrirReq(cod){ const e = escapeHtml, nn = function(v){ return Number
     d.innerHTML = txt + (est === 'nose' ? `<label><input type="checkbox" id="hjConf"> Confirmo que es la hoja del Req. ${e(num)}</label>` : ''); };
   f.querySelector('#rsvFile').addEventListener('change', async function(ev){ const fl = ev.target.files && ev.target.files[0]; if(!fl) return;
     try{ foto = await rsvFoto(fl); const l = f.querySelector('#rsvFotoL'); l.classList.add('con'); l.querySelector('span').innerHTML = `<img src="${foto}" alt="">Cambiar foto`; }catch(err){ return rsvErr(err.message); }
-    rsvErr(''); verPinta('lee', '⏳ Revisando que la foto sea la hoja del Req. ' + e(num) + '…');
+    rsvErr(''); verPinta('lee', HOJA_IA_URL ? '⏳ Leyendo la hoja…' : '⏳ Revisando que la foto sea la hoja del Req. ' + e(num) + '…');
+    if(HOJA_IA_URL) try{ const v = await hojaIA(foto, cod, L); if(f.querySelector('#rsvFile').files[0] !== fl) return;
+      const rq = String(v.req || '').replace(/\D/g, '').replace(/^0+/, ''), its = v.items || [], porCod = new Map(its.map(function(x){ return [String(x.codigo || '').replace(/\D/g, ''), x]; }));
+      if(rq && rq !== num) return verPinta('mal', '✕ Esta foto es la hoja del Req. ' + e(rq) + ', no del Req. ' + e(num) + '. Sube la hoja correcta.');
+      if(!rq && !L.some(function(a){ return porCod.has(String(a.r.idProducto)); })) return verPinta('mal', '✕ Los códigos de la foto no son de este requerimiento. Sube la hoja correcta.');
+      let n = 0, dud = 0;
+      L.forEach(function(a, i){ const x = porCod.get(String(a.r.idProducto)), d = f.querySelector('[data-hj="' + i + '"]'); d.classList.remove('ia', 'dud');
+        if(!x){ d.classList.add('dud'); dud++; return; }
+        const al = /^[LTI]$/.test(x.alm) ? x.alm : a.m.a, at = String(x.aten || '').toUpperCase(), q = +x.parentesis;
+        if(at === 'OK') a.m = { a:al, t:'ok' }; else if(at === 'PC') a.m = q > 0 && q < a.f ? { a:al, t:'par', n:q } : { a:al, t:'pc' }; else a.m.a = al;
+        d.querySelector('[data-hjn]').value = a.m.t === 'par' ? a.m.n : ''; d.classList.add('ia'); if(x.seguro === false || !at){ d.classList.add('dud'); dud++; } n++; pinta(i); });
+      return verPinta('ok', '✅ Hoja del Req. ' + e(num) + ' leída: ' + n + ' ítem' + (n === 1 ? '' : 's') + ' marcado' + (n === 1 ? '' : 's') + ' desde la foto' + (dud === 1 ? ' · revisa el que está en amarillo' : dud ? ' · revisa los ' + dud + ' en amarillo' : '') + '.');
+    }catch(err){ /* sin IA o falló: se verifica con el OCR */ }
     try{ const v = await hojaLeer(fl); if(f.querySelector('#rsvFile').files[0] !== fl) return;
       if(v.req) v.req === num ? verPinta('ok', '✅ Hoja del Req. ' + e(num) + ' verificada') : verPinta('mal', '✕ Esta foto es la hoja del Req. ' + e(v.req) + ', no del Req. ' + e(num) + '. Sube la hoja correcta.');
       else if(v.cods.length) v.cods.some(function(c){ return todos.has(c); }) ? verPinta('ok', '✅ Los códigos de la foto son de este requerimiento') : verPinta('mal', '✕ Los códigos de la foto no son de este requerimiento. Sube la hoja correcta.');
