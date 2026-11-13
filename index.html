@@ -3717,7 +3717,7 @@ html[data-theme="dark"] .pz::before{opacity:.08;} html[data-theme="dark"] .pz-mo
 .reg-c.pend{border-left:4px solid #e4655c;} .reg-c.prob{border-left:4px solid #e8a33a;} .reg-c.ok{border-left:4px solid #3aa86b;}
 .reg-est{flex:none;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;justify-self:end;} .reg-est.ok{background:#e2f4e6;color:#15803d;} .reg-est.prob{background:#fff1d6;color:#9a5b00;} .reg-est.pend{background:#fde8e6;color:#b4231a;}
 .reg-f{display:grid;grid-template-columns:minmax(0,1fr) 20px minmax(0,1.1fr) 104px;gap:10px;align-items:center;padding:6px 0;} .reg-flecha{color:var(--ink-soft);font-weight:800;text-align:center;}
-.reg-sal b{display:block;font-size:12.5px;color:var(--ink);} .reg-sal small{font-size:11px;color:var(--ink-soft);} .reg-sal.pend b{color:#b4231a;} .reg-sal b i{font-style:normal;font-weight:700;font-size:11px;color:var(--ink-soft);} .reg-sal small b{display:inline;font-size:11.5px;color:var(--ink);} .reg-razon{display:inline-block;font-style:normal;font-size:10.5px;font-weight:700;color:#2f5fb3;background:#e3ecfb;border-radius:999px;padding:1px 8px;margin-top:2px;}
+.reg-sal b{display:block;font-size:12.5px;color:var(--ink);} .reg-sal small{font-size:11px;color:var(--ink-soft);} .reg-sal.pend b{color:#b4231a;} .reg-sal b i{font-style:normal;font-weight:700;font-size:11px;color:var(--ink-soft);} .reg-sal small b{display:inline;font-size:11.5px;color:var(--ink);} .reg-gl{display:block;font-style:italic;} .reg-pos{display:block;font-style:normal;font-size:10.5px;font-weight:800;color:#b4231a;text-transform:uppercase;letter-spacing:.03em;} .reg-sal.baja > b, .reg-sal.baja > small{opacity:.75;} .reg-razon{margin-right:4px;display:inline-block;font-style:normal;font-size:10.5px;font-weight:700;color:#2f5fb3;background:#e3ecfb;border-radius:999px;padding:1px 8px;margin-top:2px;}
 .reg-mas{align-self:center;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:9px 16px;font:700 13px Inter,sans-serif;color:var(--ink);cursor:pointer;}
 @media (max-width:900px){ .reg-f{grid-template-columns:minmax(0,1fr) auto;} .reg-flecha{display:none;} .reg-sal{grid-column:1;grid-row:2;} .reg-f > .reg-est{grid-column:2;grid-row:1 / span 2;} }
 .sup-skc{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px;} .sup-skc > span{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-right:4px;}
@@ -7195,7 +7195,7 @@ function almFiltrarSedesMotivos(wb){
 const ALM_COLS = new Set(['CODIGO','TRANSFERENCIA','CANTIDAD','FECHA','SUCURSAL','DOCUMENTO','DOCUMENTO2','ORG_DOCUMENTO','IDMOTIVO','MOTIVO',
   'OCOMPRA','CLIEPROV','IDPRODUCTO','DSC_PRODUCTO','PRECIOMEX','IMPORTEMEX','GRUPO','RESPONSABLE','TCAMBIO','REQUERIMIENTO','PRODUCTO',
   'FECHA SALIDA','DOCORDENPRODUCCION','TRANSPORTISTA','PLACA','SUCURSAL_DESTINO','DEST_DOCUMENTO','DOC_PROVEEDOR2','DOC_PROVEEDOR',
-  'CONSUMIDOR','DSC_CONSUMIDOR','PROYECTO','MARCA','ALMACEN','REM_PROVEEDOR3','GLOSA','DOC_ORIGEN','DOCVENTA_REF','DIRECCION_LLEGADA','IDMEDIDA']);
+  'CONSUMIDOR','DSC_CONSUMIDOR','PROYECTO','MARCA','ALMACEN','REM_PROVEEDOR3','ALMACEN_DESTINO','GLOSA','DOC_ORIGEN','DOCVENTA_REF','DIRECCION_LLEGADA','IDMEDIDA']);
 // Salidas S88 "por traslado de bienes (no afecta stock)" (13.11.2026, Piero): salidas de urgencia que después se regularizan con otra salida.
 // Se guardan las S88 de Lurín, Ica y Trujillo y las salidas que citan una guía (GRR) en su glosa o documentos de referencia, para el módulo Regularizaciones.
 let ALM_S88_LEIDO = null;
@@ -7205,7 +7205,14 @@ function almS88Captura(mo, v, suc){ const sd = sedeInternaKardex(suc); if(!sd) r
   if(!/^S/.test(mo)) return;
   const t = ['GLOSA', 'DOC_ORIGEN', 'DOCVENTA_REF', 'DEST_DOCUMENTO', 'DOC_PROVEEDOR'].map(tx).join(' '), n = [];
   t.replace(/(GR[A-Z])?\s*(T?\d{3,4}-\d{7})(?!\d)/g, function(m, pre, num){ if(pre !== 'GRC' && n.indexOf(num) === -1) n.push(num); return m; });
-  if(n.length) A.ref.push([tx('DOCUMENTO'), tx('PRODUCTO') || tx('IDPRODUCTO'), n.join(' '), mo, fi, sd, Math.abs(+v('CANTIDAD') || 0)]); }
+  if(n.length) A.ref.push([tx('DOCUMENTO'), tx('PRODUCTO') || tx('IDPRODUCTO'), n.join(' '), mo, fi, sd, Math.abs(+v('CANTIDAD') || 0)]);
+  const tg = [tx('GLOSA'), tx('ALMACEN_DESTINO'), tx('PROYECTO')].filter(Boolean).join(' · ');
+  if(tg) (A.tmp || (A.tmp = [])).push([tx('DOCUMENTO'), tx('PRODUCTO') || tx('IDPRODUCTO'), fi, tg.slice(0, 170)]); }
+// Al terminar de leer: solo se guarda la glosa de las salidas que pueden regularizar una S88 (mismo código, desde 2 días antes de la S88)
+function almS88Cerrar(){ const A = ALM_S88_LEIDO; if(!A || !A.tmp) return A; const ini = new Map();
+  A.l.forEach(function(x){ if(!ini.has(x[1]) || x[3] < ini.get(x[1])) ini.set(x[1], x[3]); });
+  const gl = {}; A.tmp.forEach(function(t){ const f0 = ini.get(t[1]); if(f0 == null || !t[2] || Date.parse(t[2]) < Date.parse(f0) - 2 * 864e5) return; gl[t[0]] = t[3]; });
+  A.gl = gl; delete A.tmp; return A; }
 let ALM_DEVOL_LEIDO = null;   // devoluciones de proyecto (salidas S02 de la hoja Movimientos) que se leen antes de filtrar las sedes y motivos
 async function almLeerReporteGrande(buf){
   if(typeof DecompressionStream === 'undefined') return null;
@@ -7541,7 +7548,7 @@ function processAlmacen(wb, filename){
   ALMACEN_DATA = {
     danfoss: trasK.dnf.size ? [...trasK.dnf] : undefined,   // códigos de marca DANFOSS (ver invDanfossCods)
     devol: ALM_DEVOL_LEIDO || undefined,   // devoluciones de obra al almacén por PRY (ver pmDevol)
-    s88: ALM_S88_LEIDO || undefined,   // salidas S88 y referencias de guía (módulo Regularizaciones)
+    s88: almS88Cerrar() || undefined,   // salidas S88, referencias de guía y glosas de las salidas (módulo Regularizaciones)
     rows: productos, sedes: ALMACEN_SEDES.filter(sd=>sedeIdx[sd]!==undefined),
     trazaLotes, almMov,
     totalRows: dataRows.length, sinRop, excluidas, filename, sheetName,
@@ -19679,10 +19686,29 @@ document.addEventListener('input', function(ev){ if(ev.target.id !== 'rsvmQ') re
 // 2) si no, la primera salida posterior del mismo producto y almacén para el mismo cliente → Probable; 3) si no hay → Pendiente.
 const REG_UI = { est:'pend', sede:'', anio:'', q:'', tope:30 };
 const REG_SEDE = { lima:'Lurín', ica:'Ica', trujillo:'Trujillo' };
+// Puntaje del emparejamiento (13.11.2026, Piero: "analiza bien esas probabilidades"), calibrado con las S88 de 2026:
+// cita la guía = 100 · mismo PRY +50 · mismo cliente +45 (+5 si es Friopacking) · el cliente aparece en la otra glosa +35/+30 ·
+// glosas parecidas (3+ palabras) +30, (2) +10 · la salida dice "regulariz" +15 · hasta 3 días +15, hasta 14 +8, más de 30 −10.
+// Desde 40 es Probable; por debajo queda Pendiente y se muestra la salida más cercana como posible, con su puntaje.
+const REG_STOP = new Set('SSOMA SEGURIDAD BULTO BULTOS PALET PALETS PALLET PALLETS CONTENEDOR DESTINATARIO ENTREGAR ENTREGA LLEVA PRESTANDO ENVIADO ENVIAR ENVIA ENVIO TRASLADO CAJAS CAJA NUMERO MATERIALES MATERIAL ATENCION OBRA PROYECTO PERU SOCIEDAD ANONIMA AGRICOLA CORPORACION EMPRESA INVERSIONES PROCESOS AGROINDUSTRIALES FRIOPACKING CERRADA COMERCIAL SAC SRL EIRL ALMACEN GENERAL PARA DEL LOS LAS CON UNIDADES'.split(' '));
+function regNrm(t){ return sinAcentos(String(t || '').toUpperCase()).replace(/[^A-Z0-9 ]/g, ' '); }
+function regToks(t){ return new Set(regNrm(t).split(/\s+/).filter(function(w){ return w.length >= 4 && !REG_STOP.has(w) && !/^\d+$/.test(w); })); }
+function regPrys(t){ const o = new Set(); regNrm(t).replace(/\s+/g, '').replace(/PRY(20\d\d)(\d{7})/g, function(m, a, b){ o.add(a + b); return m; }); return o; }
+function regCruce(a, b){ for(const x of a) if(b.has(x)) return true; return false; }
+function regPuntaje(s, m, gl){ let sc = 0; const why = [], lag = s.d - 0, gS = s.glosa || '', gM = gl || '';
+  const cs = regNrm(s.cli).trim(), cm = regNrm(m.cp).trim(), interno = /FRIOPACKING/.test(cs);
+  if(regCruce(regPrys(gS), regPrys(gM + ' ' + (m.py || '')))){ sc += 50; why.push('mismo PRY'); }
+  if(cs && cs === cm){ sc += interno ? 5 : 45; if(!interno) why.push('mismo cliente'); }
+  const tS = regToks(gS), tM = regToks(gM);
+  if(cm !== cs && regCruce(regToks(m.cp), tS)){ sc += 35; why.push('cliente en la glosa'); }
+  if(cm !== cs && !interno && regCruce(regToks(s.cli), tM)){ sc += 30; why.push('cliente en la glosa'); }
+  let k = 0; tS.forEach(function(w){ if(tM.has(w)) k++; }); if(k >= 3){ sc += 30; why.push('glosa parecida'); } else if(k === 2) sc += 10;
+  if(/REGULARIZ/.test(regNrm(gM))){ sc += 15; why.push('dice regularización'); }
+  const d = Math.round(Date.parse(m.f + 'T00:00:00Z') / 864e5 - s.d); sc += d <= 3 ? 15 : d <= 14 ? 8 : d > 30 ? -10 : 0;
+  return { sc:Math.max(0, Math.min(95, sc)), why:why }; }
 function regDatos(){ const S = (ALMACEN_DATA && ALMACEN_DATA.s88) || null; if(!S) return null;
   return appMemo('regS88' + S.l.length + '|' + (S.ref || []).length + '|' + ((ALMACEN_DATA.rows || []).length), function(){
-    const dia = function(f){ return f ? Date.parse(f + 'T00:00:00Z') / 864e5 : NaN; }, num = function(d){ return (String(d).match(/(T?\d{3,4}-\d{7})/) || [])[1] || ''; };
-    const cl = function(t){ return sinAcentos(String(t || '').toUpperCase()).replace(/[^A-Z0-9]/g, ''); };
+    const dia = function(f){ return f ? Date.parse(f + 'T00:00:00Z') / 864e5 : NaN; }, num = function(d){ return (String(d).match(/(T?\d{3,4}-\d{7})/) || [])[1] || ''; }, GL = S.gl || {};
     const refs = new Map(); (S.ref || []).forEach(function(x){ String(x[2]).split(' ').forEach(function(n){ if(!refs.has(n)) refs.set(n, []); refs.get(n).push(x); }); });
     const usado = new Set(), movs = new Map();
     const salidasDe = function(cod){ if(!movs.has(cod)){ const p = rqStockDe(cod); movs.set(cod, ((p && p.kardexMovs) || []).filter(function(m){ return m.q < 0 && m.mo !== 'S88' && /^S/.test(m.mo || ''); })); } return movs.get(cod); };
@@ -19690,12 +19716,11 @@ function regDatos(){ const S = (ALMACEN_DATA && ALMACEN_DATA.s88) || null; if(!S
       .sort(function(a, b){ return (a.d || 0) - (b.d || 0); });
     L.forEach(function(s){ const n = num(s.doc);
       const R = (refs.get(n) || []).filter(function(x){ return x[1] === s.cod && !usado.has(x[0] + '|' + x[1]); });
-      if(R.length){ const x = R[0]; usado.add(x[0] + '|' + x[1]); s.est = 'ok'; const k = salidasDe(s.cod).find(function(m){ return m.d === x[0]; }) || {}; s.reg = { doc:x[0], mo:x[3], md:k.md, f:x[4], q:x[6], cli:k.cp, razon:'cita la guía' }; }
-      else { const C = salidasDe(s.cod).filter(function(m){ const d = dia(m.f); return m.s === s.sd && d >= s.d - 2 && d <= s.d + 150 && !usado.has(m.d + '|' + s.cod); });
-        const P = C.filter(function(m){ return cl(m.cp) && cl(m.cp) === cl(s.cli); });
-        // Sin el mismo cliente, la primera salida del mismo producto y almacén en los 60 días siguientes también cuenta como probable (13.11.2026, Piero: "es 90% seguro")
-        const H = P.length ? null : C.filter(function(m){ return dia(m.f) <= s.d + 60; })[0], m = P[0] || H;
-        if(m){ usado.add(m.d + '|' + s.cod); s.est = 'prob'; s.reg = { doc:m.d, mo:m.mo, md:m.md, f:m.f, q:Math.abs(m.q), cli:m.cp, razon:P.length ? 'mismo cliente' : 'mismo producto y almacén' }; }
+      if(R.length){ const x = R[0]; usado.add(x[0] + '|' + x[1]); s.est = 'ok'; s.pct = 100; const k = salidasDe(s.cod).find(function(m){ return m.d === x[0]; }) || {}; s.reg = { doc:x[0], mo:x[3], md:k.md, f:x[4], q:x[6], cli:k.cp, gl:GL[x[0]], why:['cita la guía'] }; }
+      else { const C = salidasDe(s.cod).filter(function(m){ const d = dia(m.f); return m.s === s.sd && d >= s.d - 2 && d <= s.d + 60 && !usado.has(m.d + '|' + s.cod); });
+        let best = null; C.forEach(function(m){ const p = regPuntaje(s, m, GL[m.d]); if(!best || p.sc > best.p.sc) best = { m:m, p:p }; });
+        if(best){ const m = best.m; s.pct = best.p.sc; s.reg = { doc:m.d, mo:m.mo, md:m.md, f:m.f, q:Math.abs(m.q), cli:m.cp, gl:GL[m.d], why:best.p.why };
+          if(s.pct >= 40){ s.est = 'prob'; usado.add(m.d + '|' + s.cod); } else s.est = 'pend'; }
         else s.est = 'pend'; }
       if(s.reg) s.lag = Math.max(0, Math.round(dia(s.reg.f) - s.d)); });
     return L; }); }
@@ -19705,11 +19730,11 @@ function regLista(G){ const e = escapeHtml, nn = function(v){ return Number(v ||
   return G.slice(0, REG_UI.tope).map(function(g, gi){ const s0 = g.l[0], dias = Math.max(0, Math.round(hoy - s0.d)), est = g.l.some(function(s){ return s.est === 'pend'; }) ? 'pend' : g.l.some(function(s){ return s.est === 'prob'; }) ? 'prob' : 'ok';
     return `<div class="rsvm-c reg-c ${est}" style="animation-delay:${Math.min(gi, 12) * 35}ms"><div class="rsvm-ch"><div class="rsvm-ct"><b>${e(s0.doc)} · ${e(polarCorta(s0.cli || '—', 46))}</b><small>${e(REG_SEDE[s0.sd] || s0.sd)} · ${e(rqFecha(new Date(s0.f + 'T12:00:00Z')))}${est === 'pend' ? ' · hace ' + appN(dias) + ' días' : ''}${s0.resp ? ' · ' + e(polarCorta(titleCase(String(s0.resp)), 30)) : ''}${s0.glosa ? ' · ' + e(polarCorta(s0.glosa, 70)) : ''}</small></div>
       <span class="reg-est ${est}">${ESTX[est][1]}${g.l.length > 1 ? ` · ${g.l.filter(function(s){ return s.est !== 'pend'; }).length}/${g.l.length}` : ''}</span></div>
-      ${g.l.map(function(s){ const r = s.reg;
+      ${g.l.map(function(s){ const r = s.reg, baja = s.est === 'pend' && r;
         return `<div class="reg-f"><span class="rsvm-t"><b>${e(s.desc || s.cod)}</b><small>${e(s.cod)}${s.um ? ' · ' + e(s.um) : ''}</small></span><span class="reg-flecha">→</span>
-          <span class="reg-sal ${s.est}">${r ? `<b>${e(r.doc)} <i>${e(r.mo)}${r.md ? ' · ' + e(polarCorta(titleCase(r.md), 34)) : ''}</i></b><small><b>${nn(r.q)} ${e(s.um || '')}</b> · ${e(rqFecha(new Date(r.f + 'T12:00:00Z')))}${s.lag != null ? ' · ' + (s.lag ? appN(s.lag) + ' d después' : 'el mismo día') : ''}${r.cli ? ' · ' + e(polarCorta(r.cli, 34)) : ''}</small><em class="reg-razon">${e(r.razon || '')}</em>`
+          <span class="reg-sal ${s.est}${baja ? ' baja' : ''}">${r ? `${baja ? '<em class="reg-pos">Posible, poco probable</em>' : ''}<b>${e(r.doc)} <i>${e(r.mo)}${r.md ? ' · ' + e(polarCorta(titleCase(r.md), 34)) : ''}</i></b><small><b>${nn(r.q)} ${e(s.um || '')}</b> · ${e(rqFecha(new Date(r.f + 'T12:00:00Z')))}${s.lag != null ? ' · ' + (s.lag ? appN(s.lag) + ' d después' : 'el mismo día') : ''}${r.cli ? ' · ' + e(polarCorta(r.cli, 34)) : ''}</small>${r.gl ? `<small class="reg-gl">“${e(polarCorta(r.gl, 110))}”</small>` : ''}${(r.why || []).map(function(w){ return `<em class="reg-razon">${e(w)}</em>`; }).join('')}`
             : `<b>Sin salida que regularice</b><small>No hay una salida de este producto en ${e(REG_SEDE[s.sd] || s.sd)} en los 60 días siguientes</small>`}</span>
-          <span class="reg-est ${s.est}">${ESTX[s.est][1]}</span></div>`; }).join('')}</div>`; }).join('')
+          <span class="reg-est ${s.est}">${ESTX[s.est][1]}${r ? ` · ${appN(s.pct)}%` : ''}</span></div>`; }).join('')}</div>`; }).join('')
     + (G.length > REG_UI.tope ? `<button type="button" class="reg-mas" data-regmas="1">Ver ${appN(Math.min(30, G.length - REG_UI.tope))} guías más de ${appN(G.length - REG_UI.tope)}</button>` : ''); }
 function regFiltrar(L){ const q = crtNorm(REG_UI.q.trim());
   return L.filter(function(s){ return (!REG_UI.sede || s.sd === REG_UI.sede) && (!REG_UI.anio || String(s.f).slice(0, 4) === REG_UI.anio)
@@ -19719,7 +19744,7 @@ function regGrupos(L){ const M = new Map(); L.forEach(function(s){ const k = s.d
     .sort(function(a, b){ return b.l[0].d - a.l[0].d || String(b.l[0].doc).localeCompare(String(a.l[0].doc)); }); }
 function appRegHtml(){ const e = escapeHtml, D = regDatos();
   const ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a8 8 0 0 1 14-4l2 2"/><path d="M20 3v4h-4"/><path d="M20 15a8 8 0 0 1-14 4l-2-2"/><path d="M4 21v-4h4"/></svg>';
-  const head = function(ks){ return `<div class="rsvm-head reg-head"><div class="rsvm-hi reg-hi">${ICO}</div><div class="rsvm-meta"><h2>Regularizaciones S88</h2><p>Salidas de urgencia con guía S88 (traslado que no afecta el kárdex) y la salida que las regulariza después. Se empareja por la guía citada o, si no, por la siguiente salida del mismo producto, almacén y cliente.</p></div>${ks || ''}</div>`; };
+  const head = function(ks){ return `<div class="rsvm-head reg-head"><div class="rsvm-hi reg-hi">${ICO}</div><div class="rsvm-meta"><h2>Regularizaciones S88</h2><p>Salidas de urgencia con guía S88 (traslado que no afecta el kárdex) y la salida que las regulariza después. Cada S88 se empareja con la salida que mejor coincide (guía citada, mismo PRY, cliente, glosa y días) y se indica qué tan probable es.</p></div>${ks || ''}</div>`; };
   if(!D) return `<div class="rsvm">${head('')}<div class="pmf-vacio">Todavía no hay datos de S88: vuelve a cargar <b>Reporte Almacen.xlsx</b> (hoja Movimientos) y usa <b>Guardar y compartir</b>.</div></div>`;
   const anios = [...new Set(D.map(function(s){ return String(s.f).slice(0, 4); }).filter(Boolean))].sort().reverse();
   if(REG_UI.anio === '' && !REG_UI._ini){ REG_UI._ini = true; REG_UI.anio = anios[0] || ''; }
@@ -22205,7 +22230,7 @@ async function appPanelPdf(){
 // el celular"). Ya no es una foto de la pantalla: sale igual en el celular y en la PC, con texto nítido.
 // Hoja del requerimiento para Almacén (13.11.2026, Piero: "el formato de PDF es este, el de la hoja de Nisira, pero con el estado según el app"):
 // mismo esquema que el Requerimiento Interno impreso (logo, RUC, datos generales y la tabla de ítems), sin el estado grande de arriba, y por
-// ítem el almacén que lo atiende y la atención según las reservas: L Lurín · T Trujillo · I Ica · OK todo del stock · PC pasa a compra · (N) lo que sale del stock.
+// ítem el almacén que lo atiende y la atención según las reservas: L Lurín · T Trujillo · I Ica · OK todo del stock · PED pasa a pedido de compra · (N) lo que sale del stock · OC ya comprado.
 async function rqHojaPdf(cod){
   rqPreparar();
   const items = RQ.filas.filter(function(r){ return r.codRequerimiento === cod && r.estadoCalc !== 'Archivado'; });
@@ -22224,13 +22249,13 @@ async function rqHojaPdf(cod){
   // Atención por ítem según las reservas registradas en la app
   const LET = { 'Lurín':'L', 'Trujillo':'T', 'Ica':'I' };
   const aten = function(r){ const k = supPaso(r), f0 = Math.max(0, (r.cantidad || 0) - (r.cantSalida || 0));
-    if(k !== 'rev' && k !== 'com'){ const sd = LET[r.sedeSalida] || ''; return r.codOrden ? { alm:'', at:'PC', c:ROJO, res:'—', comp:'—' } : { alm:sd, at:'OK', c:VERDE, res:'—', comp:'—' }; }   // con OC = se compró; sin OC = salió del stock
+    if(k !== 'rev' && k !== 'com'){ const sd = LET[r.sedeSalida] || ''; return r.codOrden ? { alm:'', at:rqOcCorta(r.codOrden), c:AZUL, res:'—', comp:'—' } : { alm:sd, at:'OK', c:VERDE, res:'—', comp:'—' }; }   // con OC: se muestra la OC (13.11.2026, Piero)   // con OC = se compró; sin OC = salió del stock
     const por = {}; resDeFila(r).forEach(function(z){ const l = LET[resSede(z)] || 'L'; por[l] = (por[l] || 0) + (+z.cantidad || 0); });
     const ks = ['L', 'T', 'I'].filter(function(l){ return por[l] > 0; }), ya = ks.reduce(function(a, l){ return a + por[l]; }, 0), resto = Math.max(0, Math.round((f0 - ya) * 100) / 100);
     const res = ks.length ? ks.map(function(l){ return l + ' ' + nn(por[l]); }).join(' · ') : '—', alm = ks.join(' ');
     if(ya >= f0 - 0.001 && ya > 0) return { alm:alm, at:'OK', c:VERDE, res:res, comp:'—' };
-    if(ya > 0) return { alm:alm, at:'PC (' + nn(ya) + ')', c:AMBAR, res:res, comp:nn(resto) };
-    const cat = supSkCat(r); return cat === 'stock' ? { alm:'', at:'POR RESERVAR', c:GRIS, res:'—', comp:'—' } : { alm:'', at:'PC', c:ROJO, res:'—', comp:nn(resto) }; };
+    if(ya > 0) return { alm:alm, at:'PED (' + nn(ya) + ')', c:AMBAR, res:res, comp:nn(resto) };
+    const cat = supSkCat(r); return cat === 'stock' ? { alm:'', at:'POR RESERVAR', c:GRIS, res:'—', comp:'—' } : { alm:'', at:'PED', c:ROJO, res:'—', comp:nn(resto) }; };
   let y = 0, pag = 1;
   const cabecera = function(){
     if(logo){ try{ pdf.addImage(logo, 'PNG', M + 2, 12, 44, 14); }catch(err){} } else { fuente('helvetica', 'bold', 18, INK); pdf.text('Friopacking', M + 2, 22); }
@@ -22287,7 +22312,7 @@ async function rqHojaPdf(cod){
   if(y + 26 > BOT){ pdf.addPage(); pag++; y = cabecera(); }
   y += 4; pdf.setDrawColor(150, 150, 150); pdf.setLineWidth(0.2); pdf.line(M, y, W - M, y); y += 4.5;
   fuente('courier', 'normal', 6.8, GRIS); pdf.text('RESERVADO: L Lurín · T Trujillo · I Ica, con la cantidad separada en cada almacén.  A COMPRA: lo que no se reservó.', M, y);
-  pdf.text('ATENCIÓN: OK se atiende todo del stock · PC pasa a pedido de compra · PC (N) N sale del stock y el resto a compra', M, y + 3.6);
+  pdf.text('ATENCIÓN: OK se atiende todo del stock · PED pasa a pedido de compra · PED (N) N sale del stock y el resto a compra · OC ya tiene orden de compra', M, y + 3.6);
   pdf.text('Las cantidades separadas son reservas de la plataforma: descuentan el stock solo hasta que la salida se registra en Nisira.', M, y + 7.2);
   pdf.setDrawColor(60, 60, 60); pdf.setLineDashPattern([0.6, 0.6], 0); pdf.line(M + 6, BOT + 6, M + 66, BOT + 6); pdf.setLineDashPattern([], 0);
   fuente('helvetica', 'normal', 7.5, INK); pdf.text('HECHO POR', M + 24, BOT + 10); fuente('helvetica', 'bold', 7.5, INK); pdf.text(T(titleCase(String((APP.usuario && APP.usuario.nombre) || '')).split(' ').slice(0, 2).join(' ')), M + 36, BOT + 13.5, { align:'center' });
