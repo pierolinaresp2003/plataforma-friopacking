@@ -3713,6 +3713,13 @@ html[data-theme="dark"] .pz::before{opacity:.08;} html[data-theme="dark"] .pz-mo
 .rsvm-e{font-size:11.5px;font-weight:700;} .rsvm-e.on{color:#0b6e63;} .rsvm-e.ok{color:#15803d;} .rsvm-e.off{color:var(--ink-soft);}
 .rsvm-x{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:#b4231a;font-size:16px;cursor:pointer;}
 @media (max-width:900px){ .rsvm-head{grid-template-columns:auto minmax(0,1fr);padding:16px;} .rsvm-hi{width:48px;height:48px;} .rsvm-ks{grid-column:1 / -1;} .rsvm-f{grid-template-columns:minmax(0,1fr) auto 28px;} .rsvm-s{grid-column:1;grid-row:2;} .rsvm-e{grid-column:2 / 4;grid-row:2;justify-self:end;} .rsvm-bus{min-width:100%;} }
+.reg-hi{background:linear-gradient(135deg,#e3ecfb,#d3e1fa);color:#2f5fb3;} .reg-k.ok b{color:#15803d;} .reg-k.prob b{color:#b26a00;} .reg-k.pend b{color:#b4231a;}
+.reg-c.pend{border-left:4px solid #e4655c;} .reg-c.prob{border-left:4px solid #e8a33a;} .reg-c.ok{border-left:4px solid #3aa86b;}
+.reg-est{flex:none;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;justify-self:end;} .reg-est.ok{background:#e2f4e6;color:#15803d;} .reg-est.prob{background:#fff1d6;color:#9a5b00;} .reg-est.pend{background:#fde8e6;color:#b4231a;}
+.reg-f{display:grid;grid-template-columns:minmax(0,1fr) 20px minmax(0,1.1fr) 104px;gap:10px;align-items:center;padding:6px 0;} .reg-flecha{color:var(--ink-soft);font-weight:800;text-align:center;}
+.reg-sal b{display:block;font-size:12.5px;color:var(--ink);} .reg-sal small{font-size:11px;color:var(--ink-soft);} .reg-sal.pend b{color:#b4231a;}
+.reg-mas{align-self:center;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:9px 16px;font:700 13px Inter,sans-serif;color:var(--ink);cursor:pointer;}
+@media (max-width:900px){ .reg-f{grid-template-columns:minmax(0,1fr) auto;} .reg-flecha{display:none;} .reg-sal{grid-column:1;grid-row:2;} .reg-f > .reg-est{grid-column:2;grid-row:1 / span 2;} }
 .sup-skc{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px;} .sup-skc > span{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-right:4px;}
 .sup-skc button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--card);border-radius:999px;padding:6px 12px;font:700 12.5px Inter,sans-serif;color:var(--ink);cursor:pointer;} .sup-skc button svg{width:16px;height:16px;} .sup-skc button b{font-weight:800;}
 .sup-skc button.stock{color:#15803d;} .sup-skc button.cam{color:#0369a1;} .sup-skc button.comp{color:#b4231a;} .sup-skc button.on{color:#fff;border-color:transparent;} .sup-skc button.stock.on{background:#15803d;} .sup-skc button:disabled{opacity:.45;cursor:default;} .rq-atn{margin:10px 0 2px;} .sup-skc button.cam.on{background:#0284c7;} .sup-skc button.comp.on{background:#b4231a;}
@@ -5434,6 +5441,7 @@ function buildSnapshot(){
     almacen: (ALMACEN_DATA && ALMACEN_DATA.rows) ? {
       dnf: ALMACEN_DATA.danfoss || undefined,   // códigos marca DANFOSS (hojas Ingresos/Movimientos)
       devol: ALMACEN_DATA.devol || undefined,   // devoluciones de obra por PRY
+      s88: ALMACEN_DATA.s88 || undefined,   // salidas S88 (Regularizaciones)
       almMov: ALMACEN_DATA.almMov || null,
       filename: ALMACEN_DATA.filename,
       sheetName: ALMACEN_DATA.sheetName,
@@ -7170,7 +7178,9 @@ function almFiltrarSedesMotivos(wb){
     if(/movimient/i.test(n) && !ALM_DEVOL_LEIDO){ const c = function(k){ return findCol(rows[h], [k]); }, iA = c('ALMACEN'), iC = c('IDPRODUCTO'), iD = c('DSC_PRODUCTO'), iQ = c('CANTIDAD'), iF = c('FECHA SALIDA'), iDo = c('DOCUMENTO'), iDs = c('SUCURSAL_DESTINO'), iU = c('IMPORTEMEX'), L = [];
       rows.slice(h + 1).forEach(function(r){ const mo = String(!r || r[iM] == null ? '' : r[iM]).replace(/\s+/g, '').toUpperCase(); if(!/^S(02|80|81)$/.test(mo)) return; const pr = pmDevPry(r[iA]); if(!pr || (mo !== 'S02' && !/SUCURSAL/i.test(String(iDs === -1 ? '' : r[iDs] || '')))) return;
         L.push([pr, String(r[iC] || '').trim(), String(r[iD] || '').trim(), +r[iQ] || 0, r[iF] instanceof Date ? isoDay(r[iF]) : '', String(r[iDo] || '').trim(), iDs === -1 ? '' : pmDevSede(r[iDs]), iU === -1 ? 0 : Math.round((+r[iU] || 0) * 100) / 100]); });
-      if(L.length) ALM_DEVOL_LEIDO = L; }
+      if(L.length) ALM_DEVOL_LEIDO = L;
+      if(!ALM_S88_LEIDO){ const H = rows[h].map(function(x){ return sinAcentos(String(x == null ? '' : x).trim().toUpperCase()); });
+        rows.slice(h + 1).forEach(function(r){ if(!r) return; almS88Captura(String(r[iM] == null ? '' : r[iM]).replace(/\s+/g, '').toUpperCase(), function(k){ const i = H.indexOf(k); return i === -1 ? null : r[i]; }, r[iS]); }); } }
     const ok = rows.slice(h + 1).filter(function(r){ return r && sedeInternaKardex(r[iS]) && mot.has(String(r[iM] == null ? '' : r[iM]).replace(/\s+/g, '').toUpperCase()); });
     if(ok.length === rows.length - h - 1) return;
     wb.Sheets[n] = XLSX.utils.aoa_to_sheet(rows.slice(0, h + 1).concat(ok), {cellDates:true});
@@ -7185,7 +7195,17 @@ function almFiltrarSedesMotivos(wb){
 const ALM_COLS = new Set(['CODIGO','TRANSFERENCIA','CANTIDAD','FECHA','SUCURSAL','DOCUMENTO','DOCUMENTO2','ORG_DOCUMENTO','IDMOTIVO','MOTIVO',
   'OCOMPRA','CLIEPROV','IDPRODUCTO','DSC_PRODUCTO','PRECIOMEX','IMPORTEMEX','GRUPO','RESPONSABLE','TCAMBIO','REQUERIMIENTO','PRODUCTO',
   'FECHA SALIDA','DOCORDENPRODUCCION','TRANSPORTISTA','PLACA','SUCURSAL_DESTINO','DEST_DOCUMENTO','DOC_PROVEEDOR2','DOC_PROVEEDOR',
-  'CONSUMIDOR','DSC_CONSUMIDOR','PROYECTO','MARCA','ALMACEN','REM_PROVEEDOR3']);
+  'CONSUMIDOR','DSC_CONSUMIDOR','PROYECTO','MARCA','ALMACEN','REM_PROVEEDOR3','GLOSA','DOC_ORIGEN','DOCVENTA_REF','DIRECCION_LLEGADA','IDMEDIDA']);
+// Salidas S88 "por traslado de bienes (no afecta stock)" (13.11.2026, Piero): salidas de urgencia que después se regularizan con otra salida.
+// Se guardan las S88 de Lurín, Ica y Trujillo y las salidas que citan una guía (GRR) en su glosa o documentos de referencia, para el módulo Regularizaciones.
+let ALM_S88_LEIDO = null;
+function almS88Captura(mo, v, suc){ const sd = sedeInternaKardex(suc); if(!sd) return;
+  const f = v('FECHA SALIDA'), fi = f instanceof Date ? isoDay(f) : '', tx = function(k){ return String(v(k) == null ? '' : v(k)).replace(/\s+/g, ' ').trim(); }, A = ALM_S88_LEIDO || (ALM_S88_LEIDO = { l:[], ref:[] });
+  if(mo === 'S88'){ A.l.push([tx('DOCUMENTO'), tx('PRODUCTO') || tx('IDPRODUCTO'), tx('DSC_PRODUCTO'), fi, sd, tx('CLIEPROV'), tx('GLOSA').slice(0, 160), tx('RESPONSABLE'), tx('DIRECCION_LLEGADA').slice(0, 110), tx('IDMEDIDA')]); return; }
+  if(!/^S/.test(mo)) return;
+  const t = ['GLOSA', 'DOC_ORIGEN', 'DOCVENTA_REF', 'DEST_DOCUMENTO', 'DOC_PROVEEDOR'].map(tx).join(' '), n = [];
+  t.replace(/(GR[A-Z])?\s*(T?\d{3,4}-\d{7})(?!\d)/g, function(m, pre, num){ if(pre !== 'GRC' && n.indexOf(num) === -1) n.push(num); return m; });
+  if(n.length) A.ref.push([tx('DOCUMENTO'), tx('PRODUCTO') || tx('IDPRODUCTO'), n.join(' '), mo, fi, sd, Math.abs(+v('CANTIDAD') || 0)]); }
 let ALM_DEVOL_LEIDO = null;   // devoluciones de proyecto (salidas S02 de la hoja Movimientos) que se leen antes de filtrar las sedes y motivos
 async function almLeerReporteGrande(buf){
   if(typeof DecompressionStream === 'undefined') return null;
@@ -7206,7 +7226,7 @@ async function almLeerReporteGrande(buf){
   const wx = await texto('xl/workbook.xml'), rx = await texto('xl/_rels/workbook.xml.rels'), rel = {}, hojas = {};
   rx.replace(/<Relationship\b[^>]*>/g, function(t){ const id = (t.match(/\bId="([^"]+)"/) || [])[1], tg = (t.match(/\bTarget="([^"]+)"/) || [])[1]; if(id && tg) rel[id] = tg.replace(/^\/?(xl\/)?/, 'xl/'); return t; });
   wx.replace(/<sheet\b[^>]*>/g, function(t){ const nm = (t.match(/\bname="([^"]*)"/) || [])[1], id = (t.match(/\br:id="([^"]+)"/) || [])[1]; if(nm != null && rel[id]) hojas[ent2(nm)] = rel[id]; return t; });
-  ALM_DEVOL_LEIDO = null;
+  ALM_DEVOL_LEIDO = null; ALM_S88_LEIDO = null;
   const nI = Object.keys(hojas).find(function(n){ return /ingres/i.test(n); }), nM = Object.keys(hojas).find(function(n){ return /movimient/i.test(n); });
   if(!nI && !nM) return null;
   // Textos compartidos y formatos de fecha
@@ -7241,6 +7261,7 @@ async function almLeerReporteGrande(buf){
         aoa.push(hdr); return; }
       if(!esIng && iM !== undefined && /^S(02|80|81)$/.test(String(celdas[iM] == null ? '' : celdas[iM]).replace(/\s+/g, '').toUpperCase())){ const v = function(n){ const i = cols.nm[n]; return i === undefined ? null : celdas[i]; }, pr = pmDevPry(v('ALMACEN')), ds = String(v('SUCURSAL_DESTINO') || '');
         if(pr && (/02$/.test(String(celdas[iM]).trim()) || /SUCURSAL/i.test(ds))){ const f = v('FECHA SALIDA'); (ALM_DEVOL_LEIDO = ALM_DEVOL_LEIDO || []).push([pr, String(v('PRODUCTO') || v('IDPRODUCTO') || '').trim(), String(v('DSC_PRODUCTO') || '').trim(), +v('CANTIDAD') || 0, f instanceof Date ? isoDay(f) : '', String(v('DOCUMENTO') || '').trim(), pmDevSede(v('SUCURSAL_DESTINO')), Math.round((+v('IMPORTEMEX') || 0) * 100) / 100]); } }
+      if(!esIng && iM !== undefined && iS !== undefined) almS88Captura(String(celdas[iM] == null ? '' : celdas[iM]).replace(/\s+/g, '').toUpperCase(), function(n){ const i = cols.nm[n]; return i === undefined ? null : celdas[i]; }, celdas[iS]);
       if(iS !== undefined && !sedeInternaKardex(celdas[iS])) return;
       if(iM !== undefined && !mot.has(String(celdas[iM] == null ? '' : celdas[iM]).replace(/\s+/g, '').toUpperCase())) return;
       const out = new Array(aoa[0].length).fill(null); Object.keys(celdas).forEach(function(i){ out[cols.idx[i]] = celdas[i]; }); aoa.push(out); };
@@ -7520,6 +7541,7 @@ function processAlmacen(wb, filename){
   ALMACEN_DATA = {
     danfoss: trasK.dnf.size ? [...trasK.dnf] : undefined,   // códigos de marca DANFOSS (ver invDanfossCods)
     devol: ALM_DEVOL_LEIDO || undefined,   // devoluciones de obra al almacén por PRY (ver pmDevol)
+    s88: ALM_S88_LEIDO || undefined,   // salidas S88 y referencias de guía (módulo Regularizaciones)
     rows: productos, sedes: ALMACEN_SEDES.filter(sd=>sedeIdx[sd]!==undefined),
     trazaLotes, almMov,
     totalRows: dataRows.length, sinRop, excluidas, filename, sheetName,
@@ -16442,7 +16464,7 @@ const APP_VISTAS = {
     // Sin Inicio y con el Daily primero (15.10.2026, Piero), como en Compras.
     // Indicadores + Almacén en "Seguimiento", por persona como en Compras; Inventario tercero (20.10.2026, Piero).
     // Sin Daily: va en Gerencial, igual que en Compras (09.11.2026, Piero).
-    tabs:[['almseg','🧭','Requerimientos'], ['almrsv','🔒','Reservas'], ['inventario','📦','Inventario'], ['polar']] },   // Reservas (13.11.2026, Piero)   // sin OTIF; Seguimiento = requerimientos como en Supervisor (12.11.2026, Piero)
+    tabs:[['almseg','🧭','Requerimientos'], ['almrsv','🔒','Reservas'], ['almreg','🔁','Regularizaciones'], ['inventario','📦','Inventario'], ['polar']] },   // Reservas (13.11.2026, Piero)   // sin OTIF; Seguimiento = requerimientos como en Supervisor (12.11.2026, Piero)
   // Supervisor (13.10.2026, Piero): trazabilidad de requerimientos y consulta de stock por producto. Reemplaza a la vista
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
   super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
@@ -16467,7 +16489,7 @@ function appVeGerencial(t){ return t === 'gerencia' || t === 'compras' || t === 
 // Vistas que usan el Inicio y las pantallas de Logística (Compras y Almacén son partes de ella).
 function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v === 'almacen'; }
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
-const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto', gastopresu:'Gasto y presupuesto', almrep:'Almacén', almseg:'Requerimientos', almrsv:'Reservas', inventario:'Inventario',
+const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto', gastopresu:'Gasto y presupuesto', almrep:'Almacén', almseg:'Requerimientos', almrsv:'Reservas', almreg:'Regularizaciones', inventario:'Inventario',
   pendcompras:'Pendientes de Compras', pendlog:'Importaciones', cmpeq:'Equipos por origen', daily:'Daily Call In', reportes:'Reportería', gobj:'Objetivos', gabas:'Abastecimiento', ggas:'Gasto', galm:'Almacén', gser:'Nivel de servicio', gdport:'Portada', gdagen:'Agenda', gdobj:'Objetivos', gdpan:'Panorama ejecutivo', gdabas:'Abastecimiento', gdcom:'Compras', gdalm:'Almacén', gdcex:'Comercio exterior', gdmej:'Mejoras', gdacu:'Acuerdos y decisiones', supreq:'Requerimientos', suppry:'Proyectos', tienda:'Consulta de producto', equipo:'Equipo Logística' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 // Reporte gerencial en su propio link (11.11.2026, Piero: "todo esto de gerencial colócalo en otro link aparte, no dentro del
@@ -17245,7 +17267,7 @@ function appElegirVista(v){
 const APP_TAB_SVG = (function(){ const s = function(d){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>'; };
   return { inicio:s('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>'), supreq:s('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6M9 18h4"/>'),
     suppry:s('<path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/>'), tienda:s('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
-    inventario:s('<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'), almseg:s('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'), almrsv:s('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
+    inventario:s('<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'), almseg:s('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'), almreg:s('<path d="M4 9a8 8 0 0 1 14-4l2 2"/><path d="M20 3v4h-4"/><path d="M20 15a8 8 0 0 1-14 4l-2-2"/><path d="M4 21v-4h4"/>'), almrsv:s('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'),
     pendcompras:s('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'), cmpeq:s('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/>'), pendlog:s('<path d="M3 17h18l-2 3H5z"/><path d="M5 17V9h14v8M9 9V5h6v4"/>'),
     gastopresu:s('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), gasto:s('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), presu:s('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>'),
     certificados:s('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h4"/>'), otif:s('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>'),
@@ -18273,7 +18295,7 @@ function almPedRegHtml(cod, st){
       g.d + ' d.h.', t ? 'a tiempo' : 'fuera de meta'); }).join('');
   return `<div class="ini-card ix">${kpis(y)}${tend}</div><div class="ini-card m-lista">${filas}</div>${L.length > tope ? `<div class="m-sec-nota">Se muestran los ${tope} más recientes de ${appN(L.length)}.</div>` : ''}`;
 }
-const APP_PANT_FN = { reportes:function(){ return appReportesHtml(); }, gobj:function(){ return appGxHtml('gobj'); }, gabas:function(){ return appGxHtml('gabas'); }, ggas:function(){ return appGxHtml('ggas'); }, galm:function(){ return appGxHtml('galm'); }, gser:function(){ return appGxHtml('gser'); }, almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appComprasHtml(); }, almseg:function(){ return appSupReqHtml(); }, almrsv:function(){ return appReservasHtml(); },
+const APP_PANT_FN = { reportes:function(){ return appReportesHtml(); }, gobj:function(){ return appGxHtml('gobj'); }, gabas:function(){ return appGxHtml('gabas'); }, ggas:function(){ return appGxHtml('ggas'); }, galm:function(){ return appGxHtml('galm'); }, gser:function(){ return appGxHtml('gser'); }, almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appComprasHtml(); }, almseg:function(){ return appSupReqHtml(); }, almrsv:function(){ return appReservasHtml(); }, almreg:function(){ return appRegHtml(); },
   cmpeq:function(){ return cqHtml(); },
   pendlog:function(){ return appPendLogHtml() + (APP.vista === 'compras' && gerAbierto ? `<div class="cmp-sec"><b>🌎 Comex</b><small>Camila Mora</small></div>${appFBarra('indicadores', { pry:1 })}${appComexHtml(APP_F.indicadores)}` : ''); }, daily:function(){ return appDailyModHtml(); }, supreq:function(){ return appSupReqHtml(); }, suppry:function(){ return appSupPryHtml(); }, equipo:function(){ return appGerEquipoHtml(); }, tienda:function(){ return appTiendaHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
@@ -18319,7 +18341,7 @@ function appRenderInicio(){
       : '<div class="ini-card"><div class="ini-vacio">⏳ Descargando los datos de la plataforma…' + (appIntentos > 12 ? ' (son varios MB, puede tardar un poco con señal lenta)' : '') + '</div></div>';
     clearTimeout(appEsperaDatos);
     appEsperaDatos = setTimeout(function(){ if(APP.enInicio) appRenderInicio(); }, 1500);
-  } else if(APP.pantalla === 'daily' || APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'suppry' || APP.pantalla === 'tienda' || APP.pantalla === 'equipo'){
+  } else if(APP.pantalla === 'daily' || APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'almreg' || APP.pantalla === 'suppry' || APP.pantalla === 'tienda' || APP.pantalla === 'equipo'){
     if((APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'suppry') && !RES.ok) resCargar();
     if(APP.pantalla === 'almrsv' && RSV_UI.ver === 'lib' && !RES.hOk) resHistCargar();
     cont.innerHTML = gdNavSi() + APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
@@ -19652,6 +19674,70 @@ document.addEventListener('click', function(ev){ const b = ev.target.closest && 
   if(b.dataset.rsvmpdf) return rqHojaPdf(b.dataset.rsvmpdf);
   if(b.dataset.rsvmlibreq) return rsvLiberarReq(b.dataset.rsvmlibreq); });
 document.addEventListener('input', function(ev){ if(ev.target.id !== 'rsvmQ') return; RSV_UI.q = ev.target.value; const l = document.getElementById('rsvmL'); if(l) l.innerHTML = rsvmLista(); });
+// ---- Módulo Regularizaciones (Almacén, 13.11.2026, Piero: "salidas S88 que no afectan el kárdex y luego se regularizan con otra salida") ----
+// Cada línea S88 se empareja con la salida que la regulariza: 1) la salida que cita la guía (GRR) en su glosa o documentos → Regularizada;
+// 2) si no, la primera salida posterior del mismo producto y almacén para el mismo cliente → Probable; 3) si no hay → Pendiente.
+const REG_UI = { est:'pend', sede:'', anio:'', q:'', tope:30 };
+const REG_SEDE = { lima:'Lurín', ica:'Ica', trujillo:'Trujillo' };
+function regDatos(){ const S = (ALMACEN_DATA && ALMACEN_DATA.s88) || null; if(!S) return null;
+  return appMemo('regS88' + S.l.length + '|' + (S.ref || []).length + '|' + ((ALMACEN_DATA.rows || []).length), function(){
+    const dia = function(f){ return f ? Date.parse(f + 'T00:00:00Z') / 864e5 : NaN; }, num = function(d){ return (String(d).match(/(T?\d{3,4}-\d{7})/) || [])[1] || ''; };
+    const cl = function(t){ return sinAcentos(String(t || '').toUpperCase()).replace(/[^A-Z0-9]/g, ''); };
+    const refs = new Map(); (S.ref || []).forEach(function(x){ String(x[2]).split(' ').forEach(function(n){ if(!refs.has(n)) refs.set(n, []); refs.get(n).push(x); }); });
+    const usado = new Set(), movs = new Map();
+    const salidasDe = function(cod){ if(!movs.has(cod)){ const p = rqStockDe(cod); movs.set(cod, ((p && p.kardexMovs) || []).filter(function(m){ return m.q < 0 && m.mo !== 'S88' && /^S/.test(m.mo || ''); })); } return movs.get(cod); };
+    const L = S.l.map(function(x, i){ return { i:i, doc:x[0], cod:x[1], desc:x[2], f:x[3], sd:x[4], cli:x[5], glosa:x[6], resp:x[7], dir:x[8], um:x[9], d:dia(x[3]) }; })
+      .sort(function(a, b){ return (a.d || 0) - (b.d || 0); });
+    L.forEach(function(s){ const n = num(s.doc);
+      const R = (refs.get(n) || []).filter(function(x){ return x[1] === s.cod && !usado.has(x[0] + '|' + x[1]); });
+      if(R.length){ const x = R[0]; usado.add(x[0] + '|' + x[1]); s.est = 'ok'; s.reg = { doc:x[0], mo:x[3], f:x[4], q:x[6], cita:true }; }
+      else { const C = salidasDe(s.cod).filter(function(m){ const d = dia(m.f); return m.s === s.sd && d >= s.d - 2 && d <= s.d + 150 && !usado.has(m.d + '|' + s.cod); });
+        const P = C.filter(function(m){ return cl(m.cp) && cl(m.cp) === cl(s.cli); });
+        if(P.length){ const m = P[0]; usado.add(m.d + '|' + s.cod); s.est = 'prob'; s.reg = { doc:m.d, mo:m.mo, md:m.md, f:m.f, q:Math.abs(m.q), cli:m.cp }; }
+        else { s.est = 'pend'; const H = C.filter(function(m){ return dia(m.f) <= s.d + 60; })[0]; if(H) s.pos = { doc:H.d, mo:H.mo, f:H.f, q:Math.abs(H.q), cli:H.cp }; } }
+      if(s.reg) s.lag = Math.max(0, Math.round(dia(s.reg.f) - s.d)); });
+    return L; }); }
+function regLista(G){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); }, hoy = +appIndCorte() / 864e5;
+  if(!G.length) return '<div class="pmf-vacio">No hay guías S88 con ese filtro.</div>';
+  const ESTX = { ok:['ok', 'Regularizada'], prob:['prob', 'Probable'], pend:['pend', 'Pendiente'] };
+  return G.slice(0, REG_UI.tope).map(function(g, gi){ const s0 = g.l[0], dias = Math.max(0, Math.round(hoy - s0.d)), est = g.l.some(function(s){ return s.est === 'pend'; }) ? 'pend' : g.l.some(function(s){ return s.est === 'prob'; }) ? 'prob' : 'ok';
+    return `<div class="rsvm-c reg-c ${est}" style="animation-delay:${Math.min(gi, 12) * 35}ms"><div class="rsvm-ch"><div class="rsvm-ct"><b>${e(s0.doc)} · ${e(polarCorta(s0.cli || '—', 46))}</b><small>${e(REG_SEDE[s0.sd] || s0.sd)} · ${e(rqFecha(new Date(s0.f + 'T12:00:00Z')))}${est === 'pend' ? ' · hace ' + appN(dias) + ' días' : ''} · ${e(titleCase(String(s0.resp || '').split(' ').slice(0, 2).join(' ')))}${s0.glosa ? ' · ' + e(polarCorta(s0.glosa, 70)) : ''}</small></div>
+      <span class="reg-est ${est}">${ESTX[est][1]}${g.l.length > 1 ? ` · ${g.l.filter(function(s){ return s.est !== 'pend'; }).length}/${g.l.length}` : ''}</span></div>
+      ${g.l.map(function(s){ const r = s.reg, h = s.pos;
+        return `<div class="reg-f"><span class="rsvm-t"><b>${e(s.desc || s.cod)}</b><small>${e(s.cod)}${s.um ? ' · ' + e(s.um) : ''}</small></span><span class="reg-flecha">→</span>
+          <span class="reg-sal ${s.est}">${r ? `<b>${e(r.doc)}</b><small>${e(r.mo)} · ${nn(r.q)} ${e(s.um || '')} · ${e(rqFecha(new Date(r.f + 'T12:00:00Z')))}${s.lag != null ? ' · ' + appN(s.lag) + ' d después' : ''}${r.cita ? ' · cita la guía' : ' · mismo cliente'}</small>`
+            : `<b>Sin salida que regularice</b><small>${h ? 'Posible: ' + e(h.doc) + ' · ' + e(h.mo) + ' · ' + nn(h.q) + ' · ' + e(rqFecha(new Date(h.f + 'T12:00:00Z'))) + (h.cli ? ' · ' + e(polarCorta(h.cli, 26)) : '') : 'No hay una salida posterior de este producto en ' + e(REG_SEDE[s.sd] || s.sd)}</small>`}</span>
+          <span class="reg-est ${s.est}">${ESTX[s.est][1]}</span></div>`; }).join('')}</div>`; }).join('')
+    + (G.length > REG_UI.tope ? `<button type="button" class="reg-mas" data-regmas="1">Ver ${appN(Math.min(30, G.length - REG_UI.tope))} guías más de ${appN(G.length - REG_UI.tope)}</button>` : ''); }
+function regFiltrar(L){ const q = crtNorm(REG_UI.q.trim());
+  return L.filter(function(s){ return (!REG_UI.sede || s.sd === REG_UI.sede) && (!REG_UI.anio || String(s.f).slice(0, 4) === REG_UI.anio)
+    && (!q || crtNorm([s.doc, s.cod, s.desc, s.cli, s.glosa, s.resp, s.reg ? s.reg.doc : ''].join(' ')).indexOf(q) !== -1); }); }
+function regGrupos(L){ const M = new Map(); L.forEach(function(s){ const k = s.doc + '|' + s.sd; if(!M.has(k)) M.set(k, { l:[] }); M.get(k).l.push(s); });
+  return [...M.values()].filter(function(g){ const est = g.l.some(function(s){ return s.est === 'pend'; }) ? 'pend' : g.l.some(function(s){ return s.est === 'prob'; }) ? 'prob' : 'ok'; return !REG_UI.est || REG_UI.est === est; })
+    .sort(function(a, b){ return b.l[0].d - a.l[0].d || String(b.l[0].doc).localeCompare(String(a.l[0].doc)); }); }
+function appRegHtml(){ const e = escapeHtml, D = regDatos();
+  const ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a8 8 0 0 1 14-4l2 2"/><path d="M20 3v4h-4"/><path d="M20 15a8 8 0 0 1-14 4l-2-2"/><path d="M4 21v-4h4"/></svg>';
+  const head = function(ks){ return `<div class="rsvm-head reg-head"><div class="rsvm-hi reg-hi">${ICO}</div><div class="rsvm-meta"><h2>Regularizaciones S88</h2><p>Salidas de urgencia con guía S88 (traslado que no afecta el kárdex) y la salida que las regulariza después. Se empareja por la guía citada o, si no, por la siguiente salida del mismo producto, almacén y cliente.</p></div>${ks || ''}</div>`; };
+  if(!D) return `<div class="rsvm">${head('')}<div class="pmf-vacio">Todavía no hay datos de S88: vuelve a cargar <b>Reporte Almacen.xlsx</b> (hoja Movimientos) y usa <b>Guardar y compartir</b>.</div></div>`;
+  const anios = [...new Set(D.map(function(s){ return String(s.f).slice(0, 4); }).filter(Boolean))].sort().reverse();
+  if(REG_UI.anio === '' && !REG_UI._ini){ REG_UI._ini = true; REG_UI.anio = anios[0] || ''; }
+  const F = regFiltrar(D), docs = function(L){ return new Set(L.map(function(s){ return s.doc + '|' + s.sd; })).size; };
+  const P = F.filter(function(s){ return s.est === 'pend'; }), O = F.filter(function(s){ return s.est === 'ok'; }), B = F.filter(function(s){ return s.est === 'prob'; });
+  const lags = O.concat(B).map(function(s){ return s.lag; }).filter(function(v){ return v != null; }), prom = lags.length ? Math.round(lags.reduce(function(a, v){ return a + v; }, 0) / lags.length) : 0;
+  const ks = `<div class="pmx-ks rsvm-ks"><div class="pmx-k"><b>${appN(docs(F))}</b><small>guías S88 · ${appN(F.length)} ítems</small></div><div class="pmx-k rev"><b>${appN(docs(P))}</b><small>guías pendientes</small></div><div class="pmx-k"><b>${appN(prom)} d</b><small>en regularizar (prom.)</small></div>
+    <div class="pmx-k reg-k ok"><b>${appN(O.length)}</b><small>ítems regularizados</small></div><div class="pmx-k reg-k prob"><b>${appN(B.length)}</b><small>ítems probables</small></div><div class="pmx-k reg-k pend"><b>${appN(P.length)}</b><small>ítems pendientes</small></div></div>`;
+  const G = regGrupos(F), chip = function(attr, v, on, t){ return `<button type="button" data-${attr}="${v}" class="${on ? 'on' : ''}">${t}</button>`; };
+  return `<div class="rsvm reg">${head(ks)}
+    <div class="rsvm-bar"><div class="rsvm-seg">${[['pend', 'Pendientes'], ['prob', 'Probables'], ['ok', 'Regularizadas'], ['', 'Todas']].map(function(o){ return chip('regest', o[0], REG_UI.est === o[0], o[1]); }).join('')}</div>
+      <div class="rsvm-sedes">${[['', 'Todos'], ['lima', 'Lurín'], ['trujillo', 'Trujillo'], ['ica', 'Ica']].map(function(o){ return chip('regsede', o[0], REG_UI.sede === o[0], o[1]); }).join('')}</div>
+      <div class="rsvm-sedes">${anios.map(function(a){ return chip('reganio', a, REG_UI.anio === a, a); }).join('')}${chip('reganio', '', !REG_UI.anio, 'Todo')}</div>
+      <input type="search" class="rsvm-bus" id="regQ" placeholder="Buscar guía, código, producto o cliente" value="${e(REG_UI.q)}" autocomplete="off"></div>
+    <div class="rsvm-l" id="regL">${regLista(G)}</div></div>`; }
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-regest],[data-regsede],[data-reganio],[data-regmas]'); if(!b) return;
+  if(b.dataset.regmas){ REG_UI.tope += 30; const l = document.getElementById('regL'); if(l) l.innerHTML = regLista(regGrupos(regFiltrar(regDatos() || []))); return; }
+  if(b.dataset.regest !== undefined) REG_UI.est = b.dataset.regest; if(b.dataset.regsede !== undefined) REG_UI.sede = b.dataset.regsede; if(b.dataset.reganio !== undefined) REG_UI.anio = b.dataset.reganio;
+  REG_UI.tope = 30; appRenderInicio(); });
+document.addEventListener('input', function(ev){ if(ev.target.id !== 'regQ') return; REG_UI.q = ev.target.value; REG_UI.tope = 30; const l = document.getElementById('regL'); if(l) l.innerHTML = regLista(regGrupos(regFiltrar(regDatos() || []))); });
 async function rsvLiberarLote(lote){ const n = RES.l.filter(function(y){ return y.lote === lote; }).length; if(!window.confirm('¿Liberar las ' + n + ' reservas que se registraron juntas?')) return;
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&lote=eq.' + encodeURIComponent(lote), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
     if(!r.ok) throw new Error(r.status); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar la hoja.'); } }
