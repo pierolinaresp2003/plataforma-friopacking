@@ -16516,7 +16516,7 @@ const APP_VISTAS = {
 // El acceso "Logística" de antes es ahora Compras.
 function appTipoNorm(t){ return t === 'logistica' ? 'compras' : t; }
 // Vistas que ven lo gerencial (con la clave de la app ya puesta).
-function appVeGerencial(t){ return t === 'gerencia' || t === 'compras' || t === 'almacen' || t === 'gerencial'; }
+function appVeGerencial(t){ return t === 'gerencia' || t === 'compras' || t === 'almacen' || t === 'gerencial' || (t === 'operario' && APP_EN_PC); }
 // Vistas que usan el Inicio y las pantallas de Logística (Compras y Almacén son partes de ella).
 function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v === 'almacen'; }
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
@@ -16536,7 +16536,7 @@ try{ const v = localStorage.getItem('fp-vista'); if(APP_VISTAS[v]) APP.vista = v
 // es una página estática, no hay un servidor con la lista de usuarios. Qué vistas ve cada tipo:
 //   Gerencia → las 3 · Logística → Logística y Supervisor · Supervisor → solo Supervisor.
 // La vista Gerencia ya no existe (12.10.2026, Piero): Compras y Almacén tienen lo gerencial; el acceso Gerencia entra a Compras.
-const APP_ACCESO = { gerencial:['gerencial','compras','almacen','super'], gerencia:['compras','almacen','super'], logistica:['compras','almacen','super'], compras:['compras','almacen','super'], almacen:['almacen','compras','super'], supervisor:['super'], frioteam:['frioteam'], operario:['operario'] };
+const APP_ACCESO = { gerencial:['gerencial','compras','almacen','super'], gerencia:['compras','almacen','super'], logistica:['compras','almacen','super'], compras:['compras','almacen','super'], almacen:['almacen','compras','super'], supervisor:['super'], frioteam:['frioteam'], operario:APP_EN_PC ? ['almacen', 'compras', 'super', 'operario'] : ['operario'] };   // Operario: en el celular solo Validar; en la web todos los módulos (13.11.2026, Piero)
 // "Ir al aplicativo" desde el reporte gerencial abre ./?app (11.11.2026): ahí el usuario gerencial entra a su primera vista del
 // aplicativo en vez de rebotar otra vez al link gerencial.
 const GD_APP = /[?&]app\b/.test(location.search);
@@ -19595,7 +19595,7 @@ const RQ_SKF = [['', 'Todos'], ['ok', 'Hay stock para todo'], ['par', 'Stock par
 // el stock real de kardex como referencia hasta que se haga la salida en el sistema" y "2 íconos para enviar por correo y WhatsApp un
 // mensaje ofreciendo alternativas si no hay stock"). Las reservas viven en Supabase (fp_reservas) y se liberan solas con la salida.
 const RES = { l:[], v:0, ok:false, cargando:false };
-function rqAnalista(){ return !!APP.usuario && ['supervisor', 'frioteam', 'operario'].indexOf(APP.usuario.tipo) === -1; }
+function rqAnalista(){ return !!APP.usuario && ['supervisor', 'frioteam'].concat(APP_EN_PC ? [] : ['operario']).indexOf(APP.usuario.tipo) === -1; }
 function rqOperario(){ return !!APP.usuario && APP.usuario.tipo === 'operario'; }
 async function resCargar(forzar){ if(RES.cargando || (RES.ok && !forzar)) return; RES.cargando = true;
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota,lote,val_estado,val_nombre,val_en,val_nota,val_q&order=creado.asc');
