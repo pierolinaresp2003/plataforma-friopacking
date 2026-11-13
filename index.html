@@ -3695,7 +3695,7 @@ html[data-theme="dark"] .pz::before{opacity:.08;} html[data-theme="dark"] .pz-mo
 .hj-seg button.on{background:#0a1e64;color:#fff;} .hj-at button.ok.on{background:#15803d;} .hj-at button.pc.on{background:#b4231a;} .hj-at button.par.on{background:#b26a00;}
 .hj-seg input{width:54px;height:28px;box-sizing:border-box;border:1px solid var(--border);border-radius:7px;font:700 13px Inter,sans-serif;text-align:center;color:var(--ink);background:var(--surface-2);}
 .hj-m{justify-self:end;font:700 15px 'Segoe Print','Bradley Hand',cursive;white-space:nowrap;color:#0a1e64;} .hj-m.ok{color:#15803d;} .hj-m.pc{color:#b4231a;} .hj-m.par{color:#b26a00;}
-.hj-pie{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:end;}
+.hj-pie{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:end;} .hj-ver{font-size:12.5px;font-weight:700;border-radius:10px;padding:8px 12px;background:var(--surface-2);color:var(--ink);} .hj-ver.ok{background:#e2f4e6;color:#15803d;} .hj-ver.mal{background:#fde8e6;color:#b4231a;} .hj-ver.nose{background:#fff1d6;color:#9a5b00;} .hj-ver label{display:flex;align-items:center;gap:6px;margin-top:6px;color:var(--ink);font-weight:700;}
 @media (max-width:700px){ .hj-f{grid-template-columns:30px minmax(0,1fr) auto;} .hj-q{grid-column:3;grid-row:1;} .hj-alm{grid-column:2;grid-row:2;justify-self:start;} .hj-at{grid-column:2;grid-row:3;justify-self:start;} .hj-m{grid-column:3;grid-row:2 / span 2;} .hj-pie{grid-template-columns:1fr;} } .rqx-sk.cam{background:#e0f2fe;color:#0369a1;} .rqx-alt{display:inline-flex;gap:4px;} .rqx-alt button{width:30px;height:30px;border-radius:9px;border:1px solid var(--border);background:var(--card);color:#1f4fd1;display:grid;place-items:center;cursor:pointer;transition:transform .15s,background .2s;} .rqx-alt button.wa{color:#1da851;} .rqx-alt button:hover{transform:translateY(-1px);background:var(--surface-2);} .rqx-alt svg{width:16px;height:16px;}
 .rsv-blq{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
 .rsv-it{display:flex;align-items:center;gap:10px;background:#ddf3ef;border-radius:12px;padding:8px 12px;} .rsv-it b{display:block;font-size:13px;color:#0b4f47;} .rsv-it small{font-size:11.5px;color:#0b6e63;} .rsv-lock{font-size:16px;}
@@ -19505,7 +19505,7 @@ const RQ_SKF = [['', 'Todos'], ['ok', 'Hay stock para todo'], ['par', 'Stock par
 const RES = { l:[], v:0, ok:false, cargando:false };
 function rqAnalista(){ return !!APP.usuario && ['supervisor', 'frioteam'].indexOf(APP.usuario.tipo) === -1; }
 async function resCargar(forzar){ if(RES.cargando || (RES.ok && !forzar)) return; RES.cargando = true;
-  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota&order=creado.asc');
+  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota,lote&order=creado.asc');
     if(r.ok){ RES.l = await r.json(); RES.ok = true; RES.v++; resLimpiar(); } }catch(e){}
   RES.cargando = false; if(RES.ok && APP.enInicio && ['supreq', 'almseg', 'suppry', 'inventario'].indexOf(APP.pantalla) !== -1) appRenderInicio(); }
 // La fila del requerimiento a la que apunta una reserva y si sigue pendiente (sin salida)
@@ -19520,9 +19520,24 @@ function resProd(cod, sede){ sede = sede || 'Lurín'; return appMemo('resP' + RE
 function rsvModal(html){ rsvCerrar(); document.body.insertAdjacentHTML('beforeend', `<div class="rsv-fondo" id="rsvFondo"><div class="rsv-box" role="dialog" aria-modal="true">${html}</div></div>`);
   const f = document.getElementById('rsvFondo'); f.addEventListener('click', function(ev){ if(ev.target === f || ev.target.closest('[data-rsvx]')) rsvCerrar(); }); return f; }
 function rsvCerrar(){ const f = document.getElementById('rsvFondo'); if(f) f.remove(); }
+// Verificación de la hoja (13.11.2026, Piero: "la foto no corresponde con lo que se ha reservado"): se lee el texto IMPRESO de la
+// foto (N° de requerimiento y códigos) con OCR en el navegador; si es de otro requerimiento no deja registrar.
+let APP_OCR = null;
+function appCargarOcr(){
+  if(window.Tesseract) return Promise.resolve(window.Tesseract);
+  if(!APP_OCR) APP_OCR = new Promise(function(ok, mal){ const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    s.onload = function(){ window.Tesseract ? ok(window.Tesseract) : mal(new Error('ocr')); }; s.onerror = function(){ APP_OCR = null; mal(new Error('ocr')); }; document.head.appendChild(s); });
+  return APP_OCR; }
+async function hojaLeer(file){ const T = await appCargarOcr(), u = URL.createObjectURL(file);
+  try{ const im = await new Promise(function(ok, mal){ const i = new Image(); i.onload = function(){ ok(i); }; i.onerror = mal; i.src = u; });
+    const k = Math.min(2, 2200 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+    const g = c.getContext('2d'); g.filter = 'grayscale(1) contrast(1.3)'; g.drawImage(im, 0, 0, c.width, c.height);
+    const t = String(((await T.recognize(c, 'eng')).data || {}).text || '').replace(/[Oo]/g, '0'), m = t.match(/(?:^|\D)0{2,3}1\s*[-–—~]?\s*0*(\d{5,7})(?!\d)/);
+    return { req:m ? m[1].replace(/^0+/, '') : '', cods:t.match(/\b0\d{11}\b/g) || [] };
+  }finally{ URL.revokeObjectURL(u); } }
 function rsvFoto(file){ return new Promise(function(ok, mal){ const u = URL.createObjectURL(file), im = new Image();
-  im.onload = function(){ const k = Math.min(1, 900 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
-    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', .62)); };
+  im.onload = function(){ const k = Math.min(1, 1400 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', .7)); };
   im.onerror = function(){ URL.revokeObjectURL(u); mal(new Error('No pude leer la imagen.')); }; im.src = u; }); }
 // Hoja del requerimiento con foto (13.11.2026, Piero): se anota igual que en la hoja impresa de Nisira. Por ítem, el almacén que lo
 // atiende (L Lurín · T Trujillo · I Ica) y la atención: OK = todo del stock, PC = pasa a pedido de compra, (N) = N del stock y el resto
@@ -19552,7 +19567,7 @@ function rsvAbrirReq(cod){ const e = escapeHtml, nn = function(v){ return Number
       <span class="hj-m ${a.m.t}">${e(marca(a))}</span></div>`; };
   const f = rsvModal(`<header><div><small>Hoja del requerimiento · prueba</small><h3>Req. ${e(String(cod).replace(/^000\d-0*/, ''))} · ${e(SUP_CLI_UNIR[c] || c)}</h3><p>Anota cada ítem como en la hoja: <b>L/T/I</b> almacén · <b>OK</b> todo del stock · <b>PC</b> pasa a compra · <b>( )</b> cuánto sale del stock</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
     <div class="hj-l">${L.map(fila).join('')}</div>
-    <div class="hj-pie"><label class="rsv-foto" id="rsvFotoL"><input type="file" id="rsvFile" accept="image/*" capture="environment" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Foto de la hoja anotada</span></label></div>
+    <div class="hj-pie"><label class="rsv-foto" id="rsvFotoL"><input type="file" id="rsvFile" accept="image/*" capture="environment" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Foto de la hoja anotada</span></label><div class="hj-ver" id="hjVer" hidden></div></div>
     <label class="rsv-lbl">Nota (opcional)<input type="text" id="rsvNota" placeholder="Ej. separado en rack A-3"></label>
     <p class="rsv-nota" id="rsvRes"></p>
     <div class="rsv-err" id="rsvErr" hidden></div>
@@ -19571,32 +19586,46 @@ function rsvAbrirReq(cod){ const e = escapeHtml, nn = function(v){ return Number
     pinta(i); if(a.m.t === 'par') f.querySelector('[data-hj="' + i + '"] [data-hjn]').focus(); });
   f.addEventListener('input', function(ev){ if(!ev.target.dataset || !ev.target.dataset.hjn) return; const i = +ev.target.closest('[data-hj]').dataset.hj; L[i].m.n = +ev.target.value; pinta(i); });
   resumen();
+  const num = String(cod).replace(/^\d+-0*/, ''), todos = new Set((RQ.filas || []).filter(function(r){ return r.codRequerimiento === cod; }).map(function(r){ return String(r.idProducto); }));
+  let ver = null; const verPinta = function(est, txt){ ver = est; const d = f.querySelector('#hjVer'); d.hidden = false; d.className = 'hj-ver ' + est;
+    d.innerHTML = txt + (est === 'nose' ? `<label><input type="checkbox" id="hjConf"> Confirmo que es la hoja del Req. ${e(num)}</label>` : ''); };
   f.querySelector('#rsvFile').addEventListener('change', async function(ev){ const fl = ev.target.files && ev.target.files[0]; if(!fl) return;
-    try{ foto = await rsvFoto(fl); const l = f.querySelector('#rsvFotoL'); l.classList.add('con'); l.querySelector('span').innerHTML = `<img src="${foto}" alt="">Cambiar foto`; }catch(err){ rsvErr(err.message); } });
+    try{ foto = await rsvFoto(fl); const l = f.querySelector('#rsvFotoL'); l.classList.add('con'); l.querySelector('span').innerHTML = `<img src="${foto}" alt="">Cambiar foto`; }catch(err){ return rsvErr(err.message); }
+    rsvErr(''); verPinta('lee', '⏳ Revisando que la foto sea la hoja del Req. ' + e(num) + '…');
+    try{ const v = await hojaLeer(fl); if(f.querySelector('#rsvFile').files[0] !== fl) return;
+      if(v.req) v.req === num ? verPinta('ok', '✅ Hoja del Req. ' + e(num) + ' verificada') : verPinta('mal', '✕ Esta foto es la hoja del Req. ' + e(v.req) + ', no del Req. ' + e(num) + '. Sube la hoja correcta.');
+      else if(v.cods.length) v.cods.some(function(c){ return todos.has(c); }) ? verPinta('ok', '✅ Los códigos de la foto son de este requerimiento') : verPinta('mal', '✕ Los códigos de la foto no son de este requerimiento. Sube la hoja correcta.');
+      else verPinta('nose', '⚠ No pude leer el N° de requerimiento en la foto. Tómala de más cerca y con buena luz, o confirma:');
+    }catch(err){ verPinta('nose', '⚠ No pude revisar la foto (revisa tu conexión). Confirma:'); } });
   f.querySelector('#rsvOk').addEventListener('click', async function(){ const b = this;
     const S = L.filter(function(a){ return qStock(a) > 0; });
     const malP = L.find(function(a){ return a.m.t === 'par' && !(a.m.n > 0 && a.m.n < a.f); }); if(malP) return rsvErr('Ítem ' + malP.r.idProducto + ': escribe entre paréntesis cuánto sale del stock (menos de ' + nn(malP.f) + ').');
     const mas = S.find(function(a){ return qStock(a) > a.lb[a.m.a] + 1e-9; }); if(mas) return rsvErr('Ítem ' + mas.r.idProducto + ': en ' + HJ_ALM[mas.m.a] + ' solo hay ' + nn(mas.lb[mas.m.a]) + ' ' + (mas.r.unidad || '') + ' libres.');
     if(!S.length) return rsvErr('Todo pasa a compra: no hay nada que reservar del stock.');
     if(!foto) return rsvErr('Falta la foto de la hoja.');
+    if(ver === 'lee') return rsvErr('Espera un momento: estoy revisando la foto.');
+    if(ver === 'mal') return rsvErr('La foto no es la hoja de este requerimiento.');
+    if(ver === 'nose' && !(f.querySelector('#hjConf') || {}).checked) return rsvErr('Confirma que la foto es la hoja del Req. ' + num + '.');
     b.disabled = true; b.textContent = 'Guardando…';
     const lote = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nt = f.querySelector('#rsvNota').value.trim();
-    const hoja = 'Hoja: ' + L.map(function(a, i){ return String(i + 1).padStart(3, '0') + ' ' + marca(a); }).join(' · ') + (nt ? ' · ' + nt : '');
     try{ const res = await sbFetch('/rest/v1/fp_reservas', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' },
-        body:JSON.stringify(S.map(function(a, i){ return { req:cod, producto:a.r.idProducto, descripcion:a.r.producto || '', cantidad:qStock(a), um:a.r.unidad || '', sede:HJ_ALM[a.m.a], foto:i ? null : foto, nota:i ? marca(a) : hoja, lote:lote }; })) });
+        body:JSON.stringify(S.map(function(a, i){ return { req:cod, producto:a.r.idProducto, descripcion:a.r.producto || '', cantidad:qStock(a), um:a.r.unidad || '', sede:HJ_ALM[a.m.a], foto:i ? null : foto, nota:marca(a) + (nt ? ' · ' + nt : ''), lote:lote }; })) });
       if(!res.ok) throw new Error('No se pudo guardar (' + res.status + ').'); rsvCerrar(); appToast('Hoja registrada ✔ · ' + S.length + ' reserva' + (S.length === 1 ? '' : 's')); resCargar(true);
     }catch(err){ b.disabled = false; resumen(); rsvErr(err.message); } }); }
 async function rsvVer(id){ rsvModal('<header><div><small>Reserva</small><h3>Foto de la hoja de separación</h3></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header><div class="rsv-img">Cargando…</div>');
   try{ const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(id) + '&select=foto,lote'); let j = r.ok ? await r.json() : []; const d = document.querySelector('#rsvFondo .rsv-img');
     if(j[0] && !j[0].foto && j[0].lote){ const r2 = await sbFetch('/rest/v1/fp_reservas?lote=eq.' + encodeURIComponent(j[0].lote) + '&foto=not.is.null&select=foto&limit=1'); j = r2.ok ? await r2.json() : []; }
     if(d) d.innerHTML = j[0] && j[0].foto ? `<img src="${j[0].foto}" alt="Foto de la reserva">` : 'Sin foto.'; }catch(e){ const d = document.querySelector('#rsvFondo .rsv-img'); if(d) d.textContent = 'No se pudo cargar la foto.'; } }
+async function rsvLiberarLote(lote){ const n = RES.l.filter(function(y){ return y.lote === lote; }).length; if(!window.confirm('¿Liberar las ' + n + ' reservas de esta hoja?')) return;
+  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&lote=eq.' + encodeURIComponent(lote), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
+    if(!r.ok) throw new Error(r.status); appToast('Hoja liberada · ' + n + ' reservas'); resCargar(true); }catch(e){ appToast('No se pudo liberar la hoja.'); } }
 async function rsvLiberar(id){ try{ const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
   if(!r.ok) throw new Error(r.status); appToast('Reserva liberada'); resCargar(true); }catch(e){ appToast('No se pudo liberar la reserva.'); } }
 // Bloque del detalle: reservas de la fila + botón para reservar
 function rsvHtml(r){ const e = escapeHtml, L = resDeFila(r), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(!L.length) return '';
   return `<div class="rsv-blq">${L.map(function(z){ return `<div class="rsv-it"><span class="rsv-lock">🔒</span><span><b>${nn(z.cantidad)} ${e(z.um || '')} reservado${+z.cantidad === 1 ? '' : 's'} · ${e(resSede(z))}</b><small>${e(String(z.usuario || '').split('@')[0])} · ${rqFecha(new Date(z.creado))}${z.nota ? ' · ' + e(z.nota) : ''}</small></span>
-      <button type="button" class="rsv-mini" data-rsvver="${z.id}">Ver foto</button>${rqAnalista() ? `<button type="button" class="rsv-mini" data-rsvlib="${z.id}">Liberar</button>` : ''}</div>`; }).join('')}</div>`; }
+      <button type="button" class="rsv-mini" data-rsvver="${z.id}">Ver foto</button>${rqAnalista() ? `<button type="button" class="rsv-mini" data-rsvlib="${z.id}">Liberar</button>` : ''}${(function(){ const n = z.lote && rqAnalista() ? RES.l.filter(function(y){ return y.lote === z.lote; }).length : 0; return n > 1 ? `<button type="button" class="rsv-mini" data-rsvlote="${e(z.lote)}" title="Libera las ${n} reservas de esta hoja">Liberar hoja (${n})</button>` : ''; })()}</div>`; }).join('')}</div>`; }
 // ---- Alternativas cuando no hay stock ----
 function altCorreoSup(nom){ const k = claveNombre(nom || ''); if(!k) return '';
   if(SUPERVISOR_MAIL && SUPERVISOR_MAIL[k]) return SUPERVISOR_MAIL[k];
@@ -19628,9 +19657,9 @@ function altAbrir(r, canal){ const e = escapeHtml, L = altLista(r), sel = L.map(
 // Íconos de la fila (correo y WhatsApp) para quien analiza el requerimiento, solo si falta stock
 function altIconos(r, falta){ if(APP.vista !== 'almacen' || !rqAnalista() || !falta) return '';   // solo en Almacén (13.11.2026, Piero)
   return `<span class="rqx-alt"><button type="button" data-rqalt="mail" title="Ofrecer una alternativa por correo" aria-label="Correo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button><button type="button" data-rqalt="wa" class="wa" title="Ofrecer una alternativa por WhatsApp" aria-label="WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg></button></span>`; }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-rqalt],[data-rsv],[data-rsvver],[data-rsvlib],[data-rsvreq]'); if(!b) return;
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-rqalt],[data-rsv],[data-rsvver],[data-rsvlib],[data-rsvreq],[data-rsvlote]'); if(!b) return;
   ev.stopPropagation(); if(b.dataset.rsvreq) return rsvAbrirReq(b.dataset.rsvreq); const it = b.closest('.rqx-it'), det = it && it.querySelector('.rqx-det'), q = det ? RQ_FILA_REG[+det.dataset.ri] : null;
-  if(b.dataset.rsvver) return rsvVer(b.dataset.rsvver); if(b.dataset.rsvlib) return rsvLiberar(b.dataset.rsvlib);
+  if(b.dataset.rsvlote) return rsvLiberarLote(b.dataset.rsvlote); if(b.dataset.rsvver) return rsvVer(b.dataset.rsvver); if(b.dataset.rsvlib) return rsvLiberar(b.dataset.rsvlib);
   if(!q) return; if(b.dataset.rqalt) return altAbrir(q[0], b.dataset.rqalt); }, true);
 document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape') rsvCerrar(); });
 function rqCabFilas(){ return `<div class="rqx-cab"><span>Producto</span><span class="r">Cant.</span><span>Dónde está</span><span>Responsable</span><span class="rqx-skf-w"><button type="button" class="rqx-skf-b" data-rqskf="1" title="Filtrar por stock">Stock en Lurín <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span><span></span><span></span></div>`; }
