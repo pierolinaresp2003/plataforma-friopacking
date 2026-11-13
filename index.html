@@ -2041,7 +2041,7 @@
   .asis-msg.bot.hablando{box-shadow:0 0 0 2px var(--brand-2), var(--shadow);}
   .asis-pie button{border:0;background:var(--brand-2);color:#1c2733;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;flex-shrink:0;}
     /* PDF "Estatus de embarques" (07.10.2026): fuera de los @media para que se vea igual en PC y celular */
-    .pc-buscar-gen{display:flex;gap:8px;align-items:flex-start;} .pc-buscar-gen input{flex:1;min-width:0;}
+    .pc-buscar-gen{display:flex;gap:8px;align-items:flex-start;} .sup-xlsw{display:flex;flex-direction:column;gap:8px;flex:none;} .sup-tl{color:#0f5fa8;} .pc-buscar-gen input{flex:1;min-width:0;}
     .pc-img-btn{flex:0 0 auto;width:50px;height:50px;border-radius:14px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;} .pc-img-btn svg{width:30px;height:30px;} .pc-img-btn:active{transform:scale(.94);} .inv-xls{width:44px;height:44px;margin-left:auto;} .inv-xls svg{width:28px;height:28px;}
     .pci-caja{position:absolute;left:-12000px;top:0;width:720px;} .pci-caja .imp-card,.pci-caja .sku-grupo,.pci-caja .m-fila{content-visibility:visible;}
     .pci-hoja{width:720px;box-sizing:border-box;padding:22px 24px 16px;background:var(--bg);color:var(--ink);}
@@ -20150,8 +20150,10 @@ function pmLineaAbrir(id){ const p = pmDatos().l.find(function(y){ return y.id =
   document.getElementById('appOC').classList.add('ancho'); pmLineaIr(); }
 // Íconos del proyecto en Requerimientos cuando se filtra un PRY: línea de tiempo, salidas (recibido en obra) y devoluciones
 function supPryIconos(){ if(!APP_SUP.pry) return ''; const p = pmDatos().l.find(function(y){ return y.id === APP_SUP.pry; }); if(!p) return ''; const e = escapeHtml, dv = pmDevol(p.id);
-  return `<button type="button" class="rqm-ico pmx-ico tl" data-pmtl="${e(p.id)}" title="Línea de tiempo del proyecto" aria-label="Línea de tiempo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18"/><circle cx="6.5" cy="12" r="2.3" fill="currentColor"/><circle cx="12.5" cy="12" r="2.3" fill="currentColor"/><circle cx="18.5" cy="12" r="2.3" fill="var(--card)"/></svg></button>`
-    + pmIcoBtn(`data-pmlista="obra" data-pmid="${e(p.id)}"`, PM_SVG.obra, p.ok, 'Salidas: recibidos en obra', 'obra') + pmIcoBtn(`data-pmlista="dev" data-pmid="${e(p.id)}"`, PM_SVG.dev, dv.length, 'Devoluciones a Lurín, Ica o Trujillo', 'dev'); }
+  return pmIcoBtn(`data-pmlista="dev" data-pmid="${e(p.id)}"`, PM_SVG.dev, dv.length, 'Devoluciones a Lurín, Ica o Trujillo', 'dev'); }   // sin salidas ni línea de tiempo aquí (13.11.2026, Piero)
+// Línea de tiempo debajo del botón de Excel cuando se filtra un PRY (13.11.2026, Piero)
+function supPryTl(){ if(!APP_SUP.pry || !pmDatos().l.some(function(y){ return y.id === APP_SUP.pry; })) return '';
+  return `<button type="button" class="pc-img-btn sup-tl" data-pmtl="${escapeHtml(APP_SUP.pry)}" title="Línea de tiempo del proyecto" aria-label="Línea de tiempo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h18"/><circle cx="6.5" cy="12" r="2.3" fill="currentColor"/><circle cx="12.5" cy="12" r="2.3" fill="currentColor"/><circle cx="18.5" cy="12" r="2.3" fill="var(--card)"/></svg></button>`; }
 // Buscador de productos en "Qué falta"
 document.addEventListener('input', function(ev){ const t = ev.target; if(!t || !t.dataset || !t.dataset.pmfq) return; APP_PM.fq = t.value; clearTimeout(pmListaAbrir._t);
   pmListaAbrir._t = setTimeout(function(){ const x = t.closest('.pmx'), p = x && pmDatos().l.find(function(y){ return y.id === x.dataset.pmx; }), c = document.getElementById('pmxCuerpo'); if(!p || !c) return;
@@ -20286,7 +20288,7 @@ function appSupReqHtml(){
   return `<div class="sup">
     <div class="sup-fil">${ac('cli', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>', 'Cliente', APP_SUP.cli)}${ac('pry', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>', 'PRY o proyecto', pryTxt)}</div>
     ${supResumenHtml(l0)}
-    <div class="m-buscar pc-buscar-gen"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}">${INV_XLS_BTN.replace('data-invxls="1"', 'data-supxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el estado de los productos de lo filtrado')}</div>
+    <div class="m-buscar pc-buscar-gen"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}"><span class="sup-xlsw">${INV_XLS_BTN.replace('data-invxls="1"', 'data-supxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el estado de los productos de lo filtrado')}${supPryTl()}</span></div>
     ${appVeAlmRq() ? supSkChips(l) : ''}
     <div id="supLista">${APP_SUP.paso || supSk() ? (function(){ const L = supSkuItems(l); return `<div class="rqm rqm-lista sup-sku">${rqCabFilas()}${supSkuFilas(L, 0, 40)}</div>${L.length > 40 ? '<div class="sup-mas" id="supMas"></div>' : ''}`; })()
       : (function(){ const lc = supCardsDe(l); return lc.slice(0, n0).map(supCard).join('') + (lc.length > n0 ? '<div class="sup-mas" id="supMas"></div>' : '') + (lc.length ? '' : `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : APP_SUP.fin ? 'No hay requerimientos ' + SUP_FIN_TXT[APP_SUP.fin] + ' con ese filtro.' : 'No hay requerimientos pendientes con ese filtro.'}</div></div>`); })()}</div></div>`;
