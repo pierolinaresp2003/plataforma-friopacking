@@ -3717,7 +3717,7 @@ html[data-theme="dark"] .pz::before{opacity:.08;} html[data-theme="dark"] .pz-mo
 .reg-c.pend{border-left:4px solid #e4655c;} .reg-c.prob{border-left:4px solid #e8a33a;} .reg-c.ok{border-left:4px solid #3aa86b;}
 .reg-est{flex:none;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap;justify-self:end;} .reg-est.ok{background:#e2f4e6;color:#15803d;} .reg-est.prob{background:#fff1d6;color:#9a5b00;} .reg-est.pend{background:#fde8e6;color:#b4231a;}
 .reg-f{display:grid;grid-template-columns:minmax(0,1fr) 20px minmax(0,1.1fr) 104px;gap:10px;align-items:center;padding:6px 0;} .reg-flecha{color:var(--ink-soft);font-weight:800;text-align:center;}
-.reg-sal b{display:block;font-size:12.5px;color:var(--ink);} .reg-sal small{font-size:11px;color:var(--ink-soft);} .reg-sal.pend b{color:#b4231a;}
+.reg-sal b{display:block;font-size:12.5px;color:var(--ink);} .reg-sal small{font-size:11px;color:var(--ink-soft);} .reg-sal.pend b{color:#b4231a;} .reg-sal b i{font-style:normal;font-weight:700;font-size:11px;color:var(--ink-soft);} .reg-sal small b{display:inline;font-size:11.5px;color:var(--ink);} .reg-razon{display:inline-block;font-style:normal;font-size:10.5px;font-weight:700;color:#2f5fb3;background:#e3ecfb;border-radius:999px;padding:1px 8px;margin-top:2px;}
 .reg-mas{align-self:center;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:9px 16px;font:700 13px Inter,sans-serif;color:var(--ink);cursor:pointer;}
 @media (max-width:900px){ .reg-f{grid-template-columns:minmax(0,1fr) auto;} .reg-flecha{display:none;} .reg-sal{grid-column:1;grid-row:2;} .reg-f > .reg-est{grid-column:2;grid-row:1 / span 2;} }
 .sup-skc{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px;} .sup-skc > span{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-right:4px;}
@@ -19690,23 +19690,25 @@ function regDatos(){ const S = (ALMACEN_DATA && ALMACEN_DATA.s88) || null; if(!S
       .sort(function(a, b){ return (a.d || 0) - (b.d || 0); });
     L.forEach(function(s){ const n = num(s.doc);
       const R = (refs.get(n) || []).filter(function(x){ return x[1] === s.cod && !usado.has(x[0] + '|' + x[1]); });
-      if(R.length){ const x = R[0]; usado.add(x[0] + '|' + x[1]); s.est = 'ok'; s.reg = { doc:x[0], mo:x[3], f:x[4], q:x[6], cita:true }; }
+      if(R.length){ const x = R[0]; usado.add(x[0] + '|' + x[1]); s.est = 'ok'; const k = salidasDe(s.cod).find(function(m){ return m.d === x[0]; }) || {}; s.reg = { doc:x[0], mo:x[3], md:k.md, f:x[4], q:x[6], cli:k.cp, razon:'cita la guía' }; }
       else { const C = salidasDe(s.cod).filter(function(m){ const d = dia(m.f); return m.s === s.sd && d >= s.d - 2 && d <= s.d + 150 && !usado.has(m.d + '|' + s.cod); });
         const P = C.filter(function(m){ return cl(m.cp) && cl(m.cp) === cl(s.cli); });
-        if(P.length){ const m = P[0]; usado.add(m.d + '|' + s.cod); s.est = 'prob'; s.reg = { doc:m.d, mo:m.mo, md:m.md, f:m.f, q:Math.abs(m.q), cli:m.cp }; }
-        else { s.est = 'pend'; const H = C.filter(function(m){ return dia(m.f) <= s.d + 60; })[0]; if(H) s.pos = { doc:H.d, mo:H.mo, f:H.f, q:Math.abs(H.q), cli:H.cp }; } }
+        // Sin el mismo cliente, la primera salida del mismo producto y almacén en los 60 días siguientes también cuenta como probable (13.11.2026, Piero: "es 90% seguro")
+        const H = P.length ? null : C.filter(function(m){ return dia(m.f) <= s.d + 60; })[0], m = P[0] || H;
+        if(m){ usado.add(m.d + '|' + s.cod); s.est = 'prob'; s.reg = { doc:m.d, mo:m.mo, md:m.md, f:m.f, q:Math.abs(m.q), cli:m.cp, razon:P.length ? 'mismo cliente' : 'mismo producto y almacén' }; }
+        else s.est = 'pend'; }
       if(s.reg) s.lag = Math.max(0, Math.round(dia(s.reg.f) - s.d)); });
     return L; }); }
 function regLista(G){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); }, hoy = +appIndCorte() / 864e5;
   if(!G.length) return '<div class="pmf-vacio">No hay guías S88 con ese filtro.</div>';
   const ESTX = { ok:['ok', 'Regularizada'], prob:['prob', 'Probable'], pend:['pend', 'Pendiente'] };
   return G.slice(0, REG_UI.tope).map(function(g, gi){ const s0 = g.l[0], dias = Math.max(0, Math.round(hoy - s0.d)), est = g.l.some(function(s){ return s.est === 'pend'; }) ? 'pend' : g.l.some(function(s){ return s.est === 'prob'; }) ? 'prob' : 'ok';
-    return `<div class="rsvm-c reg-c ${est}" style="animation-delay:${Math.min(gi, 12) * 35}ms"><div class="rsvm-ch"><div class="rsvm-ct"><b>${e(s0.doc)} · ${e(polarCorta(s0.cli || '—', 46))}</b><small>${e(REG_SEDE[s0.sd] || s0.sd)} · ${e(rqFecha(new Date(s0.f + 'T12:00:00Z')))}${est === 'pend' ? ' · hace ' + appN(dias) + ' días' : ''} · ${e(titleCase(String(s0.resp || '').split(' ').slice(0, 2).join(' ')))}${s0.glosa ? ' · ' + e(polarCorta(s0.glosa, 70)) : ''}</small></div>
+    return `<div class="rsvm-c reg-c ${est}" style="animation-delay:${Math.min(gi, 12) * 35}ms"><div class="rsvm-ch"><div class="rsvm-ct"><b>${e(s0.doc)} · ${e(polarCorta(s0.cli || '—', 46))}</b><small>${e(REG_SEDE[s0.sd] || s0.sd)} · ${e(rqFecha(new Date(s0.f + 'T12:00:00Z')))}${est === 'pend' ? ' · hace ' + appN(dias) + ' días' : ''}${s0.resp ? ' · ' + e(polarCorta(titleCase(String(s0.resp)), 30)) : ''}${s0.glosa ? ' · ' + e(polarCorta(s0.glosa, 70)) : ''}</small></div>
       <span class="reg-est ${est}">${ESTX[est][1]}${g.l.length > 1 ? ` · ${g.l.filter(function(s){ return s.est !== 'pend'; }).length}/${g.l.length}` : ''}</span></div>
-      ${g.l.map(function(s){ const r = s.reg, h = s.pos;
+      ${g.l.map(function(s){ const r = s.reg;
         return `<div class="reg-f"><span class="rsvm-t"><b>${e(s.desc || s.cod)}</b><small>${e(s.cod)}${s.um ? ' · ' + e(s.um) : ''}</small></span><span class="reg-flecha">→</span>
-          <span class="reg-sal ${s.est}">${r ? `<b>${e(r.doc)}</b><small>${e(r.mo)} · ${nn(r.q)} ${e(s.um || '')} · ${e(rqFecha(new Date(r.f + 'T12:00:00Z')))}${s.lag != null ? ' · ' + appN(s.lag) + ' d después' : ''}${r.cita ? ' · cita la guía' : ' · mismo cliente'}</small>`
-            : `<b>Sin salida que regularice</b><small>${h ? 'Posible: ' + e(h.doc) + ' · ' + e(h.mo) + ' · ' + nn(h.q) + ' · ' + e(rqFecha(new Date(h.f + 'T12:00:00Z'))) + (h.cli ? ' · ' + e(polarCorta(h.cli, 26)) : '') : 'No hay una salida posterior de este producto en ' + e(REG_SEDE[s.sd] || s.sd)}</small>`}</span>
+          <span class="reg-sal ${s.est}">${r ? `<b>${e(r.doc)} <i>${e(r.mo)}${r.md ? ' · ' + e(polarCorta(titleCase(r.md), 34)) : ''}</i></b><small><b>${nn(r.q)} ${e(s.um || '')}</b> · ${e(rqFecha(new Date(r.f + 'T12:00:00Z')))}${s.lag != null ? ' · ' + (s.lag ? appN(s.lag) + ' d después' : 'el mismo día') : ''}${r.cli ? ' · ' + e(polarCorta(r.cli, 34)) : ''}</small><em class="reg-razon">${e(r.razon || '')}</em>`
+            : `<b>Sin salida que regularice</b><small>No hay una salida de este producto en ${e(REG_SEDE[s.sd] || s.sd)} en los 60 días siguientes</small>`}</span>
           <span class="reg-est ${s.est}">${ESTX[s.est][1]}</span></div>`; }).join('')}</div>`; }).join('')
     + (G.length > REG_UI.tope ? `<button type="button" class="reg-mas" data-regmas="1">Ver ${appN(Math.min(30, G.length - REG_UI.tope))} guías más de ${appN(G.length - REG_UI.tope)}</button>` : ''); }
 function regFiltrar(L){ const q = crtNorm(REG_UI.q.trim());
