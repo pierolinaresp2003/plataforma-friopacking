@@ -17017,7 +17017,7 @@ function appLanzador(forzar){
       appNavAtras = true; try{ if(v !== APP.vista) appElegirVista(v); else appInicio(); } finally{ appNavAtras = false; }
       APP_NAV.push({ lz:1 });
       setTimeout(function(){ el.classList.remove('abierto', 'fuera', 'pz-ya'); b.classList.remove('pulsado'); el._yendo = false; }, 180); }); }
-  const ext = { gerencial:'Resumen de todo Logística: cada persona, sus números y su Daily', compras:'OC, pendientes, importaciones, gasto y Daily', almacen:'Recepción, despacho, inventario, OTIF y Daily', super:'Trazabilidad de requerimientos y consulta de stock por producto', frioteam:'Stock por sede y kardex' };
+  const ext = { gerencial:'Resumen de todo Logística: cada persona, sus números y su Daily', compras:'OC, pendientes, importaciones, gasto y Daily', almacen:'Seguimiento de requerimientos, reservas e inventario', super:'Trazabilidad de requerimientos y consulta de stock por producto', frioteam:'Stock por sede y kardex' };
   // Portada nueva (11.11.2026, Piero: "todo más simple y que vaya al grano"): saludo, una línea con lo importante de hoy y cada
   // módulo con sus 2 números clave a la derecha. Blanca, sin emojis y con íconos de línea.
   const sv = function(d){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`; };
@@ -17028,9 +17028,9 @@ function appLanzador(forzar){
   const go = sv('<path d="M9 5l7 7-7 7"/>');
   const fecha0 = new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long' }), fecha = fecha0.charAt(0).toUpperCase() + fecha0.slice(1);
   const sal = appSaludo().split(', '), correo = APP.usuario && APP.usuario.correo ? APP.usuario.correo : '', R = pzResumen();
-  const fila = function(k, i, grupo){ const v = APP_VISTAS[k] || { nombre:'Logística' }, n = (R && R[k]) || [];
+  const fila = function(k, i, grupo){ const v = APP_VISTAS[k] || { nombre:'Logística' };
     return `<button type="button" class="pz-mod pz-${k}" ${grupo ? 'data-lzgrupo="1"' : `data-lzv="${k}"`} style="--i:${i}"><span class="pz-ic">${ico[k] || ''}</span><span class="pz-tx"><b>${escapeHtml(v.nombre)}</b><span>${escapeHtml(ext[k] || v.desc || 'Compras, Almacén y Supervisor')}</span></span>
-      <span class="pz-nums">${n.map(function(x){ return `<span class="pz-n ${x[2] || ''}"><b>${appN(x[0])}</b><small>${escapeHtml(x[1])}</small></span>`; }).join('')}</span><span class="pz-go">${go}</span></button>`; };
+      <span class="pz-go">${go}</span></button>`; };
   // Gerencia (15.10.2026, Piero): primero Gerencial y abajo "Logística", que abre Compras, Almacén y Supervisor.
   const resto = vs.filter(function(k){ return k !== 'gerencial'; });
   const filas = vs.indexOf('gerencial') !== -1 && resto.length
