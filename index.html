@@ -15090,7 +15090,7 @@ function rqVistaTarjetas(cont, filas){
   const listosHtml = (listos.length ? `<details class="rqm-listos" id="rqListos"><summary>✅ Ya se envió a obra · ${listos.length} ítem${listos.length === 1 ? '' : 's'}</summary><div></div></details>` : '')
     + (archivados.length ? `<details class="rqm-listos arch" id="rqArch"><summary>🗄️ Archivados · ${archivados.length} ítem${archivados.length === 1 ? '' : 's'}</summary><div>${archivados.map(function(r, k){ return tarjeta(r, ver.length + listosVer.length + k); }).join('')}</div></details>` : '');
   const nada = soloFalta && !orden.length ? '<div class="rqm-tip">✅ No falta nada: todo lo pedido ya llegó a obra.</div>' : '';
-  cont.innerHTML = `<div class="rqm">${cab}${orden.length ? '' : nada}${tarjetas && unSoloReq && APP.vista === 'almacen' ? rqAtnHtml(ver) : ''}${tarjetas ? rqCabFilas() : ''}${tarjetas}${listosHtml}</div>` + rqMasHtml(ver.length, orden.length, soloFalta ? 'ítems por llegar' : 'ítems', 30);
+  cont.innerHTML = `<div class="rqm">${cab}${orden.length ? '' : nada}${tarjetas && unSoloReq && appVeAlmRq() ? rqAtnHtml(ver) : ''}${tarjetas ? rqCabFilas() : ''}${tarjetas}${listosHtml}</div>` + rqMasHtml(ver.length, orden.length, soloFalta ? 'ítems por llegar' : 'ítems', 30);
   rqEngancharMas();
   const det = document.getElementById('rqListos');
   if(det) det.addEventListener('toggle', function(){
@@ -15673,7 +15673,7 @@ document.addEventListener('click', function(e){
   const b = e.target.closest ? e.target.closest('[data-rqstock]') : null;
   if(b){ rqAbrirStock(b); return; }
   const rp = e.target.closest ? e.target.closest('[data-reqpdf]') : null;
-  if(rp){ if(APP.vista === 'almacen') rqHojaPdf(rp.dataset.reqpdf); else rqPdfNativo(rp.dataset.reqpdf); return; }
+  if(rp){ if(appVeAlmRq()) rqHojaPdf(rp.dataset.reqpdf); else rqPdfNativo(rp.dataset.reqpdf); return; }
   // Volver a la pantalla de la que se vino (14.10.2026, Piero: "falta una opción para retroceder").
   if(e.target.closest && e.target.closest('[data-rqvolver]')){ if(!appNavVolver()) appInicio(APP.vista === 'super' ? 'supreq' : undefined); return; }
   const rpd = e.target.closest && e.target.closest('[data-rqped]'); if(rpd){ rqPedAbrir(rpd.dataset.rqped); return; }
@@ -16540,7 +16540,7 @@ const APP_VISTAS = {
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
   super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
     // Inventario (stock por sede y kardex) se suma al Supervisor (09.11.2026, Piero).
-    tabs:[['suppry','🏗️','Proyectos'], ['supreq','📋','Requerimientos'], ['polar'], ['inventario','📦','Inventario']] },   // Producto se quitó de Supervisor (12.11.2026, Piero)   // + Proyectos (11.11.2026, Piero)   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
+    tabs:[['suppry','🏗️','Proyectos'], ['supreq','📋','Requerimientos'], ['almrsv','🔒','Reservas'], ['polar'], ['inventario','📦','Inventario']] },   // Reservas solo para ver (13.11.2026)   // Producto se quitó de Supervisor (12.11.2026, Piero)   // + Proyectos (11.11.2026, Piero)   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
   // Gerencial (15.10.2026, Piero: "kalegria, mlujan y apl no deben tener Compras ni Almacén sino un módulo gerencial con
   // el resumen de todo Logística, con las fotos, para ver en un pantallazo lo que hace cada uno y darle seguimiento").
   gerencial:  { nombre:'Gerencial',  ico:'📈', desc:'Resumen de todo Logística: qué hace cada uno en Compras, Comex y Almacén.',
@@ -17401,7 +17401,7 @@ function appInicio(pantalla){
   // Importaciones vuelve a ser su propio módulo (19.10.2026, Piero: "todo lo que son importaciones ponlo en otro módulo").
   if(APP.vista === 'compras' && pantalla === 'indicadores'){ APP_PC.persona = pdPersona(APP_F.indicadores.persona) || ''; pantalla = 'pendcompras'; }   // Reportes vive dentro de Compras (19.10.2026)
   if(APP.vista === 'almacen' && (pantalla === 'indicadores' || pantalla === 'almrep' || pantalla === 'otif')) pantalla = 'almseg';   // viven en Seguimiento (20.10.2026)
-  if(APP.vista === 'super' && ['inventario', 'supreq', 'suppry'].indexOf(pantalla) === -1) pantalla = 'suppry';   // Proyectos primero (11.11.2026, Piero)
+  if(APP.vista === 'super' && ['inventario', 'supreq', 'suppry', 'almrsv'].indexOf(pantalla) === -1) pantalla = 'suppry';   // Proyectos primero (11.11.2026, Piero)
   if((APP.vista === 'compras' || APP.vista === 'almacen') && (!pantalla || pantalla === 'inicio' || pantalla === 'daily')) pantalla = APP.vista === 'compras' ? 'pendcompras' : 'almseg';   // el Daily está en Gerencial (09.11.2026)
   if(!(APP.enInicio && APP.pantalla === (APP_PANTALLAS[pantalla] ? pantalla : 'inicio'))) appNavPush();
   if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(undefined, true); APP.entrada = false; return; }
@@ -19197,6 +19197,8 @@ function supPasoEstado(items, k){
   if(idx.some(function(x){ return x === k; })) return 'act';
   return idx.every(function(x){ return x > k; }) ? 'ok' : '';
 }
+// Requerimientos como en Almacén también para Supervisor, solo para ver (13.11.2026, Piero: "que puedan solo ver las cosas, pero no editar")
+function appVeAlmRq(){ return APP.vista === 'almacen' || APP.vista === 'super'; }
 function supEsSupervisor(){ return !!(APP.usuario && APP.usuario.tipo === 'supervisor'); }
 // El supervisor ve los req. de todos y con un toque solo los suyos (14.10.2026, Piero: "que los supervisores puedan
 // consultar los de todos y que además tengan una opción simple para que vean sus requerimientos").
@@ -19236,7 +19238,7 @@ function supFiltrados(sinQ){
 function supEstReq(g){ return g.n.arch === g.items.length ? 'arch' : g.tot > 0 && g.ok >= g.tot ? 'fin' : ''; }
 // Req. ya trabajados = con reservas activas (13.11.2026, Piero: "un candado para saber que ya se trabajó, y también en un ícono aparte arriba")
 function supRsvMapa(){ return appMemo('supRsv' + RES.v + '|' + (RQ.filas || []).length, function(){ const M = new Map(); RES.l.forEach(function(z){ if(resPend(resFila(z))) M.set(z.req, (M.get(z.req) || 0) + 1); }); return M; }); }
-function supCardsDe(l){ if(APP.vista !== 'almacen') return l; if(APP_SUP.fin === 'rsv'){ const M = supRsvMapa(); return l.filter(function(g){ return M.has(g.cod) && supEstReq(g) !== 'arch'; }); } return l.filter(function(g){ return supEstReq(g) === (APP_SUP.fin || ''); }); }
+function supCardsDe(l){ if(!appVeAlmRq()) return l; if(APP_SUP.fin === 'rsv'){ const M = supRsvMapa(); return l.filter(function(g){ return M.has(g.cod) && supEstReq(g) !== 'arch'; }); } return l.filter(function(g){ return supEstReq(g) === (APP_SUP.fin || ''); }); }
 const SUP_FIN_TXT = { fin:'finalizados', arch:'archivados', rsv:'reservados' };
 function supConPaso(l){ return APP_SUP.paso ? l.filter(function(g){ return g.n[APP_SUP.paso] > 0; }) : l; }
 // Sugerencias mientras se escribe el cliente o el proyecto.
@@ -19257,7 +19259,7 @@ function supCard(g){
   const dots = !g.tot ? '<span class="sup-c2-fin">Archivado</span>' : !nPend ? '<span class="sup-c2-fin ok">Todo en obra</span>'
     : SUP_PASOS.filter(function(p){ return g.n[p[0]] && p[0] !== 'obra'; }).map(function(p){ return `<i class="${K[p[0]][0]}" title="${g.n[p[0]]} en ${p[2]}">${g.n[p[0]]}<em>${K[p[0]][1]}</em></i>`; }).join('');
   return `<div class="sup-card sup-c2" data-clic="1" data-req="${e(g.cod)}" title="Ver el detalle del requerimiento">${pmDona(g.pct, 58, 11)}
-    <div class="sup-c2-t"><div class="sup-c2-h"><b>Req. ${e(g.cod.replace(/^000\d-0*/, ''))}${APP.vista === 'almacen' && supRsvMapa().has(g.cod) ? ` <i class="sup-c2-lk" title="Ya trabajado: ${supRsvMapa().get(g.cod)} reserva${supRsvMapa().get(g.cod) === 1 ? '' : 's'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>${supRsvMapa().get(g.cod)}</i>` : ''}</b><span>${rqFecha(g.f)}</span></div>
+    <div class="sup-c2-t"><div class="sup-c2-h"><b>Req. ${e(g.cod.replace(/^000\d-0*/, ''))}${appVeAlmRq() && supRsvMapa().has(g.cod) ? ` <i class="sup-c2-lk" title="Ya trabajado: ${supRsvMapa().get(g.cod)} reserva${supRsvMapa().get(g.cod) === 1 ? '' : 's'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>${supRsvMapa().get(g.cod)}</i>` : ''}</b><span>${rqFecha(g.f)}</span></div>
       <span class="sup-c2-cli">${e(polarCorta(g.cli, 48))}${g.id && !/^SIN PROYECTO/i.test(g.id) ? ` <em>${e(g.id)}</em>` : ''}</span>
       ${g.obs ? `<small class="sup-c2-o">${e(polarCorta(g.obs, 110))}</small>` : ''}${sup ? '' : `<small class="sup-c2-r">${e(titleCase(polarCorta(g.resp, 40)))}</small>`}
       <div class="sup-c2-d">${dots}<span class="sup-c2-n">${appN(g.ok)}/${appN(g.tot)} en obra</span></div></div></div>`;
@@ -19274,24 +19276,24 @@ function supResumenHtml(l){
   return `<div class="sup-res pmx-head sup-head${pryFondo(APP_SUP.pry, APP_SUP.cli)}"><div class="pmx-dona">${pmDona(pct, 120, 10, 'atendido')}<span class="pmx-dona-n"><b>${appN(itemsOk)}</b> de ${appN(itemsTot)} ítems</span></div>
     <div class="pmx-meta"><h2>${cliLogo(APP_SUP.cli || (pryInfo(APP_SUP.pry) || {}).cl)}${e(polarCorta(tit, 50))}</h2><p>${e(polarCorta(sub, 60))}</p>
       <dl><div><dt>Requerimientos</dt><dd>${appN(l.length)}</dd></div><div><dt>Con pendientes</dt><dd>${appN(pend)}</dd></div><div><dt>Ítems por llegar</dt><dd>${appN(itemsTot - itemsOk)}</dd></div></dl>
-      ${APP_SUP.fin && APP.vista === 'almacen' ? `<div class="sup-fil-on"><span class="pmf-fil ok">Mostrando ${SUP_FIN_TXT[APP_SUP.fin]} <button type="button" data-supfin="${APP_SUP.fin}" aria-label="Quitar filtro">×</button></span></div>` : ''}
+      ${APP_SUP.fin && appVeAlmRq() ? `<div class="sup-fil-on"><span class="pmf-fil ok">Mostrando ${SUP_FIN_TXT[APP_SUP.fin]} <button type="button" data-supfin="${APP_SUP.fin}" aria-label="Quitar filtro">×</button></span></div>` : ''}
       ${sel ? `<div class="sup-fil-on"><span class="pmf-fil ${K[sel[0]][0]}">Req. con ítems ${K[sel[0]][1]} <button type="button" data-suppaso="${sel[0]}" aria-label="Quitar filtro">×</button></span></div>` : ''}</div><div></div>
     <div class="rqx-der">${(function(){ const C = []; l.forEach(function(g){ g.items.forEach(function(r){ if(rqPasaCompras(r)) C.push(r); }); }); supResumenHtml._comp = C;
-      const nF = APP.vista === 'almacen' ? l.filter(function(g){ return supEstReq(g) === 'fin'; }).length : 0, nA = APP.vista === 'almacen' ? l.filter(function(g){ return supEstReq(g) === 'arch'; }).length : 0, MR = supRsvMapa(), nR = APP.vista === 'almacen' ? l.filter(function(g){ return MR.has(g.cod) && supEstReq(g) !== 'arch'; }).length : 0;
-      const fa = APP.vista === 'almacen' ? `<button type="button" class="rqm-ico pmx-ico supfin${APP_SUP.fin === 'fin' ? ' on' : ''}" data-supfin="fin" title="Requerimientos finalizados: todo ya está en obra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><b>${appN(nF)}</b><small>finalizados</small></button><button type="button" class="rqm-ico pmx-ico supfin arch${APP_SUP.fin === 'arch' ? ' on' : ''}" data-supfin="arch" title="Requerimientos archivados"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg><b>${appN(nA)}</b><small>archivados</small></button><button type="button" class="rqm-ico pmx-ico supfin rsv${APP_SUP.fin === 'rsv' ? ' on' : ''}" data-supfin="rsv" title="Requerimientos ya trabajados: tienen reservas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><b>${appN(nR)}</b><small>reservados</small></button>` : '';
+      const nF = appVeAlmRq() ? l.filter(function(g){ return supEstReq(g) === 'fin'; }).length : 0, nA = appVeAlmRq() ? l.filter(function(g){ return supEstReq(g) === 'arch'; }).length : 0, MR = supRsvMapa(), nR = appVeAlmRq() ? l.filter(function(g){ return MR.has(g.cod) && supEstReq(g) !== 'arch'; }).length : 0;
+      const fa = appVeAlmRq() ? `<button type="button" class="rqm-ico pmx-ico supfin${APP_SUP.fin === 'fin' ? ' on' : ''}" data-supfin="fin" title="Requerimientos finalizados: todo ya está en obra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><b>${appN(nF)}</b><small>finalizados</small></button><button type="button" class="rqm-ico pmx-ico supfin arch${APP_SUP.fin === 'arch' ? ' on' : ''}" data-supfin="arch" title="Requerimientos archivados"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg><b>${appN(nA)}</b><small>archivados</small></button><button type="button" class="rqm-ico pmx-ico supfin rsv${APP_SUP.fin === 'rsv' ? ' on' : ''}" data-supfin="rsv" title="Requerimientos ya trabajados: tienen reservas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><b>${appN(nR)}</b><small>reservados</small></button>` : '';
       return C.length || fa ? `<div class="rqx-exp">${fa}${C.length ? `<button type="button" class="rqm-ico pmx-ico comp" data-supcomp="1" title="Ítems en revisión sin stock libre en Lurín: deberían pasar a Compras" aria-label="Para Compras">${RQ_SVG_CARRO}<span class="cmp-t"><span><b>${appN(C.length)} SKU</b> para compra</span><small>en ${appN(new Set(C.map(function(r){ return r.codRequerimiento; })).size)} requerimiento${new Set(C.map(function(r){ return r.codRequerimiento; })).size === 1 ? '' : 's'}</small></span></button>` : ''}</div>` : ''; })()}<div class="pmx-ks">${SUP_PASOS.map(function(p){ const n = l.reduce(function(a, g){ return a + g.n[p[0]]; }, 0);
       return `<button type="button" class="pmx-k ${n ? K[p[0]][0] : ''}${APP_SUP.paso === p[0] ? ' sel' : ''}" data-suppaso="${p[0]}" title="Ver los req. con ítems ${K[p[0]][1]}"><b>${appN(n)}</b><small>${K[p[0]][1]}</small></button>`; }).join('')}</div></div></div>`;
 }
 document.addEventListener('click', function(ev){ if(ev.target.closest && ev.target.closest('[data-supcomp]')) rqComprasLista(supResumenHtml._comp || []); });
 // Con un paso elegido (p. ej. "en almacén") la lista muestra los SKU de ese paso, no las tarjetas de req. (12.11.2026, Piero)
 // Almacén (13.11.2026, Piero): filtrar lo pendiente por cómo se atiende: con stock (Lurín, Trujillo o Ica), OC en camino o para Compras.
-function supSk(){ return APP.vista === 'almacen' ? APP_SUP.sk : ''; }
+function supSk(){ return appVeAlmRq() ? APP_SUP.sk : ''; }
 function supSkCat(r){ const c = rqSkDe(r, supPaso(r)).skc; return c === 'ok' || c === 'par' || c === 'sede' ? 'stock' : c === 'cam' || c === 'comp' ? c : ''; }
 function supSkChips(l){ const n = { stock:0, cam:0, comp:0 }; l.forEach(function(g){ g.items.forEach(function(r){ const p = supPaso(r); if(p === 'rev' || p === 'com'){ const c = supSkCat(r); if(c) n[c]++; } }); });
   return `<div class="sup-skc"><span>Atención</span>${[['stock', 'Con stock', RQ_SVG_CAJA], ['cam', 'OC en camino', RQ_SVG_CAMION], ['comp', 'Para Compras', RQ_SVG_CARRO]].map(function(o){ return `<button type="button" class="${o[0]}${APP_SUP.sk === o[0] ? ' on' : ''}" data-supsk="${o[0]}">${o[2]}${o[1]}<b>${appN(n[o[0]])}</b></button>`; }).join('')}</div>`; }
 function supSkuItems(l){ const k = APP_SUP.paso, c = supSk(), L = []; l.forEach(function(g){ g.items.forEach(function(r){ const p = supPaso(r); if(k ? p !== k : !(p === 'rev' || p === 'com')) return; if(c && supSkCat(r) !== c) return; L.push(r); }); });
   // En Almacén, del más reciente al más antiguo (13.11.2026, Piero); en Supervisor sigue del más antiguo al más reciente
-  const rec = APP.vista === 'almacen' ? -1 : 1;
+  const rec = appVeAlmRq() ? -1 : 1;
   return L.sort(function(a, b){ return rec * ((a.fReq || 0) - (b.fReq || 0)) || rec * String(a.codRequerimiento).localeCompare(String(b.codRequerimiento)); }); }
 function supSkuFilas(L, desde, n){ const cr = APP_SUP.cli || APP_SUP.pry ? 1 : 2; return L.slice(desde, desde + n).map(function(r, i){ return rqFilaHtml(r, desde + i, cr); }).join(''); }
 function appSupMas(){
@@ -20271,7 +20273,7 @@ function appSupReqHtml(){
     <div class="sup-fil">${ac('cli', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>', 'Cliente', APP_SUP.cli)}${ac('pry', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>', 'PRY o proyecto', pryTxt)}</div>
     ${supResumenHtml(l0)}
     <div class="m-buscar pc-buscar-gen"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}">${INV_XLS_BTN.replace('data-invxls="1"', 'data-supxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el estado de los productos de lo filtrado')}</div>
-    ${APP.vista === 'almacen' ? supSkChips(l) : ''}
+    ${appVeAlmRq() ? supSkChips(l) : ''}
     <div id="supLista">${APP_SUP.paso || supSk() ? (function(){ const L = supSkuItems(l); return `<div class="rqm rqm-lista sup-sku">${rqCabFilas()}${supSkuFilas(L, 0, 40)}</div>${L.length > 40 ? '<div class="sup-mas" id="supMas"></div>' : ''}`; })()
       : (function(){ const lc = supCardsDe(l); return lc.slice(0, n0).map(supCard).join('') + (lc.length > n0 ? '<div class="sup-mas" id="supMas"></div>' : '') + (lc.length ? '' : `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : APP_SUP.fin ? 'No hay requerimientos ' + SUP_FIN_TXT[APP_SUP.fin] + ' con ese filtro.' : 'No hay requerimientos pendientes con ese filtro.'}</div></div>`); })()}</div></div>`;
 }
