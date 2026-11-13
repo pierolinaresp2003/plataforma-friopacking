@@ -24449,7 +24449,7 @@ const GD_FRENTES = {
     vistas:[['eco', 'coins', 'Desempeño económico'], ['proc', 'clock', 'Eficiencia del proceso'], ['prov', 'shield', 'Proveedores'], ['flujo', 'trend', 'Flujo de pedidos'], ['tab', 'grid', 'Tablas mes a mes']],
     tablas:[['gabas|flujo', 'Flujo de pedidos'], ['gabas|tiempos', 'Tiempos del proceso'], ['gabas|entregas', 'Entrega de OC'], ['ggas|familia', 'Gasto por familia'], ['ggas|origen', 'Nacional e importado'], ['ggas|prov', 'Por proveedor']] },
   gdalm:{ n:'Almacén', ico:'box', ey:'Almacén', foto:'almacen', resp:'Almacén',
-    vistas:[['ctl', 'shield', 'Control de inventario'], ['mov', 'box', 'Recepción y despacho'], ['tie', 'clock', 'Tiempos de Almacén'], ['inv', 'grid', 'Stock sin rotación'], ['dev', 'box', 'Devoluciones de proyectos'], ['tab', 'list', 'Tablas mes a mes']], tablas:[['galm|mov', 'Recepción y despacho'], ['galm|tiempos', 'Tiempos de Almacén']] },
+    vistas:[['ctl', 'shield', 'Control de inventario'], ['mov', 'box', 'Recepción y despacho'], ['tie', 'clock', 'Tiempos de Almacén'], ['rsv', 'check', 'Reservas y validación'], ['inv', 'grid', 'Stock sin rotación'], ['dev', 'box', 'Devoluciones de proyectos'], ['tab', 'list', 'Tablas mes a mes']], tablas:[['galm|mov', 'Recepción y despacho'], ['galm|tiempos', 'Tiempos de Almacén']] },
   gdcex:{ n:'Comercio exterior', ico:'globe', ey:'Comercio exterior', foto:'comercio-exterior', resp:'Comex',
     vistas:[['emb', 'globe', 'Seguimiento de embarques'], ['tab', 'list', 'Tablas mes a mes']], tablas:[['gabas|imp', 'Importaciones']] } };
 // ---- Período ----
@@ -24927,6 +24927,27 @@ function gdHistDias(L, cortes){ cortes = cortes || [[0, 2, '0–2 d'], [3, 5, '3
   const v = cortes.map(function(c){ return { n:c[2], v:0, c:c[0] > 10 ? 'mal' : c[0] > 5 ? 'ojo' : '' }; }); L.forEach(function(x){ const d = gdDiasDe(x); if(d == null) return; const i = cortes.findIndex(function(c){ return d >= c[0] && d <= c[1]; }); if(i !== -1) v[i].v++; });
   return v; }
 // ---- Pestañas de cada frente ----
+// ---- Reservas y validación (13.11.2026, Piero: "cuantificar cuántos requerimientos se atienden por día vs cuántos se validan con este nuevo
+// formato"): por día, req. atendidos en Nisira (salida o pedido) · req. trabajados en la app (reservas) · req. validados por un operario ----
+const GDR = { l:null, cargando:false, err:'' };
+async function gdRsvCargar(){ if(GDR.l || GDR.cargando) return; if(!sbSesion()){ GDR.err = 'login'; return; } GDR.cargando = true; GDR.err = '';
+  try{ const L = []; for(let o = 0; o < 50000; o += 1000){ const r = await sbFetch('/rest/v1/fp_reservas?select=req,cantidad,sede,creado,estado,val_estado,val_en,val_nombre&order=id.asc', { headers:{ 'Range-Unit':'items', Range:o + '-' + (o + 999) } });
+      if(!r.ok) throw new Error('No pude leer las reservas (' + r.status + ').'); const j = await r.json(); L.push.apply(L, j); if(j.length < 1000) break; }
+    GDR.l = L; }catch(err){ GDR.err = err.message || String(err); GDR.l = []; }
+  GDR.cargando = false; if(APP.enInicio && APP.pantalla === 'gdalm') appRenderInicio(); }
+function gdDiaLima(ts){ const t = new Date(ts).getTime(); return isNaN(t) ? '' : new Date(t - 5 * 3600e3).toISOString().slice(0, 10); }   // Perú: UTC−5, sin horario de verano
+function gdRsvDatos(){ const Lr = GDR.l || [], hoy = gdDiaLima(Date.now()), corte = isoDay(appIndCorte()), dia = function(s, k){ const d = new Date(Date.parse(s + 'T00:00:00Z') + k * 864e5); return d.toISOString().slice(0, 10); };
+  const D = []; for(let d = dia(hoy, -29); d <= hoy; d = dia(d, 1)) D.push(d);   // últimos 30 días: Nisira da el contexto aunque el nuevo formato sea reciente
+  const S = function(){ const M = new Map(); D.forEach(function(d){ M.set(d, new Set()); }); return M; }, nis = S(), tra = S(), val = S(), nRes = new Map(), nVal = new Map(), porOp = new Map(), reqT = new Set(), reqV = new Set(), horas = [];
+  (RQ.filas || []).forEach(function(r){ [r.fSalida, r.fPedido].forEach(function(f){ const d = f ? isoDay(f) : ''; if(nis.has(d)) nis.get(d).add(r.codRequerimiento); }); });
+  Lr.forEach(function(z){ const dc = gdDiaLima(z.creado); if(tra.has(dc)){ tra.get(dc).add(z.req); nRes.set(dc, (nRes.get(dc) || 0) + 1); if(z.sede !== 'En camino') reqT.add(z.req); }
+    if(z.val_estado === 'ok' || z.val_estado === 'obs'){ const dv = gdDiaLima(z.val_en); if(val.has(dv)){ val.get(dv).add(z.req); nVal.set(dv, (nVal.get(dv) || 0) + 1); reqV.add(z.req);
+        const op = titleCase(String(z.val_nombre || '—').split(' ').slice(0, 2).join(' ')), o = porOp.get(op) || { r:new Set(), n:0 }; o.r.add(z.req); o.n++; porOp.set(op, o); }
+      const h = (new Date(z.val_en) - new Date(z.creado)) / 36e5; if(h >= 0 && h < 24 * 60) horas.push(h); } });
+  const conNis = D.filter(function(d){ return d <= corte && nis.get(d).size; });   // promedio por día con atención (sin domingos ni feriados)
+  return { D:D, hoy:hoy, corte:corte, nis:nis, tra:tra, val:val, nRes:nRes, nVal:nVal, porOp:porOp, reqT:reqT, reqV:reqV, horas:horas,
+    nisProm:conNis.length ? conNis.reduce(function(a, d){ return a + nis.get(d).size; }, 0) / conNis.length : null,
+    pend:Lr.filter(function(z){ return z.estado === 'activa' && z.sede !== 'En camino' && (z.val_estado || 'pendiente') === 'pendiente'; }).length }; }
 const GD_TABS = {
   gdcom:{
     eco:['coins', 'Desempeño económico', function(P){ const y = P.M.y, a = gdVal('gas', P.A), a0 = gdVal('gas', P.A0), m = gdVal('gas', P.M), mp = gdVal('gas', P.P), G = gxGasto(P.A.desde, P.A.hasta), imp = (G.org.get('Importado') || { v:0 }).v;
@@ -25000,6 +25021,19 @@ const GD_TABS = {
         cuerpo:`<div class="gd-g2">${gdPan('Requerimientos e ítems, mes a mes', 'Barras: ítems requeridos · línea: ítems atendidos de stock', rptCombo('gdreq1', W, { w:640, h:250, alt:'Requerimientos', bars:[{ k:'i', n:'Ítems requeridos', c:'var(--gd-l)', v:S.map(function(o){ return o.reqI.length; }) }], lines:[{ k:'s', n:'Atendidos de stock', c:'var(--gd-b)', v:S.map(function(o){ return o.stock.length; }) }] }), 'ancho')}
           ${gdPan('Antigüedad de lo abierto', 'Días hábiles desde el requerimiento · ' + appN(q.revI) + ' ítems todavía en revisión', gdTramos(tr, ab.length, 'ítems'))}</div>` }; }] },
   gdalm:{
+    rsv:['check', 'Reservas y validación', function(P){ gdRsvCargar(); if(!RQ.filas.length) rqPreparar(); const e = escapeHtml;
+      if(GDR.err === 'login') return { h1:'Reservas y validación', cards:'', cuerpo:'<div class="gd-vacio">Entra con tu usuario de la plataforma para ver las reservas.</div>' };
+      if(!GDR.l) return { h1:'Reservas y validación', cards:'', cuerpo:'<div class="gd-vacio">⏳ Cargando las reservas…</div>' };
+      const X = gdRsvDatos(), fmtD = function(d){ return rqFecha(new Date(d + 'T00:00:00Z')); }, nT = X.reqT.size, nV = [...X.reqT].filter(function(q){ return X.reqV.has(q); }).length, pc = nT ? Math.round(nV / nT * 100) : null;
+      const hProm = X.horas.length ? X.horas.reduce(function(a, b){ return a + b; }, 0) / X.horas.length : null, hTxt = hProm == null ? '—' : hProm < 1 ? Math.round(hProm * 60) + ' min' : appN(hProm, 1) + ' h';
+      const totT = X.D.reduce(function(a, d){ return a + X.tra.get(d).size; }, 0), diasT = X.D.filter(function(d){ return X.tra.get(d).size; }).length;
+      const W = X.D.map(function(d){ return { etq:d.slice(8) + '/' + d.slice(5, 7), dia:fmtD(d), parcial:d === X.hoy }; });
+      const ops = [...X.porOp.entries()].map(function(o){ return { n:o[0], v:o[1].r.size, t:appN(o[1].n) + ' reservas validadas' }; }).sort(function(a, b){ return b.v - a.v; });
+      return { h1:'Requerimientos: <em>' + (X.nisProm == null ? '—' : appN(X.nisProm, 1)) + '</em> atendidos por día en Nisira · ' + appN(nT) + ' trabajados en la app · <em>' + (pc == null ? '—' : pc + '%') + '</em> validados',
+        cards:gdBig('Atendidos por día · Nisira', X.nisProm == null ? '—' : appN(X.nisProm, 1), 'req. con salida o pedido, promedio por día laborable · datos al ' + e(fmtD(X.corte))) + gdBig('Trabajados en la app', appN(nT), 'req. con reservas · ' + (diasT ? appN(totT / diasT, 1) + ' por día con registro' : 'sin registros aún')) + gdBig('Validados por operario', pc == null ? '—' : pc + '%', appN(nV) + ' de ' + appN(nT) + ' req. · VB en ' + hTxt + ' en promedio · ' + appN(X.pend) + ' reservas por validar'),
+        cuerpo:`<div class="gd-g2">${gdPan('Requerimientos por día', 'Atendidos en Nisira vs trabajados y validados con el nuevo formato · últimos 30 días', rptCombo('gdrsv1', W, { w:640, h:250, alt:'Requerimientos por día', bars:[{ k:'nis', n:'Atendidos en Nisira', c:'#9aa7b8', v:X.D.map(function(d){ return d <= X.corte ? X.nis.get(d).size : null; }) }, { k:'tra', n:'Trabajados en la app', c:'var(--gd-b)', v:X.D.map(function(d){ return X.tra.get(d).size; }) }, { k:'val', n:'Validados por operario', c:'#15803d', v:X.D.map(function(d){ return X.val.get(d).size; }) }] }), 'ancho')}
+          ${gdPan('Validaciones por operario', 'Requerimientos con VB en el período', ops.length ? gdBarrasH(ops, function(v){ return appN(v) + ' req.'; }) : '<div class="gd-vacio">Todavía no hay validaciones.</div>')}</div>
+          ${gdPan('Detalle por día', 'Requerimientos distintos · Nisira solo hasta el ' + e(fmtD(X.corte)) + ' (última carga)', gdTabla(['Día', 'Atendidos en Nisira', 'Trabajados en la app', 'Reservas', 'Validados', 'Validaciones'], X.D.slice().reverse().filter(function(d){ return (d <= X.corte && X.nis.get(d).size) || X.tra.get(d).size || X.val.get(d).size; }).map(function(d){ return ['<b>' + e(fmtD(d)) + '</b>', d <= X.corte ? appN(X.nis.get(d).size) : '—', appN(X.tra.get(d).size), appN(X.nRes.get(d) || 0), appN(X.val.get(d).size), appN(X.nVal.get(d) || 0)]; }), [1, 2, 3, 4, 5]))}` }; }],
     mov:['box', 'Recepción y despacho', function(P){ const S = P.serie.map(function(x){ return gxAlm(x.desde, x.hasta); }), A = gxAlm(P.M.desde, P.M.hasta), W = gdW(P), sedes = ['CD Lurín', 'CD Ica', 'CD Trujillo'];
       const sd = sedes.map(function(s){ const i = A.sede[s + '|i'], o = A.sede[s + '|s']; return { n:s, i:i ? i.size : 0, o:o ? o.size : 0 }; });
       return { h1:appN(A.grr.size) + ' guías de salida y ' + appN(A.grc.size) + ' de recepción en ' + escapeHtml(P.M.nom),
