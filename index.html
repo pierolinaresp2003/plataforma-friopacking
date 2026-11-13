@@ -15370,8 +15370,10 @@ function caminoLibre(){
 }
 // Lo libre en camino de un código (y de sus códigos homologados).
 function caminoLibreDe(codigo){
+  const I = appMemo('caminoIdx', function(){ const M = new Map(); caminoLibre().forEach(function(y){ if(!M.has(y.cod)) M.set(y.cod, []); M.get(y.cod).push(y); }); return M; });   // índice (13.11.2026, velocidad)
   const p = rqStockDe(codigo), cods = p && p.codigos && p.codigos.length ? p.codigos : [codigo];
-  return caminoLibre().filter(function(y){ return cods.indexOf(y.cod) !== -1; });
+  if(cods.length === 1) return (I.get(cods[0]) || []).slice();
+  return caminoLibre().filter(function(y){ return cods.indexOf(y.cod) !== -1; });   // homologados: mismo orden por ETA
 }
 // Ítems pendientes de un requerimiento que podrían atenderse con stock en camino sin REQ.
 function rqCruceLibre(filas){
@@ -18390,6 +18392,7 @@ function appPrecalentar(){ const sig = (APP.vista || '') + '|' + (RQ.filas || []
   if(v === 'super' || v === 'gerencia' || v === 'gerencial') T.push(function(){ pmDatos(); });
   if(v !== 'compras' && v !== 'gerencia') T.push(function(){ appInvIndice(); invFamResumen(); });
   if(v === 'compras') T.push(function(){ if(GASTO_DATA && GASTO_DATA.rows) cqDatos(y); }, function(){ if(GASTO_DATA && GASTO_DATA.rows) cqDatos(y - 1); });
+  if(v === 'almacen') T.push(function(){ supRsvMapa(); }, function(){ regDatos(); });
   let i = 0; (function paso(){ ric(function(){ if(appPrecalentar._s !== sig) return; try{ T[i](); }catch(e){} i++; if(i < T.length) paso(); }, { timeout:4000 }); })(); }
 function appRenderInicio(){
   const cont = document.getElementById('section-inicio');
@@ -20279,9 +20282,8 @@ function appSupReqHtml(){
   // Las demás tarjetas se agregan al acercarse al final de la lista (14.10.2026, Piero: "al retroceder desde Supervisor demora
   // un montón"): antes se metían las 3,000+ tarjetas en segundo plano y la pantalla quedaba pesadísima para todo lo demás.
   appSupObservar();
+  APP_SUP.mios = false;   // sin video ni "Todos / Mis requerimientos" (13.11.2026, Piero): se ven todos
   return `<div class="sup">
-    ${supVideoHtml()}
-    ${supEsSupervisor() ? `<div class="sup-mios"><button type="button" data-supmios="0" class="${APP_SUP.mios ? '' : 'on'}">👥 Todos</button><button type="button" data-supmios="1" class="${APP_SUP.mios ? 'on' : ''}">👷 Mis requerimientos</button></div>` : ''}
     <div class="sup-fil">${ac('cli', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>', 'Cliente', APP_SUP.cli)}${ac('pry', '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>', 'PRY o proyecto', pryTxt)}</div>
     ${supResumenHtml(l0)}
     <div class="m-buscar pc-buscar-gen"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}">${INV_XLS_BTN.replace('data-invxls="1"', 'data-supxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el estado de los productos de lo filtrado')}</div>
@@ -20751,11 +20753,21 @@ function appFirmaDatos(){
   FIRMA_ULT = v; FIRMA_TXT = v.join('|');   // sin gerAbierto (14.10.2026): abrir Reportes borraba todos los cálculos; las pantallas ya lo llevan en su llave
   return FIRMA_TXT;
 }
+// Con límite (13.11.2026, Piero: "optimiza todo el app para que no se ponga lenta"): antes se guardaba para siempre cada versión de
+// los cálculos (una por cada recarga de reservas) y cada pantalla ya armada (una por cada letra buscada), y con el uso la memoria
+// crecía y todo se ponía lento. Ahora: de los cálculos que dependen de una versión solo queda la última, de las pantallas armadas
+// las 16 más recientes, y del resto como mucho 500.
+const APP_MEMO_FAM = /^(rqFifo|resP|resIdx|resSet|supRsv|gdFlujo|caminoIdx|entregadas)/;
 function appMemo(clave, fn){
-  const f = appFirmaDatos();
-  if(f !== APP_MEMO.firma){ APP_MEMO.firma = f; APP_MEMO.m.clear(); }
-  if(APP_MEMO.m.has(clave)) return APP_MEMO.m.get(clave);
-  const v = fn(); APP_MEMO.m.set(clave, v); return v;
+  const f = appFirmaDatos(), m = APP_MEMO.m;
+  if(f !== APP_MEMO.firma){ APP_MEMO.firma = f; m.clear(); }
+  if(m.has(clave)){ const v0 = m.get(clave); if(clave.charCodeAt(0) === 104 && clave.indexOf('html:') === 0){ m.delete(clave); m.set(clave, v0); } return v0; }
+  const v = fn();
+  const fam = APP_MEMO_FAM.exec(clave); if(fam) for(const k of m.keys()){ if(k.indexOf(fam[1]) === 0 && k !== clave) m.delete(k); }
+  m.set(clave, v);
+  if(clave.indexOf('html:') === 0){ let n = 0; for(const k of m.keys()) if(k.indexOf('html:') === 0) n++; if(n > 16) for(const k of m.keys()){ if(k.indexOf('html:') === 0){ m.delete(k); if(--n <= 16) break; } } }
+  else if(m.size > 500){ let x = m.size - 400; for(const k of m.keys()){ if(k.indexOf('html:') !== 0){ m.delete(k); if(--x <= 0) break; } } }
+  return v;
 }
 function appIndDatos(f){ return appMemo('ind' + JSON.stringify(f || {}), function(){ return appIndDatosCalc(f); }); }
 function appIndDatosCalc(f){
