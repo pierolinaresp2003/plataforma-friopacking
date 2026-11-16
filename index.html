@@ -3568,19 +3568,16 @@ button.pm-lx-f{cursor:pointer;} button.pm-lx-f:hover{border-color:#b9c6d8;} .pm-
 .app-top, .app-oc .oc-cab, .oc-cab{background:linear-gradient(100deg,#123b67 0%,#0f5f86 30%,#0f7896 50%,#4d9db2 75%,#93cbc7 100%);box-shadow:0 2px 12px rgba(15,95,134,.25);}
 
 /* Leyenda del mapa de Proyectos (v360) */
-.pmm-ley{position:absolute;left:0;right:0;bottom:6px;z-index:2;display:grid;grid-template-columns:170px minmax(0,1fr) 290px;gap:0 18px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:11px 16px 12px;font-size:11.5px;color:var(--ink);box-shadow:0 14px 30px -24px rgba(16,24,40,.45);animation:pzSube .5s var(--pz-ease) both;}
-.pmm-ley-c + .pmm-ley-c{border-left:1px solid var(--border);padding-left:18px;}
+.pmm-ley{position:absolute;left:0;bottom:24px;z-index:2;width:clamp(300px, 31vw, 450px);background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 16px;font-size:12px;color:var(--ink);box-shadow:0 14px 30px -24px rgba(16,24,40,.45);animation:pzSube .5s var(--pz-ease) both;}
+.pmm-ley > b{display:block;font-size:13.5px;font-weight:800;margin-bottom:6px;} .pmm-ley-c + .pmm-ley-c{border-top:1px solid var(--border);margin-top:10px;padding-top:10px;} .pmm-ley-mp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px;} .pmm-ley-mp small{grid-column:1 / -1;}
 .pmm-ley small{display:block;margin:0 0 8px;font-size:10.5px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;}
-.pmm-ley ul.es{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px 12px;} .pmm-ley ul.al{grid-template-columns:repeat(2,minmax(0,1fr));} .pmm-ley .pmm-ley-c li{align-items:flex-start;line-height:1.3;} .pmm-ley li span b{display:block;font-size:12px;font-weight:800;color:var(--ink);}
+.pmm-ley ul.es, .pmm-ley ul.al{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 12px;} .pmm-ley .pmm-ley-c li{align-items:flex-start;line-height:1.3;} .pmm-ley li span b{display:block;font-size:12.5px;font-weight:800;color:var(--ink);}
 .pmm-ley ul.es li i{margin-top:3px;} .pmm-ley ul.al li i{margin-top:1px;}
 .pmm-ley-m{display:flex;align-items:center;gap:8px;margin:5px 0;color:var(--ink-soft);line-height:1.3;} .pmm-ley-m i.g{width:42px;height:10px;border-radius:99px;background:linear-gradient(90deg,#a7e0d2,#2fae93,#0b6e63);flex:none;}
 .pmm-ley-m i.n{width:20px;height:20px;border-radius:50%;background:#0a1e64;color:#fff;font:800 10px Inter,sans-serif;font-style:normal;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 0 0 1px #0a1e64;flex:none;}
 .pmm-ley ul{list-style:none;margin:0;padding:0;display:grid;gap:5px;} .pmm-ley li{display:flex;align-items:center;gap:8px;color:var(--ink-soft);} .pmm-ley li i{width:10px;height:10px;border-radius:50%;flex:none;}
 .pmm-ley ul.al{gap:8px;} .pmm-ley ul.al i{width:16px;height:16px;display:grid;place-items:center;color:#fff;font:900 10px Inter,sans-serif;font-style:normal;} .pmm-ley ul.al i.a{background:#f2b632;color:#8a5300;} .pmm-ley ul.al i.r{background:#d92d20;}
 .pmm.con .pmm-ley{display:none;}
-/* Leyenda horizontal debajo del mapa (16.11.2026): el mapa deja libre la franja de abajo para que no tape Ica ni Arequipa */
-@media (min-width:901px){ .pmm .pm-mapa svg{height:calc(100vh - 250px);} }
-@media (min-width:901px) and (max-width:1300px){ .pmm .pm-mapa svg{height:calc(100vh - 295px);} .pmm-ley ul.es{grid-template-columns:repeat(3,minmax(0,1fr));} .pmm-ley ul.al{grid-template-columns:1fr;} .pmm-ley{grid-template-columns:150px minmax(0,1fr) 190px;} }
 @media (max-width:900px){ .pmm-ley{display:none;} }
 
 /* Cabecera de las filas y filtro de stock (v360) */
@@ -19357,6 +19354,10 @@ function supCardsDe(l){ if(!appVeAlmRq()) return l; let r; if(APP_SUP.fin === 'r
   // Con un filtro de Atención (con stock, OC en camino, para Compras) siguen las tarjetas de req., solo las que tienen SKU que cumplen (16.11.2026, Piero)
   const sk = supSkTarj(); return sk ? r.filter(function(g){ return supSkN(g, sk) > 0; }) : r; }
 function supSkTarj(){ return APP_SUP.paso ? '' : supSk(); }
+// Sede donde está el stock (16.11.2026, Piero: "no solo 1 con stock sino indicar la sede en la que está"): Lurín si lo cubre el almacén
+// principal (todo o una parte), si no Trujillo o Ica según la zona del proyecto — lo mismo que la columna Stock del detalle.
+function supSkSedesTxt(g){ const M = {}; g.items.forEach(function(r){ const p = supPaso(r); if(p !== 'rev' && p !== 'com') return; const D = rqSkDe(r, p), s = D.sk ? 'Lurín' : D.sd ? D.sd.s : ''; if(s) M[s] = (M[s] || 0) + 1; });
+  const L = ['Lurín', 'Trujillo', 'Ica'].filter(function(s){ return M[s]; }); return L.length === 1 ? ' en ' + L[0] : L.length ? ': ' + L.map(function(s){ return s + ' ' + appN(M[s]); }).join(' · ') : ''; }
 function supSkN(g, sk){ let n = 0; g.items.forEach(function(r){ const p = supPaso(r); if((p === 'rev' || p === 'com') && supSkCat(r) === sk) n++; }); return n; }
 const SUP_FIN_TXT = { fin:'finalizados', arch:'archivados', rsv:'reservados' };
 function supConPaso(l){ return APP_SUP.paso ? l.filter(function(g){ return g.n[APP_SUP.paso] > 0; }) : l; }
@@ -19382,7 +19383,7 @@ function supCard(g){
     <div class="sup-c2-t"><div class="sup-c2-h"><b>Req. ${e(g.cod.replace(/^000\d-0*/, ''))}${appVeAlmRq() && supRsvMapa().has(g.cod) ? ` <i class="sup-c2-lk" title="Ya trabajado: ${supRsvMapa().get(g.cod)} reserva${supRsvMapa().get(g.cod) === 1 ? '' : 's'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>${supRsvMapa().get(g.cod)}</i>` : ''}</b><span>${rqFecha(g.f)}</span></div>
       <span class="sup-c2-cli">${e(polarCorta(g.cli, 48))}${g.id && !/^SIN PROYECTO/i.test(g.id) ? ` <em>${e(g.id)}</em>` : ''}</span>
       ${g.obs ? `<small class="sup-c2-o">${e(polarCorta(g.obs, 110))}</small>` : ''}${sup ? '' : `<small class="sup-c2-r">${e(titleCase(polarCorta(g.resp, 40)))}${appAreaDe(g.resp) ? ` · <em>${e(appAreaDe(g.resp))}</em>` : ''}</small>`}
-      <div class="sup-c2-d">${sk ? `<span class="sup-c2-sk ${sk}">${SKT[sk][1]}${appN(skN)} ${SKT[sk][0]}</span>` : dots}<span class="sup-c2-n">${appN(g.ok)}/${appN(g.tot)} en obra</span></div></div></div>`;
+      <div class="sup-c2-d">${sk ? `<span class="sup-c2-sk ${sk}">${SKT[sk][1]}${appN(skN)} ${SKT[sk][0]}${sk === 'stock' ? supSkSedesTxt(g) : ''}</span>` : dots}<span class="sup-c2-n">${appN(g.ok)}/${appN(g.tot)} en obra</span></div></div></div>`;
 }
 // Resumen de lo filtrado: anillo con el % atendido.
 function supResumenHtml(l){
@@ -19657,8 +19658,8 @@ function pmCardMin(p, i){ const e = escapeHtml, d = [];
 function pmMapaVista(l){ const e = escapeHtml, sel = APP_PM.dep, L = sel ? l.filter(function(p){ return pmDepK(p.x.dep) === sel; }) : [];
   const q = (APP_PM.q || '').trim(), res = q ? `<div class="pmm-res">${l.slice(0, 8).map(pmCardMin).join('') || '<div class="ini-vacio">Sin coincidencias.</div>'}${l.length > 8 ? `<small>${appN(l.length - 8)} más · toca un departamento para verlos</small>` : ''}</div>` : '';
   // Leyenda simple en el espacio libre del mapa (12.11.2026, Piero): cómo leer el mapa y los colores que se ven al entrar a un proyecto
-  // Horizontal y con una línea que explica cada estado (16.11.2026, Piero: "descripción más clara, corta pero clara, no solo 'en revisión'")
-  const ley = `<aside class="pmm-ley"><div class="pmm-ley-c"><small>Mapa</small><div class="pmm-ley-m"><i class="g"></i><span>Más oscuro = más proyectos</span></div><div class="pmm-ley-m"><i class="n">8</i><span>Proyectos en curso en el departamento</span></div></div>
+  // Misma tarjeta, más ancha y con una línea que explica cada estado (16.11.2026, Piero: "descripción más clara, corta pero clara, no solo 'en revisión'")
+  const ley = `<aside class="pmm-ley"><b>Leyenda</b><div class="pmm-ley-c pmm-ley-mp"><small>Mapa</small><div class="pmm-ley-m"><i class="g"></i><span>Más oscuro = más proyectos</span></div><div class="pmm-ley-m"><i class="n">8</i><span>Proyectos en curso en el departamento</span></div></div>
     <div class="pmm-ley-c"><small>Al entrar a un proyecto · dónde está cada ítem</small><ul class="es">${[['#5b3fb0', 'En revisión', 'Logística revisa el req. para pasarlo a Compras'], ['#9a5b00', 'Sin OC', 'En Compras, aún sin orden de compra'], ['#1f4fd1', 'OC en camino', 'Comprado; el proveedor aún no entrega'], ['#b4231a', 'OC vencida', 'Pasó la fecha que dio el proveedor'], ['#0b6e63', 'Por despachar', 'Ya está en almacén; falta enviarlo a obra'], ['#15803d', 'Despachado / en obra', 'Salió del almacén o ya llegó a obra']].map(function(x){ return `<li><i style="background:${x[0]}"></i><span><b>${x[1]}</b>${x[2]}</span></li>`; }).join('')}</ul></div>
     <div class="pmm-ley-c"><small>Alertas de tiempo</small><ul class="al"><li><i class="a">!</i><span><b>Cerca del límite</b>Ya pasó la meta de días; actuar pronto</span></li><li><i class="r">!</i><span><b>Pasó el límite</b>Atrasado; requiere acción</span></li></ul></div></aside>`;
   return `<div class="pmm${sel ? ' con' : ''}">${res}${ley}<div class="pmm-mapa">${pmMapaHtml(l)}</div>
