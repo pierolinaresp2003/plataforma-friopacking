@@ -3321,6 +3321,8 @@ body.app-pc .imp-linea{gap:8px;}
 .sup-c2-d i{font-style:normal;display:inline-flex;align-items:center;gap:4px;height:22px;border-radius:11px;padding:0 8px;font-size:11.5px;font-weight:800;color:#fff;}
 .sup-c2-d i em{font-style:normal;font-weight:600;opacity:.9;font-size:10.5px;}
 .sup-c2-d .rev{background:#7c5cc4;} .sup-c2-d .oc{background:#e0a100;} .sup-c2-d .cam{background:#2f6fd6;} .sup-c2-d .alm{background:#0e8f8a;} .sup-c2-d .sal{background:#3fa16a;}
+.sup-c2-sk{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;border-radius:999px;padding:3px 10px;} .sup-c2-sk svg{width:14px;height:14px;}
+.sup-c2-sk.stock{background:#e3f6ea;color:#15803d;} .sup-c2-sk.cam{background:#e0f2fe;color:#0369a1;} .sup-c2-sk.comp{background:#fdecea;color:#b4231a;}
 .sup-c2-fin{font-size:12px;font-weight:800;color:var(--ink-soft);} .sup-c2-fin.ok{color:#1e7a3c;} .sup-c2-n{margin-left:auto;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
 .rqm .rqm-cab.rqx-head{grid-template-columns:auto minmax(0,1fr) minmax(260px,auto);column-gap:26px;align-items:center;} .rqm .rqm-cab.rqx-head > *{grid-column:auto;grid-row:auto;}
 .rqm .rqm-cab.rqx-head{display:grid;background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:20px;padding:20px 24px;}
@@ -19283,7 +19285,11 @@ function supFiltrados(sinQ){
 function supEstReq(g){ return g.n.arch === g.items.length ? 'arch' : g.tot > 0 && g.ok >= g.tot ? 'fin' : ''; }
 // Req. ya trabajados = con reservas activas (13.11.2026, Piero: "un candado para saber que ya se trabajó, y también en un ícono aparte arriba")
 function supRsvMapa(){ return appMemo('supRsv' + RES.v + '|' + (RQ.filas || []).length, function(){ const M = new Map(); RES.l.forEach(function(z){ if(resPend(resFila(z))) M.set(z.req, (M.get(z.req) || 0) + 1); }); return M; }); }
-function supCardsDe(l){ if(!appVeAlmRq()) return l; if(APP_SUP.fin === 'rsv'){ const M = supRsvMapa(); return l.filter(function(g){ return M.has(g.cod) && supEstReq(g) !== 'arch'; }); } return l.filter(function(g){ return supEstReq(g) === (APP_SUP.fin || ''); }); }
+function supCardsDe(l){ if(!appVeAlmRq()) return l; let r; if(APP_SUP.fin === 'rsv'){ const M = supRsvMapa(); r = l.filter(function(g){ return M.has(g.cod) && supEstReq(g) !== 'arch'; }); } else r = l.filter(function(g){ return supEstReq(g) === (APP_SUP.fin || ''); });
+  // Con un filtro de Atención (con stock, OC en camino, para Compras) siguen las tarjetas de req., solo las que tienen SKU que cumplen (16.11.2026, Piero)
+  const sk = supSkTarj(); return sk ? r.filter(function(g){ return supSkN(g, sk) > 0; }) : r; }
+function supSkTarj(){ return APP_SUP.paso ? '' : supSk(); }
+function supSkN(g, sk){ let n = 0; g.items.forEach(function(r){ const p = supPaso(r); if((p === 'rev' || p === 'com') && supSkCat(r) === sk) n++; }); return n; }
 const SUP_FIN_TXT = { fin:'finalizados', arch:'archivados', rsv:'reservados' };
 function supConPaso(l){ return APP_SUP.paso ? l.filter(function(g){ return g.n[APP_SUP.paso] > 0; }) : l; }
 // Sugerencias mientras se escribe el cliente o el proyecto.
@@ -19303,11 +19309,12 @@ function supCard(g){
   const K = { rev:['rev', 'Req.'], com:['oc', 'Compras'], oc:['cam', 'OC'], alm:['alm', 'Almacén'], sal:['sal', 'En camino'], obra:['ok', 'Obra'] };
   const dots = !g.tot ? '<span class="sup-c2-fin">Archivado</span>' : !nPend ? '<span class="sup-c2-fin ok">Todo en obra</span>'
     : SUP_PASOS.filter(function(p){ return g.n[p[0]] && p[0] !== 'obra'; }).map(function(p){ return `<i class="${K[p[0]][0]}" title="${g.n[p[0]]} en ${p[2]}">${g.n[p[0]]}<em>${K[p[0]][1]}</em></i>`; }).join('');
-  return `<div class="sup-card sup-c2" data-clic="1" data-req="${e(g.cod)}" title="Ver el detalle del requerimiento">${pmDona(g.pct, 58, 11)}
+  const sk = supSkTarj(), skN = sk ? supSkN(g, sk) : 0, SKT = { stock:['con stock', RQ_SVG_CAJA], cam:['OC en camino', RQ_SVG_CAMION], comp:['para Compras', RQ_SVG_CARRO] };
+  return `<div class="sup-card sup-c2" data-clic="1" data-req="${e(g.cod)}"${sk ? ` data-reqskf="${sk}"` : ''} title="Ver el detalle del requerimiento">${pmDona(g.pct, 58, 11)}
     <div class="sup-c2-t"><div class="sup-c2-h"><b>Req. ${e(g.cod.replace(/^000\d-0*/, ''))}${appVeAlmRq() && supRsvMapa().has(g.cod) ? ` <i class="sup-c2-lk" title="Ya trabajado: ${supRsvMapa().get(g.cod)} reserva${supRsvMapa().get(g.cod) === 1 ? '' : 's'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>${supRsvMapa().get(g.cod)}</i>` : ''}</b><span>${rqFecha(g.f)}</span></div>
       <span class="sup-c2-cli">${e(polarCorta(g.cli, 48))}${g.id && !/^SIN PROYECTO/i.test(g.id) ? ` <em>${e(g.id)}</em>` : ''}</span>
       ${g.obs ? `<small class="sup-c2-o">${e(polarCorta(g.obs, 110))}</small>` : ''}${sup ? '' : `<small class="sup-c2-r">${e(titleCase(polarCorta(g.resp, 40)))}</small>`}
-      <div class="sup-c2-d">${dots}<span class="sup-c2-n">${appN(g.ok)}/${appN(g.tot)} en obra</span></div></div></div>`;
+      <div class="sup-c2-d">${sk ? `<span class="sup-c2-sk ${sk}">${SKT[sk][1]}${appN(skN)} ${SKT[sk][0]}</span>` : dots}<span class="sup-c2-n">${appN(g.ok)}/${appN(g.tot)} en obra</span></div></div></div>`;
 }
 // Resumen de lo filtrado: anillo con el % atendido.
 function supResumenHtml(l){
@@ -19344,7 +19351,7 @@ function supSkuItems(l){ const k = APP_SUP.paso, c = supSk(), L = []; l.forEach(
 function supSkuFilas(L, desde, n){ const cr = APP_SUP.cli || APP_SUP.pry ? 1 : 2; return L.slice(desde, desde + n).map(function(r, i){ return rqFilaHtml(r, desde + i, cr); }).join(''); }
 function appSupMas(){
   const c = document.getElementById('supLista'), m = document.getElementById('supMas'); if(!c || !m) return;
-  if(APP_SUP.paso || supSk()){ const L = supSkuItems(supConPaso(supFiltrados())), box = c.querySelector('.rqm-lista'), n = box ? box.querySelectorAll('.rqx-it').length : 0;
+  if(APP_SUP.paso){ const L = supSkuItems(supConPaso(supFiltrados())), box = c.querySelector('.rqm-lista'), n = box ? box.querySelectorAll('.rqx-it').length : 0;
     if(box && n < L.length) box.insertAdjacentHTML('beforeend', supSkuFilas(L, n, 40)); if(!box || n + 40 >= L.length){ m.remove(); return; }
     requestAnimationFrame(function(){ const r = m.getBoundingClientRect(); if(m.isConnected && r.top < window.innerHeight + 900) appSupMas(); }); return; }
   const l = supCardsDe(supConPaso(supFiltrados())), n = c.querySelectorAll('.sup-card').length;
@@ -19639,9 +19646,15 @@ function rqPasaCompras(r){ if(supPaso(r) !== 'rev') return null; const x = rqFif
 // Sin stock libre en Lurín pero con stock en Trujillo o Ica (13.11.2026, Piero: "se puede atender de Lima y Trujillo al mismo tiempo"): no pasa a Compras.
 // Almacén según la zona del proyecto (13.11.2026, Piero: "si el proyecto está en el sur no puede dar como opción Trujillo, y si está en el
 // norte no puede ser atendido desde Ica"). Lurín y en camino valen siempre; sin departamento conocido, todo vale.
-function rqSedeVale(r, k){ if(k !== 'T' && k !== 'I') return true; const Z = appMemo('rqZona', function(){ return new Map(); }), id = String((r && r.idProyecto) || ''); let z = Z.get(id);
-  if(z === undefined){ const dep = (pryInfo(id) || {}).dep; z = dep ? pmZona(dep) : ''; Z.set(id, z); }
+function rqSedeVale(r, k){ if(k !== 'T' && k !== 'I') return true; const Z = appMemo('rqZona', function(){ return new Map(); }), id = String((r && r.idProyecto) || ''), cli = String((r && r.proyecto) || ''), key = id + '|' + cli; let z = Z.get(key);
+  // Sin departamento en el proyecto (ALMACEN GENERAL, PRY antiguos): la zona del cliente (16.11.2026, Piero: "proyectos de norte no pueden tener opciones de almacén en Ica y viceversa").
+  if(z === undefined){ const dep = (pryInfo(id) || {}).dep; z = dep ? pmZona(dep) : (rqZonaCli().get(appImpNombre(cli)) || ''); Z.set(key, z); }
   return !((z === 'NORTE' && k === 'I') || (z === 'SUR' && k === 'T')); }
+// Zona de cada cliente según sus proyectos con departamento; solo si todos caen en la misma zona.
+function rqZonaCli(){ return appMemo('rqZonaCli', function(){ const M = new Map(), pon = function(cli, dep){ cli = appImpNombre(cli); const z = dep ? pmZona(dep) : ''; if(!cli || !z) return; (M.get(cli) || M.set(cli, new Set()).get(cli)).add(z); };
+  getReqRows().forEach(function(r){ const pi = pryInfo(r.idProyecto); if(pi && pi.dep) pon(r.proyecto, pi.dep); });
+  [PRY_INFO_SNAP, PRY_INFO_RM, PRY_INFO_PSR].forEach(function(O){ Object.keys(O || {}).forEach(function(k){ const x = O[k]; if(x && x.dep && x.cl) pon(x.cl, x.dep); }); });
+  const Z = new Map(); M.forEach(function(st, cli){ if(st.size === 1) Z.set(cli, [...st][0]); }); return Z; }); }
 function rsvOtraSede(r){ const t = rqSedeVale(r, 'T') ? rsvLibre(r, 'T') : 0, i = rqSedeVale(r, 'I') ? rsvLibre(r, 'I') : 0; return t > 0 || i > 0 ? (t >= i ? { s:'Trujillo', q:t } : { s:'Ica', q:i }) : null; }
 // Situación de stock de un ítem en revisión o en Compras: ok (Lurín cubre todo) · par (una parte) · sede (Trujillo/Ica) · cam (OC en camino) · comp (pasará a Compras)
 function rqSkDe(r, k){ const fx = k === 'rev' || k === 'com' ? rqFifoDe(r) : null, um = escapeHtml(r.unidad || ''), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
@@ -20047,8 +20060,9 @@ document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape') rsvCe
 function rqAtnHtml(L){ const n = { stock:0, cam:0, comp:0 }; L.forEach(function(r){ const p = supPaso(r); if(p === 'rev' || p === 'com'){ const c = supSkCat(r); if(c) n[c]++; } });
   return `<div class="sup-skc rq-atn"><span>Atención</span>${[['stock', 'Con stock', RQ_SVG_CAJA], ['cam', 'OC en camino', RQ_SVG_CAMION], ['comp', 'Para Compras', RQ_SVG_CARRO]].map(function(o){ return `<button type="button" class="${o[0]}" data-rqatn="${o[0]}"${n[o[0]] ? '' : ' disabled'}>${o[2]}${o[1]}<b>${appN(n[o[0]])}</b></button>`; }).join('')}</div>`; }
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-rqatn]'); if(!b) return; const rqm = b.closest('.rqm'); if(!rqm) return;
-  const v = rqm.dataset.skf === b.dataset.rqatn ? '' : b.dataset.rqatn; if(v) rqm.dataset.skf = v; else delete rqm.dataset.skf;
-  rqm.querySelectorAll('[data-rqatn]').forEach(function(x){ x.classList.toggle('on', x.dataset.rqatn === v); }); const fb = rqm.querySelector('.rqx-skf-b'); if(fb) fb.classList.toggle('on', !!v); });
+  rqAtnPoner(rqm, rqm.dataset.skf === b.dataset.rqatn ? '' : b.dataset.rqatn); });
+function rqAtnPoner(rqm, v){ if(!rqm) return; if(v) rqm.dataset.skf = v; else delete rqm.dataset.skf;
+  rqm.querySelectorAll('[data-rqatn]').forEach(function(x){ x.classList.toggle('on', x.dataset.rqatn === v); }); const fb = rqm.querySelector('.rqx-skf-b'); if(fb) fb.classList.toggle('on', !!v); }
 function rqCabFilas(){ return `<div class="rqx-cab"><span>Producto</span><span class="r">Cant.</span><span>Dónde está</span><span>Responsable</span><span class="rqx-skf-w"><button type="button" class="rqx-skf-b" data-rqskf="1" title="Filtrar por stock">Stock <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span><span></span><span></span></div>`; }
 function rqComprasLista(L){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   L = L.slice().sort(function(a, b){ return (a.fReq || 0) - (b.fReq || 0); });
@@ -20338,7 +20352,7 @@ function appSupReqHtml(){
     ${supResumenHtml(l0)}
     <div class="m-buscar pc-buscar-gen"><input type="search" id="supBusca" placeholder="🔍 N° de req. o producto" value="${e(APP_SUP.q)}"><span class="sup-xlsw">${INV_XLS_BTN.replace('data-invxls="1"', 'data-supxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el estado de los productos de lo filtrado')}${supPryTl()}</span></div>
     ${appVeAlmRq() ? supSkChips(l) : ''}
-    <div id="supLista">${APP_SUP.paso || supSk() ? (function(){ const L = supSkuItems(l); return `<div class="rqm rqm-lista sup-sku">${rqCabFilas()}${supSkuFilas(L, 0, 40)}</div>${L.length > 40 ? '<div class="sup-mas" id="supMas"></div>' : ''}`; })()
+    <div id="supLista">${APP_SUP.paso ? (function(){ const L = supSkuItems(l); return `<div class="rqm rqm-lista sup-sku">${rqCabFilas()}${supSkuFilas(L, 0, 40)}</div>${L.length > 40 ? '<div class="sup-mas" id="supMas"></div>' : ''}`; })()
       : (function(){ const lc = supCardsDe(l); return lc.slice(0, n0).map(supCard).join('') + (lc.length > n0 ? '<div class="sup-mas" id="supMas"></div>' : '') + (lc.length ? '' : `<div class="ini-card"><div class="ini-vacio">${supSoloMios() && !G.l.length ? 'No encontré requerimientos a tu nombre.' : APP_SUP.fin ? 'No hay requerimientos ' + SUP_FIN_TXT[APP_SUP.fin] + ' con ese filtro.' : 'No hay requerimientos pendientes con ese filtro.'}</div></div>`); })()}</div></div>`;
 }
 // Excel del Supervisor con el mismo formato que el status de Compras pendientes (03.11.2026, Piero): hoja 1 con el resumen
@@ -25787,7 +25801,7 @@ function appClickInicio(e){
   if(b.dataset.dailyfecha) return appDailyAbrir(b.dataset.dailyfecha);
   if(b.dataset.dailymes){ appDailyMes(+b.dataset.dailymes); return appRefrescarCal(); }
   if(b.dataset.dailycopia !== undefined) return appDailyCopiar(b);
-  if(b.dataset.req) return appAbrirReq(b.dataset.req);
+  if(b.dataset.req){ appAbrirReq(b.dataset.req); if(b.dataset.reqskf) rqAtnPoner(document.querySelector('#section-requerimientos .rqm'), b.dataset.reqskf); return; }   // mismo filtro de Atención (16.11.2026)
   if(b.dataset.pry) return appAbrirProyecto(b.dataset.pry);
   if(b.dataset.gper !== undefined){ APP_G.per = b.dataset.gper; return appRenderInicio(); }
   if(b.dataset.flimpiar){ APP_F[b.dataset.flimpiar] = JSON.parse(JSON.stringify(APP_F0[b.dataset.flimpiar])); return appRenderInicio(); }
