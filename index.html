@@ -3161,6 +3161,7 @@ button.pmx-k:hover{transform:translateY(-2px);box-shadow:0 10px 22px -16px rgba(
 .tlh-c b{font-size:28px;font-weight:800;line-height:1;color:var(--ink);letter-spacing:-.03em;} .tlh-c small{font-size:11px;font-weight:800;color:var(--c,#8a97a6);letter-spacing:.06em;}
 .tlh-d:hover .tlh-c{transform:scale(1.06);}
 .tlh-card{width:236px;box-sizing:border-box;background:var(--card);border:1px solid var(--border);border-top:4px solid var(--c,#8a97a6);border-radius:14px;padding:11px 13px;box-shadow:0 8px 22px -14px rgba(16,24,40,.3);text-align:left;}
+.tlh-card{content-visibility:auto;contain-intrinsic-size:auto 236px auto 276px;}   /* velocidad (16.11.2026): las tarjetas fuera de la vista no se dibujan hasta que llegan */
 .tlh-e + .tlh-e{border-top:1px dashed var(--border);margin-top:8px;padding-top:8px;}
 .tlh-et{display:flex;align-items:center;gap:7px;} .tlh-et i{width:20px;height:20px;border-radius:50%;background:var(--c,#8a97a6);flex:0 0 auto;}
 .tlh-et b{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--c,#8a97a6);} .tlh-et span{margin-left:auto;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
@@ -4390,7 +4391,11 @@ function isoDay(d){
 function fromIsoDay(s){
   if(!s) return null;
   // Camino rápido sin expresión regular (29.10.2026, velocidad: se llama decenas de miles de veces al cargar los datos).
-  if(typeof s === 'string' && s.length >= 10 && s.charCodeAt(4) === 45 && s.charCodeAt(7) === 45){ const y = +s.slice(0, 4), mo = +s.slice(5, 7), d = +s.slice(8, 10);
+  if(typeof s === 'string' && s.length >= 10 && s.charCodeAt(4) === 45 && s.charCodeAt(7) === 45){
+    // Dígitos leídos directo, sin cortar el texto (16.11.2026, velocidad); si algo no es dígito sigue el camino de antes.
+    const a = s.charCodeAt(0) - 48, b = s.charCodeAt(1) - 48, c = s.charCodeAt(2) - 48, e = s.charCodeAt(3) - 48, f = s.charCodeAt(5) - 48, g = s.charCodeAt(6) - 48, h = s.charCodeAt(8) - 48, k = s.charCodeAt(9) - 48;
+    if(a >= 0 && a <= 9 && b >= 0 && b <= 9 && c >= 0 && c <= 9 && e >= 0 && e <= 9 && f >= 0 && f <= 9 && g >= 0 && g <= 9 && h >= 0 && h <= 9 && k >= 0 && k <= 9) return new Date(Date.UTC(a * 1000 + b * 100 + c * 10 + e, f * 10 + g - 1, h * 10 + k));
+    const y = +s.slice(0, 4), mo = +s.slice(5, 7), d = +s.slice(8, 10);
     if(y === y && mo === mo && d === d) return new Date(Date.UTC(y, mo - 1, d)); }
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(!m) return null;
@@ -5766,6 +5771,10 @@ function loadFromSnapshot(snap){
   // mostrarlo mal, y el kardex se comporta igual que si el Excel publicado no tuviera esas hojas (avisa
   // que hay que volver a publicar), hasta que se vuelva a publicar con el archivo actual.
   const kardexVigente = (snap.almacen && (snap.almacenSchemaVersion||0) >= 6);
+  const KMV_K = (snap.almacen && snap.almacen.kst) || [], KMV_C = ['d', 'r', 'cp', 'mo', 'md', 'py', 'oc'];   // velocidad (16.11.2026)
+  const kmvFila = function(m){ const o = { f:m[0], q:m[1], s: m[2]==='i' ? 'ica' : m[2]==='t' ? 'trujillo' : 'lima' }; if(m[3]) o.t = 1;
+    if(m.length > 4) for(let j = 0; j < 7; j++){ const x = m[4 + j] ? KMV_K[m[4 + j] - 1] : undefined; if(x) o[KMV_C[j]] = x; }
+    return o; };
   ALMACEN_DATA = (snap.almacen && snap.almacen.rows) ? Object.assign({}, snap.almacen, {
     fromSnapshot: true,
     // El estado y el stock que cuenta para el ROP se RECALCULAN acá, no se publican: así el link
@@ -5791,10 +5800,7 @@ function loadFromSnapshot(snap){
       kardexMovimientos: kardexVigente ? (r.km || undefined) : undefined,
       kardexIngresosPorSucursal: (kardexVigente && r.kis) ? { ica: r.kis.i, lima: r.kis.l, trujillo: r.kis.t } : undefined,
       kardexMovimientosPorSucursal: (kardexVigente && r.kms) ? { ica: r.kms.i, lima: r.kms.l, trujillo: r.kms.t } : undefined,
-      kardexMovs: (kardexVigente && r.kmv) ? r.kmv.map(m=>{ const o = { f:m[0], q:m[1], s: m[2]==='i' ? 'ica' : m[2]==='t' ? 'trujillo' : 'lima' }; if(m[3]) o.t = 1;
-        if(m.length > 4){ const K = snap.almacen.kst || [], tx = function(k){ return k ? K[k - 1] : undefined; }, v = [tx(m[4]), tx(m[5]), tx(m[6]), tx(m[7]), tx(m[8]), tx(m[9]), tx(m[10])];
-          ['d', 'r', 'cp', 'mo', 'md', 'py', 'oc'].forEach(function(c, j){ if(v[j]) o[c] = v[j]; }); }
-        return o; }) : undefined,
+      kardexMovs: (kardexVigente && r.kmv) ? r.kmv.map(kmvFila) : undefined,
       disponible: (r.l||0) + (r.tr||0) - (r.rv||0) - (r.pk||0),
     })),
   }) : null;
@@ -7899,10 +7905,10 @@ function origenForDocumento(documento){
 // El índice se arma una sola vez y se reusa; se reconstruye si cambia la cantidad de filas del maestro
 // (carga de un archivo nuevo). Si no hay Reporte Maestro cargado, todo esto devuelve null y el kardex
 // cae a la regla anterior, sin romperse.
-let OC_POR_PRODUCTO = null, OC_POR_PRODUCTO_N = -1;
+let OC_POR_PRODUCTO = null, OC_POR_PRODUCTO_N = -1, OC_POR_PRODUCTO_F = null, OC_POR_PRODUCTO_P = null;
 function indiceOcPorProducto(){
   const filas = getProcesoRows();
-  if(OC_POR_PRODUCTO && OC_POR_PRODUCTO_N === filas.length) return OC_POR_PRODUCTO;
+  if(OC_POR_PRODUCTO && OC_POR_PRODUCTO_N === filas.length && OC_POR_PRODUCTO_F === filas && OC_POR_PRODUCTO_P === PEDIDO_SIN_REQ_ROWS) return OC_POR_PRODUCTO;
   const idx = new Map();
   // Se recorren los 2 archivos: Reporte Maestro (líneas nacidas de un requerimiento) y PedidoSinReq
   // (pedidos directos). De cada OC se guarda una fila representativa —para las fechas y el origen— y
@@ -7919,11 +7925,15 @@ function indiceOcPorProducto(){
   };
   for(const r of filas) meter(r, false);
   for(const r of PEDIDO_SIN_REQ_ROWS) meter(r, true);
-  OC_POR_PRODUCTO = idx; OC_POR_PRODUCTO_N = filas.length;
+  OC_POR_PRODUCTO = idx; OC_POR_PRODUCTO_N = filas.length; OC_POR_PRODUCTO_F = filas; OC_POR_PRODUCTO_P = PEDIDO_SIN_REQ_ROWS;
   return idx;
 }
 function comprasDeProducto(codigos){
-  const idx = indiceOcPorProducto();
+  // Recordado por producto mientras no cambie el índice de OC (16.11.2026, velocidad: al cargar se pedía 2-3 veces por producto).
+  const idx = indiceOcPorProducto(), key = (codigos || []).join('|');
+  if(comprasDeProducto._i !== idx){ comprasDeProducto._i = idx; comprasDeProducto._m = new Map(); }
+  let v = comprasDeProducto._m.get(key); if(!v){ v = comprasDeProductoCalc(idx, codigos); comprasDeProducto._m.set(key, v); } return v; }
+function comprasDeProductoCalc(idx, codigos){
   const ocs = new Map();
   for(const c of (codigos||[])){
     const g = idx.get(String(c==null?'':c).trim());
@@ -9884,7 +9894,11 @@ let pedirCatSel = null;
 // llegan acentuadas ("MATERIAL PARA INSTALACIÓN ELÉCTRICA", "VÁLVULA") y caían todas en el ícono
 // genérico. Se le pasa el nombre sin acentos solo desde acá, sin tocar la función compartida (la usan
 // también las imágenes de resumen, y ahí no se pidió ningún cambio).
-function sinAcentos(t){ return (t||'').normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+function sinAcentos(t){ t = t || ''; if(typeof t !== 'string' || t.length > 160) return /^[\x00-\x7f]*$/.test(t) ? t : t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Velocidad (16.11.2026): se llama cientos de miles de veces con los mismos nombres; el resultado no cambia.
+  const M = sinAcentos._m || (sinAcentos._m = new Map()); let v = M.get(t); if(v !== undefined) return v;
+  v = /^[\x00-\x7f]*$/.test(t) ? t : t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if(M.size > 40000) M.clear(); M.set(t, v); return v; }
 // modo: 'pedir'   -> solo los que hay que pedir (REPOSICIÓN y con cantidad a pedir > 0) — el de siempre
 //       'todos'   -> todos los productos del universo, con o sin cantidad a pedir
 //       'nopedir' -> solo los que NO hay que pedir (están OK, o no les falta nada para los meses pedidos)
@@ -14762,7 +14776,7 @@ function rqPreparar(){
 // Se funden en esa línea sumando lo comprado, recibido y despachado —así el semáforo compara contra
 // lo que de verdad se pidió— y la OC extra queda anotada al lado de la principal para no perderla.
 function rqFundirContinuaciones(rows){
-  const copias = rows.map(function(r){ return Object.assign({}, r); });
+  const copias = rows.map(function(r){ return { ...r }; });   // spread: misma copia, mucho más rápida que Object.assign (16.11.2026)
   const ultima = new Map();
   const fundidas = new Set();
   const suma = (a, b)=> (a == null && b == null) ? null : Math.round(((a || 0) + (b || 0)) * 100) / 100;
@@ -14793,7 +14807,7 @@ function rqFundirContinuaciones(rows){
 // guía (el 0001-0021874 sacó 720 m que cubrían sus ítems de 240 y 480). Separarlos dejaba el ítem
 // con OC como "sin salida" y lo contaba como reserva fantasma (25.09.2026).
 function rqRepartirSalida(rows, yaCopias){
-  const copias = yaCopias ? rows : rows.map(function(r){ return Object.assign({}, r); });
+  const copias = yaCopias ? rows : rows.map(function(r){ return { ...r }; });
   const grupos = new Map();
   copias.forEach(function(r){
     const k = r.codRequerimiento + '|' + r.idProducto;
@@ -17499,7 +17513,9 @@ function cmpAplDesc(t){ t = sinAcentos(String(t || '').toUpperCase());
 //  · Hengchang: sufijo -SAA / -SAS → amoníaco, -SAP / -SAG → glicol · Thermofin: T?N / serpentín N-.. → amoníaco, T?B → glicol (salmuera)
 //  · Alfa Laval de placas con junta (TK/MK BWFG) → glicol · Evapco Thermal-Pak inox → amoníaco
 //  · Evaporadores comerciales de cobre (Hispania HEA / H?N, Modine ICE / IDE / CTE, Kobol, FB, Güntner GACV, DX, Mipal, Bohn, Intarcon) → freón
-function cmpAplModelo(t, prov){ t = sinAcentos(String(t || '').toUpperCase()); prov = sinAcentos(String(prov || '').toUpperCase());
+function cmpAplModelo(t, prov){ const M = cmpAplModelo._m || (cmpAplModelo._m = new Map()), k = String(t || '') + '\u0001' + String(prov || '');   // recordado (16.11.2026)
+  if(M.has(k)) return M.get(k); const v = cmpAplModeloCalc(t, prov); if(M.size > 20000) M.clear(); M.set(k, v); return v; }
+function cmpAplModeloCalc(t, prov){ t = sinAcentos(String(t || '').toUpperCase()); prov = sinAcentos(String(prov || '').toUpperCase());
   const d = cmpAplDesc(t); if(d) return [d, 'descripción'];
   const A = 'Amoníaco', G = 'Glicol', F = 'Freón', mo = 'modelo';
   if(/SEMI ?-?HERM|HERMETIC|SCROLL|BITZER|COPELAND|MANEUROP|DORIN|REFCOMP|FRASCOLD|\bSRS\d|\bNSWL\d|\bMTZ\d/.test(t)) return [F, mo];
@@ -17519,11 +17535,13 @@ function cmpAplModelo(t, prov){ t = sinAcentos(String(t || '').toUpperCase()); p
 function cmpXlsDatos(Y){
   const TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75, hoy = appIndCorte(), mesCorte = hoy.getUTCFullYear() === Y ? hoy.getUTCMonth() + 1 : 12;
   // OC + código → proyectos (para la aplicación) y unidad de medida
-  const pry = new Map(), um = new Map(), nk = function(o){ return String(o || '').trim().replace(/^(\d+)-0*/, '$1-'); };
+  const nk = function(o){ return String(o || '').trim().replace(/^(\d+)-0*/, '$1-'); };
+  const PU = appMemo('cmpXlsPry', function(){ const pry = new Map(), um = new Map();   // una sola vez para 2026 y 2025 (16.11.2026, velocidad)
   getReqRows().forEach(function(r){ if(r.idProducto && r.unidad && !um.has(r.idProducto)) um.set(r.idProducto, r.unidad);
     if(!r.codOrden || !r.idProducto) return; const k = nk(r.codOrden) + '|' + r.idProducto; (pry.get(k) || pry.set(k, new Set()).get(k)).add(String(r.idProyecto || '').trim() || 'SIN'); });
   (PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(r.idProducto && r.unidad && !um.has(r.idProducto)) um.set(r.idProducto, r.unidad);
     if(!r.codOrden || !r.idProducto) return; const k = nk(r.codOrden) + '|' + r.idProducto; (pry.get(k) || pry.set(k, new Set()).get(k)).add(String(r.idProyecto || '').trim() || 'SIN'); });
+  return { pry:pry, um:um }; }), pry = PU.pry, um = PU.um;
   const aplDe = function(id){ if(!id || id === 'SIN' || /^SIN PROYECTO/i.test(id)) return 'Stock / sin proyecto'; const x = pryInfo(id), rf = x && pmRf(x.rf); return rf ? (CMP_XLS_APL.indexOf(rf[1]) !== -1 ? rf[1] : 'Otros') : 'Sin dato'; };
   const famNom = function(c){ c = String(c || 'OTROS'); return c.charAt(0) + c.slice(1).toLowerCase(); };
   const L = ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){ return r.anio === Y && r.codigo; }).map(function(r){
@@ -22817,7 +22835,9 @@ const APP_IMP_SEC = { tr:['🚢', 'En tránsito', 'Ya zarpó y todavía no llega
   bo:['📋', 'Pendiente booking', 'Sin ETD ni ETA · falta el booking con la agencia'],
   ot:['📦', 'Otras OC abiertas', 'Ya arribaron (falta el ingreso a Lurín), siguen en fabricación o no están en el seguimiento de Camila'],
   bk:['🏭', 'En fabricación', 'El proveedor todavía no la entrega en su fábrica para el zarpe · ordenado por esa fecha estimada'] };
-function appImpNombre(t){
+function appImpNombre(t){ t = String(t || ''); const M = appImpNombre._m || (appImpNombre._m = new Map()); let v = M.get(t);   // recordado (16.11.2026, velocidad)
+  if(v === undefined){ v = appImpNombreCalc(t); if(M.size > 8000) M.clear(); M.set(t, v); } return v; }
+function appImpNombreCalc(t){
   return String(t || '').replace(/\b(S\.?\s?A\.?\s?C\.?|S\.?\s?A\.?\s?S\.?|S\.?\s?A\.?|S\.?\s?R\.?\s?L\.?|E\.?\s?I\.?\s?R\.?\s?L\.?|SOCIEDAD ANONIMA( CERRADA)?|CO\.?,?\s?LTD\.?|LIMITED|LTDA\.?|S\.P\.A\.?|INC\.?|GMBH|CORPORATION)(?=\s|$|[.,])/gi, '')
     .replace(/[.,\s]+$/, '').replace(/\s{2,}/g, ' ').trim();
 }
