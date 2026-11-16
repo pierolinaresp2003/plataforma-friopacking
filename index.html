@@ -2999,6 +2999,10 @@ html[data-theme="dark"] .pz-ic{background:rgba(255,255,255,.06);} html[data-them
 .app-bienv .bv-entrar{background:#0a1e64;color:#fff;box-shadow:none;border-radius:12px;transition:background .2s,transform .15s;}
 .app-bienv .bv-entrar:hover{background:#123a9e;} .app-bienv .bv-entrar:active{box-shadow:none;}
 .app-bienv .bv-otro{color:#0e8a7c;text-decoration:none;}
+.bv-inv{display:grid;grid-template-columns:auto 1fr;column-gap:12px;align-items:center;width:100%;margin-top:16px;padding:12px 16px;border:1px dashed #b9c6d4;border-radius:12px;background:#f6f9fc;color:var(--pz-ink);font-family:inherit;text-align:left;cursor:pointer;}
+.bv-inv span{grid-row:span 2;font-size:22px;} .bv-inv b{font-size:14.5px;font-weight:800;} .bv-inv small{font-size:12px;color:var(--pz-soft);font-weight:600;}
+.bv-inv:hover{border-color:#1a9c86;background:#eef8f5;} .bv-inv.cargando{opacity:.6;pointer-events:none;}
+html[data-theme="dark"] .bv-inv{background:#121a26;border-color:#2a3547;color:#e7edf5;}
 .app-bienv .bv-acceso{color:#0f6b60;} .app-bienv .bv-acceso b{color:#0e8a7c;}
 .app-bienv .bv-err{background:#fdecee;border-color:#f5c2c7;color:#a12a35;}
 .app-bienv .bv-in .bv-nota, .app-bienv .bv-pie{color:var(--pz-soft);opacity:1;}
@@ -5166,6 +5170,8 @@ async function sbCache(k, v){
   }catch(e){ return null; }
 }
 async function sbDescargarDatos(){
+  if(!sbSesion() && appEsInv()){ const j = await sbCuenta({ accion:'invitado' }); if(!j.url) return null;   // invitado: sin copia en el equipo
+    const r = await fetch(j.url); if(!r.ok) throw sbError({}, r.status); return r.arrayBuffer(); }
   const rv = await sbFetch('/rest/v1/fp_publicacion?select=version,bytes&id=eq.1');
   if(!rv.ok) throw sbError(await rv.json().catch(function(){ return {}; }), rv.status);
   const pub = (await rv.json())[0];
@@ -5612,7 +5618,7 @@ async function loadPublishedSnapshot(manual){
   SNAP_ESTADO = 'cargando';
   try{
     // Desde Supabase, solo con sesión (20.10.2026). Sin sesión no hay datos: primero se entra con correo y clave.
-    if(!sbSesion()) return;
+    if(!sbSesion() && !appEsInv()) return;
     let snap = null;
     try{
       const buf = await sbDescargarDatos();
@@ -5621,7 +5627,7 @@ async function loadPublishedSnapshot(manual){
       if(txt) snap = snapExpandir(JSON.parse(txt));
     }catch(e){
       SNAP_ESTADO = { error:(e && e.message) || String(e) };
-      if(e.status === 401 || e.status === 403){ if(APP.usuario && RQ_MOVIL.matches) appBienvenida(APP.usuario.correo); return; }
+      if(e.status === 401 || e.status === 403){ if(appEsInv()) return appCerrarUsuario(); if(APP.usuario && RQ_MOVIL.matches) appBienvenida(APP.usuario.correo); return; }
       if(e.status === 404){ SNAP_ESTADO = 'vacio'; return; }
       throw e;
     }
@@ -16593,7 +16599,14 @@ function appVistaInicial(t){ if(GD_MODO) return 'gerencial'; const l = APP_ACCES
 // clave en ese celular; si no lo marcan, se pide cada vez que se abre la app (vale solo esa sesión).
 const APP_SESION = 'fp_app_ok';
 // Con Supabase (20.10.2026) todos entran con su correo y su propia clave; la sesión queda guardada en el equipo.
-function appNecesitaClave(){ return !!APP.usuario && !sbSesion(); }
+function appNecesitaClave(){ return !!APP.usuario && !APP.usuario.invitado && !sbSesion(); }
+// Invitado (16.11.2026, Piero: "una opción de entrar sin loguearse, como invitado en la parte de supervisor, que sea temporal"):
+// solo la vista Supervisor, sin escribir nada; vale hasta APP_INV_HASTA (fp-cuenta lo corta en el servidor en la misma fecha)
+// y mientras la app siga abierta (sessionStorage): al cerrarla vuelve a pedir correo.
+const APP_INV_HASTA = Date.parse('2026-11-22T23:59:59-05:00');
+function appInvVigente(){ return Date.now() <= APP_INV_HASTA; }
+function appEsInv(){ try{ return !!(APP.usuario && APP.usuario.invitado); }catch(e){ return false; } }   // APP todavía no existe en la 1.ª carga
+function appInvUsuario(){ return { correo:'invitado', nombre:'Invitado', tipo:'supervisor', invitado:true }; }
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
 // Gerencia de Logística (15.10.2026, Piero): entran primero al módulo Gerencial; también tienen Compras, Almacén y Supervisor.
 const APP_GERENCIAL_USR = ['kalegria', 'mlujan', 'apl', 'rcarlos'];   // rcarlos = Renato Carlos Sarmiento (05.11.2026, Piero)
@@ -16627,7 +16640,9 @@ try{
   if(u) u.tipo = APP_GERENCIAL_USR.indexOf(appUsuarioDe(u.correo)) !== -1 ? 'gerencial' : appTipoNorm(u.tipo);
   if(u && APP_ACCESO[u.tipo] && (appCorreoValido(u.correo) || (u.tipo === 'frioteam' && /^[^@\s]+@[^@\s]+$/.test(u.correo || '')))) APP.usuario = u;
 }catch(err){}
+if(!APP.usuario){ try{ if(sessionStorage.getItem('fp-inv') === '1' && appInvVigente()){ APP.usuario = appInvUsuario(); loadPublishedSnapshot(false); } else sessionStorage.removeItem('fp-inv'); }catch(err){} }
 function appRevisarAcceso(){
+  if(APP.usuario && APP.usuario.invitado){ if(!appInvVigente()) appCerrarUsuario(); return; }
   if(!SUPERVISOR_ROL || !APP.usuario) return;
   if(!APP.usuario.nombre){
     APP.usuario.nombre = appNombrePorCorreo(APP.usuario.correo);
@@ -17226,7 +17241,8 @@ function appBienvenida(correoFijo){
       <div class="bv-alta" id="bvAlta" hidden></div>
       <button type="submit" class="bv-entrar">Entrar</button>
       ${correoFijo ? '<button type="button" class="bv-otro" id="bvOtro">Usar otro correo</button>' : ''}
-    </form></div>
+    </form>
+    ${!correoFijo && appInvVigente() ? `<button type="button" class="bv-inv" id="bvInv"><span>👀</span><b>Entrar como invitado</b><small>Supervisor · solo ver · hasta el ${new Date(APP_INV_HASTA).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', timeZone:'America/Lima' })}</small></button>` : ''}</div>
     <p class="bv-nota">Entra con tu correo corporativo y tu clave. La primera vez toca <b>«Crea tu clave»</b> con el código de registro que te da Logística.</p>
     <p class="bv-pie">GRUPO FRIOPACKING · ${new Date().getFullYear()}</p></div>`;
   b.classList.add('abierto');
@@ -17260,6 +17276,13 @@ function appBienvenida(correoFijo){
     err('');
   };
   document.getElementById('bvModo').onclick = function(){ modo(document.getElementById('bvReg').hidden); };
+  const inv = document.getElementById('bvInv');
+  if(inv) inv.onclick = async function(){ inv.disabled = true; inv.classList.add('cargando'); err('');
+    try{ await sbCuenta({ accion:'invitado' }); }
+    catch(er){ inv.disabled = false; inv.classList.remove('cargando'); return err(er.message && er.message !== 'Failed to fetch' ? er.message : 'No hay conexión. Revisa tu internet e inténtalo de nuevo.'); }
+    APP.usuario = appInvUsuario(); try{ sessionStorage.setItem('fp-inv', '1'); }catch(er){}
+    loadPublishedSnapshot(false);
+    setTimeout(function(){ appElegirVista('super'); appLanzador(); }, 420); };
   const alta = function(c){
     err('Tu correo no está registrado todavía.');
     const msg = 'Hola, quiero acceso a la App de Logística de Grupo Friopacking. Mi correo es ' + c + '. ¿Me pueden agregar a la base de usuarios?';
@@ -17312,7 +17335,7 @@ function appBienvenida(correoFijo){
 function appCerrarUsuario(){
   sbSalir();   // cierra la sesión de Supabase y borra la copia de los datos de este equipo (20.10.2026)
   APP.usuario = null; APP.vista = null;
-  try{ localStorage.removeItem('fp-usuario'); localStorage.removeItem('fp-vista'); sessionStorage.removeItem(GER_SESION); sessionStorage.removeItem(APP_SESION); }catch(err){}
+  try{ localStorage.removeItem('fp-usuario'); localStorage.removeItem('fp-vista'); sessionStorage.removeItem(GER_SESION); sessionStorage.removeItem(APP_SESION); sessionStorage.removeItem('fp-inv'); }catch(err){}
   gerAbierto = false;
   appCerrarSheet();
   appBienvenida();
