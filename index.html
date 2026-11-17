@@ -5317,6 +5317,15 @@ async function sbCuenta(body){
 // Maestros guardados aparte en Supabase (17.11.2026, Piero: "cada que subo el Excel con las áreas luego se borra y debo volver a subirlo"):
 // el organigrama se guarda apenas se carga (tabla fp_maestro; solo el administrador escribe) y se lee al entrar, sin depender de
 // "Guardar y compartir". Sigue yendo también en el snapshot (para el invitado, que no tiene sesión).
+async function sbMaestrosLeer(){ if(!sbSesion()) return null; const r = await sbFetch('/rest/v1/fp_maestro?select=clave,datos,actualizado'); if(!r.ok) return null;
+  const M = {}; (await r.json()).forEach(function(x){ M[x.clave] = x; }); return M; }
+// El Excel guardado aparte manda si es más nuevo que la última publicación o si la publicación no lo trae.
+function appMaestrosAplicar(snap, M){ const pub = Date.parse(snap.publishedAt || '') || 0, vale = function(k, actual){ const x = M[k]; return !!(x && x.datos && (!actual || (Date.parse(x.actualizado) || 0) > pub)); };
+  if(M.areas && M.areas.datos && Object.keys(M.areas.datos).length) snap.areas = M.areas.datos;
+  if(vale('embarques', snap.embarques && snap.embarques.rows && snap.embarques.rows.length) && M.embarques.datos.rows) snap.embarques = M.embarques.datos;
+  if(vale('ocfin', snap.ocFinalizadas)) snap.ocFinalizadas = M.ocfin.datos;
+  if(vale('proveedores', snap.proveedores)){ if(M.proveedores.datos.mail) snap.proveedores = M.proveedores.datos.mail; if(M.proveedores.datos.pais) snap.provPais = M.proveedores.datos.pais; }
+  if(vale('supervisores', snap.supervisores)){ if(M.supervisores.datos.mail) snap.supervisores = M.supervisores.datos.mail; if(M.supervisores.datos.rol) snap.accesos = M.supervisores.datos.rol; } }
 async function sbMaestroLeer(clave){ if(!sbSesion()) return null; const r = await sbFetch('/rest/v1/fp_maestro?select=datos&clave=eq.' + encodeURIComponent(clave)); if(!r.ok) return null; const j = await r.json(); return j[0] ? j[0].datos : null; }
 async function sbMaestroGuardar(clave, datos){ const r = await sbFetch('/rest/v1/fp_maestro?on_conflict=clave', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify([{ clave:clave, datos:datos, actualizado:new Date().toISOString() }]) });
   if(!r.ok) throw sbError(await r.json().catch(function(){ return {}; }), r.status); }
@@ -5720,6 +5729,20 @@ function buildSnapshot(){
   };
 }
 
+// Si al publicar falta algún Excel en esta sesión (no se subió hoy o no cargó), se mantiene el de la publicación anterior (17.11.2026, Piero:
+// "debes guardar los excel que subo… no borrarlo al actualizar"). Devuelve qué se mantuvo, para avisarlo.
+async function appMantenerAnteriores(snapshot){
+  const vacio = function(v){ return v == null || (Array.isArray(v) ? !v.length : typeof v === 'object' && !Object.keys(v).length); };
+  const sinProc = !(snapshot.proceso && snapshot.proceso.rows && snapshot.proceso.rows.length);
+  const K = ['proveedores', 'provPais', 'supervisores', 'accesos', 'ocFinalizadas', 'embarques', 'gasto', 'almacen'].filter(function(k){ return vacio(snapshot[k]) || (k === 'embarques' && !(snapshot[k].rows || []).length); });
+  if(!(K.length || sinProc) || !sbSesion()) return [];
+  let prev = null; try{ const buf = await sbDescargarDatos(); if(buf) prev = snapExpandir(JSON.parse(await gunzipToText(buf))); }catch(err){ console.warn('publicación anterior', err); }
+  if(!prev) return [];
+  const NOM = { embarques:'Seguimiento de contenedores', gasto:'Consulta (gasto)', almacen:'Reporte Almacén', ocFinalizadas:'OC Finalizadas', proveedores:'DB Proveedores', supervisores:'DB Supervisores', proceso:'Reporte Maestro' }, out = [];
+  K.forEach(function(k){ if(vacio(prev[k])) return; snapshot[k] = prev[k]; if(k === 'gasto') snapshot.gastoSchemaVersion = prev.gastoSchemaVersion; if(k === 'almacen') snapshot.almacenSchemaVersion = prev.almacenSchemaVersion; if(NOM[k]) out.push(NOM[k]); });
+  if(sinProc && prev.proceso && prev.proceso.rows && prev.proceso.rows.length){ ['proceso', 'procesoSchemaVersion', 'filename', 'corte', 'excluded', 'totalRows', 'proyectos'].forEach(function(k){ snapshot[k] = prev[k]; }); out.push(NOM.proceso); }
+  return out;
+}
 async function publishSnapshot(){
   if(!DATA){ return; }
   // Publica en Supabase (20.10.2026): solo un administrador con sesión iniciada en la app.
@@ -5730,6 +5753,7 @@ async function publishSnapshot(){
   btn.textContent = "Publicando...";
   try{
     const snapshot = buildSnapshot();
+    const mantenidos = await appMantenerAnteriores(snapshot);
     const jsonStr = JSON.stringify(snapCompactar(snapshot));
     btn.textContent = "Comprimiendo...";
     const gz = await gzipBytes(jsonStr);
@@ -5753,6 +5777,7 @@ async function publishSnapshot(){
     sbCache('snap', { version:ver, buf:gz.buffer.slice(gz.byteOffset, gz.byteOffset + gz.byteLength) });
     let nU = 0; try{ nU = await sbSincronizarUsuarios(snapshot.accesos || APP_ACCESOS_BASE); }catch(e){ console.warn('usuarios', e); }
     showPublishBanner("✅ Publicado el " + new Date().toLocaleString('es-PE', { maximumFractionDigits:2 }) + " — solo lo ven los usuarios con su clave."
+      + (mantenidos.length ? " Se mantuvo lo anterior de: " + escapeHtml(mantenidos.join(', ')) + "." : "")
       + " <span style=\"opacity:.7\">(" + mb(jsonStr.length) + " comprimidos a " + mb(gz.length) + (nU ? " · " + nU + " usuarios al día" : "") + ")</span>", false);
   }catch(err){
     console.error(err);
@@ -5789,7 +5814,7 @@ async function loadPublishedSnapshot(manual){
   try{
     // Desde Supabase, solo con sesión (20.10.2026). Sin sesión no hay datos: primero se entra con correo y clave.
     if(!sbSesion() && !appEsInv()) return;
-    const pAreas = sbSesion() ? sbMaestroLeer('areas').catch(function(){ return null; }) : null;   // organigrama guardado aparte (17.11.2026)
+    const pMae = sbSesion() ? sbMaestrosLeer().catch(function(){ return null; }) : null;   // Excel guardados aparte: organigrama, contenedores, OC finalizadas, DB (17.11.2026)
     let snap = null, pAg = null, pRes = null;
     try{
       const buf = await sbDescargarDatos();
@@ -5807,7 +5832,7 @@ async function loadPublishedSnapshot(manual){
       throw e;
     }
     if(!snap){ SNAP_ESTADO = { error:'el archivo publicado no se pudo descomprimir' }; return; }
-    const areas = pAreas ? await pAreas : null; if(areas && Object.keys(areas).length) snap.areas = areas;
+    const mae = pMae ? await pMae : null; if(mae) appMaestrosAplicar(snap, mae);
     if(pAg) await pAg; if(pRes) await pRes;
     loadFromSnapshot(snap); SNAP_ESTADO = 'ok';
     appAgAplicar();   // OC enviadas por agencia fuera de los indicadores del comprador desde el inicio, sin recalcular dos veces
@@ -6107,6 +6132,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
   lastLoadFiles = parsed.map(p => ({ name: p.file.name, key: p.sig ? p.sig.key : null, error: p.error || null }));
   const PROC_ORDER = { pedidosinreq: 0, maestro: 1, consulta: 2, almacen: 3, proveedores: 4, supervisores: 5, ocfin: 6, embarques: 7, organigrama: 8 };
   parsed.sort((a,b) => (PROC_ORDER[a.sig && a.sig.key] ?? 9) - (PROC_ORDER[b.sig && b.sig.key] ?? 9));
+  const MAE = [];   // Excel que quedan guardados aparte al subirlos (17.11.2026, Piero: "debes guardar los excel que subo… no borrarlo al actualizar")
   for(const { file, wb, sig } of parsed){
     if(sig && sig.key === 'maestro'){
       maestroSeen = true;
@@ -6128,14 +6154,17 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     } else if(sig && sig.key === 'ocfin'){
       const res = processOCFinalizadas(wb, file.name);
       setFileState('ocfin', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+      if(res.ok) MAE.push(['ocfin', OC_FIN, 'OC Finalizadas']);
       if(!res.ok) showPublishBanner('❌ OC Finalizadas.xlsx: ' + escapeHtml(res.message), true);
     } else if(sig && sig.key === 'embarques'){
       const res = processEmbarques(wb, file.name);
       setFileState('embarques', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+      if(res.ok) MAE.push(['embarques', EMB_DATA, 'Seguimiento de contenedores']);
       if(!res.ok) showPublishBanner('❌ Seguimiento de contenedores: ' + escapeHtml(res.message), true);
     } else if(sig && sig.key === 'supervisores'){
       const res = processSupervisores(wb, file.name);
       setFileState('supervisores', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+      if(res.ok) MAE.push(['supervisores', { mail:SUPERVISOR_MAIL, rol:SUPERVISOR_ROL }, 'DB Supervisores']);
     } else if(sig && sig.key === 'organigrama'){
       const res = processOrganigrama(wb, file.name);
       setFileState('organigrama', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
@@ -6145,6 +6174,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     } else if(sig && sig.key === 'proveedores'){
       const res = processProveedores(wb, file.name);
       setFileState('proveedores', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
+      if(res.ok) MAE.push(['proveedores', { mail:PROVEEDOR_MAIL, pais:PROVEEDOR_PAIS }, 'DB Proveedores']);
     } else if(sig && sig.key === 'almacen'){
       // 08.09.2026: antes se reconocía el archivo pero no se procesaba ("queda en memoria... no tiene
       // indicador armado") — ahora alimenta Alertas de Reposición (ver processAlmacen).
@@ -6152,6 +6182,10 @@ document.getElementById('fileInput').addEventListener('change', async function(e
       setFileState('almacen', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
     }
   }
+  if(MAE.length){ const ok = [], mal = [];
+    for(const m of MAE){ try{ if(!sbSesion()) throw new Error('sin sesión'); await sbMaestroGuardar(m[0], m[1]); ok.push(m[2]); }catch(err){ console.warn(m[0], err); mal.push(m[2]); } }
+    showPublishBanner(mal.length ? '⚠ ' + escapeHtml(mal.join(', ')) + ': leído pero no se pudo guardar. Entra con tu usuario administrador y vuelve a cargarlo.'
+      : '✅ Guardado para todos: ' + escapeHtml(ok.join(', ')) + '. Queda aunque actualices la página; no hace falta volver a subirlo.', !!mal.length); }
   if(document.getElementById('status').textContent.startsWith("Leyendo")){
     if(maestroSeen){
       setStatus(maestroOk ? "Listo." : "Reporte Maestro.xlsx se cargó pero tuvo un problema — revisa el detalle arriba.", maestroOk ? "ok" : "err");
