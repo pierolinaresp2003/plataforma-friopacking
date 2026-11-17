@@ -5774,12 +5774,13 @@ async function loadPublishedSnapshot(manual){
     // Desde Supabase, solo con sesión (20.10.2026). Sin sesión no hay datos: primero se entra con correo y clave.
     if(!sbSesion() && !appEsInv()) return;
     const pAreas = sbSesion() ? sbMaestroLeer('areas').catch(function(){ return null; }) : null;   // organigrama guardado aparte (17.11.2026)
-    let snap = null, pAg = null;
+    let snap = null, pAg = null, pRes = null;
     try{
       const buf = await sbDescargarDatos();
       // OC por agencia, mientras se descomprime (17.11.2026). Va recién aquí: al abrir la página con la sesión guardada esta función
       // corre antes de que exista APP_AG y el error dejaba la app sin datos ("al cargar la página no se guarda lo que subo").
       pAg = sbSesion() ? appAgCargar(true) : null;
+      pRes = sbSesion() && !RES.ok ? resCargar() : null;   // reservas también antes de dibujar, así no se repinta al llegar (17.11.2026)
       if(!buf){ SNAP_ESTADO = 'vacio'; if(manual) showPublishBanner('Todavía no hay ninguna versión publicada. Carga tus archivos y usa "Guardar y compartir".', true); return; }
       const txt = await gunzipToText(buf);
       if(txt) snap = snapExpandir(JSON.parse(txt));
@@ -5791,7 +5792,7 @@ async function loadPublishedSnapshot(manual){
     }
     if(!snap){ SNAP_ESTADO = { error:'el archivo publicado no se pudo descomprimir' }; return; }
     const areas = pAreas ? await pAreas : null; if(areas && Object.keys(areas).length) snap.areas = areas;
-    if(pAg) await pAg;
+    if(pAg) await pAg; if(pRes) await pRes;
     loadFromSnapshot(snap); SNAP_ESTADO = 'ok';
     appAgAplicar();   // OC enviadas por agencia fuera de los indicadores del comprador desde el inicio, sin recalcular dos veces
   }catch(e){
@@ -19934,11 +19935,12 @@ const RQ_SKF = [['', 'Todos'], ['ok', 'Hay stock para todo'], ['par', 'Stock par
 const RES = { l:[], v:0, ok:false, cargando:false };
 function rqAnalista(){ return !!APP.usuario && ['supervisor', 'frioteam'].concat(APP_EN_PC ? [] : ['operario']).indexOf(APP.usuario.tipo) === -1; }
 function rqOperario(){ return !!APP.usuario && APP.usuario.tipo === 'operario'; }
-async function resCargar(forzar){ if(RES.cargando || (RES.ok && !forzar)) return; RES.cargando = true;
+async function resCargar(forzar){ if(RES.cargando || (RES.ok && !forzar)) return; RES.cargando = true; const antes = RES.ok ? JSON.stringify(RES.l) : null;
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota,lote,val_estado,val_nombre,val_en,val_nota,val_q&order=creado.asc');
     if(r.ok){ RES.l = await r.json(); RES.ok = true; RES.v++; resLimpiar(); } }catch(e){}
   RES.cargando = false; if(!RES.ok) return;
-  if(APP.enInicio && ['supreq', 'almseg', 'almrsv', 'almval', 'suppry', 'inventario'].indexOf(APP.pantalla) !== -1) appRenderInicio();
+  if(antes !== null && antes === JSON.stringify(RES.l)) return;   // sin cambios: no se vuelve a dibujar (17.11.2026)
+  if(APP.enInicio && appHayDatos() && ['supreq', 'almseg', 'almrsv', 'almval', 'suppry', 'inventario'].indexOf(APP.pantalla) !== -1) appRenderInicio();
   else { const sec = document.getElementById('section-requerimientos'); if(sec && sec.offsetParent !== null && typeof drawRequerimientos === 'function'){   // req. abierto: se repinta en el acto (13.11.2026, Piero)
     const ab = [...sec.querySelectorAll('.rqx-it.abierto, .rqx-it[open], .rqx-fila[aria-expanded="true"]')].map(function(x){ const it = x.closest('.rqx-it'); return it ? it.dataset.i : null; }).filter(Boolean);
     const y = window.scrollY; drawRequerimientos(); window.scrollTo(0, y);
@@ -23241,6 +23243,7 @@ function appImpNombreCalc(t){
 // Más adelante; queda en el Drive, hoja de Leo, pestaña "Correos OC", así lo ve todo el equipo).
 const APP_CORREO = { m:{}, v:0, t:0, cargando:false };
 try{ APP_CORREO.m = JSON.parse(localStorage.getItem('fp-correos') || '{}') || {}; }catch(err){}
+APP_CORREO.firma = JSON.stringify(APP_CORREO.m);
 function appCorreoBtn(oc){ const x = APP_CORREO.m[oc];
   return `<button type="button" class="imp-mail${x ? ' on' : ''}" data-correo="${escapeHtml(oc)}" title="${x ? 'Correo enviado' + (x.f ? ' el ' + escapeHtml(x.f) : '') + (x.u ? ' · ' + escapeHtml(x.u) : '') + ' · toca para quitar' : 'Marcar: correo enviado al proveedor'}" aria-label="Correo enviado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.5l4 4 8-9"/></svg></button>`; }
 function appCorreoGuardarLocal(){ try{ localStorage.setItem('fp-correos', JSON.stringify(APP_CORREO.m)); }catch(err){} }
@@ -23249,8 +23252,11 @@ function appCorreoCargar(forzar){
   APP_CORREO.cargando = true;
   fetch(POLAR_APRENDE_URL + '?accion=correos&_=' + Date.now()).then(function(r){ return r.json(); }).then(function(d){
     if(!d || !d.ok || !d.correos) throw new Error('sin correos');
-    APP_CORREO.m = d.correos; APP_CORREO.v++; appCorreoGuardarLocal();
-    if(APP.enInicio && APP.pantalla === 'pendcompras') appRenderInicio();
+    // Sin volver a dibujar la pantalla (17.11.2026, Piero: "una vez que las cosas cargan, luego vuelven a cargar"): si cambió algo,
+    // solo se actualizan los botones de correo que se ven.
+    const firma = JSON.stringify(d.correos); if(firma === APP_CORREO.firma) return;
+    APP_CORREO.m = d.correos; APP_CORREO.firma = firma; APP_CORREO.v++; appCorreoGuardarLocal();
+    document.querySelectorAll('button[data-correo]').forEach(function(x){ x.outerHTML = appCorreoBtn(x.dataset.correo); });
   }).catch(function(){}).then(function(){ APP_CORREO.cargando = false; APP_CORREO.t = Date.now(); });
 }
 function appCorreoToggle(b){
@@ -23293,7 +23299,7 @@ function appAgCargar(forzar){
     if(!l) return; const firma = JSON.stringify(l.map(function(x){ return [x.oc, x.agencia, x.persona, x.recogen, x.fecha, x.factura, x.guia]; }).sort());
     if(firma === APP_AG.firma) return;
     const m = {}; l.forEach(function(x){ m[x.oc] = x; }); APP_AG.m = m; APP_AG.firma = firma; APP_AG.v++; appAgAplicar();
-    if(APP.enInicio && ['pendcompras', 'almreg'].indexOf(APP.pantalla) !== -1) appRenderInicio();
+    if(APP.enInicio && appHayDatos() && ['pendcompras', 'almreg'].indexOf(APP.pantalla) !== -1) appRenderInicio();
   }).catch(function(){}).then(function(){ APP_AG.cargando = false; APP_AG.t = Date.now(); });
   return APP_AG.prom;
 }
