@@ -3616,6 +3616,16 @@ html[data-theme="dark"] .pm-fb-c{fill:#1b2433;stroke:#2b3647;} html[data-theme="
 .pmm-panel header .pmf-cs{display:flex;margin-top:8px;}
 .pmm-card small .pm-fr{margin-right:4px;}
 .pmm-mapa{max-width:880px;}
+/* Zonas arriba a la derecha (17.11.2026) */
+.pmm-zonas{position:absolute;top:0;right:0;z-index:4;display:flex;gap:8px;}
+.pmm-z{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:8px;align-items:center;min-width:120px;max-width:170px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:8px 12px;box-shadow:0 10px 22px -18px rgba(16,24,40,.5);transition:transform .15s,border-color .15s;}
+.pmm-z:hover{transform:translateY(-1px);border-color:var(--zc);} .pmm-z.on{border-color:var(--zc);box-shadow:0 0 0 2px color-mix(in srgb,var(--zc) 30%,transparent);}
+.pmm-z i{grid-row:1 / 3;width:10px;height:28px;border-radius:6px;background:var(--zc);} .pmm-z span{display:flex;align-items:baseline;gap:6px;} .pmm-z small{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;} .pmm-z b{font-size:18px;font-weight:900;color:var(--ink);}
+.pmm-z em{font-style:normal;font-size:10.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pmm[data-hz="NORTE"] .pm-dep[data-z="NORTE"], .pmm[data-hz="CENTRO"] .pm-dep[data-z="CENTRO"], .pmm[data-hz="SUR"] .pm-dep[data-z="SUR"]{stroke:var(--hzc,#0a1e64);stroke-width:2.4;}
+.pmm[data-hz="NORTE"]{--hzc:#2f7de1;} .pmm[data-hz="CENTRO"]{--hzc:#e08a1e;} .pmm[data-hz="SUR"]{--hzc:#8e44ad;}
+.pmm[data-hz="NORTE"] .pm-dep:not([data-z="NORTE"]), .pmm[data-hz="CENTRO"] .pm-dep:not([data-z="CENTRO"]), .pmm[data-hz="SUR"] .pm-dep:not([data-z="SUR"]){opacity:.45;}
+@media (max-width:900px){ .pmm{flex-wrap:wrap;} .pmm-zonas{position:static;margin-bottom:8px;flex:1 1 100%;} .pmm-z{min-width:0;flex:1;max-width:none;padding:7px 9px;} .pmm-z em{display:none;} }
 .pmm-ley-s{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 14px;} .pmm-ley-s + .pmm-ley-s{border-top:1px solid var(--border);margin-top:10px;padding-top:10px;}
 .pmm-ley-s li{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink);} .pmm-ley-s li i{width:10px;height:10px;border-radius:50%;flex:none;}
 .pmm-ley-s li i.g{width:34px;height:9px;border-radius:99px;background:linear-gradient(90deg,#a7e0d2,#2fae93,#0b6e63);} .pmm-ley-s li i.n{width:14px;height:14px;background:#0a1e64;border:2px solid #fff;box-shadow:0 0 0 1px #0a1e64;}
@@ -20107,7 +20117,7 @@ function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
   const zonaDe = function(k){ return pmZona(k); }, enZona = function(k){ return !APP_PM.zona || ['NORTE', 'CENTRO', 'SUR'].indexOf(APP_PM.zona) === -1 || zonaDe(k) === APP_PM.zona; };
   const deps = Object.keys(M.dep), sel = APP_PM.dep;
   const paths = deps.map(function(k){ const o = por[k], d = M.dep[k];
-    return `<path d="${d.d}" class="pm-dep t${tono(o ? o.n : 0)}${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o ? o.n : 0}|${o && o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o ? o.venc : 0}|${o ? o.sin : 0}"/>`; }).join('');
+    return `<path d="${d.d}" class="pm-dep t${tono(o ? o.n : 0)}${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-z="${zonaDe(k)}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o ? o.n : 0}|${o && o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o ? o.venc : 0}|${o ? o.sin : 0}"/>`; }).join('');
   const pins = deps.filter(function(k){ return por[k]; }).map(function(k){ const o = por[k], c = M.dep[k].c, r = 9 + 9 * Math.sqrt(o.n / mx);
     return `<g class="pm-pin${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o.n}|${o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o.venc}|${o.sin}" style="--d:${(deps.indexOf(k) * 25)}ms"><circle cx="${c[0]}" cy="${c[1]}" r="${r.toFixed(1)}"/><text x="${c[0]}" y="${(c[1] + 4).toFixed(1)}" text-anchor="middle">${o.n}</text><text class="pm-lbl" x="${c[0]}" y="${(c[1] + r + 13).toFixed(1)}" text-anchor="middle">${e(titleCase(k))}</text></g>`; }).join('');
   // Íconos de fruta grandes, sueltos junto a la costa y con una línea a su departamento (17.11.2026, Piero: "los íconos dispersos con líneas
@@ -20154,7 +20164,16 @@ function pmMapaVista(l){ const e = escapeHtml, sel = APP_PM.dep, L = sel ? l.fil
   // Leyenda escondida en un ícono que se abre al tocarlo (17.11.2026, Piero: "la leyenda debe estar oculta como un ícono").
   const leyW = `<div class="pmm-ley-w"><button type="button" class="pmm-ley-b" data-pmley="1" title="Leyenda" aria-label="Ver la leyenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="7" r="1.6" fill="currentColor"/><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="5" cy="17" r="1.6" fill="currentColor"/><path d="M10 7h10M10 12h10M10 17h7"/></svg></button>${ley}</div>`;
   const FD = pmFrutasPorDep(l), chipsF = function(o){ return pmFrutasOrden(o).map(function(f){ return `<span class="pmf-c" title="${e(pmFrutaNom(f))}">${pmFrutaIco(f, 18)}<b>${o[f]}</b></span>`; }).join(''); };
-  return `<div class="pmm${sel ? ' con' : ''}">${res}${leyW}<div class="pmm-mapa">${pmMapaHtml(l)}</div>
+  // Proyectos por zona arriba a la derecha (17.11.2026, Piero: "cuántos proyectos hay en norte, centro y sur… y poder ver cuál es cuál"):
+  // cada zona con sus departamentos; al pasar el mouse se marca en el mapa y al tocarla se filtra (tocar otra vez la quita).
+  const qz = polarNorm(APP_PM.q || '').trim().split(' ').filter(Boolean);
+  const baseZ = pmDatos().l.filter(function(p){ return (!APP_PM.rf || (p.rf && p.rf[0] === APP_PM.rf)) && (!APP_PM.pend || p.pend > 0) && qz.every(function(w){ return p.txt.indexOf(w) !== -1; }); });
+  const ZN = { NORTE:['Norte', '#2f7de1'], CENTRO:['Centro', '#e08a1e'], SUR:['Sur', '#8e44ad'] };
+  const zonas = `<div class="pmm-zonas">${Object.keys(ZN).map(function(z){ const L2 = baseZ.filter(function(p){ return p.zona === z; }), dz = {};
+      L2.forEach(function(p){ const k = pmDepK(p.x.dep); if(k) dz[k] = (dz[k] || 0) + 1; });
+      const ds = Object.keys(dz).sort(function(a, b){ return dz[b] - dz[a]; }).map(function(k){ return titleCase(k); });
+      return `<button type="button" class="pmm-z${APP_PM.zona === z ? ' on' : ''}" data-pmzona="${APP_PM.zona === z ? '' : z}" data-pmz="${z}" style="--zc:${ZN[z][1]}" title="${e(ds.join(', ') || 'Sin proyectos')}"><i></i><span><small>${ZN[z][0]}</small><b>${appN(L2.length)}</b></span><em>${e(ds.slice(0, 3).join(' · ') || '—')}${ds.length > 3 ? ' +' + (ds.length - 3) : ''}</em></button>`; }).join('')}</div>`;
+  return `<div class="pmm${sel ? ' con' : ''}">${res}${leyW}${sel ? '' : zonas}<div class="pmm-mapa">${pmMapaHtml(l)}</div>
     ${sel ? `<aside class="pmm-panel"><header><div><h3>${e(titleCase(sel))}</h3><span>${appN(L.length)} proyecto${L.length === 1 ? '' : 's'}</span>${FD.D[sel] ? `<span class="pmf-cs">${chipsF(FD.D[sel])}</span>` : ''}</div><button type="button" class="pmm-x" data-pmdep="" aria-label="Cerrar">×</button></header>
       <div class="pmm-cards">${L.map(pmCardMin).join('') || '<div class="ini-vacio">Sin proyectos en curso.</div>'}</div></aside>` : ''}</div>`; }
 function appSupPryHtml(){
@@ -20916,6 +20935,8 @@ function pmLineaDia(id, dia){ const p = pmDatos().l.find(function(x){ return x.i
 // Al abrir la línea de tiempo se ubica en HOY (con lo último que pasó a la vista)
 function pmLineaIr(){ requestAnimationFrame(function(){ const sc = document.getElementById('tlhSc'), h = document.getElementById('tlhHoy'); if(!sc || !h) return; sc.style.scrollBehavior = 'auto'; sc.scrollLeft = Math.max(0, h.offsetLeft - sc.clientWidth * .62); sc.style.scrollBehavior = ''; }); }
 // Clics del mapa, las tarjetas, las pestañas del proyecto y los filtros de la línea de tiempo
+document.addEventListener('mouseover', function(ev){ const z = ev.target.closest && ev.target.closest('[data-pmz]'), m = document.querySelector('.pmm');
+  if(!m) return; const v = z ? z.dataset.pmz : ''; if(m.dataset.hz !== v){ m.dataset.hz = v; } });
 document.addEventListener('click', function(ev){ const w = ev.target.closest && ev.target.closest('.pmm-ley-w');
   if(ev.target.closest && ev.target.closest('[data-pmley]')){ w.classList.toggle('on'); return; }
   if(!w) document.querySelectorAll('.pmm-ley-w.on').forEach(function(x){ x.classList.remove('on'); }); });
