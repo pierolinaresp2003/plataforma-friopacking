@@ -5719,6 +5719,7 @@ async function loadPublishedSnapshot(manual){
     // Desde Supabase, solo con sesión (20.10.2026). Sin sesión no hay datos: primero se entra con correo y clave.
     if(!sbSesion() && !appEsInv()) return;
     const pAreas = sbSesion() ? sbMaestroLeer('areas').catch(function(){ return null; }) : null;   // organigrama guardado aparte (17.11.2026)
+    const pAg = sbSesion() ? appAgCargar(true) : null;   // OC por agencia, en paralelo con la descarga (17.11.2026)
     let snap = null;
     try{
       const buf = await sbDescargarDatos();
@@ -5733,8 +5734,9 @@ async function loadPublishedSnapshot(manual){
     }
     if(!snap){ SNAP_ESTADO = { error:'el archivo publicado no se pudo descomprimir' }; return; }
     const areas = pAreas ? await pAreas : null; if(areas && Object.keys(areas).length) snap.areas = areas;
+    if(pAg) await pAg;
     loadFromSnapshot(snap); SNAP_ESTADO = 'ok';
-    if(sbSesion()) appAgCargar(true);   // OC enviadas por agencia (17.11.2026): fuera de los indicadores del comprador desde el inicio
+    appAgAplicar();   // OC enviadas por agencia fuera de los indicadores del comprador desde el inicio, sin recalcular dos veces
   }catch(e){
     SNAP_ESTADO = { error:(e && e.message) || String(e) };
     // sin snapshot publicado (o abierto como archivo local file://) — se queda en el estado vacío normal
@@ -23204,15 +23206,20 @@ function appTarjetaHtml(t){ const e = escapeHtml;
 }
 // Envío de la OC por agencia (17.11.2026, Piero: "considerar la opción de colocar si la OC se envió por agencia y registrar a qué agencia,
 // a qué persona y en qué fecha"): una fila por OC en Supabase (fp_oc_agencia), así lo ve todo el equipo. Se registra con el camión de la tarjeta.
-var APP_AG = { m:{}, v:0, t:0, cargando:false };
+var APP_AG = { m:{}, v:0, t:0, cargando:false, firma:'[]', prom:null };
 const APP_AG_SUG = ['Shalom', 'Olva Courier', 'Marvisur', 'Cruz del Sur Cargo', 'Flores', 'Civa'];
+// Solo si cambió algo se vuelve a calcular y dibujar (17.11.2026, Piero: "¿por qué está tardando en abrir?": cada lectura cambiaba la
+// firma de los datos y obligaba a recalcular todas las pantallas justo después de abrir).
 function appAgCargar(forzar){
-  if(!sbSesion() || APP_AG.cargando || (!forzar && Date.now() - APP_AG.t < 60000)) return;
+  if(!sbSesion() || APP_AG.cargando || (!forzar && Date.now() - APP_AG.t < 60000)) return APP_AG.prom || Promise.resolve();
   APP_AG.cargando = true;
-  sbFetch('/rest/v1/fp_oc_agencia?select=oc,agencia,persona,fecha,por,actualizado,factura,guia,regularizada,reg_por').then(function(r){ return r.ok ? r.json() : null; }).then(function(l){
-    if(!l) return; const m = {}; l.forEach(function(x){ m[x.oc] = x; }); APP_AG.m = m; APP_AG.v++; appAgAplicar();
+  APP_AG.prom = sbFetch('/rest/v1/fp_oc_agencia?select=oc,agencia,persona,fecha,por,actualizado,factura,guia,regularizada,reg_por').then(function(r){ return r.ok ? r.json() : null; }).then(function(l){
+    if(!l) return; const firma = JSON.stringify(l.map(function(x){ return [x.oc, x.agencia, x.persona, x.fecha, x.factura, x.guia, x.regularizada, x.reg_por]; }).sort());
+    if(firma === APP_AG.firma) return;
+    const m = {}; l.forEach(function(x){ m[x.oc] = x; }); APP_AG.m = m; APP_AG.firma = firma; APP_AG.v++; appAgAplicar();
     if(APP.enInicio && ['pendcompras', 'almreg'].indexOf(APP.pantalla) !== -1) appRenderInicio();
   }).catch(function(){}).then(function(){ APP_AG.cargando = false; APP_AG.t = Date.now(); });
+  return APP_AG.prom;
 }
 function ocPorAgencia(oc){ return !!(oc && APP_AG && APP_AG.m[oc]); }
 // Las OC enviadas por agencia no cuentan en el resumen ni en los indicadores del comprador (17.11.2026, Piero: "son casos aislados, solo
