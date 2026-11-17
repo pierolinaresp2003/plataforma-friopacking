@@ -3630,7 +3630,9 @@ html[data-theme="dark"] .pm-fb-c{fill:#1b2433;stroke:#2b3647;} html[data-theme="
 .pmm-ley-s li{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink);} .pmm-ley-s li i{width:10px;height:10px;border-radius:50%;flex:none;}
 .pmm-ley-s li i.g{width:34px;height:9px;border-radius:99px;background:linear-gradient(90deg,#a7e0d2,#2fae93,#0b6e63);} .pmm-ley-s li i.n{width:14px;height:14px;background:#0a1e64;border:2px solid #fff;box-shadow:0 0 0 1px #0a1e64;}
 .pmm-ley-s li i.a, .pmm-ley-s li i.r{width:16px;height:16px;display:grid;place-items:center;color:#fff;font:900 10px Inter,sans-serif;font-style:normal;} .pmm-ley-s li i.a{background:#f2b632;color:#8a5300;} .pmm-ley-s li i.r{background:#d92d20;}
-.pmm-ley-w .pmm-ley{width:min(380px,90vw);} .pmm-ley ul.pmm-ley-s{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 12px;} .pmm-ley ul.pmm-ley-s li{color:var(--ink);}
+.pmm-ley-w .pmm-ley{width:min(440px,90vw);} .pmm-ley ul.pmm-ley-s{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px;} .pmm-ley ul.pmm-ley-s li{color:var(--ink);align-items:flex-start;}
+.pmm-ley ul.pmm-ley-s li > i, .pmm-ley ul.pmm-ley-s li > svg{margin-top:3px;} .pmm-ley ul.pmm-ley-s li span{display:flex;flex-direction:column;line-height:1.25;} .pmm-ley ul.pmm-ley-s li span b{font-size:12.5px;font-weight:800;color:var(--ink);} .pmm-ley ul.pmm-ley-s li span small{display:block;margin:0;font-size:11.5px;font-weight:500;color:var(--ink-soft);text-transform:none;letter-spacing:0;}
+.pmm-ley-s li i.zn{width:14px;height:14px;border-radius:4px;background:linear-gradient(90deg,#2f7de1 33%,#e08a1e 33% 66%,#8e44ad 66%);}
 /* Tarjetas de OC visuales: Seguimiento de Compras e Importaciones (17.11.2026) */
 .oc2-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:12px;margin:6px 0 18px;}
 .oc2{--tn:#6b7a93;--tb:#eef2f7;position:relative;display:flex;flex-direction:column;gap:12px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:14px 16px 12px 19px;cursor:pointer;overflow:hidden;box-shadow:0 10px 24px -22px rgba(16,24,40,.5);transition:transform .25s var(--pz-ease),box-shadow .25s;animation:pzSube .4s var(--pz-ease) both;content-visibility:auto;contain-intrinsic-size:auto 190px;}
@@ -20110,6 +20112,11 @@ function pmFrutasDe(p){ const x = p.x || {}, t = sinAcentos(String((x.n || '') +
 // Conteo de frutas por departamento (y total) de la lista de proyectos que se ve
 function pmFrutasPorDep(l){ const D = {}, T = {}; l.forEach(function(p){ const k = pmDepK(p.x.dep); pmFrutasDe(p).forEach(function(f){ (D[k] = D[k] || {})[f] = (D[k][f] || 0) + 1; T[f] = (T[f] || 0) + 1; }); }); return { D:D, T:T }; }
 function pmFrutasOrden(o){ return Object.keys(o || {}).sort(function(a, b){ return (a === 'otros') - (b === 'otros') || o[b] - o[a]; }); }
+// Borde este del mapa a la altura y (de los contornos de los departamentos), para poner las frutas de la derecha fuera del Perú.
+function pmEsteEn(y){ const M = PM_PERU; if(!pmEsteEn._p){ pmEsteEn._p = [];
+    Object.keys(M.dep).forEach(function(k){ M.dep[k].d.split(/(?=M)/).forEach(function(sp){ const n = sp.match(/-?\d+(\.\d+)?/g) || [], pts = []; for(let i = 0; i + 1 < n.length; i += 2) pts.push([+n[i], +n[i + 1]]); if(pts.length > 2) pmEsteEn._p.push(pts); }); }); }
+  let mx = 0; pmEsteEn._p.forEach(function(P){ for(let i = 0; i < P.length; i++){ const a = P[i], b = P[(i + 1) % P.length]; if((a[1] - y) * (b[1] - y) <= 0 && a[1] !== b[1]){ const x = a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]); if(x > mx) mx = x; } } });
+  return mx; }
 function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
   l.forEach(function(p){ const k = pmDepK(p.x.dep); if(!M.dep[k]) return; const o = por[k] || (por[k] = { n:0, tot:0, ok:0, venc:0, sin:0 }); o.n++; o.tot += p.tot; o.ok += p.ok; o.venc += p.venc; o.sin += p.n[1]; });
   const mx = Math.max.apply(null, [1].concat(Object.keys(por).map(function(k){ return por[k].n; })));
@@ -20117,7 +20124,7 @@ function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
   const zonaDe = function(k){ return pmZona(k); }, enZona = function(k){ return !APP_PM.zona || ['NORTE', 'CENTRO', 'SUR'].indexOf(APP_PM.zona) === -1 || zonaDe(k) === APP_PM.zona; };
   const deps = Object.keys(M.dep), sel = APP_PM.dep;
   const paths = deps.map(function(k){ const o = por[k], d = M.dep[k];
-    return `<path d="${d.d}" class="pm-dep t${tono(o ? o.n : 0)}${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-z="${zonaDe(k)}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o ? o.n : 0}|${o && o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o ? o.venc : 0}|${o ? o.sin : 0}"/>`; }).join('');
+    return `<path d="${d.d}" class="pm-dep t${tono(o ? o.n : 0)}${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}"${o ? ` data-z="${zonaDe(k)}"` : ''} data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o ? o.n : 0}|${o && o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o ? o.venc : 0}|${o ? o.sin : 0}"/>`; }).join('');
   const pins = deps.filter(function(k){ return por[k]; }).map(function(k){ const o = por[k], c = M.dep[k].c, r = 9 + 9 * Math.sqrt(o.n / mx);
     return `<g class="pm-pin${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o.n}|${o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o.venc}|${o.sin}" style="--d:${(deps.indexOf(k) * 25)}ms"><circle cx="${c[0]}" cy="${c[1]}" r="${r.toFixed(1)}"/><text x="${c[0]}" y="${(c[1] + 4).toFixed(1)}" text-anchor="middle">${o.n}</text><text class="pm-lbl" x="${c[0]}" y="${(c[1] + r + 13).toFixed(1)}" text-anchor="middle">${e(titleCase(k))}</text></g>`; }).join('');
   // Íconos de fruta grandes, sueltos junto a la costa y con una línea a su departamento (17.11.2026, Piero: "los íconos dispersos con líneas
@@ -20131,7 +20138,9 @@ function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
     const c = M.dep[k].c, rp = 9 + 9 * Math.sqrt(por[k].n / mx), o = izq0 ? OFS[k] : [66, OFS[k] && OFS[k][1] > 40 ? 30 : 0], izq = o[0] < 0, fs = pmFrutasOrden(FR[k]).filter(function(f){ return f !== 'otros' || Object.keys(FR[k]).length === 1; }).slice(0, 4);
     const ancho = fs.length * (2 * R) + (fs.length - 1) * 8; let y = c[1] + o[1]; const lado = izq ? usados.i : usados.d;
     lado.forEach(function(v){ if(Math.abs(v - y) < PASO) y = v + PASO; }); lado.push(y);
-    const borde = izq ? c[0] + o[0] - rp : c[0] + o[0] + rp, ini = izq ? borde - ancho : borde; x0 = Math.min(x0, ini - 12); x1 = Math.max(x1, ini + ancho + 12);
+    // Fuera del mapa (17.11.2026, Piero: "las frutas no pueden estar encima del mapa"): a la derecha, pasado el borde este del Perú.
+    const este = izq ? 0 : Math.max(pmEsteEn(y - R), pmEsteEn(y), pmEsteEn(y + R)) + 30;
+    const borde = izq ? c[0] + o[0] - rp : Math.max(c[0] + o[0] + rp, este), ini = izq ? borde - ancho : borde; x0 = Math.min(x0, ini - 12); x1 = Math.max(x1, ini + ancho + 12);
     const p1 = izq ? [borde + 6, y] : [borde - 6, y], ang = Math.atan2(c[1] - y, c[0] - p1[0]), p2 = [c[0] - Math.cos(ang) * (rp + 2), c[1] - Math.sin(ang) * (rp + 2)];
     return `<g class="pm-ll${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" style="--d:${(deps.indexOf(k) * 25 + 300)}ms"><path class="pm-ll-l" d="M${p1[0].toFixed(1)} ${p1[1].toFixed(1)}L${p2[0].toFixed(1)} ${p2[1].toFixed(1)}"/><circle class="pm-ll-p" cx="${p1[0].toFixed(1)}" cy="${p1[1].toFixed(1)}" r="3"/>
       ${fs.map(function(f, i){ const cx = ini + R + i * (2 * R + 8), n = FR[k][f], fr = PM_FRUTAS.find(function(z){ return z[0] === f; });
@@ -20157,10 +20166,12 @@ function pmMapaVista(l){ const e = escapeHtml, sel = APP_PM.dep, L = sel ? l.fil
   // Leyenda simple en el espacio libre del mapa (12.11.2026, Piero): cómo leer el mapa y los colores que se ven al entrar a un proyecto
   // Misma tarjeta, más ancha y con una línea que explica cada estado (16.11.2026, Piero: "descripción más clara, corta pero clara, no solo 'en revisión'")
   // Leyenda simple (17.11.2026, Piero: "hazla más simple… el círculo azul sin el 8"); el detalle de cada estado queda al pasar el mouse.
-  const EST = [['#5b3fb0', 'En revisión', 'Logística revisa el req. para pasarlo a Compras'], ['#9a5b00', 'Sin OC', 'En Compras, aún sin orden de compra'], ['#1f4fd1', 'OC en camino', 'Comprado; el proveedor aún no entrega'], ['#b4231a', 'OC vencida', 'Pasó la fecha que dio el proveedor'], ['#0b6e63', 'Por despachar', 'Ya está en almacén; falta enviarlo a obra'], ['#15803d', 'En obra', 'Salió del almacén o ya llegó a obra']];
-  const ley = `<aside class="pmm-ley"><b>Leyenda</b><ul class="pmm-ley-s"><li><i class="g"></i>Más proyectos</li><li><i class="n"></i>Proyectos en curso</li><li>${pmFrutaIco('arandano', 18)}Fruta · N° de proyectos</li></ul>
-    <ul class="pmm-ley-s">${EST.map(function(x){ return `<li title="${e(x[2])}"><i style="background:${x[0]}"></i>${x[1]}</li>`; }).join('')}</ul>
-    <ul class="pmm-ley-s"><li><i class="a">!</i>Cerca del límite</li><li><i class="r">!</i>Pasó el límite</li></ul></aside>`;
+  // Con una descripción corta (17.11.2026, Piero: "falta en la leyenda una descripción corta").
+  const EST = [['#5b3fb0', 'En revisión', 'Logística lo revisa'], ['#9a5b00', 'Sin OC', 'En Compras, sin orden'], ['#1f4fd1', 'OC en camino', 'El proveedor aún no entrega'], ['#b4231a', 'OC vencida', 'Pasó la fecha pactada'], ['#0b6e63', 'Por despachar', 'En almacén, falta enviar'], ['#15803d', 'En obra', 'Salió o ya llegó a obra']];
+  const li = function(ic, t, d){ return `<li>${ic}<span><b>${t}</b><small>${d}</small></span></li>`; };
+  const ley = `<aside class="pmm-ley"><b>Leyenda</b><ul class="pmm-ley-s">${li('<i class="g"></i>', 'Más proyectos', 'Color más oscuro')}${li('<i class="n"></i>', 'Proyectos en curso', 'Cuántos hay en el departamento')}${li(pmFrutaIco('arandano', 18), 'Fruta', 'Qué se procesa y en cuántos')}${li('<i class="zn"></i>', 'Norte · Centro · Sur', 'Proyectos por zona; toca para filtrar')}</ul>
+    <ul class="pmm-ley-s">${EST.map(function(x){ return li(`<i style="background:${x[0]}"></i>`, x[1], x[2]); }).join('')}</ul>
+    <ul class="pmm-ley-s">${li('<i class="a">!</i>', 'Cerca del límite', 'Actuar pronto')}${li('<i class="r">!</i>', 'Pasó el límite', 'Atrasado, requiere acción')}</ul></aside>`;
   // Leyenda escondida en un ícono que se abre al tocarlo (17.11.2026, Piero: "la leyenda debe estar oculta como un ícono").
   const leyW = `<div class="pmm-ley-w"><button type="button" class="pmm-ley-b" data-pmley="1" title="Leyenda" aria-label="Ver la leyenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="7" r="1.6" fill="currentColor"/><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="5" cy="17" r="1.6" fill="currentColor"/><path d="M10 7h10M10 12h10M10 17h7"/></svg></button>${ley}</div>`;
   const FD = pmFrutasPorDep(l), chipsF = function(o){ return pmFrutasOrden(o).map(function(f){ return `<span class="pmf-c" title="${e(pmFrutaNom(f))}">${pmFrutaIco(f, 18)}<b>${o[f]}</b></span>`; }).join(''); };
