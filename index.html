@@ -20113,9 +20113,12 @@ function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
   // Íconos de fruta grandes, sueltos junto a la costa y con una línea a su departamento (17.11.2026, Piero: "los íconos dispersos con líneas
   // que señalen a dónde pertenecen y más grandes"); los de la sierra o selva van hacia la derecha.
   const FR = pmFrutasPorDep(l).D, R = 22, PASO = 52, OFS = { TUMBES:[-70, 0], PIURA:[-72, 0], LAMBAYEQUE:[-70, 0], 'LA LIBERTAD':[-74, 0], ANCASH:[-76, 0], LIMA:[-80, 0], CALLAO:[-80, 12], ICA:[-72, 30], AREQUIPA:[-58, 58], MOQUEGUA:[-46, 58], TACNA:[-40, 52] };
-  let x0 = 0, x1 = M.w; const usados = { i:[], d:[] };
+  // Repartidos a los dos lados (17.11.2026, Piero: "¿no puedes distribuirlo entre izquierda y derecha?"): de norte a sur, uno al mar y el
+  // siguiente tierra adentro; los de la sierra o selva siempre a la derecha.
+  let x0 = 0, x1 = M.w, nCosta = 0; const usados = { i:[], d:[] };
   const llamadas = deps.filter(function(k){ return por[k] && FR[k]; }).sort(function(a, b){ return M.dep[a].c[1] - M.dep[b].c[1]; }).map(function(k){
-    const c = M.dep[k].c, rp = 9 + 9 * Math.sqrt(por[k].n / mx), o = OFS[k] || [64, 0], izq = o[0] < 0, fs = pmFrutasOrden(FR[k]).filter(function(f){ return f !== 'otros' || Object.keys(FR[k]).length === 1; }).slice(0, 4);
+    const izq0 = !!OFS[k] && nCosta++ % 2 === 0;
+    const c = M.dep[k].c, rp = 9 + 9 * Math.sqrt(por[k].n / mx), o = izq0 ? OFS[k] : [66, OFS[k] && OFS[k][1] > 40 ? 30 : 0], izq = o[0] < 0, fs = pmFrutasOrden(FR[k]).filter(function(f){ return f !== 'otros' || Object.keys(FR[k]).length === 1; }).slice(0, 4);
     const ancho = fs.length * (2 * R) + (fs.length - 1) * 8; let y = c[1] + o[1]; const lado = izq ? usados.i : usados.d;
     lado.forEach(function(v){ if(Math.abs(v - y) < PASO) y = v + PASO; }); lado.push(y);
     const borde = izq ? c[0] + o[0] - rp : c[0] + o[0] + rp, ini = izq ? borde - ancho : borde; x0 = Math.min(x0, ini - 12); x1 = Math.max(x1, ini + ancho + 12);
