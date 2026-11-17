@@ -4046,7 +4046,8 @@ html[data-theme="dark"] .pz::before{opacity:.08;} html[data-theme="dark"] .pz-mo
 .imx-pin text.l{font:800 11px Inter,sans-serif;fill:#0a1e64;paint-order:stroke;stroke:#fff;stroke-width:3.5px;}
 .imx-sh{cursor:pointer;color:#fff;animation:imxFlota 3.2s ease-in-out infinite;animation-delay:var(--d,0s);} .imx-sh > circle:first-of-type{fill:#1f6fd6;stroke:#fff;stroke-width:2;filter:drop-shadow(0 2px 5px rgba(31,111,214,.45));}
 .imx-sh:hover > circle:first-of-type, .imx-sh.foco > circle:first-of-type{stroke:#ffd23f;stroke-width:3;}
-@keyframes imxFlota{0%,100%{translate:0 0;}50%{translate:0 -.6px;}}
+@keyframes imxFlota{0%,100%{opacity:1;}50%{opacity:.88;}}
+.imx-vacio{display:inline-flex;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 14px;font-size:13px;font-weight:700;color:var(--ink-soft);}
 .imx-cd{cursor:pointer;} .imx-cd rect{fill:#1e8a4f;stroke:#fff;stroke-width:2;filter:drop-shadow(0 3px 6px rgba(15,81,50,.4));} .imx-cd.on rect{stroke:#0a1e64;stroke-width:3;}
 .imx-cd .pu{fill:#1e8a4f;opacity:.35;transform-box:fill-box;transform-origin:center;animation:rtPulso 2s ease-out infinite;} .imx-cd .l{font:800 12px Inter,sans-serif;fill:#0f5132;paint-order:stroke;stroke:#fff;stroke-width:3.5px;}
 .imx-top{position:absolute;top:16px;left:16px;z-index:6;display:flex;align-items:center;gap:8px;}
@@ -24445,17 +24446,13 @@ function impPaisNom(a){ if(!a) return 'Sin país'; if(PM_PAIS_NOM[a]) return PM_
 function impPaisDe(ds, prov, oc){ const o = ctwOrigen(ds || ''), k = o ? o.replace(/\s*\(.*$/, '') : ''; return IMX_ORIGEN[k] || pmPais(prov, oc) || ''; }
 function impFlag(a, t){ return a ? `https://flagcdn.com/w${t || 80}/${a}.png` : ''; }
 // Una fila por embarque (o grupo de OC de Nisira) con su país y su estado para el mapa.
-function impItems(){ const S = appImpSecciones(), L = appImpDatos();
-  return appMemo('impItems' + (S ? 1 : 0), function(){ const out = [];
-    const st = function(k, g, emb){ return emb && emb.es === 'ARRIBO' ? 'ar' : k === 'ot' ? (g && g.k) || 'em' : k; };
-    const pys = function(g){ return g ? [...g.prys].map(appImpNombre) : []; };
-    if(S){ ['tr', 'em', 'bo'].forEach(function(k){ S[k].forEach(function(x){ const g = x.g, p = ctwPartes(x.e);
-        out.push({ sec:k, st:st(k, g, x.e), x:x, ocs:x.e.oc, org:(x.e.ds || '') + ' ' + (g ? g.prov : ''), prov:p.prov || (g ? ctwProv(g.prov) : ''), a:impPaisDe(x.e.ds, g && g.prov, x.e.oc[0]), etd:x.etd, eta:x.eta, modo:ctwCarga(x.e)[0],
-          pry:p.pry.length ? p.pry : pys(g), txt:polarNorm([x.e.oc.join(' '), x.e.ds, x.e.mt, x.e.ag, x.e.rf, g ? g.prov + ' ' + [...g.prys].join(' ') : ''].join(' ')) }); }); });
-      S.ot.forEach(function(g){ out.push({ sec:'ot', st:st('ot', g, g.emb), g:g, ocs:g.ocs, org:(g.emb ? g.emb.ds : '') + ' ' + g.prov, prov:appImpNombre(g.prov), a:impPaisDe(g.emb && g.emb.ds, g.prov, g.ocs[0]), etd:g.etd, eta:g.eta, modo:g.emb ? ctwCarga(g.emb)[0] : 'mar', pry:pys(g),
-        txt:polarNorm([g.ocs.join(' '), g.prov, [...g.prys].join(' '), [...g.prods.keys()].join(' '), g.emb ? [g.emb.rf, g.emb.ag, g.emb.ds, g.emb.mt].join(' ') : ''].join(' ')) }); }); }
-    else ['tr', 'em', 'bk'].forEach(function(k){ L[k].forEach(function(g){ out.push({ sec:k, st:st(k, g, g.emb), g:g, ocs:g.ocs, org:(g.emb ? g.emb.ds : '') + ' ' + g.prov, prov:appImpNombre(g.prov), a:impPaisDe(g.emb && g.emb.ds, g.prov, g.ocs[0]), etd:g.etd, eta:g.eta,
-      modo:g.emb ? ctwCarga(g.emb)[0] : 'mar', pry:pys(g), txt:polarNorm([g.ocs.join(' '), g.prov, [...g.prys].join(' '), [...g.prods.keys()].join(' '), g.emb ? [g.emb.rf, g.emb.ag, g.emb.ds, g.emb.mt].join(' ') : ''].join(' ')) }); }); });
+// Solo los embarques del Seguimiento de contenedores de Camila (17.11.2026, Piero: "solo considera lo que Camila tiene en su Excel, no los
+// pendientes de importación, porque si no va a salir un falso detalle"). Sin su Excel, el mapa queda vacío.
+function impItems(){ const S = appImpSecciones();
+  return appMemo('impItems' + (S ? 1 : 0), function(){ const out = []; if(!S) return out;
+    ['tr', 'em', 'bo'].forEach(function(k){ S[k].forEach(function(x){ const g = x.g, p = ctwPartes(x.e);
+      out.push({ sec:k, st:x.e.es === 'ARRIBO' ? 'ar' : k, x:x, ocs:x.e.oc, org:(x.e.ds || '') + ' ' + (g ? g.prov : ''), prov:p.prov || (g ? ctwProv(g.prov) : ''), a:impPaisDe(x.e.ds, g && g.prov, x.e.oc[0]), etd:x.etd, eta:x.eta, modo:ctwCarga(x.e)[0],
+        pry:p.pry.length ? p.pry : (g ? [...g.prys].map(appImpNombre) : []), txt:polarNorm([x.e.oc.join(' '), x.e.ds, x.e.mt, x.e.ag, x.e.rf, g ? g.prov + ' ' + [...g.prys].join(' ') : ''].join(' ')) }); }); });
     return out; }); }
 function impFiltrados(){ const q = polarNorm(APP_PL.q || ''); return impItems().filter(function(x){ return !q || x.txt.indexOf(q) !== -1 || polarCompacto(x.txt).indexOf(polarCompacto(q)) !== -1; }); }
 // Ruta del país a Lurín: Asia y Oceanía cruzan el Pacífico; Europa, EE.UU. (Golfo y este) pasan por el canal de Panamá.
@@ -24471,7 +24468,7 @@ const IMX_ICO = { barco:'<path d="M2 17c2 1.6 4 1.6 6 0 2 1.6 4 1.6 6 0 2 1.6 4 
   avion:'<path d="M2.5 13.5 21 6l-3 13-5.5-4.5L9 18v-5l9-7"/>', camion:'<path d="M2 6h11v10H2zM13 9h4.5l3.5 3.5V16h-8"/><circle cx="6" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>',
   cd:'<path d="M3 21V9l9-5 9 5v12"/><path d="M7 21v-7h10v7M7 17h10"/>' };
 // Lo elegido en el mapa (APP_PL.pais): un país ('cn'), o un estado ('e:tr', 'e:em', 'e:bk', 'e:ar'; Lurín abre 'e:ar').
-function impEnEst(x, k){ return k === 'ar' ? impEnPeru(x) : k === 'tr' ? x.st === 'tr' && !impEnPeru(x) : k === 'em' ? x.st === 'em' || x.st === 'bo' : x.st === k; }
+function impEnEst(x, k){ return k === 'ar' ? impEnPeru(x) : k === 'tr' ? x.st === 'tr' && !impEnPeru(x) : x.st === k; }
 function impSel(I){ const s = APP_PL.pais || ''; if(!s) return null; const k = s.indexOf('e:') === 0 ? s.slice(2) : '';
   return { est:k, pais:k ? '' : s, L:I.filter(function(x){ return k ? impEnEst(x, k) : x.a === s; }) }; }
 function impBarra(L){ const n = {}; L.forEach(function(x){ const k = IMX_ORD.find(function(z){ return impEnEst(x, z === 'bo' ? 'em' : z); }) || x.st; n[k] = (n[k] || 0) + 1; });
@@ -24497,10 +24494,57 @@ function impOrigen(a, L){ const n = new Map(); (L || []).forEach(function(x){ co
   if(c) return { ll:c[0].ll, n:c[0].n, real:true, otras:[...new Set([...n.keys()].map(function(z){ return z.n; }))].filter(function(z){ return z !== c[0].n; }) };
   const p = IMX_PUERTO[a] || IMX_MUNDO.c[a]; return p ? { ll:p, n:'', real:false, otras:[] } : null; }
 function impRutaLL(ll){ const P = [ll]; if(ll[0] > 10 && ll[1] > -98 && ll[1] < 60) P.push(IMX_PANAMA); P.push(IMX_LURIN); return P.map(impXY); }
-// ---- Zoom y arrastre (17.11.2026, Piero: "que se pueda hacer zoom… más limpio, los países se tapan") ----
-// El mapa base (países y rutas) es fijo; las marcas (banderas, barcos, Lurín) se vuelven a dibujar a tamaño de pantalla en cada zoom, y las que
-// quedan muy juntas se abren en abanico (países) o se agrupan con su número (barcos; tocar el grupo acerca el mapa).
-const IMX_VB = { v:null, W:0, H:0, sel:null };
+// ---- Zoom fluido de los mapas (17.11.2026, Piero: "que el zoom sea más intuitivo, más fluido") ----
+// La rueda y los botones se deslizan suave hasta el destino, el arrastre sigue al dedo y al soltar sigue un poco (inercia), pellizco en el
+// celular y doble clic acerca. Mientras se mueve solo cambia el viewBox y las marcas mantienen su tamaño (cuadro); al quedarse quieto, las
+// marcas se vuelven a ordenar (fin). id: un nombre por mapa; o: { lim:[x0, y0, x1, y1], minW, maxW, inicio(), cuadro(v, D), fin(v, D) }.
+const ZM = {};
+function zmTam(z){ const r = z.svg.getBoundingClientRect(); return [r.width || 1, r.height || 1]; }
+function zmLim(z, v){ const D = zmTam(z), a = D[0] / D[1], L = z.o.lim, w = Math.max(z.o.minW, Math.min(z.o.maxW, v[2])), h = w / a;
+  const cx = Math.max(L[0], Math.min(L[2], v[0] + v[2] / 2)), cy = Math.max(L[1], Math.min(L[3], v[1] + v[3] / 2)); return [cx - w / 2, cy - h / 2, w, h]; }
+function zmEn(v, f, fx, fy){ const w = v[2] * f, h = v[3] * f; return [v[0] + (v[2] - w) * fx, v[1] + (v[3] - h) * fy, w, h]; }   // acerca (f < 1) o aleja con un punto fijo
+function zmPintar(id, ya){ const z = ZM[id]; if(!z || !z.svg || !z.svg.isConnected) return; const D = zmTam(z);
+  z.svg.setAttribute('viewBox', z.v.map(function(n){ return n.toFixed(3); }).join(' ')); if(z.o.cuadro) z.o.cuadro(z.v, D);
+  clearTimeout(z.tf); if(ya){ if(z.o.fin) z.o.fin(z.v, D); } else z.tf = setTimeout(function(){ if(z.o.fin && z.svg.isConnected) z.o.fin(z.v, zmTam(z)); }, 170); }
+function zmIr(id, t, suave){ const z = ZM[id]; if(!z) return; z.t = zmLim(z, t);
+  if(suave === false){ cancelAnimationFrame(z.raf); z.raf = 0; z.v = z.t.slice(); return zmPintar(id); }
+  if(z.raf) return; let t0 = performance.now();
+  const paso = function(now){ const k = 1 - Math.pow(0.78, Math.min(64, now - t0) / 16.7); t0 = now; let listo = true;
+    z.v = z.v.map(function(a, i){ const d = z.t[i] - a; if(Math.abs(d) > z.t[2] * 0.0006) listo = false; return a + d * k; });
+    if(listo) z.v = z.t.slice(); zmPintar(id); z.raf = listo ? 0 : requestAnimationFrame(paso); };
+  z.raf = requestAnimationFrame(paso); }
+function zmCrear(id, svg, o){ const z = ZM[id] || (ZM[id] = {}); z.o = o; const nuevo = z.svg !== svg; z.svg = svg;
+  if(!z.v){ z.svg = svg; z.v = zmLim(z, o.inicio()); } z.t = z.v.slice(); cancelAnimationFrame(z.raf); z.raf = 0;
+  if(nuevo) zmGestos(id); zmPintar(id, true); return z; }
+function zmGestos(id){ const z = ZM[id], svg = z.svg, pt = new Map(); let b = null, vel = [0, 0], tU = 0;
+  const base = function(){ return { v:z.v.slice(), p:[...pt.values()].map(function(c){ return c.slice(); }), mov:pt.size > 1 ? 99 : 0 }; };
+  svg.addEventListener('wheel', function(ev){ ev.preventDefault(); const r = svg.getBoundingClientRect(), dy = ev.deltaMode === 1 ? ev.deltaY * 33 : ev.deltaY;
+    zmIr(id, zmEn(z.t, Math.exp(Math.max(-250, Math.min(250, dy)) * 0.0022), (ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height)); }, { passive:false });
+  svg.addEventListener('dblclick', function(ev){ const r = svg.getBoundingClientRect(); zmIr(id, zmEn(z.t, 0.45, (ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height)); });
+  svg.addEventListener('pointerdown', function(ev){ pt.set(ev.pointerId, [ev.clientX, ev.clientY]); cancelAnimationFrame(z.raf); z.raf = 0; z.t = z.v.slice(); b = base(); vel = [0, 0]; tU = performance.now(); });
+  svg.addEventListener('pointermove', function(ev){ if(!pt.has(ev.pointerId) || !b) return; const prev = pt.get(ev.pointerId); pt.set(ev.pointerId, [ev.clientX, ev.clientY]);
+    const r = svg.getBoundingClientRect(), P = [...pt.values()];
+    if(P.length === 1 && b.p.length === 1){ const dx = P[0][0] - b.p[0][0], dy = P[0][1] - b.p[0][1]; b.mov = Math.max(b.mov, Math.abs(dx) + Math.abs(dy)); if(b.mov < 5) return;
+      if(!svg.hasPointerCapture(ev.pointerId)) svg.setPointerCapture(ev.pointerId); svg.classList.add('arr');
+      const now = performance.now(), dt = Math.max(1, now - tU); tU = now; vel = [(ev.clientX - prev[0]) / dt * b.v[2] / r.width, (ev.clientY - prev[1]) / dt * b.v[3] / r.height];
+      z.v = z.t = zmLim(z, [b.v[0] - dx * b.v[2] / r.width, b.v[1] - dy * b.v[3] / r.height, b.v[2], b.v[3]]); }
+    else if(P.length === 2 && b.p.length === 2){ const d0 = Math.hypot(b.p[0][0] - b.p[1][0], b.p[0][1] - b.p[1][1]), d1 = Math.hypot(P[0][0] - P[1][0], P[0][1] - P[1][1]); if(!d0 || !d1) return;
+      const fx = ((b.p[0][0] + b.p[1][0]) / 2 - r.left) / r.width, fy = ((b.p[0][1] + b.p[1][1]) / 2 - r.top) / r.height, m = zmEn(b.v, d0 / d1, fx, fy);
+      const mx = ((P[0][0] + P[1][0]) - (b.p[0][0] + b.p[1][0])) / 2 * m[2] / r.width, my = ((P[0][1] + P[1][1]) - (b.p[0][1] + b.p[1][1])) / 2 * m[3] / r.height;
+      z.v = z.t = zmLim(z, [m[0] - mx, m[1] - my, m[2], m[3]]); }
+    else return;
+    cancelAnimationFrame(z.rp); z.rp = requestAnimationFrame(function(){ zmPintar(id); }); });
+  const fin = function(ev){ if(!pt.has(ev.pointerId)) return; pt.delete(ev.pointerId); svg.classList.remove('arr');
+    if(b && b.mov >= 5){ svg._sinClic = Date.now(); if(!pt.size && b.p.length === 1 && performance.now() - tU < 90) zmIr(id, [z.v[0] - vel[0] * 240, z.v[1] - vel[1] * 240, z.v[2], z.v[3]]); }
+    b = pt.size ? base() : null; };
+  svg.addEventListener('pointerup', fin); svg.addEventListener('pointercancel', fin); }
+// Marcas a tamaño fijo de pantalla mientras se hace zoom: data-a = lugar en el mapa, data-o = corrimiento en px (abanico), data-r = radio en px.
+function zmEscala(g, v, D){ if(!g) return; const u = v[2] / D[0];
+  g.querySelectorAll('[data-a]').forEach(function(el){ const a = el._a || (el._a = el.dataset.a.split(',').map(Number)), o = el._o || (el._o = (el.dataset.o || '0,0').split(',').map(Number));
+    if(el.dataset.r){ el.setAttribute('r', (el.dataset.r * u).toFixed(4)); return; }
+    const x = a[0] + o[0] * u, y = a[1] + o[1] * u; if(el.tagName === 'line'){ el.setAttribute('x2', x.toFixed(3)); el.setAttribute('y2', y.toFixed(3)); }
+    else el.setAttribute('transform', 'translate(' + x.toFixed(3) + ' ' + y.toFixed(3) + ') scale(' + u.toFixed(5) + ')'); }); }
+// Mapa del mundo de Importaciones: las marcas se ordenan con la escala de pantalla (abanico de países, barcos agrupados).
 function impPx(){ const m = document.querySelector('.imx-mapa'); return m && m.clientWidth ? [m.clientWidth, m.clientHeight] : [Math.max(320, window.innerWidth - 64), Math.max(420, window.innerHeight - 120)]; }
 function impEncuadre(pts, ins){ const D = impPx(), W = D[0], H = D[1], movil = window.innerWidth <= 900;
   ins = movil ? { L:12, R:12, T:12, B:12 } : ins || { L:24, R:24, T:76, B:64 };
@@ -24529,9 +24573,10 @@ function impMarcas(I, v, W){ const e = escapeHtml, s = W / v[2], u = 1 / s, sel 
     // En el orden en que están alrededor del centro, para que las líneas no se crucen.
     g.l.forEach(function(x){ x.t = Math.atan2(x.q[1] - cy, x.q[0] - cx); }); g.l.sort(function(a, b){ return a.t - b.t; }); const t0 = g.l[0].t;
     g.l.forEach(function(x, i){ const ang = t0 + i * 2 * Math.PI / n, d = n > 1 ? uni([cx + r * Math.cos(ang), cy + r * Math.sin(ang)]) : x.p, on = act.has(x.a);
-      if(n > 1) lineas.push(`<line class="imx-ld${on ? ' on' : ''}" x1="${x.p[0].toFixed(2)}" y1="${x.p[1].toFixed(2)}" x2="${d[0].toFixed(2)}" y2="${d[1].toFixed(2)}"/><circle class="imx-dot" cx="${x.p[0].toFixed(2)}" cy="${x.p[1].toFixed(2)}" r="${(3 * u).toFixed(3)}"/>`);
+      const ao = `data-a="${x.p[0].toFixed(3)},${x.p[1].toFixed(3)}" data-o="${((d[0] - x.p[0]) * s).toFixed(2)},${((d[1] - x.p[1]) * s).toFixed(2)}"`;
+      if(n > 1) lineas.push(`<line class="imx-ld${on ? ' on' : ''}" ${ao} x1="${x.p[0].toFixed(2)}" y1="${x.p[1].toFixed(2)}" x2="${d[0].toFixed(2)}" y2="${d[1].toFixed(2)}"/><circle class="imx-dot" data-a="${x.p[0].toFixed(3)},${x.p[1].toFixed(3)}" data-r="3" cx="${x.p[0].toFixed(2)}" cy="${x.p[1].toFixed(2)}" r="${(3 * u).toFixed(3)}"/>`);
       const nom = impPaisNom(x.a) + (x.o.n ? ' · ' + x.o.n : '');
-      pins.push(`<g class="imx-pin${on ? ' on' : ''}" data-impais="${x.a}" transform="translate(${d[0].toFixed(2)} ${d[1].toFixed(2)}) scale(${u.toFixed(4)})"><title>${e(nom)} · ${x.n} embarque${x.n === 1 ? '' : 's'}${x.o.real ? '' : ' (ciudad de referencia)'}</title><circle class="b" r="13"/><image href="${impFlag(x.a)}" x="-11" y="-11" width="22" height="22" preserveAspectRatio="xMidYMid slice" clip-path="url(#imxClip)"/><circle class="n" cx="12" cy="-11" r="8"/><text x="12" y="-8">${x.n}</text>${s >= 2.4 || on ? `<text class="l" y="28">${e(nom)}</text>` : ''}</g>`); }); });
+      pins.push(`<g class="imx-pin${on ? ' on' : ''}" data-impais="${x.a}" ${ao} transform="translate(${d[0].toFixed(2)} ${d[1].toFixed(2)}) scale(${u.toFixed(4)})"><title>${e(nom)} · ${x.n} embarque${x.n === 1 ? '' : 's'}${x.o.real ? '' : ' (ciudad de referencia)'}</title><circle class="b" r="13"/><image href="${impFlag(x.a)}" x="-11" y="-11" width="22" height="22" preserveAspectRatio="xMidYMid slice" clip-path="url(#imxClip)"/><circle class="n" cx="12" cy="-11" r="8"/><text x="12" y="-8">${x.n}</text>${s >= 2.4 || on ? `<text class="l" y="28">${e(nom)}</text>` : ''}</g>`); }); });
   // Barcos y aviones en camino: si caen muy juntos, uno solo con el número; tocarlo acerca el mapa.
   const B = []; P.forEach(function(x){ const R = impRutaLL(x.o.ll), on = act.has(x.a); por[x.a].filter(function(y){ return impEnEst(y, 'tr'); }).forEach(function(y){ const p = impEnRuta(R, impFrac(y));
       B.push({ x:y, a:x.a, p:p, q:scr(p), on:on && (!sel.est || sel.est === 'tr') }); }); });
@@ -24540,11 +24585,11 @@ function impMarcas(I, v, W){ const e = escapeHtml, s = W / v[2], u = 1 / s, sel 
     const ic = n === 1 && b.x.modo === 'aire' ? 'avion' : n === 1 && b.x.modo === 'tierra' ? 'camion' : 'barco';
     const tt = n > 1 ? n + ' embarques en camino · toca para acercar' : `OC ${b.x.ocs.map(function(c){ return c.replace(/^000\d-0*/, ''); }).join(', ')} · ${b.x.prov || ''} · ${b.x.eta ? 'llega ' + appDDMM(b.x.eta) : 'ETA por confirmar'}`;
     const at = n > 1 ? `data-imzc="${g.p[0].toFixed(2)},${g.p[1].toFixed(2)}"` : `data-impais="${b.a}" data-imfoco="${e(b.x.ocs[0])}"`;
-    return `<g class="imx-sh${on ? ' on' : ''}${foco ? ' foco' : ''}" ${at} transform="translate(${g.p[0].toFixed(2)} ${g.p[1].toFixed(2)}) scale(${u.toFixed(4)})" style="--d:${(i % 5) * 0.4}s"><title>${e(tt)}</title><circle r="11"/><g transform="translate(-7.5 -7.5) scale(.625)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO[ic]}</svg></g>${n > 1 ? `<circle class="n" cx="10" cy="-9" r="7.5"/><text x="10" y="-6">${n}</text>` : ''}</g>`; });
+    return `<g class="imx-sh${on ? ' on' : ''}${foco ? ' foco' : ''}" ${at} data-a="${g.p[0].toFixed(3)},${g.p[1].toFixed(3)}" transform="translate(${g.p[0].toFixed(2)} ${g.p[1].toFixed(2)}) scale(${u.toFixed(4)})" style="--d:${(i % 5) * 0.4}s"><title>${e(tt)}</title><circle r="11"/><g transform="translate(-7.5 -7.5) scale(.625)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO[ic]}</svg></g>${n > 1 ? `<circle class="n" cx="10" cy="-9" r="7.5"/><text x="10" y="-6">${n}</text>` : ''}</g>`; });
   const lu = impXY(IMX_LURIN), arr = I.filter(impEnPeru).length;
-  const cd = `<g class="imx-cd${sel && sel.est === 'ar' ? ' on' : ''}" data-impais="e:ar" transform="translate(${lu[0].toFixed(2)} ${lu[1].toFixed(2)}) scale(${u.toFixed(4)})"><title>Almacén principal · Lurín (Friopacking)${arr ? ' · ' + arr + ' en Perú, falta el ingreso · toca para verlos' : ''}</title><circle class="pu" r="12"/><rect x="-12" y="-12" width="24" height="24" rx="7"/><g transform="translate(-8.5 -8.5) scale(.7)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO.cd}</svg></g><text class="l" x="17" y="5">Lurín</text>${arr ? `<circle class="n" cx="11" cy="-12" r="8"/><text x="11" y="-9">${arr}</text>` : ''}</g>`;
+  const cd = `<g class="imx-cd${sel && sel.est === 'ar' ? ' on' : ''}" data-impais="e:ar" data-a="${lu[0].toFixed(3)},${lu[1].toFixed(3)}" transform="translate(${lu[0].toFixed(2)} ${lu[1].toFixed(2)}) scale(${u.toFixed(4)})"><title>Almacén principal · Lurín (Friopacking)${arr ? ' · ' + arr + ' en Perú, falta el ingreso · toca para verlos' : ''}</title><circle class="pu" r="12"/><rect x="-12" y="-12" width="24" height="24" rx="7"/><g transform="translate(-8.5 -8.5) scale(.7)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO.cd}</svg></g><text class="l" x="17" y="5">Lurín</text>${arr ? `<circle class="n" cx="11" cy="-12" r="8"/><text x="11" y="-9">${arr}</text>` : ''}</g>`;
   return `<g>${lineas.join('')}</g><g>${pins.join('')}</g>${cd}<g>${barcos.join('')}</g>`; }
-function impMapaHtml(I){ const M = IMX_MUNDO, e = escapeHtml, sel = impSel(I), por = {}, D = impPx(), v = IMX_VB.v || impVistaInicial();
+function impMapaHtml(I){ const M = IMX_MUNDO, e = escapeHtml, sel = impSel(I), por = {}, D = impPx(), v = (ZM.imx && ZM.imx.v) || impVistaInicial();
   I.forEach(function(x){ if(x.a) (por[x.a] = por[x.a] || []).push(x); });
   const act = new Set(sel ? sel.L.map(function(x){ return x.a; }) : []), ks = Object.keys(por), mx = Math.max.apply(null, [1].concat(ks.map(function(k){ return por[k].length; })));
   const col = function(n){ const t = Math.sqrt(n / mx), a = [167, 224, 210], b = [11, 110, 99]; return 'rgb(' + a.map(function(c, i){ return Math.round(c + (b[i] - c) * t); }).join(',') + ')'; };
@@ -24554,40 +24599,19 @@ function impMapaHtml(I){ const M = IMX_MUNDO, e = escapeHtml, sel = impSel(I), p
     let d = 'M' + P[0][0].toFixed(1) + ' ' + P[0][1].toFixed(1); for(let i = 1; i < P.length; i++){ const c = impCurva(P[i - 1], P[i]); d += ' Q' + c[0].toFixed(1) + ' ' + c[1].toFixed(1) + ' ' + P[i][0].toFixed(1) + ' ' + P[i][1].toFixed(1); }
     return `<path class="imx-ru${viva ? ' viva' : ''}${act.has(k) ? ' on' : ''}" d="${d}" data-impais="${k}"/>`; }).join('');
   return `<svg viewBox="${v.map(function(n){ return n.toFixed(2); }).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa del mundo con las importaciones"><defs><clipPath id="imxClip"><circle r="11"/></clipPath></defs><g class="imx-ps">${paises}</g><g>${rutas}</g><g id="imxMarcas">${impMarcas(I, v, D[0])}</g></svg>`; }
-function impAplicar(){ const svg = document.querySelector('#imxMapa svg'), g = document.getElementById('imxMarcas'); if(!svg || !IMX_VB.v) return;
-  svg.setAttribute('viewBox', IMX_VB.v.map(function(n){ return n.toFixed(2); }).join(' ')); if(g) g.innerHTML = impMarcas(impFiltrados(), IMX_VB.v, impPx()[0]); }
-function impLimitar(v){ const D = impPx(), a = D[0] / D[1]; let w = Math.max(28, Math.min(1300, v[2])), h = w / a; const cx = v[0] + v[2] / 2, cy = v[1] + v[3] / 2;
-  return [Math.max(-300, Math.min(1000 - w + 300, cx - w / 2)), Math.max(-200, Math.min(444 - h + 200, cy - h / 2)), w, h]; }
-function impIrA(v2){ const v1 = (IMX_VB.v || v2).slice(), t0 = performance.now(); cancelAnimationFrame(impIrA._f);
-  const paso = function(t){ const k = Math.min(1, (t - t0) / 380), f = 1 - Math.pow(1 - k, 3); IMX_VB.v = v1.map(function(a, i){ return a + (v2[i] - a) * f; }); impAplicar(); if(k < 1) impIrA._f = requestAnimationFrame(paso); };
-  impIrA._f = requestAnimationFrame(paso); }
-function impZoom(f, px, py){ const v = IMX_VB.v, D = impPx(), mx = v[0] + (px == null ? 0.5 : px / D[0]) * v[2], my = v[1] + (py == null ? 0.5 : py / D[1]) * v[3], w = v[2] * f, h = v[3] * f;
-  return impLimitar([mx - (px == null ? 0.5 : px / D[0]) * w, my - (py == null ? 0.5 : py / D[1]) * h, w, h]); }
-// Después de cada dibujo: tamaño real, zoom al elegido (o de vuelta al mundo) y los gestos (rueda, arrastre, pellizco, doble clic).
-function impMapaIniciar(){ const svg = document.querySelector('#imxMapa svg'); if(!svg) return; const D = impPx(), I = impFiltrados(), sel = APP_PL.pais || '';
-  if(!IMX_VB.v || Math.abs(IMX_VB.W - D[0]) > 4 || Math.abs(IMX_VB.H - D[1]) > 4){ IMX_VB.W = D[0]; IMX_VB.H = D[1]; IMX_VB.v = sel && impSelPts(I) ? impEncuadre(impSelPts(I), { L:70, R:540, T:90, B:80 }) : impVistaInicial(); IMX_VB.sel = sel; impAplicar(); }
-  else if(IMX_VB.sel !== sel){ IMX_VB.sel = sel; const pts = sel && !APP_PL.foco ? impSelPts(I) : null; if(pts) impIrA(impEncuadre(pts, { L:70, R:540, T:90, B:80 })); else if(!sel) impIrA(impVistaInicial()); else impAplicar(); }
-  else impAplicar();
-  const f = APP_PL.foco && document.querySelector('.imx-c.foco'); if(f) f.scrollIntoView({ block:'nearest', behavior:'smooth' });
-  if(svg._gestos) return; svg._gestos = true; const pt = new Map(); let base = null;
-  svg.addEventListener('wheel', function(ev){ ev.preventDefault(); const r = svg.getBoundingClientRect(); IMX_VB.v = impZoom(ev.deltaY < 0 ? 0.8 : 1.25, ev.clientX - r.left, ev.clientY - r.top); impAplicar(); }, { passive:false });
-  svg.addEventListener('dblclick', function(ev){ const r = svg.getBoundingClientRect(); impIrA(impZoom(0.5, ev.clientX - r.left, ev.clientY - r.top)); });
-  svg.addEventListener('pointerdown', function(ev){ pt.set(ev.pointerId, [ev.clientX, ev.clientY]); base = { v:IMX_VB.v.slice(), p:[...pt.values()].map(function(x){ return x.slice(); }), mov:0 }; });
-  svg.addEventListener('pointermove', function(ev){ if(!pt.has(ev.pointerId) || !base) return; pt.set(ev.pointerId, [ev.clientX, ev.clientY]); const D2 = impPx(), P2 = [...pt.values()];
-    if(P2.length === 1 && base.p.length === 1){ const dx = P2[0][0] - base.p[0][0], dy = P2[0][1] - base.p[0][1]; base.mov = Math.max(base.mov, Math.abs(dx) + Math.abs(dy)); if(base.mov < 4) return;
-      svg.setPointerCapture(ev.pointerId); svg.classList.add('arr'); IMX_VB.v = impLimitar([base.v[0] - dx * base.v[2] / D2[0], base.v[1] - dy * base.v[3] / D2[1], base.v[2], base.v[3]]); }
-    else if(P2.length === 2 && base.p.length === 2){ const d0 = Math.hypot(base.p[0][0] - base.p[1][0], base.p[0][1] - base.p[1][1]), d1 = Math.hypot(P2[0][0] - P2[1][0], P2[0][1] - P2[1][1]); if(!d0) return; base.mov = 99;
-      const r = svg.getBoundingClientRect(), cx = (P2[0][0] + P2[1][0]) / 2 - r.left, cy = (P2[0][1] + P2[1][1]) / 2 - r.top; IMX_VB.v = base.v; IMX_VB.v = impZoom(d0 / d1, cx, cy); }
-    else return;
-    cancelAnimationFrame(impMapaIniciar._f); impMapaIniciar._f = requestAnimationFrame(impAplicar); });
-  const fin = function(ev){ pt.delete(ev.pointerId); svg.classList.remove('arr'); if(base && base.mov >= 4) svg._sinClic = Date.now(); base = pt.size ? { v:IMX_VB.v.slice(), p:[...pt.values()].map(function(x){ return x.slice(); }), mov:99 } : null; };
-  svg.addEventListener('pointerup', fin); svg.addEventListener('pointercancel', fin); }
+function impMapaIniciar(){ const svg = document.querySelector('#imxMapa svg'); if(!svg) return; const I = impFiltrados(), sel = APP_PL.pais || '', ins = { L:70, R:540, T:90, B:80 };
+  const z = zmCrear('imx', svg, { lim:[0, 0, 1000, 444], minW:22, maxW:1300, inicio:impVistaInicial, cuadro:function(v, D){ zmEscala(document.getElementById('imxMarcas'), v, D); },
+    fin:function(v, D){ const g = document.getElementById('imxMarcas'); if(g) g.innerHTML = impMarcas(impFiltrados(), v, D[0]); } });
+  if(z.sel !== sel){ const primera = z.sel === undefined; z.sel = sel; const pts = sel && !APP_PL.foco ? impSelPts(I) : null;
+    if(pts) zmIr('imx', impEncuadre(pts, ins), primera ? false : true); else if(!sel && !primera) zmIr('imx', impVistaInicial()); }
+  const f = APP_PL.foco && document.querySelector('.imx-c.foco'); if(f) f.scrollIntoView({ block:'nearest', behavior:'smooth' }); }
 // Resumen chico abajo (estados y países, todo se toca); el detalle de lo elegido va en el panel de la derecha.
 function impLado(I){ const e = escapeHtml, sel = impSel(I), por = {};
   I.forEach(function(x){ const k = x.a || ''; (por[k] = por[k] || []).push(x); });
-  const EN = { tr:'En tránsito', em:'Por embarcar', bk:'En fabricación', ar:'En Perú, falta ingreso' };
+  const EN = { tr:'En tránsito', em:'Por embarcar', bo:'Falta booking', bk:'En fabricación', ar:'En Perú, falta ingreso' };
   if(!sel){ const ks = Object.keys(por).sort(function(a, b){ return (a === '') - (b === '') || por[b].length - por[a].length; });
-    return `<div class="imx-chips">${['tr', 'em', 'bk', 'ar'].map(function(k){ return `<button type="button" data-impais="e:${k}" title="Ver ${EN[k].toLowerCase()}"><i style="background:${IMX_EST[k][1]}"></i><b>${appN(I.filter(function(x){ return impEnEst(x, k); }).length)}</b>${EN[k]}</button>`; }).join('')}
+    if(!I.length) return `<div class="imx-chips"><span class="imx-vacio">${appImpSecciones() ? 'No hay embarques con esa búsqueda.' : 'Carga el Seguimiento de contenedores de Camila para ver las importaciones en el mapa.'}</span></div>`;
+    return `<div class="imx-chips">${['tr', 'em', 'bo', 'ar'].filter(function(k){ return k === 'tr' || k === 'em' || I.some(function(x){ return impEnEst(x, k); }); }).map(function(k){ return `<button type="button" data-impais="e:${k}" title="Ver ${EN[k].toLowerCase()}"><i style="background:${IMX_EST[k][1]}"></i><b>${appN(I.filter(function(x){ return impEnEst(x, k); }).length)}</b>${EN[k]}</button>`; }).join('')}
       <span class="imx-plw"><button type="button" class="imx-plb" data-impl="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/></svg>Países <b>${appN(ks.filter(Boolean).length)}</b></button>
         <div class="imx-pl">${ks.map(function(k){ return `<button type="button" class="imx-or" ${k ? `data-impais="${k}"` : 'disabled'}>${k ? `<img src="${impFlag(k, 40)}" alt="" loading="lazy">` : '<i class="imx-nf">?</i>'}<span>${e(impPaisNom(k))}</span>${impBarra(por[k])}<b>${appN(por[k].length)}</b></button>`; }).join('')}</div></span></div>`; }
   const L = sel.L.slice().sort(function(a, b){ return IMX_ORD.indexOf(a.st) - IMX_ORD.indexOf(b.st) || (a.eta || a.etd || 9e15) - (b.eta || b.etd || 9e15); }), S = appImpSecciones();
@@ -24615,14 +24639,15 @@ function impVistaMapa(){ const I = impFiltrados(), e = escapeHtml;
 document.addEventListener('click', function(ev){ const svg = document.querySelector('#imxMapa svg'); if(!svg) return;
   const z = ev.target.closest && ev.target.closest('[data-imzoom],[data-imzc],[data-impl]');
   if(z){ if(z.dataset.impl){ z.parentElement.classList.toggle('on'); return; }
-    if(z.dataset.imzc){ const p = z.dataset.imzc.split(',').map(Number), w = IMX_VB.v[2] * 0.35; return impIrA(impLimitar([p[0] - w / 2, p[1] - IMX_VB.v[3] * 0.175, w, IMX_VB.v[3] * 0.35])); }
-    return impIrA(z.dataset.imzoom === 'fit' ? impVistaInicial() : impZoom(z.dataset.imzoom === 'in' ? 0.6 : 1.6)); }
+    const Z = ZM.imx; if(!Z) return;
+    if(z.dataset.imzc){ const p = z.dataset.imzc.split(',').map(Number), w = Z.t[2] * 0.35, h = Z.t[3] * 0.35; return zmIr('imx', [p[0] - w / 2, p[1] - h / 2, w, h]); }
+    return zmIr('imx', z.dataset.imzoom === 'fit' ? impVistaInicial() : zmEn(Z.t, z.dataset.imzoom === 'in' ? 0.55 : 1.8, 0.5, 0.5)); }
   if(!ev.target.closest('.imx-plw')) document.querySelectorAll('.imx-plw.on').forEach(function(x){ x.classList.remove('on'); });
   const b = ev.target.closest && ev.target.closest('[data-impais]'); if(!b || !document.querySelector('.imx')) return;
   if(b.closest('#imxMapa') && Date.now() - (svg._sinClic || 0) < 350) return;   // fue un arrastre, no un toque
   const v = b.dataset.impais, f = b.dataset.imfoco || '';
   APP_PL.pais = f ? v : APP_PL.pais === v ? '' : v; APP_PL.foco = f; appRenderInicio(); });
-window.addEventListener('resize', function(){ clearTimeout(impMapaIniciar._r); impMapaIniciar._r = setTimeout(function(){ if(APP.enInicio && APP.pantalla === 'pendlog'){ IMX_VB.v = null; impMapaIniciar(); } }, 200); });
+window.addEventListener('resize', function(){ clearTimeout(impMapaIniciar._r); impMapaIniciar._r = setTimeout(function(){ if(APP.enInicio && APP.pantalla === 'pendlog' && ZM.imx){ ZM.imx.v = null; ZM.imx.svg = null; impMapaIniciar(); } }, 200); });
 function appPendLogLista(){
   const L = appImpDatos(), q = polarNorm(APP_PL.q || ''), S = appImpSecciones();
   const ddmm = appDDMM;
