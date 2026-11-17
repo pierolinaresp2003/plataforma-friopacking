@@ -3601,8 +3601,9 @@ html[data-theme="dark"] .oc2.t-mal, html[data-theme="dark"] .ocx2-hero.t-mal{--t
 .oc2-big{width:64px;height:64px;border-radius:18px;background:var(--tb);color:var(--tn);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1;}
 .oc2-big b{font-size:24px;font-weight:900;letter-spacing:-.02em;} .oc2-big small{font-size:9.5px;font-weight:700;margin-top:3px;line-height:1.1;padding:0 4px;}
 .oc2-t{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.oc2-cods .oc2-mas{font-size:12px;font-weight:800;color:var(--tn);background:var(--tb);border-radius:999px;padding:1px 8px;align-self:center;} .oc2-cods .oc2-mas:hover{text-decoration:none;filter:brightness(.95);} .oc2-resto{display:contents;} .oc2-resto[hidden]{display:none;}
 .oc2-l1{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.oc2-cods{display:inline-flex;align-items:baseline;gap:4px;font-size:16px;font-weight:900;color:var(--ink);} .oc2-cods small{font-size:11px;font-weight:800;color:var(--ink-soft);} .oc2-cods button{all:unset;cursor:pointer;} .oc2-cods button:hover{text-decoration:underline;} .oc2-cods i{font-style:normal;color:var(--ink-soft);}
+.oc2-cods{display:inline-flex;flex-wrap:wrap;row-gap:0;min-width:0;max-width:100%;align-items:baseline;gap:4px;font-size:16px;font-weight:900;color:var(--ink);} .oc2-cods small{font-size:11px;font-weight:800;color:var(--ink-soft);} .oc2-cods button{all:unset;cursor:pointer;} .oc2-cods button:hover{text-decoration:underline;} .oc2-cods i{font-style:normal;color:var(--ink-soft);}
 .oc2-l1 > em{font-style:normal;font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 8px;background:var(--surface-2);color:var(--ink-soft);white-space:nowrap;}
 .oc2-l1 > em.oc2-est{text-transform:uppercase;letter-spacing:.04em;background:var(--tb);color:var(--tn);} .oc2-l1 > em.mal{background:#fdecea;color:#b4231a;} .oc2-l1 > em.ok{background:#e3f5ea;color:#1e7a45;} .oc2-l1 > em.prox{background:#fff4dd;color:#9a5b00;}
 .oc2-prov{font-size:14px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -16842,7 +16843,7 @@ function appNecesitaClave(){ return !!APP.usuario && !APP.usuario.invitado && !s
 // Invitado (16.11.2026, Piero: "una opción de entrar sin loguearse, como invitado en la parte de supervisor, que sea temporal"):
 // solo la vista Supervisor, sin escribir nada; vale hasta APP_INV_HASTA (fp-cuenta lo corta en el servidor en la misma fecha)
 // y mientras la app siga abierta (sessionStorage): al cerrarla vuelve a pedir correo.
-const APP_INV_HASTA = Date.parse('2026-11-22T23:59:59-05:00');
+const APP_INV_HASTA = 0;   // invitado desactivado (17.11.2026, revisión de seguridad: entregaba sin clave el archivo completo de datos)
 function appInvVigente(){ return Date.now() <= APP_INV_HASTA; }
 function appEsInv(){ try{ return !!(APP.usuario && APP.usuario.invitado); }catch(e){ return false; } }   // APP todavía no existe en la 1.ª carga
 function appInvUsuario(){ return { correo:'invitado', nombre:'Invitado', tipo:'supervisor', invitado:true }; }
@@ -23384,6 +23385,8 @@ function appAgAbrir(oc){
   });
   setTimeout(function(){ const i = f.querySelector('#agAg'); if(i) i.focus(); }, 50);
 }
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-oc2mas]'); if(!b) return; ev.preventDefault(); ev.stopPropagation();
+  const r = b.nextElementSibling, sep = b.previousElementSibling; if(r){ r.hidden = false; if(sep && sep.tagName === 'I') sep.remove(); b.remove(); } }, true);
 // En fase de captura: el camión no abre la OC de la tarjeta.
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-ocag]'); if(!b) return; ev.preventDefault(); ev.stopPropagation(); appAgAbrir(b.dataset.ocag); }, true);
 // Tarjeta visual de OC (17.11.2026, Piero: "cambiar por completo cómo se ve el módulo de compras… así simplemente está en columnas y no
@@ -23393,7 +23396,7 @@ document.addEventListener('click', function(ev){ const b = ev.target.closest && 
 function appOcCard(t){ const e = escapeHtml, ag = t.agOc ? APP_AG.m[t.agOc] : null;
   return `<div class="oc2 ${t.cls} t-${t.tono || 'neu'}" data-clic="1" ${t.cods.length ? t.cods[0][1] : ''}>
     <div class="oc2-h"><span class="oc2-big"><b>${e(String(t.big[0]))}</b><small>${e(t.big[1] || '')}</small></span>
-      <span class="oc2-t"><span class="oc2-l1"><span class="oc2-cods"><small>${t.codLbl}</small>${t.cods.map(function(c){ return `<button type="button" ${c[1]}>${e(c[0])}</button>`; }).join('<i>·</i>')}</span><em class="oc2-est">${t.est}</em>${t.flag || ''}${ag && t.est !== 'Por agencia' ? '<em class="ag">Por agencia</em>' : ''}</span>
+      <span class="oc2-t"><span class="oc2-l1"><span class="oc2-cods"><small>${t.codLbl}</small>${t.cods.slice(0, t.cods.length > 4 ? 3 : 4).map(function(c){ return `<button type="button" ${c[1]}>${e(c[0])}</button>`; }).join('<i>·</i>')}${t.cods.length > 4 ? `<i>·</i><button type="button" class="oc2-mas" data-oc2mas="1" title="${e(t.cods.map(function(c){ return c[0]; }).join(' · '))}">+${t.cods.length - 3}</button><span class="oc2-resto" hidden>${t.cods.slice(3).map(function(c){ return `<i>·</i><button type="button" ${c[1]}>${e(c[0])}</button>`; }).join('')}</span>` : ''}</span><em class="oc2-est">${t.est}</em>${t.flag || ''}${ag && t.est !== 'Por agencia' ? '<em class="ag">Por agencia</em>' : ''}</span>
         <b class="oc2-prov" title="${e(t.a[1] || '')}">${e(t.a[1] || '—')}</b><small class="oc2-cli">${e(t.b[1] || '—')}</small></span>
       <span class="oc2-q">${appQuienAv(t.quien)}<small>${e(t.quien || '')}</small>${t.correo || t.agOc ? `<span class="oc2-acc">${t.correo ? appCorreoBtn(t.correo) : ''}${t.agOc ? appAgBtn(t.agOc) : ''}</span>` : ''}</span></div>
     ${t.via ? appOcViaje(t.via) : ''}
