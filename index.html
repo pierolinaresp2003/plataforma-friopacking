@@ -3606,10 +3606,15 @@ button.pm-lx-f{cursor:pointer;} button.pm-lx-f:hover{border-color:#b9c6d8;} .pm-
 .pmm.con .pmm-ley-w{display:none;}
 @media (max-width:900px){ .pmm-ley-w{bottom:auto;top:auto;position:fixed;left:16px;bottom:84px;} .pmm-ley-w .pmm-ley{width:min(92vw,420px);} }
 /* Frutas en el mapa y "Qué se produce" (17.11.2026) */
-.pm-ll{cursor:pointer;animation:pmPin .5s var(--pz-ease) both;animation-delay:calc(.3s + var(--d,0ms));} .pm-ll.fuera{opacity:.25;}
-.pm-ll-l{stroke:#0a1e64;stroke-width:1.6;stroke-dasharray:4 4;opacity:.45;fill:none;} .pm-ll-p{fill:#0a1e64;opacity:.55;}
-.pm-fb-c{fill:#fff;stroke:#d7e0ea;stroke-width:1.4;filter:drop-shadow(0 4px 8px rgba(10,30,100,.22));transition:transform .2s;transform-box:fill-box;transform-origin:center;}
-.pm-ll:hover .pm-fb-c{stroke:#0a1e64;} .pm-fb-n{fill:#0a1e64;stroke:#fff;stroke-width:2;} .pm-fb-t{font:800 10.5px Inter,sans-serif;fill:#fff;pointer-events:none;}
+.pm-ll{cursor:pointer;} .pm-ll.fuera{opacity:.25;}
+.pm-ll-l{stroke:#0a1e64;stroke-width:1.5;stroke-dasharray:2 5;stroke-linecap:round;opacity:.5;fill:none;animation:pmLinea 1.6s linear infinite, pmLlEntra .7s ease both;animation-delay:0s, var(--d,0ms);} .pm-ll-p{fill:#0a1e64;opacity:.6;}
+@keyframes pmLinea{to{stroke-dashoffset:-14;}} @keyframes pmLlEntra{from{opacity:0;}to{opacity:.5;}}
+.pm-fb{transform-box:fill-box;transform-origin:center;animation:pmFbEntra .55s cubic-bezier(.34,1.56,.64,1) both, pmFlota 4.2s ease-in-out infinite;animation-delay:var(--d,0ms), calc(var(--d,0ms) + var(--f,0s));}
+@keyframes pmFbEntra{from{opacity:0;transform:scale(.3);}to{opacity:1;transform:none;}} @keyframes pmFlota{0%,100%{transform:translateY(0);}50%{transform:translateY(-3.5px);}}
+.pm-fb-c{fill:#fff;stroke:#d7e0ea;stroke-width:1.4;filter:drop-shadow(0 5px 9px rgba(10,30,100,.22));transition:stroke .2s,stroke-width .2s;}
+.pm-ll:hover .pm-fb-c{stroke:#0a1e64;stroke-width:2;} .pm-ll:hover .pm-ll-l{opacity:.9;stroke-width:2;} .pm-fb:hover{animation-play-state:paused;}
+.pm-fb-n{fill:#0a1e64;stroke:#fff;stroke-width:2;} .pm-fb-t{font:800 10px Inter,sans-serif;fill:#fff;pointer-events:none;}
+@media (prefers-reduced-motion:reduce){ .pm-fb, .pm-ll-l{animation:none;} }
 html[data-theme="dark"] .pm-fb-c{fill:#1b2433;stroke:#2b3647;} html[data-theme="dark"] .pm-ll-l{stroke:#8fb3ff;}
 .pm-fr{display:inline-block;vertical-align:-3px;flex:none;}
 .pmf-cs{display:inline-flex;flex-wrap:wrap;gap:4px;} .pmf-c{display:inline-flex;align-items:center;gap:3px;background:var(--surface-2);border-radius:999px;padding:3px 8px 3px 5px;} .pmf-c b{font-size:11.5px;font-weight:800;color:var(--ink);}
@@ -20127,25 +20132,29 @@ function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
     return `<path d="${d.d}" class="pm-dep t${tono(o ? o.n : 0)}${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}"${o ? ` data-z="${zonaDe(k)}"` : ''} data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o ? o.n : 0}|${o && o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o ? o.venc : 0}|${o ? o.sin : 0}"/>`; }).join('');
   const pins = deps.filter(function(k){ return por[k]; }).map(function(k){ const o = por[k], c = M.dep[k].c, r = 9 + 9 * Math.sqrt(o.n / mx);
     return `<g class="pm-pin${sel === k ? ' sel' : ''}${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" data-tip="${e(titleCase(k))}|${o.n}|${o.tot ? Math.round(o.ok / o.tot * 100) : ''}|${o.venc}|${o.sin}" style="--d:${(deps.indexOf(k) * 25)}ms"><circle cx="${c[0]}" cy="${c[1]}" r="${r.toFixed(1)}"/><text x="${c[0]}" y="${(c[1] + 4).toFixed(1)}" text-anchor="middle">${o.n}</text><text class="pm-lbl" x="${c[0]}" y="${(c[1] + r + 13).toFixed(1)}" text-anchor="middle">${e(titleCase(k))}</text></g>`; }).join('');
-  // Íconos de fruta grandes, sueltos junto a la costa y con una línea a su departamento (17.11.2026, Piero: "los íconos dispersos con líneas
-  // que señalen a dónde pertenecen y más grandes"); los de la sierra o selva van hacia la derecha.
-  const FR = pmFrutasPorDep(l).D, R = 22, PASO = 52, OFS = { TUMBES:[-70, 0], PIURA:[-72, 0], LAMBAYEQUE:[-70, 0], 'LA LIBERTAD':[-74, 0], ANCASH:[-76, 0], LIMA:[-80, 0], CALLAO:[-80, 12], ICA:[-72, 30], AREQUIPA:[-58, 58], MOQUEGUA:[-46, 58], TACNA:[-40, 52] };
-  // Repartidos a los dos lados (17.11.2026, Piero: "¿no puedes distribuirlo entre izquierda y derecha?"): de norte a sur, uno al mar y el
-  // siguiente tierra adentro; los de la sierra o selva siempre a la derecha.
-  let x0 = 0, x1 = M.w, nCosta = 0; const usados = { i:[], d:[] };
-  const llamadas = deps.filter(function(k){ return por[k] && FR[k]; }).sort(function(a, b){ return M.dep[a].c[1] - M.dep[b].c[1]; }).map(function(k){
-    const izq0 = !!OFS[k] && nCosta++ % 2 === 0;
-    const c = M.dep[k].c, rp = 9 + 9 * Math.sqrt(por[k].n / mx), o = izq0 ? OFS[k] : [66, OFS[k] && OFS[k][1] > 40 ? 30 : 0], izq = o[0] < 0, fs = pmFrutasOrden(FR[k]).filter(function(f){ return f !== 'otros' || Object.keys(FR[k]).length === 1; }).slice(0, 4);
-    const ancho = fs.length * (2 * R) + (fs.length - 1) * 8; let y = c[1] + o[1]; const lado = izq ? usados.i : usados.d;
-    lado.forEach(function(v){ if(Math.abs(v - y) < PASO) y = v + PASO; }); lado.push(y);
-    // Fuera del mapa (17.11.2026, Piero: "las frutas no pueden estar encima del mapa"): a la derecha, pasado el borde este del Perú.
-    const este = izq ? 0 : Math.max(pmEsteEn(y - R), pmEsteEn(y), pmEsteEn(y + R)) + 30;
-    const borde = izq ? c[0] + o[0] - rp : Math.max(c[0] + o[0] + rp, este), ini = izq ? borde - ancho : borde; x0 = Math.min(x0, ini - 12); x1 = Math.max(x1, ini + ancho + 12);
-    const p1 = izq ? [borde + 6, y] : [borde - 6, y], ang = Math.atan2(c[1] - y, c[0] - p1[0]), p2 = [c[0] - Math.cos(ang) * (rp + 2), c[1] - Math.sin(ang) * (rp + 2)];
-    return `<g class="pm-ll${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" style="--d:${(deps.indexOf(k) * 25 + 300)}ms"><path class="pm-ll-l" d="M${p1[0].toFixed(1)} ${p1[1].toFixed(1)}L${p2[0].toFixed(1)} ${p2[1].toFixed(1)}"/><circle class="pm-ll-p" cx="${p1[0].toFixed(1)}" cy="${p1[1].toFixed(1)}" r="3"/>
-      ${fs.map(function(f, i){ const cx = ini + R + i * (2 * R + 8), n = FR[k][f], fr = PM_FRUTAS.find(function(z){ return z[0] === f; });
-        return `<g class="pm-fb"><title>${e(pmFrutaNom(f))} · ${n} proyecto${n === 1 ? '' : 's'} en ${e(titleCase(k))}</title><circle class="pm-fb-c" cx="${cx.toFixed(1)}" cy="${y.toFixed(1)}" r="${R}"/><svg x="${(cx - 15).toFixed(1)}" y="${(y - 15).toFixed(1)}" width="30" height="30" viewBox="0 0 24 24">${fr[3]}</svg>
-          <circle class="pm-fb-n" cx="${(cx + 15).toFixed(1)}" cy="${(y - 16).toFixed(1)}" r="9"/><text class="pm-fb-t" x="${(cx + 15).toFixed(1)}" y="${(y - 12.5).toFixed(1)}" text-anchor="middle">${n}</text></g>`; }).join('')}</g>`; }).join('');
+  // Frutas alrededor del mapa, nunca encima (17.11.2026, Piero: "más dinámicos, mejor colocados"): cada departamento con su grupo de
+  // burbujas (más grandes las de más proyectos, en zigzag), a cerca o a más distancia para que se vean sueltas, unidas con una curva
+  // animada a su departamento y flotando suave. Norte y centro van al mar (izquierda); el sur, pasado el borde este (derecha).
+  const FR = pmFrutasPorDep(l).D;
+  const OFS = { TUMBES:[-60, -6], PIURA:[-62, -8], LAMBAYEQUE:[-150, 4], 'LA LIBERTAD':[-62, 2], ANCASH:[-150, 6], LIMA:[-66, 4], CALLAO:[-150, 14], ICA:[-70, 36], AREQUIPA:[-50, 64], MOQUEGUA:[-46, 60], TACNA:[-40, 52] };
+  const nMax = Math.max.apply(null, [1].concat([].concat.apply([], Object.keys(FR).map(function(k){ return Object.keys(FR[k]).map(function(f){ return FR[k][f]; }); }))));
+  const radio = function(n){ return 19 + 9 * Math.sqrt(n / nMax); };
+  let x0 = 0, x1 = M.w, ani = 0;
+  const llamadas = deps.filter(function(k){ return por[k] && FR[k]; }).sort(function(a, b){ return M.dep[a].c[1] - M.dep[b].c[1]; }).map(function(k, ik){
+    const c = M.dep[k].c, rp = 9 + 9 * Math.sqrt(por[k].n / mx), fs = pmFrutasOrden(FR[k]).filter(function(f){ return f !== 'otros' || Object.keys(FR[k]).length === 1; }).slice(0, 4);
+    const izq = !!OFS[k] && c[1] < 600, o = izq ? OFS[k] : [0, OFS[k] ? 10 : 0], y = c[1] + o[1];
+    const rs = fs.map(function(f){ return radio(FR[k][f]); });
+    // inicio del grupo: al mar (izq) o pasado el borde este a esa altura (der)
+    const este = izq ? 0 : Math.max(pmEsteEn(y - 30), pmEsteEn(y), pmEsteEn(y + 30)) + 34;
+    let x = izq ? c[0] + o[0] - rp : Math.max(c[0] + rp + 60, este);
+    const B = fs.map(function(f, i){ const r = rs[i], cx = izq ? x - r : x + r, cy = y + (i % 2 ? 11 : -6); x = izq ? x - 2 * r - 7 : x + 2 * r + 7; return { f:f, r:r, cx:cx, cy:cy }; });
+    B.forEach(function(b){ x0 = Math.min(x0, b.cx - b.r - 14); x1 = Math.max(x1, b.cx + b.r + 14); });
+    const p0 = B[0], ang0 = Math.atan2(c[1] - p0.cy, c[0] - p0.cx), p1 = [p0.cx + Math.cos(ang0) * (p0.r + 4), p0.cy + Math.sin(ang0) * (p0.r + 4)], p2 = [c[0] - Math.cos(ang0) * (rp + 3), c[1] - Math.sin(ang0) * (rp + 3)];
+    const mxp = (p1[0] + p2[0]) / 2, myp = (p1[1] + p2[1]) / 2 - Math.min(46, Math.abs(p2[0] - p1[0]) * .14) * (ik % 2 ? 1 : -1);
+    return `<g class="pm-ll${enZona(k) ? '' : ' fuera'}" data-pmdep="${e(k)}" style="--d:${(ik * 90 + 350)}ms"><path class="pm-ll-l" d="M${p1[0].toFixed(1)} ${p1[1].toFixed(1)}Q${mxp.toFixed(1)} ${myp.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}"/><circle class="pm-ll-p" cx="${p2[0].toFixed(1)}" cy="${p2[1].toFixed(1)}" r="2.6"/>
+      ${B.map(function(b){ const n = FR[k][b.f], fr = PM_FRUTAS.find(function(z){ return z[0] === b.f; }), ic = b.r * 1.32, bx = b.cx + b.r * .72, by = b.cy - b.r * .72;
+        return `<g class="pm-fb" style="--f:${(ani++ % 7) * 0.45}s"><title>${e(pmFrutaNom(b.f))} · ${n} proyecto${n === 1 ? '' : 's'} en ${e(titleCase(k))}</title><circle class="pm-fb-c" cx="${b.cx.toFixed(1)}" cy="${b.cy.toFixed(1)}" r="${b.r.toFixed(1)}"/><svg x="${(b.cx - ic / 2).toFixed(1)}" y="${(b.cy - ic / 2).toFixed(1)}" width="${ic.toFixed(1)}" height="${ic.toFixed(1)}" viewBox="0 0 24 24">${fr[3]}</svg>
+          <circle class="pm-fb-n" cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="8.5"/><text class="pm-fb-t" x="${bx.toFixed(1)}" y="${(by + 3.5).toFixed(1)}" text-anchor="middle">${n}</text></g>`; }).join('')}</g>`; }).join('');
   const vb = `${Math.floor(x0)} 0 ${Math.ceil(x1 - x0)} ${M.h}`;
   return `<div class="pm-mapa"><svg viewBox="${vb}" role="img" aria-label="Mapa del Perú con los proyectos por departamento"><g class="pm-deps">${paths}</g><g class="pm-frutas">${llamadas}</g><g class="pm-pins">${pins}</g></svg>
     <div class="pm-tip" id="pmTip" hidden></div>
