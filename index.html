@@ -5173,6 +5173,12 @@ async function sbCuenta(body){
   if(!r.ok) throw sbError(j, r.status);
   return j;
 }
+// Maestros guardados aparte en Supabase (17.11.2026, Piero: "cada que subo el Excel con las áreas luego se borra y debo volver a subirlo"):
+// el organigrama se guarda apenas se carga (tabla fp_maestro; solo el administrador escribe) y se lee al entrar, sin depender de
+// "Guardar y compartir". Sigue yendo también en el snapshot (para el invitado, que no tiene sesión).
+async function sbMaestroLeer(clave){ if(!sbSesion()) return null; const r = await sbFetch('/rest/v1/fp_maestro?select=datos&clave=eq.' + encodeURIComponent(clave)); if(!r.ok) return null; const j = await r.json(); return j[0] ? j[0].datos : null; }
+async function sbMaestroGuardar(clave, datos){ const r = await sbFetch('/rest/v1/fp_maestro?on_conflict=clave', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify([{ clave:clave, datos:datos, actualizado:new Date().toISOString() }]) });
+  if(!r.ok) throw sbError(await r.json().catch(function(){ return {}; }), r.status); }
 async function sbYo(){
   const x = sbSesion(); if(!x) return null;
   const r = await sbFetch('/rest/v1/fp_usuarios?select=usuario,correo,nombre,tipo,admin,activo&correo=eq.' + encodeURIComponent(x.correo));
@@ -5642,6 +5648,7 @@ async function loadPublishedSnapshot(manual){
   try{
     // Desde Supabase, solo con sesión (20.10.2026). Sin sesión no hay datos: primero se entra con correo y clave.
     if(!sbSesion() && !appEsInv()) return;
+    const pAreas = sbSesion() ? sbMaestroLeer('areas').catch(function(){ return null; }) : null;   // organigrama guardado aparte (17.11.2026)
     let snap = null;
     try{
       const buf = await sbDescargarDatos();
@@ -5655,6 +5662,7 @@ async function loadPublishedSnapshot(manual){
       throw e;
     }
     if(!snap){ SNAP_ESTADO = { error:'el archivo publicado no se pudo descomprimir' }; return; }
+    const areas = pAreas ? await pAreas : null; if(areas && Object.keys(areas).length) snap.areas = areas;
     loadFromSnapshot(snap); SNAP_ESTADO = 'ok';
   }catch(e){
     SNAP_ESTADO = { error:(e && e.message) || String(e) };
@@ -5984,7 +5992,9 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     } else if(sig && sig.key === 'organigrama'){
       const res = processOrganigrama(wb, file.name);
       setFileState('organigrama', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
-      showPublishBanner(res.ok ? '✅ Organigrama: ' + escapeHtml(res.message) + ' Toca «Guardar y compartir» (☁) para publicarlo y que se vea en los requerimientos.' : '❌ Organigrama: ' + escapeHtml(res.message), !res.ok);
+      let guardado = false; if(res.ok && sbSesion()){ try{ await sbMaestroGuardar('areas', PERSONA_AREA); guardado = true; }catch(err){ console.warn('organigrama', err); } }
+      showPublishBanner(!res.ok ? '❌ Organigrama: ' + escapeHtml(res.message) : guardado ? '✅ Organigrama guardado: ' + escapeHtml(res.message) + ' Queda guardado para todos; no hace falta volver a subirlo.'
+        : '⚠ Organigrama leído (' + escapeHtml(res.message) + ') pero no se pudo guardar: entra con tu usuario administrador y vuelve a cargarlo.', !res.ok || !guardado);
     } else if(sig && sig.key === 'proveedores'){
       const res = processProveedores(wb, file.name);
       setFileState('proveedores', res.ok ? '✅' : '❌', res.message, res.ok ? 'ok' : 'err');
