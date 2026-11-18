@@ -23300,7 +23300,7 @@ function appPendComprasHtml(soloLista, sinCaras){
       else if(o.f && o.d > 0){ via.p = 2; via.ico = OC2_ICO.alerta; tono = 'mal'; big = [o.d, 'd.h. ETA pasada']; }
       else { via.p = 1 + appOcTramo(ii.etd, o.f); via.ico = OC2_ICO.barco; tono = 'cam'; big = o.f ? (o.d === 0 ? ['Hoy', 'llega'] : [-o.d, 'd.h. para llegar']) : ['—', 'ETA por definir']; }
     } else {
-      via = { n:[['Emitida', o.fo ? e2(o.fo) : ''], ['Aprobada', o.fb ? e2(o.fb) : 'pendiente'], ['Entrega', o.f ? e2(o.f) : 'sin fecha'], ['Lurín', '']] };
+      via = { n:[['Emitida', o.fo ? e2(o.fo) : ''], ['Aprobada', o.fb ? e2(o.fb) : 'pendiente'], ['Entrega', o.f ? e2(o.f) : 'sin fecha'], [RT_SEDE[ncSede(ncUbi(o.prov))].n, '']] };   // su almacén (18.11.2026)
       if(o.est === 'Sin aprobar'){ via.p = 0; via.ico = OC2_ICO.firma; tono = k === 'venc' ? 'mal' : 'prox'; }
       else if(o.est === 'Llegó parcial'){ via.p = 2; via.ico = OC2_ICO.caja; tono = k === 'venc' ? 'mal' : 'prox'; }
       else if(k === 'venc'){ via.p = 2; via.ico = OC2_ICO.reloj; tono = 'mal'; }
@@ -23477,6 +23477,11 @@ function ncK(t){ return sinAcentos(String(t || '')).toUpperCase().replace(/[^A-Z
 function ncNom(k){ return NC_NOM[k] || String(k || '').toLowerCase().replace(/(^|\s)(\S)/g, function(m, a, b){ return a + b.toUpperCase(); })
   .replace(/ (De|Del|Y)(?= )/g, function(m, w){ return ' ' + w.toLowerCase(); }).replace(/ (de|del) (La|Las|Los)(?= )/g, function(m, a, w){ return ' ' + a + ' ' + w.toLowerCase(); }); }
 function ncLu(){ return rtXY(RT_SEDE.LIM.ll); }
+// Almacén al que llega la OC (18.11.2026, Piero: "si se compra en Ica o Trujillo, el almacén es Ica o Trujillo, no va hasta Lurín"): el CD de
+// Friopacking más cercano al proveedor (Lurín, Trujillo o Ica). Sin distrito, Lurín.
+function ncSede(u){ if(!u) return 'LIM'; if(u.sd) return u.sd; let b = 'LIM', bd = Infinity;
+  ['LIM', 'TRU', 'ICA'].forEach(function(k){ const p = rtXY(RT_SEDE[k].ll), d = Math.hypot(p[0] - u.p[0], p[1] - u.p[1]); if(d < bd){ bd = d; b = k; } }); u.sd = b; return b; }
+function ncSedeXY(u){ return rtXY(RT_SEDE[ncSede(u)].ll); }
 // Lugar en el mapa de un departamento / provincia / distrito como lo escribe DB Proveedores (Callao viene como "PROV. CONST. DEL CALLAO" y hay
 // nombres cortados a 25 letras). Si el distrito no está, el centro de la provincia; si tampoco, el del departamento.
 function ncLugar(dep, prov, dist){ const G = NC_GEO.c; dep = ncK(dep); prov = ncK(prov); dist = ncK(dist);
@@ -23523,7 +23528,7 @@ function ncAnillo(c, r){ const K = Object.keys(NC_EST).filter(function(k){ retur
 // Encuadres: si la mayoría está en Lima y Callao, el mapa abre en Lima (distritos a la vista); si no, todo lo que hay.
 function ncIns(){ return APP_NC.d || APP_NC.est || APP_PC.q ? { L:290, R:540, T:40, B:40 } : { L:290, R:84, T:40, B:40 }; }
 function ncFit(V){ V = V.filter(function(x){ return x.u; }); if(!V.length) return null; const lim = V.filter(function(x){ return x.u.lima; });
-  return (lim.length >= V.length * 0.5 ? lim : V).map(function(x){ return x.u.p; }).concat([ncLu()]); }
+  const U = lim.length >= V.length * 0.5 ? lim : V; return U.map(function(x){ return x.u.p; }).concat([...new Set(U.map(function(x){ return ncSede(x.u); }))].map(function(k){ return rtXY(RT_SEDE[k].ll); })); }
 function ncVistaLima(){ return impEncuadre([rtXY([-11.8, -77.17]), rtXY([-12.3, -76.78])], ncIns(), 3); }
 function ncVistaPeru(){ return impEncuadre([[20, 20], [560, 820]], ncIns(), 3); }
 function ncVistaInicial(){ const p = ncFit(ncVis(NCM.I)); return p ? impEncuadre(p, ncIns(), 3) : ncVistaLima(); }
@@ -23552,8 +23557,8 @@ function ncMarcas(I, v, W){ const e = escapeHtml, s = W / v[2], u = 1 / s, dSel 
     if(c.l.length === 1){ const g = c.l[0].g; return `<g class="ncm-pin${c.on ? ' on' : ''}" data-ncd="${e(g.k)}" ${at}><title>${e(g.u.n)} · ${n} OC · toca para ver el detalle</title>${cuerpo}</g>`; }
     const xs = c.l.map(function(y){ return y.g.u.p[0]; }), ys = c.l.map(function(y){ return y.g.u.p[1]; }), nom = c.l.map(function(y){ return y.g.u.n; });
     return `<g class="ncm-pin ncm-cl" data-nczc="${Math.min.apply(null, xs).toFixed(2)},${Math.min.apply(null, ys).toFixed(2)},${Math.max.apply(null, xs).toFixed(2)},${Math.max.apply(null, ys).toFixed(2)}" ${at}><title>${e(nom.slice(0, 8).join(', ') + (nom.length > 8 ? '…' : ''))} · ${n} OC · toca para acercar</title>${cuerpo}</g>`; });
-  const lu = ncLu();
-  const cd = `<g class="imx-cd ncm-cd" data-a="${lu[0].toFixed(3)},${lu[1].toFixed(3)}" transform="translate(${lu[0].toFixed(3)} ${lu[1].toFixed(3)}) scale(${u.toFixed(5)})"><title>Almacén principal · CD Lurín (Friopacking): aquí llegan las OC</title><circle class="pu" r="12"/><rect x="-12" y="-12" width="24" height="24" rx="7"/><g transform="translate(-8.5 -8.5) scale(.7)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO.cd}</svg></g><text class="l" x="17" y="5">CD Lurín</text></g>`;
+  const cd = ['LIM', 'TRU', 'ICA'].map(function(k){ const lu = rtXY(RT_SEDE[k].ll), n = RT_SEDE[k].n;
+    return `<g class="imx-cd ncm-cd" data-a="${lu[0].toFixed(3)},${lu[1].toFixed(3)}" transform="translate(${lu[0].toFixed(3)} ${lu[1].toFixed(3)}) scale(${u.toFixed(5)})"><title>Almacén Friopacking · CD ${n}: aquí llegan las OC de los proveedores de la zona</title><circle class="pu" r="12"/><rect x="-12" y="-12" width="24" height="24" rx="7"/><g transform="translate(-8.5 -8.5) scale(.7)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO.cd}</svg></g><text class="l" x="17" y="5">CD ${n}</text></g>`; }).join('');
   return cd + pins.reverse().join(''); }
 function ncMapaHtml(I){ const e = escapeHtml, M = PM_PERU, G = ncGrupos(ncVis(I)), v = (ZM.ncm && ZM.ncm.v) || ncVistaInicial(), D = impPx(), dSel = APP_NC.d;
   // La región se pinta solo con lo de fuera de Lima Metropolitana y Callao (allí van los distritos).
@@ -23564,7 +23569,7 @@ function ncMapaHtml(I){ const e = escapeHtml, M = PM_PERU, G = ncGrupos(ncVis(I)
   const deps = Object.keys(M.dep).map(function(k){ const n = dep[k] || 0; return `<path class="ncm-dep${n ? ' si' : ''}" d="${M.dep[k].d}"${n ? ` style="fill:${ramp(n, mxD * 2.2, [214, 233, 228])}"` : ''}><title>${e(ncNom(k))}${n ? ' · ' + n + ' OC' : ''}</title></path>`; }).join('');
   const pols = Object.keys(NC_GEO.d).map(function(pk){ const n = pol[pk] || 0, k = (pk.indexOf('CALLAO|') === 0 ? 'CALLAO|' : 'LIMA|') + pk, nm = (ncLugarK(k) || {}).n || ncNom(pk.split('|')[1]);
     return `<path class="ncm-d${n ? ' si' : ''}${pk === selPk ? ' on' : ''}" d="${NC_GEO.d[pk]}"${n ? ` data-ncd="${e(k)}" style="fill:${ramp(n, mxP, [190, 228, 218])}"` : ''}><title>${e(nm)}${n ? ' · ' + n + ' OC' : ''}</title></path>`; }).join('');
-  const lu = ncLu(), rutas = [...G.values()].filter(function(g){ return g.u; }).map(function(g){ const p = g.u.p, c = impCurva(p, lu);
+  const rutas = [...G.values()].filter(function(g){ return g.u; }).map(function(g){ const p = g.u.p, lu = ncSedeXY(g.u), c = impCurva(p, lu);
     return `<path class="ncm-ru ${ncPeor(g.c)}${g.k === dSel ? ' on' : ''}" d="M${p[0].toFixed(2)} ${p[1].toFixed(2)} Q${c[0].toFixed(2)} ${c[1].toFixed(2)} ${lu[0].toFixed(2)} ${lu[1].toFixed(2)}"/>`; }).join('');
   return `<svg viewBox="${v.map(function(n){ return n.toFixed(3); }).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa del Perú con las OC nacionales por distrito del proveedor"><g>${deps}</g><g>${pols}</g><g>${rutas}</g><g id="ncmMarcas">${ncMarcas(I, v, D[0])}</g></svg>`; }
 function ncmIniciar(){ const svg = document.querySelector('#ncmMapa svg'); if(!svg) return;
@@ -23605,7 +23610,7 @@ function ncLado(I, D, lista){ const e = escapeHtml, d = APP_NC.d, est = APP_NC.e
   const tEst = est === 'ab' || !est ? 'OC abiertas' : NC_EST[est][0];
   let cab;
   if(q) cab = `<i class="imx-pi ncm-pi" style="background:#0a1e64">${ncSvg(NC_ICO.lupa)}</i><div><h3>“${e(q)}”</h3><span>${appN(nOc)} OC en el mapa${u ? ' · ' + e(u.n) : ''} · también salen pedidos y entregadas</span></div>`;
-  else if(d) cab = `<i class="imx-pi ncm-pi" style="background:${d === 'sd' ? '#98a2b3' : NC_EST[ncPeor(c)][1]}">${ncSvg(NC_ICO.pin)}</i><div><h3>${d === 'sd' ? 'Sin distrito' : e(u ? u.n : d)}</h3><span>${d === 'sd' ? 'Proveedores sin distrito en DB Proveedores' : e(u ? u.sub : '')} · ${appN(nOc)} OC${est && est !== 'ab' ? ' ' + tEst.toLowerCase() : ''}</span>${ncBarra(c)}</div>`;
+  else if(d) cab = `<i class="imx-pi ncm-pi" style="background:${d === 'sd' ? '#98a2b3' : NC_EST[ncPeor(c)][1]}">${ncSvg(NC_ICO.pin)}</i><div><h3>${d === 'sd' ? 'Sin distrito' : e(u ? u.n : d)}</h3><span>${d === 'sd' ? 'Proveedores sin distrito en DB Proveedores' : e(u ? u.sub + ' · llega a CD ' + RT_SEDE[ncSede(u)].n : '')} · ${appN(nOc)} OC${est && est !== 'ab' ? ' ' + tEst.toLowerCase() : ''}</span>${ncBarra(c)}</div>`;
   else cab = `<i class="imx-pi" style="background:${est === 'ab' ? '#0a1e64' : NC_EST[est][1]}"></i><div><h3>${tEst}</h3><span>${appN(nOc)} OC nacionales · ${appN(nD)} distrito${nD === 1 ? '' : 's'}</span>${ncBarra(c)}</div>`;
   // Proveedores del distrito, con su dirección (para coordinar el recojo).
   const pv = new Map(); if(d && !q) L.forEach(function(x){ const y = pv.get(x.prov) || pv.set(x.prov, { n:0, dir:x.u ? x.u.dir : '' }).get(x.prov); y.n++; });
@@ -23615,7 +23620,7 @@ function ncLado(I, D, lista){ const e = escapeHtml, d = APP_NC.d, est = APP_NC.e
 function ncVista(D, lista){ const I = ncItems(D), e = escapeHtml; NCM.I = I;
   const ley = `<aside class="pmm-ley"><b>Leyenda</b><ul class="pmm-ley-s"><li><i class="g"></i><span><b>Más OC</b><small>Distrito o región más oscuro</small></span></li>
       <li><i class="ncm-lr"></i><span><b>Estado de sus OC</b><small>Rojo vencidas · azul más adelante · morado por agencia · verde entregadas</small></span></li>
-      <li><i class="imx-lc"></i><span><b>CD Lurín</b><small>Almacén principal, a donde llegan</small></span></li></ul>
+      <li><i class="imx-lc"></i><span><b>CD Lurín, Trujillo e Ica</b><small>Cada OC llega al almacén más cercano al proveedor</small></span></li></ul>
     <p class="imx-ayuda">Rueda del mouse o pellizco para acercar · arrastra para moverte · toca un distrito para ver sus OC</p></aside>`;
   const Z = function(k, t, p){ return `<button type="button" data-nczoom="${k}" title="${t}" aria-label="${t}">${p.charAt(0) === '<' ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>` : `<span class="ncm-zt">${p}</span>`}</button>`; };
   const con = APP_NC.d || APP_NC.est || APP_PC.q;
