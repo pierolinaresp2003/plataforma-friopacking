@@ -4173,7 +4173,7 @@ html[data-theme="dark"] .imx-nv-al{background:rgba(255,190,60,.14);color:#ffd27a
 .nvc-nota{margin:0;font-size:12.5px;color:var(--ink);} .nvc-cb{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px;}
 .nvc-x{all:unset;box-sizing:border-box;cursor:pointer;display:block;padding:4px 0;} .nvc-x b{display:block;font-size:14px;font-weight:900;color:#0a1e64;} .nvc-x span{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);} .nvc-x:hover b{text-decoration:underline;}
 .nvc-lk{display:flex;flex-direction:column;align-items:flex-start;gap:6px;} .nvc-lk a{display:inline-flex;align-items:center;gap:6px;font:800 13px Inter,sans-serif;color:#0a1e64;border:1.5px solid #0a1e64;border-radius:10px;padding:5px 11px;text-decoration:none;} .nvc-lk a:hover{background:#eef2fb;}
-.imx-fi .nvc{border-radius:16px;flex:none;} .imx-pan .nvc-h{display:flex;grid-template-columns:none;align-items:center;} .imx-pan .nvc-h h3{color:#fff;} .imx-fi .nvc-h h3{font-size:16px;} .imx-fi .nvc-g b.big{font-size:20px;}
+.imx-fi .nvc{border-radius:16px;flex:none;} .imx-pan .nvc-h{display:flex;grid-template-columns:none;align-items:center;} .imx-pan .nvc-h h3{color:#fff;} .imx-pan .nvc-h span, .imx-pan .nvc-h > div > span{color:#fff;opacity:.92;margin:0;} .imx-fi .nvc-h h3{font-size:16px;} .imx-fi .nvc-g b.big{font-size:20px;}
 html[data-theme="dark"] .nvc-x b, html[data-theme="dark"] .nvc-lk a{color:#9db8ff;border-color:#9db8ff;} html[data-theme="dark"] .nvc-lk a:hover{background:rgba(120,160,255,.12);} html[data-theme="dark"] .nvc-h > i{background:#0f1828;}
 @media (max-width:900px){ .nvks{grid-template-columns:repeat(2,minmax(0,1fr));} .nvg{grid-template-columns:1fr;} }
 .imx-fi-lu{grid-column:1 / -1;display:flex;align-items:center;gap:10px;border-top:1px dashed var(--border);padding-top:10px;} .imx-fi-lu svg{width:30px;height:30px;padding:6px;border-radius:9px;background:#1e8a4f;color:#fff;flex:none;box-sizing:border-box;}
@@ -25560,10 +25560,16 @@ function impMapaHtml(I){ const M = IMX_MUNDO, e = escapeHtml, sel = impSel(I), p
   const rutas = ks.map(function(k){ const o = impOrigen(k, por[k]); if(!o) return ''; const T = new Map(); por[k].forEach(function(x){ const tp = impTipoRuta(x); T.set(tp, T.get(tp) || impEnEst(x, 'tr')); });
     return [...T.entries()].map(function(z){ return `<path class="imx-ru${z[1] ? ' viva' : ''}${z[0] === 'tierra' ? ' tie' : ''}${act.has(k) ? ' on' : ''}" d="${impLineaD(impLinea(o.ll, z[0], k))}" data-impais="${k}"/>`; }).join(''); }).join('');
   return `<svg viewBox="${v.map(function(n){ return n.toFixed(2); }).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Mapa del mundo con las importaciones"><defs><clipPath id="imxClip"><circle r="11"/></clipPath></defs><path class="imx-gr" d="${M.g || ''}"/><g class="imx-ps">${paises}</g><g>${rutas}</g><g id="imxMarcas">${impMarcas(I, v, D[0])}</g></svg>`; }
+// Lo que tiene que verse al abrir un barco: dónde está, su recorrido (itinerario si lo hay) y Lurín.
+function impFocoPts(I){ const x = I.find(function(y){ return y.ocs[0] === APP_PL.foco; }); if(!x) return null; const nv = impNave(x), lu = impXY(IMX_LURIN);
+  if(nv){ const p = impNvPos(impNvEstado(nv.s)); return nv.s.escalas.map(function(z){ return impNvLL(z.p); }).filter(Boolean).map(impXY).concat([[p[0], p[1]], lu]); }
+  const o = x.a ? impOrigen(x.a, I.filter(function(y){ return y.a === x.a; })) : null; if(!o) return null; const L = impLinea(o.ll, impTipoRuta(x), x.a), p = impSobre(L, impFrac(x));
+  return [L[0], [p[0], p[1]], lu]; }
 function impMapaIniciar(){ const svg = document.querySelector('#imxMapa svg'); if(!svg) return; const I = impFiltrados(), sel = APP_PL.pais || '', ins = { L:70, R:540, T:90, B:80 };
   const z = zmCrear('imx', svg, { lim:[0, 0, 1000, 444], minW:22, maxW:1300, inicio:impVistaInicial, cuadro:function(v, D){ zmEscala(document.getElementById('imxMarcas'), v, D); },
     fin:function(v, D){ const g = document.getElementById('imxMarcas'); if(g) g.innerHTML = impMarcas(impFiltrados(), v, D[0]); } });
-  if(z.sel !== sel){ const primera = z.sel === undefined; z.sel = sel; const pts = sel && !APP_PL.foco ? impSelPts(I) : null;
+  const clave = sel + '|' + (APP_PL.foco || '');
+  if(z.sel !== clave){ const primera = z.sel === undefined; z.sel = clave; const pts = APP_PL.foco ? impFocoPts(I) : sel ? impSelPts(I) : null;   // el barco elegido queda a la vista, a la izquierda del panel (18.11.2026)
     if(pts) zmIr('imx', impEncuadre(pts, ins), primera ? false : true); else if(!sel && !primera) zmIr('imx', impVistaInicial()); }
   const f = APP_PL.foco && document.querySelector('.imx-c.foco'); if(f) f.scrollIntoView({ block:'nearest', behavior:'smooth' }); }
 // Resumen chico abajo (estados y países, todo se toca); el detalle de lo elegido va en el panel de la derecha.
@@ -25632,7 +25638,7 @@ function impVistaMapa(){ const I = impFiltrados(), e = escapeHtml;
     <div class="imx-mapa" id="imxMapa">${impMapaHtml(I)}</div>
     <div class="imx-top"><label class="pmm-q"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg><input type="search" id="plBusca" placeholder="OC, proveedor, proyecto o producto" value="${e(APP_PL.q)}" autocomplete="off"></label>
       <a class="imx-stl" href="${IMX_STATUS_URL}" target="_blank" rel="noopener" title="Abrir el Status de importaciones (resumen, naves y análisis)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14 21 3M15 3h6v6"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg><span>Status de importaciones</span></a>
-      <button type="button" class="imx-ib" data-impdf="1" title="Estatus en imágenes" aria-label="Estatus en imágenes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg></button>
+      <!-- sin el botón de estatus en imágenes (18.11.2026, Piero: "elimina esto de comex") -->
       <div class="pmm-ley-w"><button type="button" class="pmm-ley-b" data-pmley="1" title="Leyenda" aria-label="Ver la leyenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="7" r="1.6" fill="currentColor"/><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="5" cy="17" r="1.6" fill="currentColor"/><path d="M10 7h10M10 12h10M10 17h7"/></svg></button>${ley}</div></div>
     <div class="imx-zoom">${Z('in', 'Acercar', '<path d="M12 5v14M5 12h14"/>')}${Z('out', 'Alejar', '<path d="M5 12h14"/>')}${Z('fit', 'Ver todo', '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>')}</div>
     <div class="imx-lado" id="imxLado">${impLado(I)}</div></div></div>`; }
