@@ -4282,11 +4282,11 @@ html[data-theme="dark"] .ncm-pin text{fill:#e8eefc;} html[data-theme="dark"] .nc
 .ncs-fam{flex:0 0 300px;margin-left:auto;} .ncs-fam select{width:100%;}
 .skt-av{width:30px;height:30px;border-radius:50%;overflow:hidden;display:grid;place-items:center;flex:none;font:800 11px Inter,sans-serif;color:#fff;background:#98a2b3;} .skt-av img{width:100%;height:100%;object-fit:cover;} .skt-av.sin{background:var(--surface-2);color:var(--ink-soft);font-size:14px;}
 .skt{container-type:inline-size;display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
-.skt-st{display:flex;align-items:center;gap:8px;padding:6px 16px 4px;border-top:1px solid var(--border);font:800 10.5px Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:color-mix(in srgb,var(--fam) 80%,var(--ink));}
-.skt-st em{font-style:normal;font-weight:700;color:var(--ink-soft);} .skt-st .skt-x{width:16px;height:16px;border-radius:5px;margin-right:2px;}
+.skt-st{display:flex;align-items:center;gap:8px;padding:7px 16px 7px 28px;border-top:1px solid var(--border);background:color-mix(in srgb,var(--fam) 4%,var(--surface-2));font:800 11px Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:color-mix(in srgb,var(--fam) 85%,var(--ink));}
+.skt-st::before{content:'';width:3px;height:14px;border-radius:2px;background:var(--fam);margin-left:-12px;} .skt.cot .skt-st::before{display:none;} .skt.cot .skt-st{padding-left:16px;}
+.skt-st em{font-style:normal;font-weight:800;font-size:10.5px;color:var(--ink-soft);margin-left:auto;background:var(--card);border-radius:99px;padding:1px 8px;} .skt-st .skt-x{width:16px;height:16px;border-radius:5px;margin-right:2px;}
+.skt-tg + .skt-tg{border-top:6px solid color-mix(in srgb,var(--fam) 6%,var(--surface-2));}
 .skt-st + .skt-f{border-top:0;}
-.skt-gc{font:700 11px Inter,sans-serif;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
-.skt-blk.prov .skt-g b{text-transform:none;font-size:13.5px;letter-spacing:0;} .ncs-agr{flex:none;margin-left:auto;} .ncs-agr + .ncs-fam{margin-left:0;}
 .skt-blk{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--fam);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;}
 .skt-f{all:unset;box-sizing:border-box;width:100%;cursor:pointer;border-top:1px solid var(--border);transition:background .12s;}
 .skt-h, .skt-f{display:grid;grid-template-columns:60px minmax(0,3fr) 104px 104px 64px minmax(0,1.25fr) minmax(0,1fr) 32px;gap:14px;align-items:center;padding:7px 16px;}
@@ -23611,7 +23611,7 @@ function appOCCerrar(){
 }
 
 // ---------- Pendientes de Compras (Logística) ----------
-const APP_PC = { sub:'nac', mod:'oc', skuPer:'', skuAgr:'prov', cot:[], persona:'', sec:'venc', tope:20, q:'', cli:'', fam:'', entAnio:'', entMes:'', entTope:60 };
+const APP_PC = { sub:'nac', mod:'oc', skuPer:'', cot:[], persona:'', sec:'venc', tope:20, q:'', cli:'', fam:'', entAnio:'', entMes:'', entTope:60 };
 // ---------- OC entregadas (07.10.2026, Piero: "falta un buscador para todas las OC que ya se entregaron") ----------
 // Una OC entregada = ninguna de sus líneas sigue pendiente (regla de Pendientes: estado de Nisira + lo
 // recibido + OC Finalizadas.xlsx) y no está anulada. Fecha de entrega = la última recepción en Lurín.
@@ -23781,7 +23781,7 @@ function appPendComprasHtml(soloLista, sinCaras){
     // Con "Familia · Tipo" (18.11.2026): los tipos de una misma familia juntos; la familia con el pedido más antiguo primero.
     const fm = new Map(); g.forEach(function(l2, k){ const f = k.split(' · ')[0], v = f0(l2); if(!fm.has(f) || v < fm.get(f)) fm.set(f, v); });
     const fa = function(k){ return fm.get(k.split(' · ')[0]); };
-    return [...g.entries()].sort(function(a,b){ return fa(a[0]) - fa(b[0]) || a[0].split(' · ')[0].localeCompare(b[0].split(' · ')[0]) || f0(a[1]) - f0(b[1]) || b[1].length - a[1].length || a[0].localeCompare(b[0]); });
+    return [...g.entries()].sort(function(a,b){ return fa(a[0]) - fa(b[0]) || a[0].split(' · ')[0].localeCompare(b[0].split(' · ')[0]) || / · Otr[oa]s/.test(a[0]) - / · Otr[oa]s/.test(b[0]) || f0(a[1]) - f0(b[1]) || b[1].length - a[1].length || a[0].localeCompare(b[0]); });
   };
   // SKU sin OC en una tabla simple (18.11.2026, Piero: "que sea simple de ver porque hay mucho espacio en blanco y está todo agrupado"): una
   // fila por SKU, el pedido más antiguo primero; la familia va como etiqueta (y se filtra con los chips de arriba). Tocar la fila abre su ficha.
@@ -23810,26 +23810,12 @@ function appPendComprasHtml(soloLista, sinCaras){
       // línea fina (no un bloque cada uno); si la familia tiene un solo tipo, el título ya lo dice ("Danfoss · FIA").
       const sel = function(rs){ return cot && rs.every(function(r){ return APP_PC.cot.indexOf(skuKey(r)) !== -1; }); };
       const ck = function(on, attr, t){ return cot ? `<span class="skt-x${on ? ' on' : ''}" data-clic="1" ${attr}="1" role="checkbox" aria-checked="${on}" title="${t}"></span>` : ''; };
-      let F = []; const porProv = APP_PC.skuAgr !== 'fam';
-      // Por proveedor (18.11.2026): un bloque por el último proveedor al que se le compró; dentro, sus productos por familia y tipo. Los que
-      // nunca se compraron van al final, también por familia y tipo.
-      if(porProv){ const P = new Map(), U = new Map(), nuevo = new Set(), porCat = new Map();
-        l.forEach(function(r){ const u = skuUltProv(r); U.set(r, u); if(u.k === '~') return; const c = skuCategoria(r), m = porCat.get(c) || porCat.set(c, new Map()).get(c); m.set(u.k, (m.get(u.k) || 0) + 1); });
-        // Lo que nunca se compró va con el proveedor que tiene más productos de su mismo tipo en la lista (marcado "sin compra previa").
-        l.forEach(function(r){ let u = U.get(r); if(u.k === '~'){ const m = porCat.get(skuCategoria(r)); if(m){ const k = [...m.entries()].sort(function(a, b){ return b[1] - a[1]; })[0][0], o = l.find(function(y){ return U.get(y).k === k; }); if(o){ u = U.get(o); nuevo.add(r); } } }
-          if(!P.has(u.k)) P.set(u.k, { n:u.n, l:[] }); P.get(u.k).l.push(r); });
-        const catDe = function(r){ return skuCategoria(r) + (nuevo.has(r) ? ' · sin compra previa' : ''); };
-        const f0 = function(l2){ return l2.reduce(function(m, r){ return r.fPedido && (!m || r.fPedido < m) ? r.fPedido : m; }, null) || new Date(8.64e15); };
-        F = [...P.entries()].sort(function(a, b){ return (a[0] === '~') - (b[0] === '~') || f0(a[1].l) - f0(b[1].l) || b[1].l.length - a[1].l.length; })
-          .map(function(x){ return { f:x[1].n, t:skuGrupos(x[1].l, catDe), prov:true, nunca:x[0] === '~' }; }); }
-      else skuGrupos(l, skuCategoria).forEach(function(g){ const f = skuFamilia(g[0]), u = F[F.length - 1]; if(u && u.f === f) u.t.push(g); else F.push({ f:f, t:[g] }); });
-      // Los grupos con un solo SKU, juntos en un bloque (cada uno con su línea), donde estaba el primero de ellos.
-      const sueltas = F.filter(function(x){ return !x.nunca && x.t.length === 1 && x.t[0][1].length === 1; });
-      if((porProv || !APP_PC.fam) && sueltas.length >= 2){ const i0 = F.indexOf(sueltas[0]); F = F.filter(function(x){ return sueltas.indexOf(x) === -1; });
-        F.splice(Math.min(i0, F.length), 0, { f:porProv ? 'Proveedores con un solo SKU' : 'Otras familias', t:[].concat.apply([], sueltas.map(function(x){ return porProv ? [[x.f + ' · ' + x.t[0][0], x.t[0][1]]] : x.t; })), varias:true }); }
+      // Cada familia en su propio bloque (18.11.2026, Piero: "regresa a la categorización por familia y que se separen bien los grupos"):
+      // sin mezclar familias en un bloque común; dentro, cada tipo con su propio encabezado.
+      const F = []; skuGrupos(l, skuCategoria).forEach(function(g){ const f = skuFamilia(g[0]), u = F[F.length - 1]; if(u && u.f === f) u.t.push(g); else F.push({ f:f, t:[g] }); });
       return F.map(function(x){ const uno = x.t.length === 1, rs = [].concat.apply([], x.t.map(function(g){ return g[1]; }));
-        return `<section class="skt-blk${x.prov ? ' prov' : ''}" style="--fam:${x.varias || x.nunca ? '#7b8794' : appColorFamilia(x.f)}"><div class="skt-g">${ck(sel(rs), 'data-skuselg', uno ? 'Elegir toda la categoría para cotizar' : 'Elegir toda la familia para cotizar')}<i></i><b>${e(uno && !x.prov ? x.t[0][0] : x.f)}</b>${uno && x.prov ? `<small class="skt-gc">${e(x.t[0][0])}</small>` : ''}<span>${rs.length} SKU</span></div>${x.t.map(function(g){
-          return uno ? g[1].map(fila).join('') : `<div class="skt-tg"><div class="skt-st">${ck(sel(g[1]), 'data-skuselt', 'Elegir este grupo para cotizar')}<b>${e(x.varias || x.prov ? g[0] : g[0].split(' · ').slice(1).join(' · '))}</b><em>${g[1].length}</em></div>${g[1].map(fila).join('')}</div>`; }).join('')}</section>`; }).join(''); })()}</div>`; };
+        return `<section class="skt-blk" style="--fam:${appColorFamilia(x.f)}"><div class="skt-g">${ck(sel(rs), 'data-skuselg', uno ? 'Elegir toda la categoría para cotizar' : 'Elegir toda la familia para cotizar')}<i></i><b>${e(uno ? x.t[0][0] : x.f)}</b><span>${rs.length} SKU</span></div>${x.t.map(function(g){
+          return uno ? g[1].map(fila).join('') : `<div class="skt-tg"><div class="skt-st">${ck(sel(g[1]), 'data-skuselt', 'Elegir este tipo para cotizar')}<b>${e(g[0].split(' · ').slice(1).join(' · '))}</b><em>${g[1].length} SKU</em></div>${g[1].map(fila).join('')}</div>`; }).join('')}</section>`; }).join(''); })()}</div>`; };
   // Buscador general (05.10.2026, Piero): OC, pedido, req., código, producto, proveedor o proyecto, en
   // todos los estados a la vez. Una OC sale completa si cualquiera de sus ítems coincide.
   const q = polarNorm(APP_PC.q || ''), tope = Infinity;   // todo a la vista (05.10.2026)
@@ -23877,8 +23863,7 @@ function appPendComprasHtml(soloLista, sinCaras){
       return `<optgroup label="${escapeHtml(f)}">${tipos.length > 1 ? opF('F|' + f, 'Toda la familia · ' + famF[f], f + ' (toda la familia) · ' + famF[f]) : ''}${tipos.map(function(c){ return opF(c, c.split(' · ').slice(1).join(' · ') + ' · ' + famN[c], c + ' · ' + famN[c]); }).join('')}</optgroup>`; }).join('')}</select></label>` : '';
     // SKU sin OC (18.11.2026, Piero: "quita lo que dice pedidos sin OC, el más antiguo primero…"): solo las caras, la familia y la tabla.
     if(k === 'ped' && sku){ const lf = APP_PC.fam ? l.filter(function(r){ return skuPasaCat(r, APP_PC.fam); }) : l;
-      const agr = `<div class="rsvm-seg ncs-agr" role="group" aria-label="Agrupar por">${[['prov', 'Por proveedor'], ['fam', 'Por familia']].map(function(o){ return `<button type="button" data-skuagr="${o[0]}" class="${(APP_PC.skuAgr !== 'fam') === (o[0] === 'prov') ? 'on' : ''}">${o[1]}</button>`; }).join('')}</div>`;
-      return `<div class="ncs-fil">${ncSkuPer(items)}${agr}${famChips}</div>` + (lf.length ? skuTabla(lf) : `<div class="ini-vacio">${q ? 'No hay SKU sin OC con "' + escapeHtml(APP_PC.q) + '".' : '✅ No hay SKU sin OC.'}</div>`); }
+      return `<div class="ncs-fil">${ncSkuPer(items)}${famChips}</div>` + (lf.length ? skuTabla(lf) : `<div class="ini-vacio">${q ? 'No hay SKU sin OC con "' + escapeHtml(APP_PC.q) + '".' : '✅ No hay SKU sin OC.'}</div>`); }
     const nPed = k === 'ped' ? new Set(l.map(function(r){ return r.codPedido; })).size : 0, nIt = l.length;
     if(k === 'ped' && APP_PC.fam) l = l.filter(function(r){ return skuPasaCat(r, APP_PC.fam); });
     if((q || omitir) && !l.length) return '';
@@ -24266,18 +24251,6 @@ function skuCategoriaCalc(r){ const p = sinAcentos(String(r.producto || '')).toU
   if(fam && fam !== 'OTROS') return skuFamNom(fam) + ' · ' + grupo(fam);
   return 'Otros productos · ' + (skuBonito(r.familia) || 'Sin familia'); }
 function skuFamilia(c){ return String(c || '').split(' · ')[0]; }
-// A quién le compramos por última vez cada código (18.11.2026, Piero: "que se agrupe por el proveedor al que le compramos… para cotizar por
-// tanda"): Consulta.xlsx y las OC de Nisira, la compra más reciente; si el código nunca se compró, la de un código homologado.
-function skuUltCompras(){ return appMemo('skuUltProv', function(){ const m = new Map();
-  const pon = function(cod, f, prov, ruc){ cod = String(cod || '').trim(); prov = String(prov || '').trim(); if(!cod || !prov || !f || isNaN(f)) return; const x = m.get(cod); if(!x || f > x.f) m.set(cod, { f:f, prov:prov, ruc:String(ruc || '').trim() }); };
-  ((typeof GASTO_DATA !== 'undefined' && GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(r.oc) pon(r.codigo, new Date(Date.UTC(r.anio, (r.mes || 1) - 1, r.dia || 1)), r.proveedor, r.ruc); });
-  try{ polarLineasOC().forEach(function(r){ if(r.codOrden && !/anul/i.test(r.estadoOrden || '')) pon(r.idProducto, r.fOrden, r.proveedor, r.rucProveedor); }); }catch(err){}
-  return m; }); }
-function skuUltProv(r){ const M = skuUltCompras(), cod = String(r.idProducto || '').trim(); let x = M.get(cod);
-  if(!x){ try{ const g = appSkuStock(cod).grupo; (g && g.miembros || []).forEach(function(mb){ const y = M.get(mb.codigo); if(y && (!x || y.f > x.f)) x = y; }); }catch(err){} }
-  if(!x) return { k:'~', n:'Sin compras anteriores' };
-  const nom = gdCorto(x.prov) || x.prov; return { k:x.ruc || ncK(nom), n:nom, f:x.f }; }
-function skuProvNom(r){ return skuUltProv(r).n; }
 // Filtro elegido arriba: una categoría o toda una familia ("F|Danfoss").
 function skuPasaCat(r, sel){ if(!sel) return true; return sel.indexOf('F|') === 0 ? skuFamilia(skuCategoria(r)) === sel.slice(2) : skuCategoria(r) === sel; }
 function skuCatNombre(sel){ return String(sel || '').indexOf('F|') === 0 ? sel.slice(2) + ' (toda la familia)' : String(sel || ''); }
@@ -24518,8 +24491,7 @@ async function appPcListaExcel(){
     H = ['Categoría', 'Código', 'Producto', 'Cantidad', 'UM', 'Pedido', 'F. pedido', 'D.h. esperando', 'Req.', 'Cliente', 'Id proyecto', 'Proyecto', 'Solicitante', 'Observación', 'Comprador', 'Nota'];
     W = [22, 15, 50, 10, 7, 10, 11, 11, 10, 26, 16, 32, 26, 40, 16, 30]; izq = [1, 3, 10, 12, 13, 14, 15, 16];
     let l = D.items; if(APP_PC.skuPer) l = l.filter(function(r){ return (r.persona || '-') === APP_PC.skuPer; }); if(APP_PC.fam) l = l.filter(function(r){ return skuPasaCat(r, APP_PC.fam); });
-    const porProv = APP_PC.skuAgr !== 'fam'; if(porProv) H[0] = 'Último proveedor · categoría';
-    (porProv ? D.skuGrupos(l, function(r){ return skuProvNom(r) + ' · ' + skuCategoria(r); }) : D.skuGrupos(l, skuCategoria)).forEach(function(g){ F.push({ fam:g[0], n:g[1].length });
+    D.skuGrupos(l, skuCategoria).forEach(function(g){ F.push({ fam:g[0], n:g[1].length });
       g[1].forEach(function(r){ const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', cli = /^pedido directo|^sin proyecto/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : appImpNombre(r.proyecto || '');
         F.push([g[0], String(r.idProducto || ''), r.producto || '', r.cantPedido != null ? +r.cantPedido : null, r.unidad || '', cod(r.codPedido), fd(r.fPedido), r.fPedido ? Math.max(0, busdayCount(r.fPedido, hoy) || 0) : null, cod(r.req), cli, pryId, pryNombre(pryId) || '',
           r.solicitante ? titleCase(r.solicitante) : '', r.obs || '', r.persona ? nomP(r.persona) : '', [r.directo ? 'Pedido directo' : '', r.parcial ? 'OC parcial ' + r.parcial.ocs.map(cod).join(', ') + ' por ' + r.parcial.q + ' de ' + r.parcial.total : ''].filter(Boolean).join(' · ')]); }); });
@@ -28742,7 +28714,6 @@ function appClickInicio(e){
   const b = e.target.closest('button, [data-clic]'); if(!b || b.type === 'submit') return;
   if(b.dataset.correo){ e.stopPropagation(); return appCorreoToggle(b); }
   if(b.dataset.skusel !== undefined){ e.stopPropagation(); return ncCotToggle([b.dataset.skusel]); }   // elegir para cotizar (18.11.2026)
-  if(b.dataset.skuagr){ APP_PC.skuAgr = b.dataset.skuagr; const l = document.getElementById('pcLista'); if(l) l.innerHTML = appPendComprasHtml(true); return; }   // agrupar por proveedor o por familia
   if(b.dataset.skuselt !== undefined){ e.stopPropagation(); const ks = [...b.closest('.skt-tg').querySelectorAll('[data-skusel]')].map(function(x){ return x.dataset.skusel; }); return ncCotToggle(ks, !ks.every(function(k){ return APP_PC.cot.indexOf(k) !== -1; })); }   // un tipo dentro de la familia
   if(b.dataset.skuselg !== undefined){ e.stopPropagation(); const ks = [...b.closest('.skt-blk').querySelectorAll('[data-skusel]')].map(function(x){ return x.dataset.skusel; }); return ncCotToggle(ks, !ks.every(function(k){ return APP_PC.cot.indexOf(k) !== -1; })); }
   if(b.dataset.cotlimpiar){ APP_PC.cot = []; return ncCotPintar(); }
