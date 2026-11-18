@@ -4181,6 +4181,11 @@ html[data-theme="dark"] .imx-nv-al{background:rgba(255,190,60,.14);color:#ffd27a
 .imx.ncm .imx-mw{background:linear-gradient(180deg,#b9d6ee 0%,#a9cbe8 100%);} .ncm .ncm-dep{fill:#f4f2ec;stroke:#d3ccbd;} .ncm .ncm-d{fill:#f7f5ef;stroke:#d8d1c2;}
 .ncm .ncm-mod, .ncm .ncm-izq .pmm-q{box-shadow:0 10px 22px -16px rgba(16,24,40,.5);}
 .ncm-dot{cursor:pointer;} .ncm-dot circle{fill:#0a1e64;stroke:#fff;stroke-width:2;} .ncm-dot.on circle{fill:#1f4fd1;stroke-width:3;} .ncm-dot text{font:800 11px Inter,sans-serif;fill:#0a1e64;text-anchor:middle;paint-order:stroke;stroke:#fff;stroke-width:3.5px;pointer-events:none;}
+.ncm-pn{cursor:pointer;--sc:#2f6fd6;} .ncm-pn.k-venc{--sc:#d43c3c;} .ncm-pn.k-ag{--sc:#8a5cd1;} .ncm-pn.k-ent{--sc:#1e8a4f;} .ncm-pn.k-agr{--sc:#b9a3e3;}
+.ncm-pn .pb{fill:var(--sc);stroke:#fff;stroke-width:2;filter:drop-shadow(0 3px 4px rgba(10,30,60,.32));transition:transform .15s;} .ncm-pn:hover .pb{filter:drop-shadow(0 0 4px var(--sc)) drop-shadow(0 3px 4px rgba(10,30,60,.32));} .ncm-pn.on .pb{stroke:#0a1e64;stroke-width:3;}
+.ncm-pn text{font:800 10.5px Inter,sans-serif;fill:#fff;text-anchor:middle;pointer-events:none;} .ncm-pn text.l{font:800 11px Inter,sans-serif;fill:#0a1e64;paint-order:stroke;stroke:#fff;stroke-width:3.5px;}
+.imx.ncm.cond .ncm-pn:not(.on){opacity:.4;} html[data-theme="dark"] .ncm-pn text.l{fill:#e8eefc;stroke:#0f1828;} html[data-theme="dark"] .ncm-pn .pb{stroke:#0f1828;}
+.ncm-fi .imx-fic svg{width:22px;height:22px;fill:none;stroke:#fff;}
 .ncm-tk{cursor:pointer;--sc:#2f6fd6;} .ncm-tk.k-venc{--sc:#d43c3c;} .ncm-tk.k-ag{--sc:#8a5cd1;} .ncm-tk.k-ent{--sc:#1e8a4f;} .ncm-tk.k-agr{--sc:#b9a3e3;}
 .ncm-tk .sk{fill:var(--sc);stroke:#fff;stroke-width:1.5;stroke-linejoin:round;paint-order:stroke;filter:drop-shadow(0 1.5px 2px rgba(10,30,60,.35));} .ncm-tk .rd{fill:#1b2433;stroke:#fff;stroke-width:1.3;}
 .ncm-tk .hit{fill:transparent;} .ncm-tk .hl{fill:color-mix(in srgb,var(--sc) 14%,transparent);stroke:var(--sc);stroke-width:1.6;opacity:0;} .ncm-tk.foco .hl{opacity:1;} .ncm-tk:hover .sk{filter:drop-shadow(0 0 3px var(--sc)) drop-shadow(0 1.5px 2px rgba(10,30,60,.35));}
@@ -18264,7 +18269,7 @@ function appSplashEsperar(){
   const t0 = Date.now();
   (function mira(){
     if(!appHayDatos() && Date.now() - t0 < 9000) return setTimeout(mira, 150);
-    if(appHayDatos() && APP.enInicio){ clearTimeout(appEsperaDatos); appRenderInicio(); }
+    if(appHayDatos() && APP.enInicio){ clearTimeout(appEsperaDatos); appRenderFondo(); }
     const lz = document.getElementById('appLanz'); if(appHayDatos() && lz && lz.classList.contains('abierto')){ lz.classList.add('pz-ya'); appLanzador(lz._desdeLogo); }   // números de la portada (v330)
     const espera = appSplashFuera() || 0;
     setTimeout(function(){
@@ -19480,6 +19485,11 @@ function appPrecalentar(){ const sig = (APP.vista || '') + '|' + (RQ.filas || []
   if(v === 'compras') T.push(function(){ if(GASTO_DATA && GASTO_DATA.rows) cqDatos(y); }, function(){ if(GASTO_DATA && GASTO_DATA.rows) cqDatos(y - 1); });
   if(v === 'almacen') T.push(function(){ supRsvMapa(); }, function(){ regDatos(); });
   let i = 0; (function paso(){ ric(function(){ if(appPrecalentar._s !== sig) return; try{ T[i](); }catch(e){} i++; if(i < T.length) paso(); }, { timeout:4000 }); })(); }
+// Repintado por datos que llegan solos (18.11.2026, Piero: "al refrescar la página los módulos como que cargan más de 1 vez"): al abrir llegan
+// los datos, los recojos, las agencias y las reservas, cada uno por su lado, y cada uno volvía a armar la pantalla (el mapa y las animaciones
+// se veían de nuevo). Ahora se juntan en un solo repintado y, si lo que se ve no cambió, la pantalla no se toca.
+function appRenderFondo(){ clearTimeout(appRenderFondo._t); appRenderFondo._t = setTimeout(function(){ if(!APP.enInicio) return; APP._fondo = true; try{ appRenderInicio(); } finally{ APP._fondo = false; } }, 150); }
+function appPonerInicio(cont, html){ if(APP._fondo && cont._h === html && cont.firstChild) return false; cont.innerHTML = html; cont._h = html; return true; }
 function appRenderInicio(){
   const cont = document.getElementById('section-inicio');
   const v = APP.vista || 'supervisor';
@@ -19505,18 +19515,18 @@ function appRenderInicio(){
   } else if(APP.pantalla === 'daily' || APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'almreg' || APP.pantalla === 'almval' || APP.pantalla === 'almrut' || APP.pantalla === 'suppry' || APP.pantalla === 'tienda' || APP.pantalla === 'equipo'){
     if((APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'almval' || APP.pantalla === 'suppry') && !RES.ok) resCargar();
     if(APP.pantalla === 'almrsv' && RSV_UI.ver === 'lib' && !RES.hOk) resHistCargar();
-    cont.innerHTML = gdNavSi() + APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' && APP.pantalla !== 'almrut' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
+    if(!appPonerInicio(cont, gdNavSi() + APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' && APP.pantalla !== 'almrut' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''))) return;
     if(APP.pantalla === 'almrut') setTimeout(function(){ rtsIniciar(); rtpIniciar(); }, 0);   // el zoom del mapa con su tamaño real
     return;
   } else if(APP.pantalla === 'cmpeq' || APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'almrep' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog' || APP.pantalla === 'impnav' || APP.pantalla === 'almseg' || APP.pantalla === 'reportes' || GX_MODS[APP.pantalla] || GD_PANT[APP.pantalla]){
-    cont.innerHTML = gdNavSi() + appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
+    if(!appPonerInicio(cont, gdNavSi() + appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''))) return;
     if(APP.pantalla === 'inventario'){ setTimeout(appInvCompletar, 0); setTimeout(appInvKdxPintar, 0); }
     if(APP.pantalla === 'pendlog') setTimeout(impMapaIniciar, 0);   // zoom, gestos y marcas del mapa del mundo
     if(APP.pantalla === 'pendcompras') setTimeout(ncmIniciar, 0);   // y del mapa de Seguimiento por distritos
     if(GX_MODS[APP.pantalla] || GD_PANT[APP.pantalla]) setTimeout(function(){ document.querySelectorAll('#section-inicio .gx-wrap').forEach(function(w){ w.scrollLeft = w.scrollWidth; }); }, 0);   // la tabla abre en lo más reciente   // el kardex se dibuja sobre el HTML ya puesto (también si vino de la memoria)
     return;
   } else if(APP.pantalla === 'indicadores' || APP.pantalla === 'otif'){
-    cont.innerHTML = gdNavSi() + appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : '');
+    appPonerInicio(cont, gdNavSi() + appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''));
     return;
   } else if(v === 'gerencia') cuerpo = appInicioGerencia();
   // Compras y Almacén: siempre el calendario del daily arriba (12.10.2026, Piero), sin los indicadores de la semana.
@@ -20870,7 +20880,7 @@ async function resCargar(forzar){ if(RES.cargando || (RES.ok && !forzar)) return
     if(r.ok){ RES.l = await r.json(); RES.ok = true; RES.v++; resLimpiar(); } }catch(e){}
   RES.cargando = false; if(!RES.ok) return;
   if(antes !== null && antes === JSON.stringify(RES.l)) return;   // sin cambios: no se vuelve a dibujar (17.11.2026)
-  if(APP.enInicio && appHayDatos() && ['supreq', 'almseg', 'almrsv', 'almval', 'suppry', 'inventario'].indexOf(APP.pantalla) !== -1) appRenderInicio();
+  if(APP.enInicio && appHayDatos() && ['supreq', 'almseg', 'almrsv', 'almval', 'suppry', 'inventario'].indexOf(APP.pantalla) !== -1) appRenderFondo();
   else { const sec = document.getElementById('section-requerimientos'); if(sec && sec.offsetParent !== null && typeof drawRequerimientos === 'function'){   // req. abierto: se repinta en el acto (13.11.2026, Piero)
     const ab = [...sec.querySelectorAll('.rqx-it.abierto, .rqx-it[open], .rqx-fila[aria-expanded="true"]')].map(function(x){ const it = x.closest('.rqx-it'); return it ? it.dataset.i : null; }).filter(Boolean);
     const y = window.scrollY; drawRequerimientos(); window.scrollTo(0, y);
@@ -20965,7 +20975,7 @@ const RSV_UI = { ver:'act', sede:'', q:'' };
 async function resHistCargar(forzar){ if(RES.hCargando || (RES.hOk && !forzar)) return; RES.hCargando = true;
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.liberada&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota,lote,val_estado,val_nombre,val_en,val_nota,val_q&order=creado.desc&limit=300');
     if(r.ok){ RES.h = await r.json(); RES.hOk = true; } }catch(e){}
-  RES.hCargando = false; if(APP.enInicio && APP.pantalla === 'almrsv') appRenderInicio(); }
+  RES.hCargando = false; if(APP.enInicio && APP.pantalla === 'almrsv') appRenderFondo(); }
 async function rsvLiberarReq(cod){ const n = RES.l.filter(function(y){ return y.req === cod; }).length; if(!n || !window.confirm('¿Liberar las ' + n + ' reservas del Req. ' + String(cod).replace(/^000\d-0*/, '') + '?')) return;
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&req=eq.' + encodeURIComponent(cod), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
     if(!r.ok) throw new Error(r.status); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar.'); } }
@@ -21241,7 +21251,7 @@ function rtCargar(forzar){
   RT.prom = sbFetch('/rest/v1/fp_rutas?select=id,tipo,oc,estado,datos,por,creado,actualizado&order=creado.desc&limit=5000').then(function(r){ if(!r.ok){ RT.err = 'No se pudo leer las rutas (' + r.status + ').'; return null; } return r.json(); }).then(function(l){
     if(!l) return; RT.err = ''; RT.ok = true; const firma = JSON.stringify(l.map(function(x){ return [x.id, x.estado, x.actualizado]; }));
     if(firma === RT.firma) return; RT.firma = firma; const m = {}; l.forEach(function(x){ m[x.id] = x; }); RT.m = m;
-    if(APP.enInicio && appHayDatos() && ['almrut', 'pendcompras'].indexOf(APP.pantalla) !== -1) appRenderInicio();
+    if(APP.enInicio && appHayDatos() && ['almrut', 'pendcompras'].indexOf(APP.pantalla) !== -1) appRenderFondo();
   }).catch(function(){ RT.err = 'Sin conexión con la base de rutas.'; }).then(function(){ RT.cargando = false; RT.t = Date.now(); });
   return RT.prom; }
 async function rtGuardar(fila){ const nuevo = !RT.m[fila.id]; fila.actualizado = new Date().toISOString(); if(nuevo && !fila.por) fila.por = rtYo();
@@ -23859,7 +23869,7 @@ function ncLugar(dep, prov, dist){ const G = NC_GEO.c; dep = ncK(dep); prov = nc
     return { k:dep + '|' + prov + '|', dep:dep, prov:prov, dist:'', n:ncNom(prov), sub:'Provincia' + (prov !== dep ? ' · ' + ncNom(dep) : ''), p:p, lima:lima, pk:'' }; }
   const pk = NC_GEO.d[prov + '|' + dist] ? prov + '|' + dist : dep === 'CALLAO' ? 'CALLAO|CALLAO' : '';
   return { k:dep + '|' + prov + '|' + dist, dep:dep, prov:prov, dist:dist, n:lima && dist === 'LIMA' ? 'Cercado de Lima' : ncNom(dist), sub:sub, p:P[dist], lima:lima, pk:pk }; }
-function ncLugarK(k){ const a = String(k || '').split('|'); return ncLugar(a[0], a[1], a[2]); }
+function ncLugarK(k){ const a = String(k || '').split('|'); return a[0] === 'AG' ? ncAgLugar(a[1]) : ncLugar(a[0], a[1], a[2]); }
 // Distrito del proveedor de una OC (nombre como sale en Nisira). PROVEEDOR_UBI = { u:['DEP|PROV|DIST'], n:{ nombre normalizado: i o [i, dirección] } }
 function ncUbi(prov){ const U = PROVEEDOR_UBI; if(!U || !U.n || !prov) return null;
   if(ncUbi.u !== U){ ncUbi.u = U; ncUbi.m = new Map(); } const M = ncUbi.m; if(M.has(prov)) return M.get(prov);
@@ -23875,7 +23885,16 @@ function ncAmbito(){ if(APP_PC.mod === 'sku') return null; const d = APP_NC.d;
   if(d) return function(oc, prov){ const u = !ncImp(oc) && ncUbi(prov); return !!u && u.k === d; };
   return APP_PC.q ? null : function(oc){ return !ncImp(oc); }; }
 // OC nacionales para el mapa con su estado y el distrito del proveedor (con el buscador, solo las que coinciden).
-function ncItems(D){ const q = !!D.q, I = [], add = function(st, o){ if(!ncImp(o.oc)) I.push({ st:st, oc:o.oc, prov:o.prov, u:ncUbi(o.prov), per:o.persona || '', o:o }); };
+// OC por agencia (18.11.2026, Piero: "los que son por agencia deben estar ubicados en la ubicación de la agencia de la sede principal"): van en el
+// local principal de la agencia en Lima (la dirección que publica cada una), no en el distrito del proveedor.
+const NC_AGENCIAS = [[/SHALOM/, 'Shalom', [-12.0665, -77.0225], 'Av. México, La Victoria'], [/OLVA/, 'Olva Courier', [-12.0835, -77.0365], 'Av. Gral. Álvarez de Arenales 1775, Lince'],
+  [/MARVISUR/, 'Marvisur', [-12.0690, -77.0280], 'La Victoria'], [/CRUZ DEL SUR/, 'Cruz del Sur Cargo', [-12.0895, -77.0135], 'Av. Javier Prado Este 1109, La Victoria'],
+  [/CIVA/, 'Civa', [-12.0625, -77.0290], 'Av. 28 de Julio 1145, La Victoria'], [/FLORES/, 'Flores', [-12.0645, -77.0335], 'La Victoria']];
+function ncAgLugar(nom){ const t = sinAcentos(String(nom || '')).toUpperCase(), a = NC_AGENCIAS.find(function(x){ return x[0].test(t); }), n = a ? a[1] : titleCase(nom || 'Agencia');
+  const ll = a ? a[2] : [-12.0700 + (t.length % 7) * 0.002, -77.0250], dist = a && /Lince/.test(a[3]) ? 'LINCE' : 'LA VICTORIA';
+  return { k:'AG|' + n, dep:'LIMA', prov:'LIMA', dist:dist, n:'Agencia ' + n, sub:(a ? 'Sede principal · ' : 'Ubicación aproximada · ') + ncNom(dist), p:rtXY(ll), lima:true, pk:'LIMA|' + dist, dir:a ? a[3] : '', sd:'LIM', ag:n }; }
+function ncItems(D){ const q = !!D.q, I = [], add = function(st, o){ if(ncImp(o.oc)) return; const ag = (st === 'ag' || st === 'agr') && APP_AG && APP_AG.m[o.oc];
+    I.push({ st:st, oc:o.oc, prov:o.prov, u:ag ? ncAgLugar(ag.agencia) : ncUbi(o.prov), per:o.persona || '', o:o }); };
   D.S.venc[3].forEach(function(o){ if(!q || D.ocHit.has(o.oc)) add('venc', o); });
   D.S.luego[3].forEach(function(o){ if(!q || D.ocHit.has(o.oc)) add('luego', o); });
   D.S.ag[3].forEach(function(x){ if(!q || D.ocHit.has(x.o.oc)) add(x.pend ? 'ag' : 'agr', x.o); });
@@ -23896,40 +23915,29 @@ function ncVistaLima(){ return impEncuadre([rtXY([-11.8, -77.17]), rtXY([-12.3, 
 function ncVistaPeru(){ return impEncuadre([[20, 20], [560, 820]], ncIns(), 3); }
 function ncVistaInicial(){ const p = ncFit(ncVis(NCM.I)); return p ? impEncuadre(p, ncIns(), 3) : ncVistaLima(); }
 function ncSelPts(){ const d = APP_NC.d;
-  if(APP_NC.foco){ const x = (NCM.I || []).find(function(y){ return y.oc === APP_NC.foco; }); if(x && x.u){ const R = ncRuta(x), q = ncEnRuta(R, ncFrac(x)); return [R[0], R[2], [q[0], q[1]]]; } }
+  if(APP_NC.foco){ const x = (NCM.I || []).find(function(y){ return y.oc === APP_NC.foco; }); if(x && x.u){ const r = x.u.lima ? 4 : 10; return [[x.u.p[0] - r, x.u.p[1] - r], [x.u.p[0] + r, x.u.p[1] + r], ncSedeXY(x.u)]; } }
   if(d && d !== 'sd'){ const u = ncLugarK(d); if(!u) return null; const r = u.lima ? 6 : 12; return [[u.p[0] - r, u.p[1] - r * 0.7], [u.p[0] + r, u.p[1] + r * 0.7]]; }
   return APP_NC.est || APP_PC.q ? ncFit(ncVis(NCM.I)) : null; }
 // Marcas a escala de pantalla: un círculo por distrito (anillo con los estados, número de OC); los que se tocan se juntan en uno y tocarlo acerca.
 // Seguimiento al estilo de Importaciones (18.11.2026, Piero: "arregla ese módulo de compras siguiendo el diseño que usaste para importación, pero
-// esto es solo nacional… y tiene Lima, Trujillo o Ica"): cada OC es un camión simple en la ruta del distrito del proveedor a su CD (Lurín, Trujillo
-// o Ica), avanzado según los días entre la aprobación y el compromiso de entrega; rojo si ya se venció; tocarlo abre su ficha.
-const NC_CAMION = 'M-13.5 -8.5h15.5v11.5h-15.5z M3.4 -4.6h5.9l4.2 4.3v3.3H3.4z';
-function ncFrac(x){ if(x.st === 'venc') return 0.1;   // vencida: el camión sigue en el proveedor (no llegó al CD)
-  if(x.st === 'ent' || x.st === 'agr') return 1; if(x.st === 'ag') return 0.6; const o = x.o || {}, a = o.fb || o.fo, b = o.f;
-  if(!a || !b) return 0.5; const h = +appIndCorte(); return Math.max(0.06, Math.min(0.9, (h - a) / Math.max(864e5, b - a))); }
-function ncRuta(x){ const p = x.u.p, lu = ncSedeXY(x.u), c = impCurva(p, lu); return [p, c, lu]; }
-function ncEnRuta(R, t){ const u = 1 - t, P = [0, 1].map(function(i){ return u * u * R[0][i] + 2 * u * t * R[1][i] + t * t * R[2][i]; }), d = [0, 1].map(function(i){ return 2 * u * (R[1][i] - R[0][i]) + 2 * t * (R[2][i] - R[1][i]); }); return [P[0], P[1], Math.atan2(d[1], d[0])]; }
+// esto es solo nacional… y tiene Lima, Trujillo o Ica"): mapa a toda la pantalla, un pin por distrito del proveedor y la ruta a su CD (Lurín, Trujillo o Ica).
 function ncMarcas(I, v, W){ const e = escapeHtml, s = W / v[2], u = 1 / s, dSel = APP_NC.d, foco = APP_NC.foco || '';
-  // Distritos de los proveedores: un punto (con el nombre si hay espacio); tocarlo abre sus OC.
-  const G = [...ncGrupos(ncVis(I)).values()].filter(function(g){ return g.u; }).sort(function(a, b){ return b.l.length - a.l.length; }), cajas = [];
-  const dots = G.map(function(g){ const p = g.u.p, q = [(p[0] - v[0]) * s, (p[1] - v[1]) * s], on = g.k === dSel, w = g.u.n.length * 6.2 + 8, b = [q[0] - w / 2, q[1] + 8, q[0] + w / 2, q[1] + 22];
-    const lbl = (on || s >= 7) && !cajas.some(function(a){ return b[0] < a[2] && a[0] < b[2] && b[1] < a[3] && a[1] < b[3]; }); if(lbl) cajas.push(b);
-    return `<g class="ncm-dot${on ? ' on' : ''}" data-ncd="${e(g.k)}" data-a="${p[0].toFixed(3)},${p[1].toFixed(3)}" transform="translate(${p[0].toFixed(3)} ${p[1].toFixed(3)}) scale(${u.toFixed(5)})"><title>${e(g.u.n)} · ${g.l.length} OC · toca para ver sus OC</title><circle r="5.5"/>${lbl ? `<text class="l" y="19">${e(g.u.n)}</text>` : ''}</g>`; }).join('');
-  // Camiones: uno por OC; si se pisan en pantalla, uno solo con el número (tocarlo acerca).
-  const B = ncVis(I).filter(function(x){ return x.u && (x.st !== 'ent' && x.st !== 'agr' || APP_NC.est === 'ent' || APP_PC.q); }).map(function(x){ const p = ncEnRuta(ncRuta(x), ncFrac(x)); return { x:x, p:p, q:[(p[0] - v[0]) * s, (p[1] - v[1]) * s] }; });
-  const BG = []; B.forEach(function(b){ const g = b.x.oc === foco ? null : BG.find(function(g){ return !g.fijo && Math.hypot(g.q[0] - b.q[0], g.q[1] - b.q[1]) < 14; }); if(g) g.l.push(b); else BG.push({ q:b.q, p:b.p, l:[b], fijo:b.x.oc === foco }); });
-  const peor = function(l){ return ['venc', 'ag', 'luego', 'agr', 'ent'].find(function(k){ return l.some(function(b){ return b.x.st === k; }); }) || 'luego'; };
-  const cam = BG.map(function(g, i){ const b = g.l[0], n = g.l.length, k = peor(g.l), f = n === 1 && b.x.oc === foco, izq = Math.cos(b.p[2] || 0) < 0, on = !dSel || g.l.some(function(z){ return z.x.u.k === dSel; });
-    const xs = g.l.map(function(z){ return z.p[0]; }), ys = g.l.map(function(z){ return z.p[1]; });
-    const at = n > 1 ? `data-nczc="${(Math.min.apply(null, xs) - 2).toFixed(2)},${(Math.min.apply(null, ys) - 2).toFixed(2)},${(Math.max.apply(null, xs) + 2).toFixed(2)},${(Math.max.apply(null, ys) + 2).toFixed(2)}"` : `data-ncfoco="${e(b.x.oc)}"`;
-    const tt = n > 1 ? n + ' OC · toca para acercar' : `OC ${b.x.oc.replace(/^000\d-0*/, '')} · ${appImpNombre(b.x.prov) || ''} · ${NC_EST[b.x.st][0]} · llega a CD ${RT_SEDE[ncSede(b.x.u)].n}`;
-    return `<g class="ncm-tk k-${k}${f ? ' foco' : ''}${on ? '' : ' fu'}" ${at} data-a="${g.p[0].toFixed(3)},${g.p[1].toFixed(3)}" transform="translate(${g.p[0].toFixed(3)} ${g.p[1].toFixed(3)}) scale(${u.toFixed(5)})"><title>${e(tt)}</title><circle class="hl" r="17"/><circle class="hit" r="14"/><g transform="scale(${izq ? '-1 1' : '1'})"><path class="sk" d="${NC_CAMION}"/><circle class="rd" cx="-8" cy="5" r="2.6"/><circle class="rd" cx="7.4" cy="5" r="2.6"/></g>${n > 1 ? `<circle class="n" cx="13" cy="-11" r="7"/><text x="13" y="-8">${n}</text>` : ''}</g>`; }).join('');
-  // Recorrido del elegido: lo avanzado en línea continua.
-  let est = ''; const fx = foco && B.find(function(b){ return b.x.oc === foco; });
-  if(fx){ const R = ncRuta(fx.x), t = ncFrac(fx.x), P = []; for(let i = 0; i <= 24; i++){ const q = ncEnRuta(R, t * i / 24); P.push([q[0], q[1]]); } est = `<path class="imx-est${fx.x.st === 'venc' ? ' tarde' : ''}" d="${impLineaD(P)}"/>`; }
+  // Un pin por distrito del proveedor (las OC no viajan todo el plazo: están en el proveedor hasta que se entregan, 18.11.2026): el número de
+  // OC y el color del peor estado. Si los pines se tocan en pantalla se juntan; una sola OC abre su ficha y varias, la lista del distrito.
+  const peor = function(c){ return ['venc', 'ag', 'luego', 'agr', 'ent'].find(function(k){ return c[k]; }) || 'luego'; };
+  const G = [...ncGrupos(ncVis(I)).values()].filter(function(g){ return g.u; }).map(function(g){ return { g:g, n:g.l.length, q:[(g.u.p[0] - v[0]) * s, (g.u.p[1] - v[1]) * s] }; }).sort(function(a, b){ return (b.g.k === dSel) - (a.g.k === dSel) || b.n - a.n; });
+  const C = []; G.forEach(function(x){ const c = x.g.k === dSel ? null : C.find(function(c){ return !c.fijo && Math.hypot(c.q[0] - x.q[0], c.q[1] - x.q[1]) < 26; }); if(c) c.l.push(x); else C.push({ l:[x], q:x.q, fijo:x.g.k === dSel }); });
+  const cajas = [], pins = C.map(function(c){ const n = c.l.reduce(function(a, y){ return a + y.n; }, 0), cs = {}; c.l.forEach(function(y){ Object.keys(y.g.c).forEach(function(k){ cs[k] = (cs[k] || 0) + y.g.c[k]; }); });
+    const p = c.l.length === 1 ? c.l[0].g.u.p : [0, 1].map(function(i){ return c.l.reduce(function(a, y){ return a + y.g.u.p[i] * y.n; }, 0) / n; }), q = [(p[0] - v[0]) * s, (p[1] - v[1]) * s];
+    const uno = c.l.length === 1, g = c.l[0].g, on = uno && g.k === dSel, f = uno && g.l.length === 1 && g.l[0].oc === foco, nom = uno ? g.u.n : c.l.length + ' distritos', w = nom.length * 6.2 + 8, b = [q[0] - w / 2, q[1] + 4, q[0] + w / 2, q[1] + 18];
+    const lbl = (on || f || s >= 7 || !uno) && !cajas.some(function(a){ return b[0] < a[2] && a[0] < b[2] && b[1] < a[3] && a[1] < b[3]; }); if(lbl) cajas.push(b);
+    const xs = c.l.map(function(y){ return y.g.u.p[0]; }), ys = c.l.map(function(y){ return y.g.u.p[1]; });
+    const at = !uno ? `data-nczc="${Math.min.apply(null, xs).toFixed(2)},${Math.min.apply(null, ys).toFixed(2)},${Math.max.apply(null, xs).toFixed(2)},${Math.max.apply(null, ys).toFixed(2)}"` : g.l.length === 1 ? `data-ncfoco="${e(g.l[0].oc)}"` : `data-ncd="${e(g.k)}"`;
+    const tt = (uno ? g.u.n + ' · ' + g.u.sub : nom) + ' · ' + n + ' OC' + (cs.venc ? ' (' + cs.venc + ' vencida' + (cs.venc === 1 ? '' : 's') + ')' : '') + (uno ? (g.l.length === 1 ? ' · toca para ver su ficha' : ' · toca para ver sus OC') : ' · toca para acercar');
+    return `<g class="ncm-pn k-${peor(cs)}${on || f ? ' on' : ''}" ${at} data-a="${p[0].toFixed(3)},${p[1].toFixed(3)}" transform="translate(${p[0].toFixed(3)} ${p[1].toFixed(3)}) scale(${u.toFixed(5)})"><title>${e(tt)}</title><path class="pb" d="M0 0C-5.5-6.5-11-10.5-11-17a11 11 0 0 1 22 0C11-10.5 5.5-6.5 0 0z"/><text y="-13.2">${n}</text>${lbl ? `<text class="l" y="15">${e(nom)}</text>` : ''}</g>`; }).join('');
   const cd = ['LIM', 'TRU', 'ICA'].map(function(k){ const lu = rtXY(RT_SEDE[k].ll), n = RT_SEDE[k].n;
     return `<g class="imx-cd ncm-cd" data-a="${lu[0].toFixed(3)},${lu[1].toFixed(3)}" transform="translate(${lu[0].toFixed(3)} ${lu[1].toFixed(3)}) scale(${u.toFixed(5)})"><title>Almacén Friopacking · CD ${n}: aquí llegan las OC de los proveedores de la zona</title><circle class="pu" r="12"/><rect x="-12" y="-12" width="24" height="24" rx="7"/><g transform="translate(-8.5 -8.5) scale(.7)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO.cd}</svg></g><text class="l" x="17" y="5">CD ${n}</text></g>`; }).join('');
-  return `<g>${est}</g><g>${dots}</g>${cd}<g>${cam}</g>`; }
+  return `${cd}<g>${pins}</g>`; }
 // Ficha de la OC (como la del barco en Importaciones): de dónde a qué CD, cuánto falta o cuánto se pasó, comprador, proyecto y su tarjeta de siempre.
 function ncFicha(x, D){ const e = escapeHtml, o = x.o || {}, est = NC_EST[x.st] || NC_EST.luego, col = est[1], sd = x.u ? RT_SEDE[ncSede(x.u)].n : 'Lurín', cor = +appIndCorte();
   const a = o.fb || o.fo, b = o.f, pct = a && b ? Math.max(0, Math.min(1, (cor - a) / Math.max(864e5, b - a))) : null, hoy = new Date();
@@ -23940,14 +23948,14 @@ function ncFicha(x, D){ const e = escapeHtml, o = x.o || {}, est = NC_EST[x.st] 
   const dato = function(k, v){ return v ? `<div><small>${k}</small><b title="${e(v)}">${e(v)}</b></div>` : ''; };
   const iO = ['venc', 'luego'].indexOf(x.st) !== -1 ? D.cardOC(o, 0, x.st) : '';
   const L = x.u ? NCM.I.filter(function(y){ return y.u && y.u.k === x.u.k && ncEnEst(y, 'ab'); }).length : 0;
-  return `<div class="imx-pan imx-fi ncm-fi" style="--fc:${col}"><header><i class="imx-fic"><svg viewBox="-15 -11 30 20"><path d="${NC_CAMION}"/><circle cx="-8" cy="5" r="2.6"/><circle cx="7.4" cy="5" r="2.6"/></svg></i><div><h3>OC ${e(ocC)}</h3><span>${e(prov)}</span></div><button type="button" class="pmm-x" data-ncx="1" aria-label="Cerrar">×</button></header>
+  return `<div class="imx-pan imx-fi ncm-fi" style="--fc:${col}"><header><i class="imx-fic">${ncSvg('<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>')}</i><div><h3>OC ${e(ocC)}</h3><span>${e(prov)}</span></div><button type="button" class="pmm-x" data-ncx="1" aria-label="Cerrar">×</button></header>
     <div class="imx-fi-est"><b>${e(est[0])}</b><span>${e(cuando)}</span></div>
-    <div class="imx-fi-ru"><div class="imx-fi-pt"><span><small>Sale de</small><b>${e(x.u ? x.u.n : 'Sin distrito')}</b><em>${e(x.u ? x.u.sub : 'Falta en DB Proveedores')}</em></span></div>
-      <div class="imx-fi-pt fin"><span><small>Llega a</small><b>CD ${e(sd)}</b><em>${b ? 'Compromiso ' + fmtDate(b) : 'Sin compromiso'}</em></span></div>
-      <div class="imx-fi-bar"><i style="width:${pct === null ? 0 : (pct * 100).toFixed(1)}%"></i><svg viewBox="-15 -11 30 20" style="left:${pct === null ? 0 : (pct * 100).toFixed(1)}%"><path d="${NC_CAMION}"/><circle cx="-8" cy="5" r="2.6"/><circle cx="7.4" cy="5" r="2.6"/></svg></div>
-      ${pct !== null ? `<small class="imx-fi-pc">${Math.round(pct * 100)}% del plazo · OC ${o.fo ? 'del ' + fmtDate(o.fo) : ''}${o.fb ? ', aprobada el ' + fmtDate(o.fb) : ''}</small>` : ''}</div>
+    <div class="imx-fi-ru"><div class="imx-fi-pt"><span><small>${x.u && x.u.ag ? 'Está en' : 'Proveedor en'}</small><b>${e(x.u ? x.u.n : 'Sin distrito')}</b><em>${e(x.u ? x.u.sub : 'Falta en DB Proveedores')}</em></span></div>
+      <div class="imx-fi-pt fin"><span><small>Se entrega en</small><b>CD ${e(sd)}</b><em>${b ? 'Compromiso ' + fmtDate(b) : 'Sin compromiso'}</em></span></div>
+      <div class="imx-fi-bar"><i style="width:${pct === null ? 0 : (pct * 100).toFixed(1)}%"></i></div>
+      ${pct !== null ? `<small class="imx-fi-pc">${Math.round(pct * 100)}% del plazo de entrega · OC ${o.fo ? 'del ' + fmtDate(o.fo) : ''}${o.fb ? ', aprobada el ' + fmtDate(o.fb) : ''}</small>` : ''}</div>
     <div class="imx-fi-gr">${dato('Comprador', per ? titleCase(per) : '')}${dato('Proyecto', [...(o.prys || [])].map(appImpNombre).join(', '))}${dato('Ítems', o.n ? appN(o.n) : '')}${dato('Estado en Nisira', o.est || '')}${dato('Distrito', x.u ? x.u.n + ' · ' + x.u.sub : '')}${dato('Dirección', x.u && x.u.dir ? titleCase(x.u.dir) : '')}</div>
-    <div class="imx-lk"><a href="${e(ncMapsUrl(x.prov, x.u && x.u.dir ? x.u.dir + ', ' + x.u.n : ''))}" target="_blank" rel="noopener">${ncSvg(NC_ICO.web)}Proveedor en Google Maps</a></div>
+    <div class="imx-lk"><a href="${e(x.u && x.u.ag ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(x.u.ag + ' ' + x.u.dir + ', Lima, Perú') : ncMapsUrl(x.prov, x.u && x.u.dir ? x.u.dir + ', ' + x.u.n : ''))}" target="_blank" rel="noopener">${ncSvg(NC_ICO.web)}${x.u && x.u.ag ? 'Agencia' : 'Proveedor'} en Google Maps</a></div>
     ${iO ? `<div class="imx-cards" id="pcLista">${iO}</div>` : ''}
     ${L > 1 ? `<button type="button" class="imx-fi-mas" data-ncd="${e(x.u.k)}">${ncSvg(NC_ICO.pin)}Ver las ${appN(L)} OC de ${e(x.u.n)} ›</button>` : ''}</div>`; }
 function ncMapaHtml(I){ const e = escapeHtml, M = PM_PERU, G = ncGrupos(ncVis(I)), v = (ZM.ncm && ZM.ncm.v) || ncVistaInicial(), D = impPx(), dSel = APP_NC.d;
@@ -25112,7 +25120,7 @@ function appAgCargar(forzar){
     if(!l) return; const firma = JSON.stringify(l.map(function(x){ return [x.oc, x.agencia, x.persona, x.recogen, x.fecha, x.factura, x.guia]; }).sort());
     if(firma === APP_AG.firma) return;
     const m = {}; l.forEach(function(x){ m[x.oc] = x; }); APP_AG.m = m; APP_AG.firma = firma; APP_AG.v++; appAgAplicar();
-    if(APP.enInicio && appHayDatos() && ['pendcompras', 'almreg'].indexOf(APP.pantalla) !== -1) appRenderInicio();
+    if(APP.enInicio && appHayDatos() && ['pendcompras', 'almreg'].indexOf(APP.pantalla) !== -1) appRenderFondo();
   }).catch(function(){}).then(function(){ APP_AG.cargando = false; APP_AG.t = Date.now(); });
   return APP_AG.prom;
 }
@@ -25586,11 +25594,13 @@ function impMarcas(I, v, W){ const e = escapeHtml, s = W / v[2], u = 1 / s, sel 
   const barcos = BG.map(function(g, i){ const b = g.l[0], n = g.l.length, on = g.l.some(function(z){ return z.on; }), foco = g.l.some(function(z){ return APP_PL.foco && APP_PL.foco === z.x.ocs[0]; });
     const ic = n === 1 && b.x.modo === 'aire' ? 'avion' : n === 1 && b.x.modo === 'tierra' ? 'camion' : 'barco';
     const nv = (b.x.x && b.x.x.e) || {}, nave = n === 1 && nv.nave ? titleCase(nv.nave) : '';
-    const tt = n > 1 ? n + ' embarques en camino · toca para acercar' : `OC ${b.x.ocs.map(function(c){ return c.replace(/^000\d-0*/, ''); }).join(', ')} · ${b.x.prov || ''}${nave ? ' · ' + nave : ''}${nv.nv ? ' (' + nv.nv + ')' : ''} · ${b.x.eta ? 'llega ' + appDDMM(b.x.eta) : 'ETA por confirmar'}`;
+    // En el mismo punto (misma nave, o el mismo lugar): acercar no los separa, así que tocarlo abre la ficha (18.11.2026, "al hacer click a algún barco simplemente se hace zoom").
+    const junto = n > 1 && g.l.every(function(z){ return Math.hypot(z.p[0] - b.p[0], z.p[1] - b.p[1]) < 0.6; });
+    const tt = n > 1 ? n + ' embarques en camino' + (junto ? ' · toca para ver el detalle' : ' · toca para acercar') : `OC ${b.x.ocs.map(function(c){ return c.replace(/^000\d-0*/, ''); }).join(', ')} · ${b.x.prov || ''}${nave ? ' · ' + nave : ''}${nv.nv ? ' (' + nv.nv + ')' : ''} · ${b.x.eta ? 'llega ' + appDDMM(b.x.eta) : 'ETA por confirmar'}`;
     const izq = Math.cos(b.p[2] || 0) < 0, tarde = g.l.some(function(z){ return z.x.eta && +impLurinFecha(z.x.eta, impTipoLurin(z.x.x && z.x.x.e, z.x.modo)) < Date.now(); });   // pasó su llegada estimada a Lurín
     const glifo = ic === 'barco' ? `<circle class="hl" r="17"/><circle class="hit" r="15"/><path class="sk" d="${IMX_BARCO_MIN}" transform="scale(${izq ? '-1.15 1.15' : '1.15'})"/>`
       : `<circle r="11"/><g transform="translate(-7.5 -7.5) scale(.625)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO[ic]}</svg></g>`;
-    const at = n > 1 ? `data-imzc="${g.p[0].toFixed(2)},${g.p[1].toFixed(2)}"` : `data-impais="${b.a}" data-imfoco="${e(b.x.ocs[0])}"`;
+    const at = n > 1 && !junto ? `data-imzc="${g.p[0].toFixed(2)},${g.p[1].toFixed(2)}"` : `data-impais="${b.a}" data-imfoco="${e(b.x.ocs[0])}"`;
     return `<g class="imx-sh${on ? ' on' : ''}${foco ? ' foco' : ''}${tarde ? ' tarde' : ''}" ${at} data-a="${g.p[0].toFixed(3)},${g.p[1].toFixed(3)}" transform="translate(${g.p[0].toFixed(2)} ${g.p[1].toFixed(2)}) scale(${u.toFixed(4)})" style="--d:${(i % 5) * 0.4}s"><title>${e(tt)}</title>${glifo}${n > 1 ? `<circle class="n" cx="13" cy="-11" r="7"/><text x="13" y="-8">${n}</text>` : ''}${nave && (s >= 1.4 || on || foco) && (function(){ const w = nave.length * 3.4 + 4, r = [g.q[0] - w, g.q[1] + 12, g.q[0] + w, g.q[1] + 27]; if(!foco && !libre(r)) return false; ocup.push(r); return true; })() ? `<text class="l" y="23">${e(nave)}</text>` : ''}</g>`; });
   const oce = s < 5 ? [['Océano Pacífico', [-22, -128]], ['Océano Pacífico', [18, 160]], ['Océano Atlántico', [12, -36]]].map(function(o){ const p = impXY(o[1]); return `<text class="imx-oc" data-a="${p[0].toFixed(2)},${p[1].toFixed(2)}" transform="translate(${p[0].toFixed(2)} ${p[1].toFixed(2)}) scale(${u.toFixed(4)})">${o[0]}</text>`; }).join('') : '';
   const lu = impXY(IMX_LURIN), arr = I.filter(impEnPeru).length;
@@ -27806,7 +27816,7 @@ async function gdRsvCargar(){ if(GDR.l || GDR.cargando) return; if(!sbSesion()){
   try{ const L = []; for(let o = 0; o < 50000; o += 1000){ const r = await sbFetch('/rest/v1/fp_reservas?select=req,cantidad,sede,creado,estado,val_estado,val_en,val_nombre,val_disp&order=id.asc', { headers:{ 'Range-Unit':'items', Range:o + '-' + (o + 999) } });
       if(!r.ok) throw new Error('No pude leer las reservas (' + r.status + ').'); const j = await r.json(); L.push.apply(L, j); if(j.length < 1000) break; }
     GDR.l = L; }catch(err){ GDR.err = err.message || String(err); GDR.l = []; }
-  GDR.cargando = false; if(APP.enInicio && APP.pantalla === 'gdalm') appRenderInicio(); }
+  GDR.cargando = false; if(APP.enInicio && APP.pantalla === 'gdalm') appRenderFondo(); }
 function gdDiaLima(ts){ const t = new Date(ts).getTime(); return isNaN(t) ? '' : new Date(t - 5 * 3600e3).toISOString().slice(0, 10); }   // Perú: UTC−5, sin horario de verano
 function gdRsvDatos(){ const Lr = GDR.l || [], hoy = gdDiaLima(Date.now()), corte = isoDay(appIndCorte()), dia = function(s, k){ const d = new Date(Date.parse(s + 'T00:00:00Z') + k * 864e5); return d.toISOString().slice(0, 10); };
   const D = []; for(let d = dia(hoy, -29); d <= hoy; d = dia(d, 1)) D.push(d);   // últimos 30 días: Nisira da el contexto aunque el nuevo formato sea reciente
