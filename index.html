@@ -17136,6 +17136,7 @@ function psrRepetidaCalc(r){ const q = function(x){ return x.cantOrden != null ?
   return !!((r.codPedido && k.has(String(r.codPedido).trim() + '|' + String(r.idProducto || '').trim())) ||
     (r.codOrden && k.has('OC|' + String(r.codOrden).trim() + '|' + String(r.idProducto || '').trim() + '|' + q(r)))); }
 function pdFilas(){ return appMemo('pdFilas', pdFilasCalc).slice(); }
+const PD_PARCIAL_DESDE = new Date(Date.UTC(2026, 0, 1));
 function pdFilasCalc(){
   const out = [], parc = new Map();
   getReqRows().forEach(function(r){
@@ -17148,7 +17149,11 @@ function pdFilasCalc(){
     else if(pdPedidoAbierto(r)) out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, base));
     // OC parcial (10.11.2026, Piero: "uno que generé parcial y no lo estás considerando"): si la OC cubre solo parte del
     // pedido y el pedido sigue Pendiente en Nisira, lo que falta también va en "SKU sin OC", con la OC parcial a la vista.
-    if(r.codPedido && r.codOrden && String(r.estadoPedido || '').trim().toLowerCase() === 'pendiente' && !/anul/i.test(r.estadoOrden || '')){
+    // También "Atendido Parcial" (18.11.2026, Piero: "por qué desapareció el de Agroberries 4G2.5 de 1133 m"): cuando llega la OC parcial,
+    // Nisira pasa la línea de Pendiente a Atendido Parcial y lo que falta (16,050 − 14,917 = 1,133 m) se dejaba de ver. Solo pedidos desde
+    // 2026: los Atendido Parcial de 2023–2025 son saldos viejos que nadie va a comprar.
+    const epL = String(r.estadoPedido || '').trim().toLowerCase(), parcAbierto = epL === 'pendiente' || (epL === 'atendido parcial' && r.fPedido && r.fPedido >= PD_PARCIAL_DESDE);
+    if(r.codPedido && r.codOrden && parcAbierto && !/anul/i.test(r.estadoOrden || '')){
       const k = r.codRequerimiento + '|' + r.codPedido + '|' + r.idProducto + '|' + r.cantPedido, g = parc.get(k) || { r:r, base:base, q:0, ocs:[] };
       g.q += +r.cantOrden || 0; if(g.ocs.indexOf(r.codOrden) === -1) g.ocs.push(r.codOrden); parc.set(k, g); }
   });
@@ -23768,7 +23773,10 @@ function appPendComprasHtml(soloLista, sinCaras){
     const g = new Map(); l.forEach(function(r){ const k = fk ? fk(r) : (r.familia || 'Sin familia').toString().trim() || 'Sin familia'; if(!g.has(k)) g.set(k, []); g.get(k).push(r); });
     // Por prioridad (07.10.2026, Piero): primero la familia con el pedido más antiguo; dentro, el más antiguo primero.
     const f0 = function(l2){ return l2.reduce(function(m, r){ return r.fPedido && (!m || r.fPedido < m) ? r.fPedido : m; }, null) || new Date(8.64e15); };
-    return [...g.entries()].sort(function(a,b){ return f0(a[1]) - f0(b[1]) || b[1].length - a[1].length || a[0].localeCompare(b[0]); });
+    // Con "Familia · Tipo" (18.11.2026): los tipos de una misma familia juntos; la familia con el pedido más antiguo primero.
+    const fm = new Map(); g.forEach(function(l2, k){ const f = k.split(' · ')[0], v = f0(l2); if(!fm.has(f) || v < fm.get(f)) fm.set(f, v); });
+    const fa = function(k){ return fm.get(k.split(' · ')[0]); };
+    return [...g.entries()].sort(function(a,b){ return fa(a[0]) - fa(b[0]) || a[0].split(' · ')[0].localeCompare(b[0].split(' · ')[0]) || f0(a[1]) - f0(b[1]) || b[1].length - a[1].length || a[0].localeCompare(b[0]); });
   };
   // SKU sin OC en una tabla simple (18.11.2026, Piero: "que sea simple de ver porque hay mucho espacio en blanco y está todo agrupado"): una
   // fila por SKU, el pedido más antiguo primero; la familia va como etiqueta (y se filtra con los chips de arriba). Tocar la fila abre su ficha.
@@ -23794,7 +23802,7 @@ function appPendComprasHtml(soloLista, sinCaras){
     // Con una persona elegida arriba, sin su cara en cada fila (18.11.2026, Piero: "es redundante").
     return `<div class="skt${APP_PC.mod === 'sku' && APP_PC.skuPer ? ' sin-u' : ''}${cot ? ' cot' : ''}"><div class="skt-h">${cot ? '<span></span>' : ''}<span>Espera</span><span>Producto</span><span class="hq">Cant.</span><span>Pedido</span><span>Req.</span><span>Cliente</span><span>Supervisor</span><span></span></div>${skuGrupos(l, skuCategoria).map(function(g){
       const todo = cot && g[1].every(function(r){ return APP_PC.cot.indexOf(skuKey(r)) !== -1; });
-      return `<section class="skt-blk" style="--fam:${appColorFamilia(g[0])}"><div class="skt-g">${cot ? `<span class="skt-x${todo ? ' on' : ''}" data-clic="1" data-skuselg="1" role="checkbox" aria-checked="${todo}" title="Elegir toda la categoría para cotizar"></span>` : ''}<i></i><b>${e(g[0])}</b><span>${g[1].length} SKU</span></div>${g[1].map(fila).join('')}</section>`; }).join('')}</div>`; };
+      return `<section class="skt-blk" style="--fam:${appColorFamilia(skuFamilia(g[0]))}"><div class="skt-g">${cot ? `<span class="skt-x${todo ? ' on' : ''}" data-clic="1" data-skuselg="1" role="checkbox" aria-checked="${todo}" title="Elegir toda la categoría para cotizar"></span>` : ''}<i></i><b>${e(g[0])}</b><span>${g[1].length} SKU</span></div>${g[1].map(fila).join('')}</section>`; }).join('')}</div>`; };
   // Buscador general (05.10.2026, Piero): OC, pedido, req., código, producto, proveedor o proyecto, en
   // todos los estados a la vez. Una OC sale completa si cualquiera de sus ítems coincide.
   const q = polarNorm(APP_PC.q || ''), tope = Infinity;   // todo a la vista (05.10.2026)
@@ -23832,15 +23840,19 @@ function appPendComprasHtml(soloLista, sinCaras){
     if(amb && k !== 'ped') l = l.filter(function(o){ return amb(o.oc, o.prov); });
     if(q) l = k === 'ped' ? l.filter(pasa) : l.filter(function(o){ return ocHit.has(o.oc); });
     // Familia en un desplegable (18.11.2026, Piero: "tiene que ser un desplegable nada más, no como tarjetas").
-    const famDe = skuCategoria, famN = {}; if(k === 'ped') l.forEach(function(r){ famN[famDe(r)] = (famN[famDe(r)] || 0) + 1; });
-    if(k === 'ped' && APP_PC.fam && !famN[APP_PC.fam]) APP_PC.fam = '';
-    const famChips = k === 'ped' && l.length ? `<label class="ncs-fam"><select class="ini-select" id="pcFam" aria-label="Categoría">${[['', 'Todas las categorías · ' + l.length]].concat(Object.keys(famN).sort(function(a, b){ return a.localeCompare(b); }).map(function(f){ return [f, f + ' · ' + famN[f]]; }))
-      .map(function(o){ return `<option value="${escapeHtml(o[0])}"${o[0] === (APP_PC.fam || '') ? ' selected' : ''}>${escapeHtml(o[1])}</option>`; }).join('')}</select></label>` : '';
+    // Por familia y tipo (18.11.2026, Piero: "segmenta bien por productos"): cada familia es un grupo del desplegable, con "toda la familia" y sus tipos.
+    const famDe = skuCategoria, famN = {}, famF = {}; if(k === 'ped') l.forEach(function(r){ const c = famDe(r), f = skuFamilia(c); famN[c] = (famN[c] || 0) + 1; famF[f] = (famF[f] || 0) + 1; });
+    if(k === 'ped' && APP_PC.fam && !(APP_PC.fam.indexOf('F|') === 0 ? famF[APP_PC.fam.slice(2)] : famN[APP_PC.fam])) APP_PC.fam = '';
+    // El elegido dice también la familia (cerrado, el desplegable solo muestra el texto de esa opción).
+    const opF = function(v, t, tSel){ const on = v === (APP_PC.fam || ''); return `<option value="${escapeHtml(v)}"${on ? ' selected' : ''}>${escapeHtml(on && tSel ? tSel : t)}</option>`; };
+    const famChips = k === 'ped' && l.length ? `<label class="ncs-fam"><select class="ini-select" id="pcFam" aria-label="Categoría">${opF('', 'Todas las categorías · ' + l.length)}${Object.keys(famF).sort(function(a, b){ return (a === 'Otros productos') - (b === 'Otros productos') || a.localeCompare(b); }).map(function(f){
+      const tipos = Object.keys(famN).filter(function(c){ return skuFamilia(c) === f; }).sort(function(a, b){ return /· Otr/.test(a) - /· Otr/.test(b) || a.localeCompare(b); });
+      return `<optgroup label="${escapeHtml(f)}">${tipos.length > 1 ? opF('F|' + f, 'Toda la familia · ' + famF[f], f + ' (toda la familia) · ' + famF[f]) : ''}${tipos.map(function(c){ return opF(c, c.split(' · ').slice(1).join(' · ') + ' · ' + famN[c], c + ' · ' + famN[c]); }).join('')}</optgroup>`; }).join('')}</select></label>` : '';
     // SKU sin OC (18.11.2026, Piero: "quita lo que dice pedidos sin OC, el más antiguo primero…"): solo las caras, la familia y la tabla.
-    if(k === 'ped' && sku){ const lf = APP_PC.fam ? l.filter(function(r){ return famDe(r) === APP_PC.fam; }) : l;
+    if(k === 'ped' && sku){ const lf = APP_PC.fam ? l.filter(function(r){ return skuPasaCat(r, APP_PC.fam); }) : l;
       return `<div class="ncs-fil">${ncSkuPer(items)}${famChips}</div>` + (lf.length ? skuTabla(lf) : `<div class="ini-vacio">${q ? 'No hay SKU sin OC con "' + escapeHtml(APP_PC.q) + '".' : '✅ No hay SKU sin OC.'}</div>`); }
     const nPed = k === 'ped' ? new Set(l.map(function(r){ return r.codPedido; })).size : 0, nIt = l.length;
-    if(k === 'ped' && APP_PC.fam) l = l.filter(function(r){ return famDe(r) === APP_PC.fam; });
+    if(k === 'ped' && APP_PC.fam) l = l.filter(function(r){ return skuPasaCat(r, APP_PC.fam); });
     if((q || omitir) && !l.length) return '';
     return `<div class="m-pl-tit"><span>${x[0]} ${x[1]}</span><b>${k === 'ped' ? (q ? l.length + (l.length === 1 ? ' ítem' : ' ítems') : nPed + (nPed === 1 ? ' pedido · ' : ' pedidos · ') + nIt + (nIt === 1 ? ' ítem' : ' ítems')) : l.length}</b></div><div class="m-sec-nota">${x[4]}</div>`
       + famChips + (!l.length ? '<div class="ini-vacio">✅ Nada en este estado.</div>' : k === 'ped' ? skuTabla(l.slice(0, tope))
@@ -24070,20 +24082,169 @@ function ncVista(D, lista){ const I = ncItems(D), e = escapeHtml; NCM.I = I;
     <div class="imx-zoom">${Z('in', 'Acercar', '<path d="M12 5v14M5 12h14"/>')}${Z('out', 'Alejar', '<path d="M5 12h14"/>')}${Z('lima', 'Ver Lima Metropolitana', 'Lima')}${Z('pe', 'Ver todo el Perú', 'Perú')}</div>
     <div class="imx-lado" id="ncmLado">${ncLado(I, D, lista)}</div></div></div>`; }
 // SKU sin OC: el listado por familia de siempre, aparte del mapa, con su buscador y su Excel para cotizar.
-// Categoría de un SKU sin OC (18.11.2026, Piero): los cables por tipo (VFD, N2XOH, apantallado, RZ1…); lo demás, su familia.
-const SKU_CABLES = [[/\bV(FD|DF)\b/, 'Cable VFD'], [/ETHERNET|\b(F\/)?UTP\b|\bSTP\b|\bCAT[ .-]?[56]|MODBUS|RS-?485|COMUNICACI/, 'Cable de red y comunicación'],
-  [/APANT|APTANALL|INSTRUMENTACI|\bCY\b|-CY\b|YSLCY|PIMF|\bSHD\b|SHIELD/, 'Cable apantallado'], [/ACERADO|DE ACERO/, 'Cable de acero'], [/CALEFACT/, 'Cable calefactor'],
-  [/\bNH ?-? ?[89]0\b|NHX|NH[89]0/, 'Cable NH-80 / NHX-90'], [/N2XOH|N2XY|FREETOX/, 'Cable N2XOH (unipolar / tripolar)'],
-  [/RZ0?1-?K|ROZ1|R0Z1|AFERINAS|AFIRENAS|AFUMEX|\bRV-?K\b|BARRYFLEX|POWERFLEX|EXZHELLENT/, 'Cable RZ1-K / RV-K (fuerza)'],
-  [/CONTROL|MULTIHILO|MULTICONDUCTOR|JZ-500/, 'Cable de control'], [/\bTHW|\bTWF?\b|\bGPT\b|\bCPT\b|THHN/, 'Cable THW / GPT / CPT'],
-  [/VULCANIZ|\bNLT\b|\bNMT\b|TTRF|\bSJT/, 'Cable vulcanizado (NLT / NMT)'], [/DESNUDO|ATERRAR/, 'Cable desnudo (tierra)']];
-function skuCategoria(r){ const p = sinAcentos(String(r.producto || '')).toUpperCase();
-  if(/^(NO USAR\W+)?(CABLE\b|C ?\/|CONDUCTOR\b)/.test(p)){ const c = SKU_CABLES.find(function(x){ return x[0].test(p); }); return c ? c[1] : 'Otros cables'; }
-  const f = (r.familia || 'Sin familia').toString().trim() || 'Sin familia'; return f.charAt(0) + f.slice(1).toLowerCase(); }
+// Categoría de un SKU sin OC por TIPO DE PRODUCTO (18.11.2026, Piero: "así como separaste la familia de cables, separar igual para los SKU
+// sin OC de los demás compradores y las demás familias… hay otros que están desordenados… segmenta bien por productos"). Sale "Familia · Tipo":
+//   1) Danfoss con los grupos del Inventario (SVA, ICF, solenoides, variadores…), por su código de parte aunque la compra diga otra cosa.
+//   2) Cables eléctricos por tipo (VFD, N2XOH, apantallado, RZ1-K…), también los que no empiezan con "CABLE" (TOXFREE, NHX-90…).
+//   3) Lo que es por lo que dice la descripción (con qué palabra empieza: un "TEE PVC DESAGÜE" es tubería PVC aunque en Nisira esté en otra
+//      familia; una "PUERTA RÁPIDA… PLC SIEMENS" es una puerta, no Siemens).
+//   4) Siemens, Schneider, PPR, inox, SCH, EPP y uniformes con los grupos del Inventario.
+//   5) Si nada calza, la familia del Inventario y, si tampoco, la de Nisira.
+const SKU_CABLES = [[/\bV(FD|DF)\b/, 'VFD'], [/ETHERNET|\b(F\/)?UTP\b|\bSTP\b|\bCAT[ .-]?[56]|MODBUS|RS-?485|COMUNICACI|HDMI|\bUSB\b|PROFIBUS|PROFINET/, 'Red y comunicación'],
+  [/APANT|APTANALL|INSTRUMENTACI|\bCY\b|-CY\b|YSLCY|PIMF|\bSHD\b|SHIELD/, 'Apantallado'], [/CALEFACT/, 'Calefactor'],
+  [/\bNH ?-? ?[89]0\b|NHX|NH[89]0/, 'NH-80 / NHX-90'], [/N2XOH|N2XY|FREETOX/, 'N2XOH (unipolar / tripolar)'],
+  [/RZ0?1-?K|ROZ1|R0Z1|AFERINAS|AFIRENAS|AFUMEX|\bRV-?K\b|BARRYFLEX|POWERFLEX|EXZHELLENT|TOXFREE/, 'RZ1-K / RV-K (fuerza)'],
+  [/CONTROL|MULTIHILO|MULTICONDUCTOR|JZ-500/, 'Control'], [/\bTHW|\bTWF?\b|\bGPT\b|\bCPT\b|THHN/, 'THW / GPT / CPT'],
+  [/VULCANIZ|\bNLT\b|\bNMT\b|TTRF|\bSJT/, 'Vulcanizado (NLT / NMT)'], [/DESNUDO|ATERRAR/, 'Desnudo (tierra)']];
+const SKU_ES_CABLE = /^(CABLE\b|C ?\/|CONDUCTOR\b|TOXFREE|AFUMEX|AFERINAS|FREETOX|N2XOH|N2XY|NHX|NH-?[89]0\b|THW\b|NYY\b|OPVC|OLFLEX|YSLY|RZ1|ROZ1|NLT\b|NMT\b|GPT\b|CPT\b|TTRF|MULTICONDUCTOR)/;
+// [regla, familia, tipo o [[regla, tipo], …]] — se prueban en orden y gana la primera; dentro, el primer tipo que calza.
+const SKU_REGLAS_EQ = [   // equipos y lo que manda por sí mismo (antes de las marcas: una puerta con PLC Siemens es una puerta)
+  [/^PUERTA (DE |PARA )?(GABINETE|TABLERO)/, 'Material eléctrico', 'Tableros y gabinetes'],
+  [/^(EVAPORADORA|CONDENSADORA|UNIDAD) SPLIT|\bSPLIT\b.*BTU|^AIRE ACONDICIONADO|^(EQUIPO DE )?AIRE ACONDICIONADO|^FAN ?COIL|^CORTINA DE AIRE/, 'Aire acondicionado', [[/CORTINA DE AIRE/, 'Cortinas de aire'], [/./, 'Split y fan coil']]],
+  [/^(PUERTA|PORTON|VENTANA|ABRIGO|SELLO (DE )?ANDEN|RAMPA|NIVELADOR|BUMPER|TOPE (DE )?ANDEN|CERRADURA|CERRADERO|BISAGRA|BARRA ANTIPANICO|MANIJA|JALADOR|PICAPORTE|CIERRAPUERTA|BRAZO (HIDRAULICO|CIERRA))|(PARA|P\/|DE) (LA )?PUERTA|PUERTA (RAPIDA|SECCIONAL|CORREDERA|BATIENTE)/, 'Puertas y ventanas', [
+    [/^(PUERTA|PORTON).*RAPIDA/, 'Puertas rápidas'], [/^(PUERTA|PORTON).*SEC/, 'Puertas seccionales'], [/^(PUERTA|PORTON).*CORREDERA/, 'Puertas correderas'],
+    [/^(PUERTA|PORTON).*VAIVEN/, 'Puertas vaivén'], [/^(PUERTA|PORTON).*(EMERGENCIA|CORTAFUEGO|ESCAPE)/, 'Puertas de emergencia'], [/^(PUERTA|PORTON).*LONA/, 'Puertas de lona'],
+    [/^(PUERTA|PORTON).*(BATIENTE|PIVOT)/, 'Puertas batientes'], [/^(PUERTA|PORTON).*(OFICINA|ALUMINIO|CONTRAPLACADO|MADERA|VIDRIO|UPVC|CRISTAL)/, 'Puertas de oficina'], [/^(PUERTA|PORTON)/, 'Otras puertas'], [/^VENTANA/, 'Ventanas'],
+    [/^(ABRIGO|SELLO|RAMPA|NIVELADOR|BUMPER|TOPE)/, 'Andén (abrigos, sellos y rampas)'], [/^(CERRADURA|CERRADERO|BISAGRA|BARRA ANTIPANICO|MANIJA|JALADOR|PICAPORTE|CIERRAPUERTA|BRAZO)/, 'Cerraduras y herrajes'],
+    [/RADAR|TARJETA|MICROINTERRUPTOR|FOTOCELDA|SENSOR|MOTOR|CONTROL REMOTO|PULSADOR|ENCODER|FINAL DE CARRERA|CATENA|FRENO|TABLERO|CONTROLADOR/, 'Motores y electrónica de puerta'], [/./, 'Repuestos y accesorios de puerta']]],
+  [/^(RESISTENCIA|ADICIONAL(ES)?|BANDEJA|KIT)\b.*(EVAPORADOR|ENFRIADOR)|^RESISTENCIA.*(DESHIELO|DESESCARCHE|ANULAR|DRENAJE)/, 'Evaporadores y enfriadores', 'Resistencias y adicionales'],
+  [/^(EVAPORADOR(?!A)|EVPORADOR|EVAP\.? |ENFRIADOR(ES)? (?!DE (AGUA|LIQUIDO|GLICOL))|ENFRIADOR\b|UNIT ?COOLER|AIR ?COOLER|SERPENTIN|SERPETIN|BATERIA (DE ENFRIAMIENTO|EVAPORADORA|ZFQ)|BATERIA\b.*(NH3|ALETA|\bKW\b))/, 'Evaporadores y enfriadores', [
+    [/^(SERPENTIN|SERPETIN|BATERIA)/, 'Serpentines y baterías'], [/CUBIC/, 'Cúbicos'], [/DOBLE (FLUJO|DESCARGA)/, 'Doble flujo'], [/PLACAS/, 'De placas'], [/./, 'Otros']]],
+  [/^(CHILLER|ENFRIADOR(A)? DE (AGUA|LIQUIDO|GLICOL))/, 'Unidades condensadoras y chillers', 'Chillers'],
+  [/^(UNIDAD(ES)? (DE )?CONDENSA|CONDENSADOR(A)?\b(?! (DE (POTENCIA|ARRANQUE|MARCHA)|TRIFASICO|MONOFASICO|ELECTROLITICO))|TORRE DE ENFRIAMIENTO)/, 'Unidades condensadoras y chillers', [
+    [/EVAPORATIV|TORRE/, 'Condensadores evaporativos y torres'], [/./, 'Unidades condensadoras']]],
+  [/^COMPRESOR(A)? DE AIRE|^COMPRESSOR DE AIRE/, 'Herramientas y equipos', 'Compresores de aire'],
+  [/^(COMPRESOR|COMPRESSOR|MOTOCOMPRESOR|MOTO COMPRESOR|UNIDAD COMPRESORA|RACK\b.*COMPRESOR)/, 'Compresores y motores', 'Compresores'],
+  [/^(VENTILADOR|MOTOVENTILADOR|EXTRACTOR(?! DE (RODAMIENTO|POLEA))|HELICE|ASPA\b|DAMPER|PERSIANA|REJILLA (DE )?VENTILACION|DIFUSOR)/, 'Ventiladores', [
+    [/AXIAL/, 'Axiales'], [/CENTRIFUG/, 'Centrífugos'], [/^EXTRACTOR/, 'Extractores'], [/^(HELICE|ASPA)/, 'Hélices y aspas'], [/DAMPER|PERSIANA|REJILLA|DIFUSOR/, 'Dampers, rejillas y difusores'], [/./, 'Otros']]],
+  [/^(ELECTROBOMBA|BOMBA(?! DE (VACIO|ENGRASE|GRASA))|MOTOBOMBA|SELLO MECANICO)/, 'Bombas', [[/^SELLO/, 'Sellos mecánicos'], [/AMONIACO|NH3/, 'Bombas de amoníaco'], [/CONDENSAD|DRENAJE/, 'Bombas de condensado'], [/./, 'Electrobombas']]],
+  [/^(TANQUE(?! (DE )?(WC|INODORO))|RECIBIDOR|RECIPIENTE|ESTANQUE|TERMOSIFON|SEPARADOR (DE )?(ACEITE|LIQUIDO|AIRE)|ACUMULADOR|PURGADOR DE ACEITE|INTERCAMBIADOR|HIDRONEUMATICO)/, 'Tanques e intercambiadores', [
+    [/RECIBIDOR|ACUMULADOR|SEPARADOR|TERMOSIFON|PURGADOR|RECIPIENTE/, 'Recipientes de refrigeración'], [/INTERCAMBIADOR/, 'Intercambiadores'], [/./, 'Tanques de agua y glicol']]],
+  [/^PANEL(?! (LED|DE (CONTROL|OPERADOR|OPERACION)|OPERADOR|HMI|TACTIL|SOLAR|ELECTRICO))|^(CUMBRERA|PLATINA PREPINTADA|CANTONERA|ESQUINERO(?! DE CARTON)|ZOCALO|MANDIL|CENEFA|FLASHING|CANALETA (PREPINTADA|PLUVIAL)|TAPA CONICA|COBERTURA|TAPAJUNTA|CONTRAZOCALO|PERFIL (OMEGA|SANITARIO|[LUFZ]\b|DE (ALUMINIO|PVC|PANEL))|ANGULO (SANITARIO|PREPINTADO|DE ALUMINIO|PVC|ALUZ|INTERIOR|EXTERIOR)|LISTON(ES)? DE POL)|^(PERFIL|ANGULO|CANAL U|PLATINA)\b.*(PREPINT|PANEL|COBERTURA|CAPUCHON|SANITARIO|ALUZ|CAUCHO|\bPOL\b|\bPUR\b)/, 'Paneles y perfiles', [
+    [/^PANEL/, 'Paneles'], [/COBERTURA|CUMBRERA|CANALETA|FLASHING|CENEFA|MANDIL/, 'Coberturas y remates'], [/./, 'Perfiles, ángulos y accesorios']]],
+  [/^(LONA|TOLDO|CORTINA(?! RAPIDA| DE AIRE)|LAMA)\b/, 'Lonas y cortinas', [[/^TOLDO/, 'Toldos'], [/^LONA/, 'Lonas'], [/^LAMA|TIRAS|HAWAIANA|PVC/, 'Cortinas de tiras PVC'], [/./, 'Cortinas']]],
+  [/^(LUMINARIA|LUMINARA|REFLECTOR|LAMPARA|FOCO|TUBO (LED|LINEAL|FLUORESCENTE)|PANEL LED|LUZ (DE EMERGENCIA|LED)|BALIZA|CIRCULINA|SEMAFORO|SIRENA|ESTROBO|PLAFON|CINTA LED)/, 'Iluminación y señalización', [
+    [/BALIZA|CIRCULINA|SEMAFORO|SIRENA|ESTROBO/, 'Balizas, sirenas y semáforos'], [/EMERGENCIA/, 'Luces de emergencia'], [/./, 'Luminarias y reflectores']]],
+  [/^(CONTENEDOR (DE )?\d|CONTENEDOR (ESTANDAR|MARITIMO|REFRIGERADO|PLEGABLE)|CASA CONTENEDOR|FLATPACK|CASETA|MODULO PRE ?FABRICADO|ELEVADOR|PLATAFORMA ELEVADORA|MONTACARGA|APILADOR|TRANSPALETA|STOCKA|ESTOCA|GRUPO ELECTROGENO|GENERADOR ELECTRICO|HIDROLAVADORA|SELLADORA|BALANZA)/, 'Equipos y activos', [
+    [/CONTENEDOR|FLATPACK|CASETA|MODULO/, 'Contenedores y casetas'], [/ELEVADOR|PLATAFORMA|MONTACARGA|APILADOR|TRANSPALETA|STOCKA|ESTOCA/, 'Elevadores y transpaletas'], [/./, 'Maquinaria y equipos']]],
+  [/^(SERVICIO|MANO DE OBRA|FLETE|TRANSPORTE|ALQUILER|INSTALACION DE|MANTENIMIENTO|CALIBRACION|ASESORIA|CAPACITACION)/, 'Servicios', [[/FLETE|TRANSPORTE/, 'Transporte'], [/./, 'Servicios']]],
+  [/AVEVA|SOFTWARE|LICENCIA|\bSCADA\b|ANTIVIRUS|OFFICE 365|MICROSOFT 365/, 'Oficina y tecnología', 'Software y licencias'],
+  [/^(ACEITE|LUBRICANTE|GRASA|REFRIGERANTE|GAS REFRIGERANTE|GAS R-?\d|R-?\d{2,3}[A-Z]?\b|AMONIACO|NITROGENO|GLICOL|PROPILENGLICOL|MONOPROPILENGLICOL|ETILENGLICOL|ANTICONGELANTE|COMBUSTIBLE|PETROLEO|DIESEL|GASOLINA|DESENGRASANTE|LIMPIADOR (DE )?(SERPENTIN|CONTACTO|BOBINA|SISTEMA)|ECOFLUSH|SOLVENTE DIELECTRICO)/, 'Aceites, refrigerantes e insumos', [
+    [/^(ACEITE|LUBRICANTE|GRASA)/, 'Aceites y lubricantes'], [/GLICOL|ANTICONGELANTE/, 'Glicol'], [/COMBUSTIBLE|PETROLEO|DIESEL|GASOLINA/, 'Combustibles'], [/DESENGRAS|LIMPIADOR|SOLVENTE|ECOFLUSH/, 'Químicos de limpieza'], [/./, 'Refrigerantes y gases']]],
+  [/^(FILTRO (DE (ACEITE|AIRE|SUCCION)|COALESCENTE|SEPARADOR|PARA COMPRESOR|SECADOR|DESHIDRATADOR|SINTETICO|DE BOLSA|PLISADO)|(NUCLEO|CARTUCHO|BLOQUE) (FILTRANTE|DESHIDRATADOR|SECADOR))/, 'Aceites, refrigerantes e insumos', 'Filtros (aceite, aire y secadores)'],
+  [/(PARA|P\/) (EL )?COMPRESOR|\bFRICK\b|SABROE|MYCOM|BITZER|GRASSO|VILTER|HOWDEN|UNISAB|^(KIT DE (REPARACION|EMPAQUES?|JUNTAS)|PISTON|BIELA|CIGUENAL|PLATO DE VALVULA)/, 'Compresores y motores', 'Repuestos de compresor'],
+  [/^(RODAMIENTO|CHUMACERA|FAJA|POLEA|ACOPLE (FLEXIBLE|DE MOTOR|ELASTICO)|ACOPLAMIENTO|CADENA DE TRANSMISION|PINON|CATALINA|RETEN)/, 'Compresores y motores', 'Rodamientos y transmisión'],
+  [/^(MOTOR(?!CICLETA)|MOTORREDUCTOR|ELECTROMOTOR|SERVOMOTOR)/, 'Compresores y motores', 'Motores']
+];
+const SKU_MARCAS = { 'SIEMENS':1, 'SCHNEIDER ELECTRIC':1, 'PPR':0, 'ACCESORIOS INOX':0, 'TUBERÍAS SCH':0, 'JUNTAS Y VÁLVULAS CHECK':0, 'UNIFORMES':0, 'EPP Y SEGURIDAD':0 };   // 1: la marca manda aunque el grupo sea "Otros"
+const SKU_REGLAS = [   // después de las marcas
+  [/^(VARILLA (DE )?COBRE|VARILLA (DE )?PUESTA|POZO (A|DE) TIERRA|CEMENTO CONDUCTIVO|THOR ?GE[LN]|CONECTOR (PARA|DE) VARILLA|SOLDADURA EXOTERMICA|CARGA EXOTERMICA|DOSIS QUIMICA|CAJA DE REGISTRO (PARA|DE) (POZO|PUESTA))/, 'Material eléctrico', 'Puesta a tierra'],
+  [/^(VALV|VLV\b|ELECTROVALVULA|LLAVE (DE )?(PASO|BOLA|ESFERICA|COMPUERTA|GLOBO)|GRIFO DE (PRUEBA|PURGA)|PURGADOR|FILTRO ("|'|”)?Y\b|FILTRO (T\/ ?|TIPO )?(CANASTA|Y\b)|VISOR DE (LIQUIDO|FLUJO)|ACTUADOR)/, 'Válvulas', [
+    [/^(FILTRO|VISOR)/, 'Filtros y visores de línea'], [/^PURGADOR/, 'Purgadores'], [/^ACTUADOR/, 'Actuadores'], [/BOLA|ESFERA|ESFERICA/, 'De bola'], [/MARIPOSA/, 'Mariposa'], [/CHECK|RETENCION/, 'Check'],
+    [/SOLENOIDE|ELECTROVALV/, 'Solenoides'], [/EXPANSION|EXPASION/, 'De expansión'], [/ALIVIO|SEGURIDAD/, 'De alivio y seguridad'], [/2 VIAS|3 VIAS|MOTORIZADA|BALANCE|PIBCV|DE CONTROL/, 'De control (2 y 3 vías)'], [/./, 'De paso, globo y otras']]],
+  [/^(CONTROLADOR|TERMOSTATO|PRESOSTATO|HUMIDOSTATO|TERMOHIGROMETRO|REGISTRADOR|DATA ?LOGGER|TERMOMETRO|MANOMETRO|VACUOMETRO|MANIFOLD|ANEMOMETRO|HIGROMETRO|SENSOR|SONDA|TRANSMISOR|TRANSDUCTOR|DETECTOR(?! DE FUGA)|BULBO|TERMOCUPLA|TERMOPOZO|RTD\b|PT ?100|FLUJOSTATO|CAUDALIMETRO|FLUJOMETRO|INTERRUPTOR DE (NIVEL|FLUJO|PRESION)|SWITCH DE (NIVEL|FLUJO|PRESION)|MEDIDOR|MULTIMETRO|ANALIZADOR|PINZA AMPERIMETRICA|MEGOMETRO|TELUROMETRO|PIROMETRO|TACOMETRO|INDICADOR (DIGITAL|DE TEMPERATURA)|MONITOR CONTROLADOR)/, 'Control e instrumentación', [
+    [/^(CONTROLADOR|TERMOSTATO|PRESOSTATO|HUMIDOSTATO|REGISTRADOR|DATA ?LOGGER|INDICADOR|MONITOR)/, 'Controladores y termostatos'], [/^(SENSOR|SONDA|TRANSMISOR|TRANSDUCTOR|DETECTOR|BULBO|TERMOCUPLA|TERMOPOZO|RTD|PT ?100|FLUJOSTATO|CAUDALIMETRO|FLUJOMETRO|INTERRUPTOR|SWITCH)/, 'Sensores, transmisores y detectores'],
+    [/./, 'Instrumentos de medición']]],
+  [/^(VARIADOR|CONVERTIDOR DE FRECUENCIA|DRIVE\b|ARRANCADOR|SOFT ?STARTER|MODULO PLUG-IN)/, 'Material eléctrico', 'Variadores y arrancadores'],
+  [/^(INTERRUPTOR(?! DE PARED)|LLAVE (TERMO|DIFERENCIAL|CUCHILLA|DE (FUERZA|CONTROL))|TERMOMAGNETICO|AUTOMATICO|AUTOM.TICO|DIFERENCIAL|GUARDAMOTOR|CONTACTOR|RELE\b|RELAY|RELEVADOR|FUSIBLE|PORTAFUSIBLE|SECCIONADOR|BREAKER|SUPRESOR|PARARRAYO|TEMPORIZADOR|BLOQUE (DE )?(CONTACTO|AUXILIAR)|CONTACTO AUXILIAR|PULSADOR|BOTONERA|SELECTOR|PILOTO|LUZ PILOTO|PARADA DE EMERGENCIA|REPARTIDOR|BARRA (DE )?(COBRE|NEUTRO|TIERRA)|PEINE)/, 'Material eléctrico', 'Protección y maniobra'],
+  [/^(PLC\b|CPU\b|MODULO|HMI\b|PANTALLA|TERMINAL (?!DE (COBRE|OJO|PIN|PUNTA|COMPRESION|HORQUILLA))|BUS DE CAMPO|ACOPLADOR|SWITCH|ROUTER|CONVERTIDOR|GATEWAY|MINI PC|ARM INDUSTRIAL|COMPUTADORA INDUSTRIAL|RADIO BASE|ANTENA|REPETIDOR|ENCODER|FINAL DE CARRERA|LIMIT SWITCH)/, 'Material eléctrico', 'Automatización y comunicación'],
+  [/^(TABLERO|GABINETE(?! CONTRA)|ARMARIO|CAJA (METALICA|PORTA ?MEDIDOR|DE CONTROL|DE DISTRIBUCION|PARA TABLERO)|STD\d|CELDA|BANCO DE CONDENSADORES)/, 'Material eléctrico', 'Tableros y gabinetes'],
+  [/^(TRANSFORMADOR|AUTOTRANSFORMADOR|UPS\b|ESTABILIZADOR|FUENTE|BATERIA\b|CARGADOR DE BATERIA|CONDENSADOR (DE (POTENCIA|ARRANQUE|MARCHA)|TRIFASICO|MONOFASICO))/, 'Material eléctrico', 'Transformadores, fuentes y UPS'],
+  [/^(BANDEJA (?!DE PINTURA|ANTIDERRAME)|CURVA (HORIZONTAL|VERTICAL)|TEE (HORIZONTAL|VERTICAL)|ESCALERILLA|CANALETA|CANAL (UNISTRUT|STRUT)|TUBO (CONDUIT|EMT|IMC|PVC[ -]?SAP|SAP|FLEXIBLE|CORRUGADO)|CONDUIT|CURVA (CONDUIT|EMT|IMC|PVC[ -]?SAP|SAP)|CONDULET|CAJA (DE PASE|OCTOGONAL|RECTANGULAR|CUADRADA|UNIVERSAL|SUPERFICIAL|DE PASO|ELECTRICA|PVC|DE EMPALME|CONDULET)|CONECTOR (EMT|CONDUIT|IMC|PVC[ -]?SAP|RECTO|CURVO|DE TUBO)|UNION (EMT|CONDUIT|IMC|DE PVC \(LUZ\)|PVC[ -]?SAP|SAP)|ABRAZADERA (EMT|CONDUIT|UNISTRUT|TIPO UNA|DE UNA)|RIEL (DIN|UNISTRUT|STRUT)|ESPIRAL|CINTILLO|AMARRACABLE|PRENSAESTOPA|SOPORTE EN CANAL|KIT DE UNION|PLACA INTERMEDIA|TAPA (CIEGA|PARA CAJA)|TUBERIA FLEXIBLE|FLEXIBLE (METALICO|LIQUID))/, 'Material eléctrico', 'Canalización (bandejas, tubos y cajas)'],
+  [/^(BORNE|BORNERA|TERMINAL|TOMA\b|TOMACORRIENTE|ENCHUFE|CLAVIJA|CONECTOR(?!.*(PPR|PVC|COBRE|HDPE|BRONCE|NPT|ROSCA|SOLDAR|MANGUERA|TUB))|EMPALME|MANGA TERMO|TERMOCONTRAIBLE|CINTA (AISLANTE|VULCANIZANTE|TEMFLEX)|INTERRUPTOR DE PARED|PLACA (DE )?(TOMA|INTERRUPTOR)|MARCADOR|ROTULADOR|MAGIC GEL)/, 'Material eléctrico', 'Conexionado y accesorios'],
+  [/^(RESISTENCIA|CALEFACTOR|CINTA CALEFACT)/, 'Material eléctrico', 'Resistencias y calefactores'],
+  [/^(CAJA DE REGISTRO|REGISTRO (ROSCADO|MIXTO|DE BRONCE|DE PISO)|SUMIDERO|CAMARA DE INSPECCION|INODORO|LAVATORIO|URINARIO|SISTEMA P\/ ?TANQUE|TANQUE (DE )?(WC|INODORO)|GRIFERIA|CANO\b|LLAVE (DE )?(LAVATORIO|DUCHA)|DUCHA(?! DE EMERGENCIA| LAVAOJOS)|LAVADERO|TRAMPA DE GRASA|BOTADERO)/, 'Instalaciones sanitarias', [
+    [/CAJA|CAMARA|REGISTRO|SUMIDERO/, 'Cajas, registros y sumideros'], [/./, 'Aparatos sanitarios y grifería']]],
+  [/ARMAFLEX|K-?FLEX|ELASTOMER|LANA (DE )?(VIDRIO|ROCA|MINERAL)|FIBRA DE VIDRIO|^(AISLAMIENTO|AISLANTE|COQUILLA|CANUELA|ESPUMAS? (ACUSTICA|ELASTOMERICA|DE POLIETILENO)|MANGUERA AISLANTE|POLIURETANO|SISTEMA DE POLIURETANO|POLIOL|ISOCIANATO|BARRERA DE VAPOR|FOAMGLASS|POLIESTIRENO|PLANCHA DE POLIESTIRENO|TECNOPOR)/, 'Aislamiento', [
+    [/POLIURETANO|POLIOL|ISOCIANATO|LUPRANATE|ELASTOPOR/, 'Poliuretano'], [/LANA|FIBRA DE VIDRIO/, 'Lana de vidrio y roca'], [/POLIESTIRENO|TECNOPOR/, 'Poliestireno'], [/./, 'Elastomérica y planchas']]],
+  [/^(FIERRO|ACERO CORRUGADO|ALAMBRE|MALLA ELECTROSOLDADA|VIGA|COLUMNA|CORREA|PERFIL|PLANCHA|PLNACHA|PLATINA|TUBO\b.*(CUAD|RECTANG|ESTRUCTURAL|\bLAC\b|\bLAF\b)|ANGULO|CANAL (C|U)\b|BARRA (LISA|CUADRADA|REDONDA)|VARILLA (LISA|CORRUGADA))/, 'Obra civil y estructuras', 'Acero estructural y planchas'],
+  [/^(TUBO|TUBERIA|TUBING|CODO|TEE\b|YEE?\b|REDUCCION|REDUCTOR|TAPON|CAP\b|COPLA|UNION|NIPLE|BRIDA|ADAPTADOR|MANGUITO|CURVA|TRAMPA|SOMBRERO|ANILLO DE JEBE|CRUZ\b|BUJE|COLLARIN(?! CERVICAL)|SILLETA|ABRAZADERA|EMPAQUETADURA|EMPAQUE|JUNTA|CEMENTO (PVC|CPVC)|PEGAMENTO (PVC|PARA PVC|CPVC)|SOLDADURA (PVC|LIQUIDA)|LIMPIADOR PVC|ESPIGA|CONECTOR|ACOPLE|PORTA ?FILTRO|MANGUERA)/, 'Tubería y accesorios', [
+    [/HDPE|POLIETILENO|PE ?100|PE ?80|\bSDR|TERMOFUSION|ELECTROFUSION/, 'HDPE / polietileno'], [/PVC.*(DESAGUE|\bDS\b|DS-CP|ALCANTARILLADO|S-25|\bSN ?[248]\b|ISO 4435|PLUVIAL)|(DESAGUE|ALCANTARILLADO).*PVC|ANILLO DE JEBE/, 'PVC desagüe'],
+    [/CPVC|PVC|CLASE ?1[05]\b|\bC-1[05]\b/, 'PVC presión y pegamentos'], [/COBRE|\bACR\b|\bCU\b|TIPO [KL]\b|\d"? ?OD\b|ROLL-?STOP|\(W ?\d{5}\)/, 'Cobre'], [/^MANGUERA/, 'Mangueras'], [/^(EMPAQUETADURA|EMPAQUE|JUNTA|ANILLO)/, 'Empaques y juntas'],
+    [/^(ABRAZADERA|COLLARIN|SILLETA)/, 'Abrazaderas y soportes'], [/INOX|C-? ?30[4-9]|C-? ?316|\bSS ?3|A-?312|A-?269|AISI/, 'Acero inoxidable'], [/GALV|FIERRO|ACERO|\bFE\b|\bFF\b|SCH|NEGRO|A-?53|A-?106|BRONCE|LATON/, 'Acero, fierro y bronce'], [/./, 'Otros']]],
+  [/^(CABLE (DE ACERO|ACERADO)|CADENA|ESLABON|GUARDACABO|SUJETACABLE|GRAPA (PARA CABLE|CROSBY)|CORDEL|SOGA|DRIZA|TEMPLADOR|GRILLETE|TENSOR)/, 'Ferretería y herramientas', 'Cables de acero, cadenas y sogas'],
+  [/^(PERNO|TUERCA|ARANDELA|ESPARRAGO|ANCLAJE|TORNILLO|TARUGO|REMACHE|CLAVO|VARILLA ROSCADA|PASADOR|CHAVETA|ARGOLLA|GANCHO(?! ADHESIVO)|ALCAYATA|CANCAMO|PRISIONERO|EXPANSOR|FIJACION|SUJETADOR)/, 'Ferretería y herramientas', 'Pernos, anclajes y fijaciones'],
+  [/^(PINTURA|ESMALTE|BASE ZINCROMATO|ZINCROMATO|ANTICORROSIV|THINNER|DILUYENTE|BROCHA|RODILLO|BANDEJA DE PINTURA|SUPER GLOSS|IMPRIMANTE|LACA|BARNIZ|MASILLA|LIJA|SPRAY|AEROSOL|EPOXICO)/, 'Ferretería y herramientas', 'Pintura y acabados'],
+  [/^(MASKING|CINTA (?!AISLANTE|VULCANIZ|DE SEGURIDAD|LED|CALEFACT|TEMFLEX)|SILICONA|SELLADOR|ESPUMA (EXPANSIVA|DE POLIURETANO)|PEGAMENTO|ADHESIVO|TEFLON|POXIPOL|SIKAFLEX|SIKA\b)/, 'Ferretería y herramientas', 'Cintas, adhesivos y selladores'],
+  [/^(SOLDADURA|VARILLA (DE )?(PLATA|BRONCE)|ELECTRODO|FUNDENTE|SILFOS|ALAMBRE (DE )?SOLDAR|OXIGENO|ACETILENO|GAS (MAPP|ARGON)|BOQUILLA)/, 'Ferretería y herramientas', 'Soldadura'],
+  [/^(ALICATE|DESARMADOR|DESTORNILLADOR|LLAVE|MARTILLO|COMBA|SIERRA|ARCO DE SIERRA|DISCO|BROCA|TALADRO|AMOLADORA|ESMERIL|ROTOMARTILLO|HERRAMIENTA|KIT DE HERRAMIENTA|JUEGO DE|NIVEL (DE BURBUJA|LASER|DE MANO)|WINCHA|FLEXOMETRO|ESCALERA|CARRETILLA|TECLE|GATA|SOPLETE|PISTOLA|DADO|CORTATUBO|ABOCARDADOR|EXPANDIDOR|EXTRACTOR DE|BOMBA DE (VACIO|ENGRASE|GRASA)|DETECTOR DE FUGA|SOLDADORA|MAQUINA|TIJERA|CUTTER|ESPATULA|PALA\b|PICO\b|BARRETA|CINCEL|LIMA\b|MALETA|CAJA DE HERRAMIENTA|TORQUIMETRO|REMACHADORA|ENGRAPADORA|CAUTIN|MULTIHERRAMIENTA)/, 'Ferretería y herramientas', 'Herramientas'],
+  [/^(CEMENTO|CONCRETO|ARENA|PIEDRA|HORMIGON|AGREGADO|LADRILLO|BLOQUE(TA)? (DE )?(CONCRETO|CEMENTO)|ADITIVO|CURADOR|FIBRA METALICA|MORTERO|YESO|FRAGUA)/, 'Obra civil y estructuras', 'Concreto y agregados'],
+  [/^(MADERA|TRIPLAY|LISTON|TABLA\b|TABLON|OSB\b|MDF\b|MELAMINA)/, 'Obra civil y estructuras', 'Madera'],
+  [/^(DRYWALL|SUPERBOARD|PLACA (DE )?(YESO|FIBROCEMENTO)|PISO|CERAMICO|PORCELANATO|POLICARBONATO|TEJA|CALAMINA|IMPERMEABILIZANTE|GEOMEMBRANA|GEOTEXTIL|MALLA (RASCHEL|ANTIAFIDO|ANTI ?AFIDO|SOMBRA)|VIDRIO|ESPEJO)/, 'Obra civil y estructuras', 'Acabados y cerramientos'],
+  [/^(PC\b|LAPTOP|COMPUTADORA|MONITOR(?! CONTROLADOR)|IMPRESORA|MULTIFUNCIONAL|TECLADO|MOUSE|DISCO (DURO|SOLIDO)|SSD\b|MEMORIA|TONER|CARTUCHO|TINTA|PROYECTOR|TELEVISOR|TV\b|CELULAR|SMARTPHONE|TABLET|IPAD|ACCESS POINT|CAMARA (IP|DE SEGURIDAD|DE VIGILANCIA|WEB)|DVR\b|NVR\b|AUDIFONO|PARLANTE|DOCKING|HUB\b|PAPEL BOND|ARCHIVADOR|LAPICERO|FOLDER|SILLA|ESCRITORIO|MESA\b)/, 'Oficina y tecnología', [
+    [/^(CAMARA|DVR|NVR)/, 'Cámaras de seguridad'], [/^(PAPEL|ARCHIVADOR|LAPICERO|FOLDER)/, 'Útiles de oficina'], [/^(SILLA|ESCRITORIO|MESA)/, 'Mobiliario'], [/IMPRESORA|MULTIFUNCIONAL|TONER|CARTUCHO|TINTA/, 'Impresión'], [/./, 'Computadoras y accesorios']]],
+  [/^(BOLSA|STRETCH|FILM\b|ZUNCHO|FLEJE|CARTON|CAJA DE CARTON|BURBUPACK|PLASTICO|MANGA PLASTICA|ESQUINERO DE CARTON|CINTA DE EMBALAJE|ESCOBA|RECOGEDOR|TRAPEADOR|JABON|DETERGENTE|DESINFECTANTE|LEJIA|ALCOHOL|PAPEL (HIGIENICO|TOALLA)|TOALLA|BIDON|TACHO|CONTENEDOR DE BASURA|BALDE|DISPENSADOR|AMBIENTADOR|LIMPIA|TRAPO|WAIPE|GUAIPE|FRANELA|ESPONJA|PANO\b)/, 'Limpieza y embalaje', [
+    [/^(BOLSA|STRETCH|FILM|ZUNCHO|FLEJE|CARTON|CAJA DE CARTON|BURBUPACK|PLASTICO|MANGA|ESQUINERO|CINTA DE EMBALAJE)/, 'Embalaje'], [/./, 'Limpieza']]]
+];
+// Nombres de familia y de grupo más legibles ("TUBERÍA Y ACCESORIOS" → "Tubería y accesorios", "Cubico" → "Cúbico").
+const SKU_SIGLAS = { EPP:1, SCH:1, PPR:1, HDPE:1, PVC:1, HMI:1, UPS:1, PLC:1, LED:1, TV:1, NH3:1, AB:1, ICF:1, ICM:1, ICS:1, SVA:1, FIA:1, REG:1, PIBCV:1 };
+const SKU_TILDES = { CUBICO:'cúbico', SERPENTIN:'serpentín', BATERIA:'batería', MANOMETRO:'manómetro', PRESION:'presión', ANEMOMETRO:'anemómetro', VAIVEN:'vaivén', ELECTRICA:'eléctrica',
+  ELECTRICO:'eléctrico', ELECTRONICO:'electrónico', ELECTRONICA:'electrónica', TUNEL:'túnel', CENTRIFUGO:'centrífugo', HIDRAULICO:'hidráulico', TECNOLOGIA:'tecnología', ANGULO:'ángulo', VALVULA:'válvula',
+  VALVULAS:'válvulas', TUBERIA:'tubería', TUBERIAS:'tuberías', CAMARA:'cámara', MEDICION:'medición', CONSTRUCCION:'construcción', FABRICACION:'fabricación', INSTALACION:'instalación', ENERGIA:'energía' };
+function skuBonito(t){ const s = String(t || '').replace(/\s+/g, ' ').trim(); if(!s) return '';
+  const w = s.split(' ').map(function(p, i){ const u = sinAcentos(p).toUpperCase().replace(/[^A-Z0-9]/g, ''); if(SKU_SIGLAS[u]) return p.toUpperCase();
+    const l = SKU_TILDES[u] || p.toLowerCase(); return i === 0 ? l.charAt(0).toUpperCase() + l.slice(1) : l; });
+  return w.join(' ').replace(/\bdanfoss\b/i, 'Danfoss').replace(/\bsiemens\b/i, 'Siemens').replace(/\bschneider electric\b/i, 'Schneider Electric'); }
+const SKU_FAM_ALIAS = { 'UNIDADES CONDENSADORAS':'Unidades condensadoras y chillers', 'TANQUES':'Tanques e intercambiadores', 'ILUMINACIÓN':'Iluminación y señalización' };
+function skuFamNom(f){ return SKU_FAM_ALIAS[f] || skuBonito(f); }
+// Subfamilias de Nisira con el mismo nombre que los tipos de arriba ("Aceite" → "Aceites y lubricantes"); las piezas sueltas, a repuestos.
+const SKU_GRUPO_ALIAS = { 'aceite':'Aceites y lubricantes', 'refrigerante':'Refrigerantes y gases', 'gas':'Refrigerantes y gases', 'filtros':'Filtros (aceite, aire y secadores)',
+  'cubico':'Cúbicos', 'bateria':'Serpentines y baterías', 'serpentin':'Serpentines y baterías', 'resistencia electrica':'Resistencias y adicionales', 'resistencia anular':'Resistencias y adicionales',
+  'axial':'Axiales', 'centrifugo':'Centrífugos', 'helice':'Hélices y aspas', 'rejilla':'Dampers, rejillas y difusores', 'damper y persiana':'Dampers, rejillas y difusores',
+  'sello mecanico':'Sellos mecánicos', 'de condensado':'Bombas de condensado', 'de amoniaco':'Bombas de amoníaco', 'electrobomba centrifuga':'Electrobombas',
+  'chiller':'Chillers', 'evaporativo':'Condensadores evaporativos y torres', 'con compresor semihermetico':'Unidades condensadoras', 'con compresor hermetico':'Unidades condensadoras', 'aire forzado':'Unidades condensadoras',
+  'semihermetico':'Compresores', 'reciprocante':'Compresores', 'Compresores y motores|tornillo':'Compresores', 'Compresores y motores|electrico':'Motores', 'controlador de capacidad':'Repuestos de compresor',
+  'recibidor de liquido':'Recipientes de refrigeración', 'purga aceite':'Recipientes de refrigeración', 'termosifon':'Recipientes de refrigeración', 'Tanques e intercambiadores|purgador de aire':'Recipientes de refrigeración',
+  'Tanques e intercambiadores|de agua':'Tanques de agua y glicol', 'Tanques e intercambiadores|glicol':'Tanques de agua y glicol', 'Tanques e intercambiadores|hidroneumatico':'Tanques de agua y glicol', 'Tanques e intercambiadores|estanque de bombeo':'Tanques de agua y glicol',
+  'rapida':'Puertas rápidas', 'seccional':'Puertas seccionales', 'corredera':'Puertas correderas', 'batiente':'Puertas batientes', 'vaiven':'Puertas vaivén', 'de lona':'Puertas de lona', 'de emergencia':'Puertas de emergencia',
+  'de oficina':'Puertas de oficina', 'Puertas y ventanas|fija':'Ventanas', 'cerradura':'Cerraduras y herrajes', 'accesorio electronico':'Motores y electrónica de puerta', 'Puertas y ventanas|inflable':'Andén (abrigos, sellos y rampas)', 'Puertas y ventanas|hidraulico':'Andén (abrigos, sellos y rampas)',
+  'cortina para ventana de tunel':'Cortinas', 'toldo central para tunel':'Toldos', 'toldo para pallet':'Toldos', 'Lonas y cortinas|para puerta':'Lonas', 'tapa para tunel':'Lonas',
+  'Iluminación y señalización|luminaria':'Luminarias y reflectores', 'Limpieza y embalaje|articulo':'Limpieza', 'Limpieza y embalaje|embalaje':'Embalaje', 'Limpieza y embalaje|consumible':'Limpieza',
+  'computadora':'Computadoras y accesorios', 'computadoras':'Computadoras y accesorios', 'accesorio de computadora':'Computadoras y accesorios', 'videovigilancia':'Cámaras de seguridad', 'accesorio para oficina':'Útiles de oficina', 'accesorio para impresora':'Impresión',
+  'pvc':'PVC presión y pegamentos', 'acero, fierro y metales':'Acero, fierro y bronce', 'bandejas y canalizacion':'Canalización (bandejas, tubos y cajas)', 'conexionado (bornes, terminales, tomas)':'Conexionado y accesorios',
+  'control y automatizacion':'Automatización y comunicación', 'proteccion y maniobra (otras marcas)':'Protección y maniobra',
+  'Control e instrumentación|de humedad':'Sensores, transmisores y detectores', 'Control e instrumentación|de presion':'Sensores, transmisores y detectores', 'Control e instrumentación|de temperatura':'Sensores, transmisores y detectores', 'Control e instrumentación|de flujo':'Sensores, transmisores y detectores',
+  'Control e instrumentación|de gases':'Sensores, transmisores y detectores', 'sensores para pinchar':'Sensores, transmisores y detectores', 'sonda para controlador':'Sensores, transmisores y detectores', 'manometro':'Instrumentos de medición', 'anemometro':'Instrumentos de medición',
+  'de expansion electronica':'De expansión', 'de servicio / pichina':'De paso, globo y otras', 'de bola':'De bola', 'mariposa':'Mariposa', 'solenoide':'Solenoides', 'de alivio':'De alivio y seguridad', 'visor de nivel':'Filtros y visores de línea',
+  'arandela':'Pernos, anclajes y fijaciones', 'perno':'Pernos, anclajes y fijaciones', 'esparrago':'Pernos, anclajes y fijaciones', 'tuerca':'Pernos, anclajes y fijaciones', 'anillo':'Pernos, anclajes y fijaciones', 'autoperforante':'Pernos, anclajes y fijaciones',
+  'remache':'Pernos, anclajes y fijaciones', 'colgador':'Pernos, anclajes y fijaciones', 'fijador':'Pernos, anclajes y fijaciones', 'consumible de ferreteria':'Consumibles de ferretería', 'pintura':'Pintura y acabados',
+  'cadena':'Cables de acero, cadenas y sogas', 'templador':'Cables de acero, cadenas y sogas', 'cable no electrico':'Cables de acero, cadenas y sogas', 'herramienta':'Herramientas', 'winche':'Herramientas', 'herramienta de comunicacion':'Herramientas',
+  'cemento':'Concreto y agregados', 'arena':'Concreto y agregados', 'concreto premezclado':'Concreto y agregados', 'acero de refuerzo':'Acero estructural y planchas', 'estructura principal':'Acero estructural y planchas',
+  'soporteria mayor':'Soportería', 'soporteria menor':'Soportería', 'techo y cerramiento':'Acabados y cerramientos', 'ceramico / laminado':'Acabados y cerramientos', 'policarbonato':'Acabados y cerramientos',
+  'perfil f':'Perfiles, ángulos y accesorios', 'perfil l':'Perfiles, ángulos y accesorios', 'perfil u':'Perfiles, ángulos y accesorios', 'perfil w':'Perfiles, ángulos y accesorios', 'perfil z':'Perfiles, ángulos y accesorios',
+  'angulo':'Perfiles, ángulos y accesorios', 'platina':'Perfiles, ángulos y accesorios', 'listones':'Perfiles, ángulos y accesorios', 'accesorio para panel':'Perfiles, ángulos y accesorios', 'accesorio para tr4':'Perfiles, ángulos y accesorios',
+  'cumbrera':'Coberturas y remates', 'de poliestireno':'Paneles', 'de poliisocianurato':'Paneles', 'Aislamiento|plancha':'Elastomérica y planchas', 'espuma elastomerica':'Elastomérica y planchas', 'materiales - servicio':'Otros' };
+const SKU_GRUPO_REPUESTO = /^(repuestos?|accesorio|brida|filtro|piston|visor|kit|kit accesorio|consumibles|base para ventilador|boca masa|accesorios adicionales|elemento|cuerpo|paquete de valvula|antivibrador|porta filtro|separador de aceite|tobera|valvula|ventilador|puerta|air streamer|marco|resorte|mirilla|mecanico|bolsa de lona|soplador|bomba hidraulica|big perimetral|bigi|conector para controlador|caja de distribucion|tarjeta electronica \/ modulo|convertidor|ups|controlador - servicio|accesorio de puerta|accesorio de puerta seccional)$/;
+function skuGrupoNom(famNom, g){ g = String(g || '').replace(/\s+/g, ' ').trim(); if(!g || /^otros/i.test(g)) return 'Otros';
+  const k = sinAcentos(g).toLowerCase(), a = SKU_GRUPO_ALIAS[famNom + '|' + k] || SKU_GRUPO_ALIAS[k]; if(a) return a;
+  if(SKU_GRUPO_REPUESTO.test(k)) return famNom === 'Compresores y motores' ? 'Repuestos de compresor' : famNom === 'Puertas y ventanas' ? 'Repuestos y accesorios de puerta' : 'Repuestos y accesorios';
+  if(/^[a-z0-9]{2,5}$/.test(k) && (g === g.toUpperCase() || /^(sva|dsv|evra|sfa|ics|icf|icm|fia|reg|ppr|hvac)$/.test(k))) return g.toUpperCase();   // modelos: SVA, DSV, EVRA…
+  return g === g.toUpperCase() ? skuBonito(g) : g.charAt(0).toUpperCase() + g.slice(1); }
+function skuTipoDe(t, p){ if(typeof t === 'string') return t; const x = t.find(function(y){ return y[0].test(p); }); return x ? x[1] : 'Otros'; }
+function skuCategoria(r){ const firma = typeof ALMACEN_DATA !== 'undefined' ? ALMACEN_DATA : null;
+  if(r._skc && r._skcF === firma) return r._skc;
+  const c = skuCategoriaCalc(r); try{ Object.defineProperty(r, '_skc', { value:c, writable:true, configurable:true }); Object.defineProperty(r, '_skcF', { value:firma, writable:true, configurable:true }); }catch(err){}
+  return c; }
+function skuCategoriaCalc(r){ const p = sinAcentos(String(r.producto || '')).toUpperCase().replace(/^NO USAR\W+/, '').trim(), pr = { idProducto:r.idProducto, producto:r.producto || '' };
+  let fam = ''; try{ fam = pmCat(pr); }catch(err){}
+  const grupo = function(f){ let g = ''; try{ g = pmSubfam(f, pr); }catch(err){} return skuGrupoNom(skuFamNom(f), String(g || '').split(' › ')[0]); };
+  // Si la regla solo dice "otros…" y el Inventario ubica el producto en la misma familia, su subfamilia (un "EVAPORADOR HEA 4503" sin más: Cúbico).
+  const conRegla = function(fn, t){ if(/^Otr(o|a)s/.test(t) && fam && skuFamNom(fam) === fn){ const g = grupo(fam); if(g !== 'Otros' && !/^Repuestos/.test(g)) return fn + ' · ' + g; } return fn + ' · ' + t; };
+  if(fam === 'DANFOSS') return 'Danfoss · ' + grupo(fam);
+  if(SKU_ES_CABLE.test(p) && !/^CABLE (DE ACERO|ACERADO)/.test(p)){ const c = SKU_CABLES.find(function(x){ return x[0].test(p); }); return 'Cables y conductores · ' + (c ? c[1] : 'Otros cables'); }
+  for(let i = 0; i < SKU_REGLAS_EQ.length; i++){ const x = SKU_REGLAS_EQ[i]; if(x[0].test(p)) return conRegla(x[1], skuTipoDe(x[2], p)); }
+  if(SKU_MARCAS[fam] !== undefined){ const g = grupo(fam); if(g !== 'Otros' || SKU_MARCAS[fam]) return skuFamNom(fam) + ' · ' + g; }
+  for(let i = 0; i < SKU_REGLAS.length; i++){ const x = SKU_REGLAS[i]; if(x[0].test(p)) return conRegla(x[1], skuTipoDe(x[2], p)); }
+  if(fam && fam !== 'OTROS') return skuFamNom(fam) + ' · ' + grupo(fam);
+  return 'Otros productos · ' + (skuBonito(r.familia) || 'Sin familia'); }
+function skuFamilia(c){ return String(c || '').split(' · ')[0]; }
+// Filtro elegido arriba: una categoría o toda una familia ("F|Danfoss").
+function skuPasaCat(r, sel){ if(!sel) return true; return sel.indexOf('F|') === 0 ? skuFamilia(skuCategoria(r)) === sel.slice(2) : skuCategoria(r) === sel; }
+function skuCatNombre(sel){ return String(sel || '').indexOf('F|') === 0 ? sel.slice(2) + ' (toda la familia)' : String(sel || ''); }
 // ---- Cotizar (18.11.2026, Piero: "seleccionar las familias o los ítems por separado para enviarlos a cotizar a los proveedores ideales") ----
 function skuKey(r){ return [r.codPedido || '', r.idProducto || '', r.req || '', r.cantPedido == null ? '' : r.cantPedido].join('|'); }
 // Con quién cotizar por categoría (se puede ampliar: [categoría (expresión), [proveedores]]).
-const COT_PROV = [[/^(Cable|Otros cables)/, ['Sonepar', 'Globaltec', 'Prysmian', 'Diprosol', 'Sigelec', 'Helukabel', 'Kabelwire', 'Cominsa', 'Anixter']]];
+const COT_PROV = [[/^Cables y conductores/, ['Sonepar', 'Globaltec', 'Prysmian', 'Diprosol', 'Sigelec', 'Helukabel', 'Kabelwire', 'Cominsa', 'Anixter']]];
 function ncCotBarra(){ const n = APP_PC.cot.length;
   return `<div class="ncs-bar" id="ncsCot"${n ? '' : ' hidden'}><span><b id="ncsCotN">${appN(n)}</b> SKU para cotizar</span><button type="button" class="rsv-b" data-cotlimpiar="1">Quitar selección</button><button type="button" class="rsv-b ok" data-cotabrir="1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></svg>Cotizar con proveedores</button></div>`; }
 // Marca o desmarca sin volver a dibujar la pantalla.
@@ -24102,7 +24263,7 @@ function appCotItems(){ const S = new Set(APP_PC.cot); return appPendComprasHtml
 function appCotAbrir(){ const e = escapeHtml, L = appCotItems(); if(!L.length) return appToast('Elige primero los SKU que quieres cotizar.');
   const cats = [...new Set(L.map(skuCategoria))], P = new Map();
   // 1) Los proveedores de la categoría; 2) a quién se le compró antes cada SKU (Consulta y Nisira).
-  COT_PROV.forEach(function(c){ if(cats.some(function(x){ return c[0].test(x); })) c[1].forEach(function(n){ if(!P.has(ncK(n))) P.set(ncK(n), { n:n, tag:'Sugerido para ' + cats.filter(function(x){ return c[0].test(x); }).map(function(x){ return x.replace(/^Cable /, ''); }).slice(0, 2).join(', ') + (cats.length > 2 ? '…' : ''), sug:true }); }); });
+  COT_PROV.forEach(function(c){ if(cats.some(function(x){ return c[0].test(x); })) c[1].forEach(function(n){ if(!P.has(ncK(n))) P.set(ncK(n), { n:n, tag:'Sugerido para ' + cats.filter(function(x){ return c[0].test(x); }).map(function(x){ return x.replace(/^Cables y conductores · /, 'cable '); }).slice(0, 2).join(', ') + (cats.length > 2 ? '…' : ''), sug:true }); }); });
   const H = new Map(); L.forEach(function(r){ const vistos = new Set(); appSkuHistorial(r.idProducto).forEach(function(h){ const k = ncK(gdCorto(h.prov)); if(!k || vistos.has(k)) return; vistos.add(k); const x = H.get(k) || H.set(k, { n:h.prov, ruc:h.ruc, c:0 }).get(k); x.c++; }); });
   [...H.values()].sort(function(a, b){ return b.c - a.c; }).slice(0, 8).forEach(function(h){ const k = ncK(gdCorto(h.n)); if([...P.keys()].some(function(p){ return k.replace(/ /g, '').indexOf(p.replace(/ /g, '')) !== -1; })) return;
     P.set(k, { n:appImpNombre(h.n), ruc:h.ruc, tag:'Ya le compramos ' + h.c + ' de estos SKU', sug:false }); });
@@ -24315,7 +24476,7 @@ async function appPcListaExcel(){
   if(k === 'ped'){
     H = ['Categoría', 'Código', 'Producto', 'Cantidad', 'UM', 'Pedido', 'F. pedido', 'D.h. esperando', 'Req.', 'Cliente', 'Id proyecto', 'Proyecto', 'Solicitante', 'Observación', 'Comprador', 'Nota'];
     W = [22, 15, 50, 10, 7, 10, 11, 11, 10, 26, 16, 32, 26, 40, 16, 30]; izq = [1, 3, 10, 12, 13, 14, 15, 16];
-    let l = D.items; if(APP_PC.skuPer) l = l.filter(function(r){ return (r.persona || '-') === APP_PC.skuPer; }); if(APP_PC.fam) l = l.filter(function(r){ return skuCategoria(r) === APP_PC.fam; });
+    let l = D.items; if(APP_PC.skuPer) l = l.filter(function(r){ return (r.persona || '-') === APP_PC.skuPer; }); if(APP_PC.fam) l = l.filter(function(r){ return skuPasaCat(r, APP_PC.fam); });
     D.skuGrupos(l, skuCategoria).forEach(function(g){ F.push({ fam:g[0], n:g[1].length });
       g[1].forEach(function(r){ const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', cli = /^pedido directo|^sin proyecto/i.test(r.proyecto || '') ? 'Stock / sin proyecto' : appImpNombre(r.proyecto || '');
         F.push([g[0], String(r.idProducto || ''), r.producto || '', r.cantPedido != null ? +r.cantPedido : null, r.unidad || '', cod(r.codPedido), fd(r.fPedido), r.fPedido ? Math.max(0, busdayCount(r.fPedido, hoy) || 0) : null, cod(r.req), cli, pryId, pryNombre(pryId) || '',
@@ -24335,7 +24496,7 @@ async function appPcListaExcel(){
   if(!F.length){ appToast('No hay nada en ' + NOM[k] + ' para ' + quien + '.'); return; }
   const wb = new EJ.Workbook(), ws = wb.addWorksheet(NOM[k], { views:[{ state:'frozen', ySplit:4, showGridLines:false }] });
   ws.mergeCells(1, 1, 1, H.length); ws.getCell(1, 1).value = NOM[k] + (k === 'ped' ? ' · listado para cotizar' : '') + ' · ' + quien; ws.getCell(1, 1).font = { bold:true, size:15, color:{ argb:C.navy } };
-  ws.mergeCells(2, 1, 2, H.length); ws.getCell(2, 1).value = (k === 'ped' ? D.items.length + ' SKU sin OC' + (APP_PC.fam ? ' · ' + APP_PC.fam : '') : F.length + ' OC') + ' · Datos al ' + fd(appIndCorte()) + ' · Grupo Friopacking · Compras';
+  ws.mergeCells(2, 1, 2, H.length); ws.getCell(2, 1).value = (k === 'ped' ? D.items.length + ' SKU sin OC' + (APP_PC.fam ? ' · ' + skuCatNombre(APP_PC.fam) : '') : F.length + ' OC') + ' · Datos al ' + fd(appIndCorte()) + ' · Grupo Friopacking · Compras';
   ws.getCell(2, 1).font = { italic:true, size:10, color:{ argb:C.gris } };
   ws.getRow(4).values = H; ws.getRow(4).eachCell(function(c){ c.fill = fill(C.navy); c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; }); ws.getRow(4).height = 30;
   F.forEach(function(f){
