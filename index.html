@@ -14551,8 +14551,12 @@ async function crtGuardarEnDrive(file, tipo, destinos){
   };
   // Sin encabezados propios: así el navegador no dispara el preflight que
   // Apps Script no sabe responder.
-  const r = await fetch(CRT_DRIVE.url, { method:'POST', body: JSON.stringify(payload) });
-  return await r.json();
+  // Si el Apps Script no contesta JSON (por ejemplo, se borró su implementación y Google devuelve una página de error), antes se cortaba
+  // todo en silencio y la pantalla no cambiaba (18.11.2026, Piero: "subí 2 fichas técnicas y no se actualiza"). Ahora vuelve con el error.
+  try{
+    const r = await fetch(CRT_DRIVE.url, { method:'POST', body: JSON.stringify(payload) });
+    const t = await r.text(); try{ return JSON.parse(t); }catch(e){ return { ok:false, error:'el enlace de Drive (Apps Script) no responde: hay que volver a publicarlo' }; }
+  }catch(err){ return { ok:false, error:'no hay conexión con Drive' }; }
 }
 
 /** Trae de Drive los documentos que ya existen en un proyecto. */
@@ -15232,6 +15236,7 @@ async function crtRecibirArchivo(file, lote){
       (yaEstaba.length > 4 ? ' y ' + (yaEstaba.length-4) + ' más' : '') + ': no se guarda otra copia.'
     : '';
 
+  if(!lote && !(res && res.ok)) appToast('No se guardó en Drive: ' + ((res && res.error) || 'sin conexión') + '.');
   if(lote) return { ok:!!(res && res.ok), nombre:reg.nombre, error:res && !res.ok ? (res.sinConexion ? 'sin conexión a Drive' : (res.error || 'error de red')) : '', tocados:tocados };
   if(tocados.length > 1){
     CRT.sel.clear();
@@ -17430,6 +17435,7 @@ async function crtRecibirVarios(fs, pend){
     (mal.length ? ' <b>No se guardaron en Drive:</b> ' + mal.map(function(r){ return escapeHtml(r.nombre) + ' (' + escapeHtml(r.error) + ')'; }).join(', ') + '.' : '');
   if(tocados.length > 1){ CRT.sel.clear(); crtMensaje(html); } else { crtMensaje(''); if(tocados[0]) tocados[0].nota = { html:html }; }
   crtDibujar();
+  if(mal.length) appToast('No se guardó en Drive: ' + mal[0].error + '.');
 }
 document.getElementById('crtSubirCert').addEventListener('click', ()=> crtPedirArchivo([...CRT.sel], 'cert'));
 document.getElementById('crtSubirFicha').addEventListener('click', ()=> crtPedirArchivo([...CRT.sel], 'ficha'));
