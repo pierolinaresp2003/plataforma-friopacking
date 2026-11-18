@@ -4164,6 +4164,12 @@ html[data-theme="dark"] .imx:not(.ncm) .imx-mw{background:linear-gradient(180deg
 @media (max-width:900px){ .imx:not(.ncm) .imx-mw, html[data-theme="dark"] .imx:not(.ncm) .imx-mw{background:none;} .imx:not(.ncm) .imx-mapa{background:linear-gradient(180deg,#b9d6ee 0%,#a9cbe8 100%);} html[data-theme="dark"] .imx:not(.ncm) .imx-mapa{background:linear-gradient(180deg,#0f1c2e,#0b1524);} }
 html[data-theme="dark"] .imx-sh .sk{stroke:#0b1524;} html[data-theme="dark"] .imx-fi-bar svg{stroke:var(--surface-2);}
 @media (prefers-reduced-motion:reduce){ .imx-sh.foco .hl{animation:none;} }
+/* Velocidad (18.11.2026, Piero: "optimiza todo el app porque está bien lenta"): en un SVG cualquier animación sin fin obliga a volver a pintar
+   todo el mapa en cada cuadro (el del mundo y el de Lima son pesados), y eso gastaba CPU aun sin tocar nada. Las rutas quedan quietas y los
+   pulsos se ven solo unas veces al aparecer. */
+.imx-ru.viva, .ncm-ru.luego, .imx-sh{animation:none !important;}
+.imx-ru.viva, .ncm-ru.luego, .pm-ll-l, .rt-tr.k-cam .rt-ru.b{animation:none !important;} .pm-fb{animation:pmFbEntra .55s cubic-bezier(.34,1.56,.64,1) both !important;}
+.imx-cd .pu, .rt-mk .pu, .rtm-vivo i, .imx-sh.foco .hl, .pm-al-ic.rojo, .ocv-st.act i, .oc2-rail > em, .imp-rc{animation-iteration-count:3 !important;}
 /* Filtro por persona en el mapa (en lugar de la leyenda) y proveedores en Google Maps (18.11.2026) */
 .ncm-perw .pmm-ley-b.ncm-perb{width:44px;height:44px;padding:0;} .ncm-perb.sel{background:#fff;border:2px solid #0a1e64;} .ncm-perb .skt-av{width:36px;height:36px;font-size:12.5px;} .ncm-perb svg{width:22px;height:22px;}
 .ncm-izq .ncm-perw .pmm-ley.ncm-perl{width:280px;padding:12px;display:none;flex-direction:column;gap:2px;max-height:min(70vh,520px);overflow:auto;} .ncm-izq .ncm-perw.on .pmm-ley.ncm-perl{display:flex;}
@@ -4425,6 +4431,7 @@ html[data-theme="dark"] .rtm{background:radial-gradient(1200px 700px at 60% 40%,
 .rtp-st li b{display:block;font-size:13px;font-weight:800;color:var(--ink);} .rtp-st li small{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink-soft);} .rtp-st li small svg{width:12px;height:12px;flex:none;}
 .rtp-st time{font-size:12.5px;font-weight:800;color:var(--ink);white-space:nowrap;} .rtp-sa{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;} .rtp-sa .rt-bt{padding:4px 9px;font-size:11.5px;}
 .rtp-ra{display:flex;justify-content:flex-end;}
+.rtp .rtm-deps{filter:none;}   /* con zoom: la sombra de todo el mapa se recalculaba en cada cuadro */
 .rtp-dis{fill:#f6f9fd;stroke:#c9d6e5;stroke-width:.7;vector-effect:non-scaling-stroke;}
 .rtp-ru{fill:none;stroke:var(--rc);stroke-width:3.4;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;} .rtp-ru.z{stroke:#fff;stroke-width:6.5;opacity:.9;} .rtp-ru.vu{stroke-width:2;stroke-dasharray:2 6;opacity:.75;}
 .rtp-r{cursor:pointer;transition:opacity .2s;} .rtp.con .rtp-r:not(.on), .rtp.con .rtp-mk:not(.on){opacity:.18;}
@@ -18394,11 +18401,11 @@ function appPintarBarra(activa){
   document.getElementById('appVistaBtn').innerHTML = `${v.nombre} <span>▾</span>`;
   // En la PC las pestañas van a lo largo de la barra azul de arriba (14.10.2026, Piero: "como son pocas opciones, colocar
   // los módulos a lo largo de la barra azul"), en vez del menú ☰.
-  if(APP_EN_PC) requestAnimationFrame(function(){ const w = barra.offsetWidth; if(w) document.body.style.setProperty('--lado', w + 'px'); });   // menú lateral a la medida
+  if(APP_EN_PC) requestAnimationFrame(function(){ const w = barra.offsetWidth; if(w && w !== appPintarBarra._w){ appPintarBarra._w = w; document.body.style.setProperty('--lado', w + 'px'); } });   // menú lateral a la medida (solo si cambió: tocar body recalculaba toda la página, 18.11.2026)
   const top = document.getElementById('appTopTabs');
   if(top){ top.innerHTML = tabs.map(function(t){ return `<button type="button" data-tab="${t[0]}" class="${t[0] === activa ? 'on' : ''}"><span class="i">${appTabIc(t)}</span>${t[2]}</button>`; }).join('');
     // Si en una ventana angosta no entran todas, vuelve el ☰ a la derecha.
-    requestAnimationFrame(function(){ document.body.classList.toggle('tabs-llenas', !!APP_EN_PC && top.scrollWidth > top.clientWidth + 2); }); }
+    requestAnimationFrame(function(){ const ll = !!APP_EN_PC && top.scrollWidth > top.clientWidth + 2; if(document.body.classList.contains('tabs-llenas') !== ll) document.body.classList.toggle('tabs-llenas', ll); }); }
 }
 
 // Llamada desde irASeccion: mantiene el encabezado y la barra de abajo al día con la navegación normal.
@@ -23534,7 +23541,9 @@ function appEntregadas(){ return appMemo('entregadas', function(){
     o.f = o.fr || (o.fin && OC_FIN[o.oc].f ? fromIsoDay(String(OC_FIN[o.oc].f).slice(0, 10)) : null) || o.fo;
     o.atraso = o.fr && o.fx ? busdayCount(o.fx, o.fr) : null;
     o.pr = presu.get(o.oc) || null;
-    o.txt = polarNorm([o.oc, o.prov, [...o.clis].join(' '), [...o.ids].join(' ')].concat(o.txt).join(' '));
+    // El texto para el buscador se arma recién cuando se busca (18.11.2026, velocidad: normalizar miles de OC al abrir Compras costaba).
+    const crudo = [o.oc, o.prov, [...o.clis].join(' '), [...o.ids].join(' ')].concat(o.txt);
+    Object.defineProperty(o, 'txt', { configurable:true, enumerable:true, get:function(){ const v = polarNorm(crudo.join(' ')); Object.defineProperty(o, 'txt', { value:v, writable:true, enumerable:true, configurable:true }); return v; } });
     delete o.vistos; return o;
   }).sort(function(a, b){ return (b.f || 0) - (a.f || 0); });
 }); }
