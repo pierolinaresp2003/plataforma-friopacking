@@ -19875,7 +19875,7 @@ function appPantallaEstado(p){
   const e = { cmpeq:[APP_CQ, ((GASTO_DATA && GASTO_DATA.rows) || []).length], reportes:[APP_RPT, APP_DCI.t, APP_DCI.lista.length], gobj:gx, gabas:gx, ggas:gx, galm:gx, gser:gx, almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INVZ.z, APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam, APP_INV.kdx, invParetoSub, RES.v], pendcompras:[APP_PC, APP_NC, appId(PROVEEDOR_UBI), APP_PL, APP_CORREO.v, APP_AG.v, APP_F.indicadores, APP_REP.sec], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
     indicadores:[APP_F.indicadores, APP_REP.sec], otif:[APP_F.otif], tienda:[APP_TIENDA.q, APP_TIENDA.fam, APP_TIENDA.pdf ? APP_TIENDA.pdf.t : 0] }[p]
     || (GD_PANT[p] ? gx.concat([GD.mes, GD.fv, GD.fvt, GD.acu, GD.ver, GD.err, GD.provOrg, APP.usuario ? APP.usuario.nombre : '', GDF.per, GDR.l ? GDR.l.length : -1, GDR.err]) : null);
-  return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (APP.vista || '');
+  return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (APP.vista || '') + '|' + APP_VIVO_V;   // + cambios en vivo de otros usuarios (19.11.2026)
 }
 function appPantallaHtml(p){ return appMemo('html:' + appPantallaEstado(p), APP_PANT_FN[p]); }
 // Mientras nadie toca nada, se adelanta el cálculo de las otras pestañas de a poquito (un trozo por
@@ -21299,7 +21299,12 @@ async function resCargar(forzar){ if(RES.cargando || (RES.ok && !forzar)) return
     if(r.ok){ RES.l = await r.json(); RES.ok = true; RES.v++; resLimpiar(); } }catch(e){}
   RES.cargando = false; if(!RES.ok) return;
   if(antes !== null && antes === JSON.stringify(RES.l)) return;   // sin cambios: no se vuelve a dibujar (17.11.2026)
-  if(APP.enInicio && appHayDatos() && ['supreq', 'almseg', 'almrsv', 'almval', 'almdesp', 'suppry', 'inventario'].indexOf(APP.pantalla) !== -1) appRenderFondo();
+  APP_VIVO_V++;
+  // En vivo en todos los módulos (19.11.2026, Piero: "si pasa un pedido de la validación a Compras porque no hay stock, que le salga al comprador
+  // que esté en esa pestaña"): se vuelve a dibujar la pantalla que se esté viendo (si su HTML no cambió, no se toca), la portada y Gerencial.
+  const lz = document.getElementById('appLanz'); if(lz && lz.classList.contains('abierto') && appHayDatos()) appLanzador(lz._desdeLogo);
+  if(typeof GDR !== 'undefined' && GDR.l){ GDR.l = null; if(APP.enInicio && APP.pantalla === 'gdalm') gdRsvCargar(); }
+  if(APP.enInicio && appHayDatos()) vivoRepintarInicio();
   else { const sec = document.getElementById('section-requerimientos'); if(sec && sec.offsetParent !== null && typeof drawRequerimientos === 'function'){   // req. abierto: se repinta en el acto (13.11.2026, Piero)
     const ab = [...sec.querySelectorAll('.rqx-it.abierto, .rqx-it[open], .rqx-fila[aria-expanded="true"]')].map(function(x){ const it = x.closest('.rqx-it'); return it ? it.dataset.i : null; }).filter(Boolean);
     const y = window.scrollY; drawRequerimientos(); window.scrollTo(0, y);
@@ -21780,6 +21785,7 @@ async function palCargar(forzar){ if(PAL.cargando || (PAL.ok && !forzar)) return
   const antes = PAL.ok ? JSON.stringify(PAL.l) + PAL.falta : null;
   try{ const r = await sbFetch('/rest/v1/fp_pallets?select=*&order=numero.asc'); if(r.ok){ PAL.l = await r.json(); PAL.ok = true; PAL.falta = false; } else if(r.status === 404 || r.status === 400){ PAL.falta = true; PAL.ok = true; } }catch(e){}
   PAL.cargando = false; if(antes !== null && antes === JSON.stringify(PAL.l) + PAL.falta) return;   // sin cambios: no se repinta
+  APP_VIVO_V++;
   if(APP.enInicio && APP.pantalla === 'almdesp') appRenderFondo(); }
 function despCli(z){ const r = resFila(z), c = r ? appImpNombre(r.proyecto || '') || r.proyecto || '' : ''; return SUP_CLI_UNIR[c] || c || '—'; }
 function despPry(z){ const r = resFila(z); return r && r.idProyecto && !/^SIN/i.test(r.idProyecto) ? r.idProyecto : ''; }
@@ -21895,7 +21901,7 @@ function rtCargar(forzar){
   RT.cargando = true;
   RT.prom = sbFetch('/rest/v1/fp_rutas?select=id,tipo,oc,estado,datos,por,creado,actualizado&order=creado.desc&limit=5000').then(function(r){ if(!r.ok){ RT.err = 'No se pudo leer las rutas (' + r.status + ').'; return null; } return r.json(); }).then(function(l){
     if(!l) return; RT.err = ''; RT.ok = true; const firma = JSON.stringify(l.map(function(x){ return [x.id, x.estado, x.actualizado]; }));
-    if(firma === RT.firma) return; RT.firma = firma; const m = {}; l.forEach(function(x){ m[x.id] = x; }); RT.m = m;
+    if(firma === RT.firma) return; RT.firma = firma; const m = {}; l.forEach(function(x){ m[x.id] = x; }); RT.m = m; APP_VIVO_V++;
     if(APP.enInicio && appHayDatos() && ['almrut', 'pendcompras'].indexOf(APP.pantalla) !== -1) appRenderFondo();
   }).catch(function(){ RT.err = 'Sin conexión con la base de rutas.'; }).then(function(){ RT.cargando = false; RT.t = Date.now(); });
   return RT.prom; }
@@ -25954,7 +25960,7 @@ function appAgCargar(forzar){
   APP_AG.prom = sbFetch('/rest/v1/fp_oc_agencia?select=oc,agencia,persona,recogen,fecha,por,actualizado,factura,guia,regularizada,reg_por').then(function(r){ return r.ok ? r.json() : null; }).then(function(l){
     if(!l) return; const firma = JSON.stringify(l.map(function(x){ return [x.oc, x.agencia, x.persona, x.recogen, x.fecha, x.factura, x.guia]; }).sort());
     if(firma === APP_AG.firma) return;
-    const m = {}; l.forEach(function(x){ m[x.oc] = x; }); APP_AG.m = m; APP_AG.firma = firma; APP_AG.v++; appAgAplicar();
+    const m = {}; l.forEach(function(x){ m[x.oc] = x; }); APP_AG.m = m; APP_AG.firma = firma; APP_AG.v++; APP_VIVO_V++; appAgAplicar();
     if(APP.enInicio && appHayDatos() && ['pendcompras', 'almreg'].indexOf(APP.pantalla) !== -1) appRenderFondo();
   }).catch(function(){}).then(function(){ APP_AG.cargando = false; APP_AG.t = Date.now(); });
   return APP_AG.prom;
@@ -25963,8 +25969,9 @@ function appAgCargar(forzar){
 // Un solo websocket a Supabase Realtime (protocolo Phoenix, sin librerías): avisa cuando cambia una reserva, un pallet, una ruta, una OC por
 // agencia o la publicación de datos, y se vuelve a leer solo eso. Si alguien está escribiendo o tiene una ventana abierta, se espera a que
 // termine para no borrarle lo que está haciendo. Sin conexión en vivo, se revisa cada 30 s mientras la app está a la vista.
+var APP_VIVO_V = 0;   // sube cada vez que cambia algo que comparten los usuarios (reservas, pallets, rutas, agencias): la pantalla guardada ya no sirve
 const VIVO = { ws:null, ref:0, join:'', hb:null, tok:null, re:null, espera:2000, ok:false, ultimo:0, pend:{}, t:null, oculto:0 };
-const VIVO_TABLAS = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia', 'fp_publicacion'];
+const VIVO_TABLAS = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia', 'fp_publicacion', 'fp_gerencial'];
 function vivoEnviar(topic, event, payload){ if(!VIVO.ws || VIVO.ws.readyState !== 1) return ''; const ref = String(++VIVO.ref); VIVO.ws.send(JSON.stringify({ topic:topic, event:event, payload:payload || {}, ref:ref, join_ref:topic === 'phoenix' ? undefined : VIVO.join })); return ref; }
 async function vivoConectar(){ if(VIVO.ws || VIVO.re || !window.WebSocket || !sbSesion() || !APP.usuario) return; let t; try{ t = await sbToken(); }catch(e){ return; } if(!t || VIVO.ws) return;
   const ws = new WebSocket(SB_URL.replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' + encodeURIComponent(SB_KEY) + '&vsn=1.0.0'); VIVO.ws = ws; VIVO.ok = false;
@@ -25981,6 +25988,9 @@ async function vivoConectar(){ if(VIVO.ws || VIVO.re || !window.WebSocket || !sb
   ws.onclose = function(){ clearInterval(VIVO.hb); clearInterval(VIVO.tok); VIVO.ws = null; VIVO.ok = false;
     VIVO.re = setTimeout(function(){ VIVO.re = null; vivoConectar(); }, VIVO.espera); VIVO.espera = Math.min(VIVO.espera * 2, 60000); };
   ws.onerror = function(){}; }
+// Repinta la pantalla de inicio sin cerrar las filas de requerimiento que estaban abiertas
+function vivoRepintarInicio(){ const sec = document.getElementById('section-inicio'), ab = sec ? [...sec.querySelectorAll('.rqx-it')].filter(function(it){ const d = it.querySelector('.rqx-det'); return d && !d.hidden; }).map(function(it){ return it.dataset.i; }) : [];
+  appRenderFondo(); if(ab.length) setTimeout(function(){ const s = document.getElementById('section-inicio'); ab.forEach(function(i){ const it = s && s.querySelector('.rqx-it[data-i="' + i + '"]'), d = it && it.querySelector('.rqx-det'); if(d && d.hidden){ const f = it.querySelector('.rqx-fila'); if(f) f.click(); } }); }, 300); }
 function vivoCambio(t){ VIVO.pend[t] = 1; clearTimeout(VIVO.t); VIVO.t = setTimeout(vivoAplicar, 700); }
 // Ocupado: escribiendo en un campo de la pantalla o con una ventana abierta (reserva, foto, No hay…)
 function vivoOcupado(){ const a = document.activeElement; return !!document.getElementById('rsvFondo') || !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && !a.closest('#appTabbar')); }
@@ -25990,13 +26000,16 @@ function vivoAplicar(){ if(document.hidden) return; if(vivoOcupado()){ clearTime
   if(P.fp_pallets && PAL.ok) palCargar(true);
   if(P.fp_rutas) rtCargar(true);
   if(P.fp_oc_agencia) appAgCargar(true);
+  if(P.fp_gerencial && typeof GD !== 'undefined' && GD.items) gdCargar(true);
   if(P.fp_publicacion) vivoDatosNuevos(); }
 // Datos nuevos de Nisira publicados por otra persona: aviso para actualizar cuando quiera (no se cambia la pantalla de golpe).
 function vivoDatosNuevos(){ if(document.getElementById('vivoDatos')) return;
+  const aMedias = vivoOcupado() || (typeof RSV_SEL !== 'undefined' && RSV_SEL.size) || (typeof DESP_SEL !== 'undefined' && DESP_SEL.size) || (typeof APP_PC !== 'undefined' && APP_PC.cot && APP_PC.cot.length);
+  if(!aMedias && appHayDatos()){ appToast('🔄 Llegaron datos nuevos de Nisira: actualizando…'); loadPublishedSnapshot(false); return; }   // sin nada a medio hacer: se actualiza solo
   document.body.insertAdjacentHTML('beforeend', '<button type="button" id="vivoDatos" class="vivo-datos">🔄 Hay datos nuevos de Nisira · <b>Actualizar</b></button>'); }
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('#vivoDatos'); if(!b) return; b.remove(); appToast('Actualizando datos…'); loadPublishedSnapshot(false); });
 // Sin conexión en vivo (o al volver a la app después de un rato): se vuelve a leer lo que cambia entre usuarios.
-function vivoRefrescar(){ if(!sbSesion() || !APP.usuario || vivoOcupado()) return; resCargar(true); if(PAL.ok) palCargar(true); rtCargar(true); appAgCargar(true); }
+function vivoRefrescar(){ if(!sbSesion() || !APP.usuario || vivoOcupado()) return; resCargar(true); if(PAL.ok) palCargar(true); rtCargar(true); appAgCargar(true); if(typeof GD !== 'undefined' && GD.items && APP.enInicio && (APP.pantalla === 'gdmej' || APP.pantalla === 'gdacu' || GD_FRENTES[APP.pantalla])) gdCargar(true); }
 setInterval(function(){ if(document.hidden) return; if(!VIVO.ws && !VIVO.re) vivoConectar(); if(!VIVO.ok) vivoRefrescar(); }, 30000);
 document.addEventListener('visibilitychange', function(){ if(document.hidden){ VIVO.oculto = Date.now(); return; }
   if(VIVO.oculto && Date.now() - VIVO.oculto > 20000){ vivoRefrescar(); if(VIVO.ws && Date.now() - VIVO.ultimo > 60000){ try{ VIVO.ws.close(); }catch(e){} } } if(!VIVO.ws && !VIVO.re) vivoConectar(); if(Object.keys(VIVO.pend).length) vivoAplicar(); });
