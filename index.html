@@ -17179,17 +17179,28 @@ function pdFilasCalc(){
     else if(pdPedidoAbierto(r)) out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, base));
     // OC parcial (10.11.2026, Piero: "uno que generé parcial y no lo estás considerando"): si la OC cubre solo parte del
     // pedido y el pedido sigue Pendiente en Nisira, lo que falta también va en "SKU sin OC", con la OC parcial a la vista.
-    // También "Atendido Parcial" (18.11.2026, Piero: "por qué desapareció el de Agroberries 4G2.5 de 1133 m"): cuando llega la OC parcial,
-    // Nisira pasa la línea de Pendiente a Atendido Parcial y lo que falta (16,050 − 14,917 = 1,133 m) se dejaba de ver. Solo pedidos desde
-    // 2026: los Atendido Parcial de 2023–2025 son saldos viejos que nadie va a comprar.
-    const epL = String(r.estadoPedido || '').trim().toLowerCase(), parcAbierto = epL === 'pendiente' || (epL === 'atendido parcial' && r.fPedido && r.fPedido >= PD_PARCIAL_DESDE);
-    if(r.codPedido && r.codOrden && parcAbierto && !/anul/i.test(r.estadoOrden || '')){
-      const k = r.codRequerimiento + '|' + r.codPedido + '|' + r.idProducto + '|' + r.cantPedido, g = parc.get(k) || { r:r, base:base, q:0, ocs:[] };
-      g.q += +r.cantOrden || 0; if(g.ocs.indexOf(r.codOrden) === -1) g.ocs.push(r.codOrden); parc.set(k, g); }
+    // También "Atendido Parcial" (18.11.2026, Piero: "por qué desapareció el de Agroberries 4G2.5 de 1133 m"); solo pedidos desde 2026.
+    // Por requerimiento + pedido + producto (19.11.2026, Piero: "¿y el 4G2.5 de 2500 m?"): con dos líneas del mismo producto Nisira cruza
+    // los estados (la de 16,050 con OC sale "Pendiente" y la de 2,500 sin OC sale "Con orden de compra"). Se cuenta todo junto: lo pedido
+    // (cada línea una vez) menos lo que tienen las OC (cada OC una vez); lo que falta va primero a las líneas sin OC y el resto como parcial.
+    if(r.codPedido){ const gk = r.codRequerimiento + '|' + r.codPedido + '|' + r.idProducto; (parc.get(gk) || parc.set(gk, []).get(gk)).push({ r:r, base:base }); }
   });
-  parc.forEach(function(g){ const r = g.r, falta = (+r.cantPedido || 0) - g.q;
-    if(falta <= 1e-6 || pedidoCerradoManual({ codPedido:r.codPedido, idProducto:r.idProducto, cantidadPedido:r.cantPedido })) return;
-    out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, g.base, { codOrden:'', cantPedido:Math.round(falta * 1000) / 1000, parcial:{ q:g.q, total:r.cantPedido, ocs:g.ocs } })); });
+  parc.forEach(function(rows){
+    const ep = function(r){ return String(r.estadoPedido || '').trim().toLowerCase(); }, conOC = function(r){ return r.codOrden && !/anul/i.test(r.estadoOrden || ''); };
+    if(!rows.some(function(x){ return conOC(x.r); })) return;
+    if(!rows.some(function(x){ const e = ep(x.r); return e === 'pendiente' || (e === 'atendido parcial' && x.r.fPedido && x.r.fPedido >= PD_PARCIAL_DESDE); })) return;
+    const L = new Map(), vistos = new Set(), ocs = []; let ocTot = 0;
+    rows.forEach(function(x){ const r = x.r, q = +r.cantPedido || 0, e = ep(r);
+      if(q > 0 && (r.codOrden || e === 'pendiente' || e === 'atendido parcial' || e === 'con orden de compra')){ const l = L.get(q) || L.set(q, { q:q, x:x, oc:false, pend:false }).get(q); if(conOC(r)){ l.oc = true; l.x = x; } if(!r.codOrden && e === 'pendiente') l.pend = true; }
+      if(conOC(r)){ const k = r.codOrden + '|' + (+r.cantOrden || 0); if(!vistos.has(k)){ vistos.add(k); ocTot += +r.cantOrden || 0; } if(ocs.indexOf(r.codOrden) === -1) ocs.push(r.codOrden); } });
+    const lin = [...L.values()]; let falta = lin.reduce(function(a, l){ return a + l.q; }, 0) - ocTot; if(falta <= 1e-6) return;
+    const cerrado = function(r){ return pedidoCerradoManual({ codPedido:r.codPedido, idProducto:r.idProducto, cantidadPedido:r.cantPedido }); };
+    lin.filter(function(l){ return !l.oc; }).sort(function(a, b){ return b.q - a.q; }).forEach(function(l){ if(falta <= 1e-6) return;
+      if(l.pend){ falta -= l.q; return; }   // ya está en la lista (línea Pendiente sin OC)
+      const r = l.x.r; if(l.q > falta + 1e-6 || cerrado(r)) return; out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, l.x.base)); falta -= l.q; });
+    const lo = lin.filter(function(l){ return l.oc; }).sort(function(a, b){ return b.q - a.q; })[0]; if(falta <= 1e-6 || !lo || cerrado(lo.x.r)) return;
+    const r = lo.x.r;
+    out.push(Object.assign({ tipo:'ped', persona: pdPersona(r.responsablePedido) }, lo.x.base, { codOrden:'', cantPedido:Math.round(falta * 1000) / 1000, parcial:{ q:ocTot, total:lo.q, ocs:ocs } })); });
   // Familia de los pedidos directos (no la traen): la del mismo código en el Reporte Maestro o PedidoSinReq.
   const famDe = new Map();
   getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(x){ if(x.idProducto && x.familia && x.familia !== 'Sin familia' && !famDe.has(x.idProducto)) famDe.set(x.idProducto, x.familia); });
@@ -17663,7 +17674,7 @@ const APP_VISTAS = {
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
   super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
     // Inventario (stock por sede y kardex) se suma al Supervisor (09.11.2026, Piero).
-    tabs:[['suppry','🏗️','Proyectos'], ['supreq','📋','Requerimientos'], ['polar'], ['inventario','📦','Inventario']] },   // Producto se quitó de Supervisor (12.11.2026, Piero)   // + Proyectos (11.11.2026, Piero)   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
+    tabs:[['suppry','🏗️','Proyectos'], ['supreq','📋','Requerimientos'], ['polar'], ['pendlog','🚢','Importaciones'], ['inventario','📦','Inventario']] },   // + Importaciones (19.11.2026, Piero: "el supervisor también debe tener la vista de importaciones")   // Producto se quitó de Supervisor (12.11.2026, Piero)   // + Proyectos (11.11.2026, Piero)   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
   // Gerencial (15.10.2026, Piero: "kalegria, mlujan y apl no deben tener Compras ni Almacén sino un módulo gerencial con
   // el resumen de todo Logística, con las fotos, para ver en un pantallazo lo que hace cada uno y darle seguimiento").
   gerencial:  { nombre:'Gerencial',  ico:'📈', desc:'Resumen de todo Logística: qué hace cada uno en Compras, Comex y Almacén.',
@@ -18553,7 +18564,7 @@ function appInicio(pantalla){
   // Importaciones vuelve a ser su propio módulo (19.10.2026, Piero: "todo lo que son importaciones ponlo en otro módulo").
   if(APP.vista === 'compras' && pantalla === 'indicadores'){ APP_PC.persona = pdPersona(APP_F.indicadores.persona) || ''; pantalla = 'pendcompras'; }   // Reportes vive dentro de Compras (19.10.2026)
   if(APP.vista === 'almacen' && (pantalla === 'indicadores' || pantalla === 'almrep' || pantalla === 'otif')) pantalla = 'almseg';   // viven en Seguimiento (20.10.2026)
-  if(APP.vista === 'super' && ['inventario', 'supreq', 'suppry'].indexOf(pantalla) === -1) pantalla = 'suppry';   // Proyectos primero (11.11.2026, Piero)
+  if(APP.vista === 'super' && ['inventario', 'supreq', 'suppry', 'pendlog'].indexOf(pantalla) === -1) pantalla = 'suppry';   // Proyectos primero (11.11.2026, Piero)
   if((APP.vista === 'compras' || APP.vista === 'almacen') && (!pantalla || pantalla === 'inicio' || pantalla === 'daily')) pantalla = APP.vista === 'compras' ? 'pendcompras' : 'almseg';
   if(APP.vista === 'compras' && pantalla === 'pendlog' && appVistasPermitidas().indexOf('comex') !== -1){ APP.vista = 'comex'; try{ localStorage.setItem('fp-vista', 'comex'); }catch(err){} }   // Importaciones vive en Comex (18.11.2026)
   if(APP.vista === 'comex' && ['pendcompras', 'cmpeq', 'indicadores'].indexOf(pantalla) !== -1 && appVistasPermitidas().indexOf('compras') !== -1){ APP.vista = 'compras'; try{ localStorage.setItem('fp-vista', 'compras'); }catch(err){} if(pantalla === 'indicadores') pantalla = 'pendcompras'; }   // desde Leo
@@ -25933,7 +25944,15 @@ function impMarcas(I, v, W){ const e = escapeHtml, s = W / v[2], u = 1 / s, sel 
   // Barcos y aviones en camino: si caen muy juntos, uno solo con el número; tocarlo acerca el mapa.
   const B = []; P.forEach(function(x){ const on = act.has(x.a); por[x.a].filter(function(y){ return impEnEst(y, 'tr'); }).forEach(function(y){ const nv = impNave(y), p = nv ? impNvPos(impNvEstado(nv.s)) : impSobre(impLinea(x.o.ll, impTipoRuta(y), x.a), impFrac(y));   // con itinerario, donde está la nave
       B.push({ x:y, a:x.a, p:p, q:scr(p), on:on && (!sel.est || sel.est === 'tr') }); }); });
-  const BG = []; B.forEach(function(b){ const g = BG.find(function(g){ return Math.hypot(g.q[0] - b.q[0], g.q[1] - b.q[1]) < 13; }); if(g) g.l.push(b); else BG.push({ q:b.q, p:b.p, l:[b] }); });   // uno por uno salvo que se pisen (18.11.2026)
+  const BG0 = []; B.forEach(function(b){ const g = BG0.find(function(g){ return g.l.some(function(y){ return Math.hypot(y.q[0] - b.q[0], y.q[1] - b.q[1]) < 22; }); }); if(g) g.l.push(b); else BG0.push({ q:b.q, p:b.p, l:[b] }); });   // uno por uno salvo que se pisen (18.11.2026)
+  // Los que se pisan, en abanico alrededor de su lugar (19.11.2026, Piero: "salen como 2, sepáralos bien porque al dar click solo te acerca"):
+  // cada barco a la vista con su línea a donde está de verdad, y tocarlo abre su ficha. Solo con muchos (más de 12) queda el número para acercar.
+  const BG = [], lineasB = []; BG0.forEach(function(g){ const n = g.l.length; if(n === 1 || n > 12){ BG.push(g); return; }
+    const cx = g.l.reduce(function(a, b){ return a + b.q[0]; }, 0) / n, cy = g.l.reduce(function(a, b){ return a + b.q[1]; }, 0) / n, r = Math.max(26, 8.5 * n + 12);
+    g.l.forEach(function(b){ b.t = Math.hypot(b.q[0] - cx, b.q[1] - cy) > .5 ? Math.atan2(b.q[1] - cy, b.q[0] - cx) : -Math.PI / 2; }); g.l.sort(function(a, b){ return a.t - b.t; });
+    const t0 = g.l[0].t; g.l.forEach(function(b, i){ const ang = t0 + i * 2 * Math.PI / n, sx = cx + r * Math.cos(ang), sy = cy + r * Math.sin(ang), d = uni([sx, sy]), o = [(d[0] - b.p[0]) * s, (d[1] - b.p[1]) * s];
+      lineasB.push(`<line class="imx-ld${b.on ? ' on' : ''}" data-a="${b.p[0].toFixed(3)},${b.p[1].toFixed(3)}" data-o="${o[0].toFixed(2)},${o[1].toFixed(2)}" x1="${b.p[0].toFixed(2)}" y1="${b.p[1].toFixed(2)}" x2="${d[0].toFixed(2)}" y2="${d[1].toFixed(2)}"/><circle class="imx-dot" data-a="${b.p[0].toFixed(3)},${b.p[1].toFixed(3)}" data-r="3" cx="${b.p[0].toFixed(2)}" cy="${b.p[1].toFixed(2)}" r="${(3 * u).toFixed(3)}"/>`);
+      BG.push({ q:[sx, sy], p:b.p, d:d, o:o, l:[b] }); }); });
   // Estela del barco elegido: lo navegado en línea continua (como MarineTraffic).
   let estela = ''; if(APP_PL.foco){ const f = B.find(function(b){ return b.x.ocs[0] === APP_PL.foco; }); const o = f && P.find(function(x){ return x.a === f.a; });
     const nvF = f && impNave(f.x);
@@ -25953,11 +25972,12 @@ function impMarcas(I, v, W){ const e = escapeHtml, s = W / v[2], u = 1 / s, sel 
     const glifo = ic === 'barco' ? `<circle class="hl" r="17"/><circle class="hit" r="15"/><path class="sk" d="${IMX_BARCO_MIN}" transform="scale(${izq ? '-1.15 1.15' : '1.15'})"/>`
       : `<circle r="11"/><g transform="translate(-7.5 -7.5) scale(.625)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO[ic]}</svg></g>`;
     const at = n > 1 && !junto ? `data-imzc="${g.p[0].toFixed(2)},${g.p[1].toFixed(2)}"` : `data-impais="${b.a}" data-imfoco="${e(b.x.ocs[0])}"`;
-    return `<g class="imx-sh${on ? ' on' : ''}${foco ? ' foco' : ''}${tarde ? ' tarde' : ''}" ${at} data-a="${g.p[0].toFixed(3)},${g.p[1].toFixed(3)}" transform="translate(${g.p[0].toFixed(2)} ${g.p[1].toFixed(2)}) scale(${u.toFixed(4)})" style="--d:${(i % 5) * 0.4}s"><title>${e(tt)}</title>${glifo}${n > 1 ? `<circle class="n" cx="13" cy="-11" r="7"/><text x="13" y="-8">${n}</text>` : ''}${nave && (s >= 1.4 || on || foco) && (function(){ const w = nave.length * 3.4 + 4, r = [g.q[0] - w, g.q[1] + 12, g.q[0] + w, g.q[1] + 27]; if(!foco && !libre(r)) return false; ocup.push(r); return true; })() ? `<text class="l" y="23">${e(nave)}</text>` : ''}</g>`; });
+    const dp = g.d || g.p;
+    return `<g class="imx-sh${on ? ' on' : ''}${foco ? ' foco' : ''}${tarde ? ' tarde' : ''}" ${at} data-a="${g.p[0].toFixed(3)},${g.p[1].toFixed(3)}"${g.o ? ` data-o="${g.o[0].toFixed(2)},${g.o[1].toFixed(2)}"` : ''} transform="translate(${dp[0].toFixed(2)} ${dp[1].toFixed(2)}) scale(${u.toFixed(4)})" style="--d:${(i % 5) * 0.4}s"><title>${e(tt)}</title>${glifo}${n > 1 ? `<circle class="n" cx="13" cy="-11" r="7"/><text x="13" y="-8">${n}</text>` : ''}${nave && (s >= 1.4 || on || foco) && (function(){ const w = nave.length * 3.4 + 4, r = [g.q[0] - w, g.q[1] + 12, g.q[0] + w, g.q[1] + 27]; if(!foco && !libre(r)) return false; ocup.push(r); return true; })() ? `<text class="l" y="23">${e(nave)}</text>` : ''}</g>`; });
   const oce = s < 5 ? [['Océano Pacífico', [-22, -128]], ['Océano Pacífico', [18, 160]], ['Océano Atlántico', [12, -36]]].map(function(o){ const p = impXY(o[1]); return `<text class="imx-oc" data-a="${p[0].toFixed(2)},${p[1].toFixed(2)}" transform="translate(${p[0].toFixed(2)} ${p[1].toFixed(2)}) scale(${u.toFixed(4)})">${o[0]}</text>`; }).join('') : '';
   const lu = impXY(IMX_LURIN), arr = I.filter(impEnPeru).length;
   const cd = `<g class="imx-cd${sel && sel.est === 'ar' ? ' on' : ''}" data-impais="e:ar" data-a="${lu[0].toFixed(3)},${lu[1].toFixed(3)}" transform="translate(${lu[0].toFixed(2)} ${lu[1].toFixed(2)}) scale(${u.toFixed(4)})"><title>Almacén principal · Lurín (Friopacking)${arr ? ' · ' + arr + ' en Perú, falta el ingreso · toca para verlos' : ''}</title><circle class="pu" r="12"/><rect x="-12" y="-12" width="24" height="24" rx="7"/><g transform="translate(-8.5 -8.5) scale(.7)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${IMX_ICO.cd}</svg></g><text class="l" x="17" y="5">Lurín</text>${arr ? `<circle class="n" cx="11" cy="-12" r="8"/><text x="11" y="-9">${arr}</text>` : ''}</g>`;
-  return `<g>${oce}</g><g>${estela}</g><g>${lineas.join('')}</g><g>${pins.join('')}</g>${cd}<g>${barcos.join('')}</g>`; }
+  return `<g>${oce}</g><g>${estela}</g><g>${lineas.join('')}</g><g>${pins.join('')}</g>${cd}<g>${lineasB.join('')}</g><g>${barcos.join('')}</g>`; }
 function impMapaHtml(I){ const M = IMX_MUNDO, e = escapeHtml, sel = impSel(I), por = {}, D = impPx(), v = (ZM.imx && ZM.imx.v) || impVistaInicial();
   I.forEach(function(x){ if(x.a) (por[x.a] = por[x.a] || []).push(x); });
   const act = new Set(sel ? sel.L.map(function(x){ return x.a; }) : []), ks = Object.keys(por), mx = Math.max.apply(null, [1].concat(ks.map(function(k){ return por[k].length; })));
