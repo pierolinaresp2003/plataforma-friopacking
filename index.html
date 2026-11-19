@@ -21181,7 +21181,7 @@ function rqFilaHtml(r, i, conReq){
   const um = escapeHtml(r.unidad || ''), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   const D = rqSkDe(r, k), fx = D.fx, sk = D.sk, sd = D.sd, aCompras = D.aCompras, cam = D.cam, skc = D.skc, ya = fx ? rsvYaV(r) : 0, ob = D.ob;
   // Alerta en la fila, sin abrirla (19.11.2026, Piero: "debe ir como alerta en el preview de Mary, no debe salir abajo")
-  const obTxt = ob ? (function(){ const z = ob.Z[0], quien = titleCase(String(z.val_nombre || '').split(' ')[0] || ''), nota = String(z.val_nota || '').replace(/\s*·?\s*Parcial: hay .*$/, '').replace(/^(Rechazada: no está separado; pasa a Compras|No hay en almacén: pasa a Compras)$/, '').trim();
+  const obTxt = ob ? (function(){ const z = ob.Z[0], quien = titleCase(String(z.val_nombre || '').split(' ')[0] || ''), nota = String(z.val_nota || '').replace(/\s*·?\s*(Parcial: hay .*|No hay [\d.,]+ de [\d.,]+ → Compras)$/, '').replace(/^(Rechazada: no está separado; pasa a Compras|No hay en almacén: pasa a Compras)$/, '').trim();
     return `<span class="rqx-alerta"><b>⚠ Validación${quien ? ' de ' + escapeHtml(quien) : ''}:</b> ${ob.hay > 0 ? `solo hay ${nn(ob.hay)} de ${nn(ob.tot)} ${um}` : `no está en almacén (${nn(ob.tot)} ${um})`}. Faltan <b>${nn(ob.q)} ${um}</b>: revisa la reserva y ${ob.hay > 0 ? 'pasa el resto' : 'pásalo'} a pedido en Nisira${nota ? ' · “' + escapeHtml(polarCorta(nota, 80)) + '”' : ''}.</span>`; })() : '';
   return `<div class="rqm-card rqx-it st-${k}" data-i="${i}" data-paso="${k}" data-sk="${skc}"${aCompras ? ' data-comp="1"' : ''}>
     <div class="rqx-fila" data-rqxab="1" role="button" tabindex="0" aria-expanded="false">
@@ -21547,8 +21547,8 @@ document.addEventListener('input', function(ev){ if(ev.target.id !== 'regQ') ret
 function rsvVB(z, corto){ const e = escapeHtml, n = titleCase(String(z.val_nombre || '').split(' ')[0] || '');
   if(z.val_estado === 'ok') return `<span class="vb ok" title="Validado por ${e(titleCase(z.val_nombre || ''))}${z.val_en ? ' · ' + e(rqFecha(new Date(z.val_en))) : ''}">✓ VB ${e(n)}</span>`;
   // Parcial: lo que falta pasó a Compras; 0 = rechazada, no estaba separado nada (19.11.2026)
-  if(z.val_estado === 'obs' && z.val_q != null && z.val_q !== '' && +z.val_q === 0) return `<span class="vb obs no" title="${e(z.val_nota || '')}">✕ No hay ${e(n)}</span>`;
-  if(z.val_estado === 'obs') return `<span class="vb obs" title="${e(z.val_nota || '')}">⚠ Parcial ${e(n)}${z.val_q != null && z.val_q !== '' && +z.val_q !== +z.cantidad ? ' · hay ' + e(String(+z.val_q)) + ' de ' + e(String(+z.cantidad)) : ''}</span>`;
+  if(z.val_estado === 'obs' && z.val_q != null && z.val_q !== '' && +z.val_q === 0) return `<span class="vb obs no" title="${e(z.val_nota || '')}">✕ No hay nada ${e(n)}</span>`;
+  if(z.val_estado === 'obs') return `<span class="vb obs no" title="${e(z.val_nota || '')}">✕ No hay ${z.val_q != null && z.val_q !== '' && +z.val_q !== +z.cantidad ? e(String(Math.round((+z.cantidad - +z.val_q) * 1000) / 1000)) + ' de ' + e(String(+z.cantidad)) + ' ' : ''}${e(n)}</span>`;
   return resSede(z) === 'En camino' ? '<span class="vb cam">🚢 Por llegar</span>' : resValida(z) ? '<span class="vb pend">Por validar</span>' : ''; }
 // Desde qué equipo se valida (13.11.2026, Piero: "para ver si es realmente necesaria una compra de tablets")
 function rsvDisp(){ const ua = navigator.userAgent || ''; return /iPad|Tablet/.test(ua) || (/Android/.test(ua) && !/Mobile/.test(ua)) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'Tablet' : /iPhone|iPod|Android|Mobile/.test(ua) ? 'Celular' : 'PC'; }
@@ -21571,32 +21571,33 @@ function appValHtml(){ const e = escapeHtml, nn = function(v){ return Number(v |
         ${l.map(function(z){ const sd = resSede(z);
           return `<div class="val-it" data-valit="${z.id}"><div class="val-t"><b>${e(z.descripcion || z.producto)}</b><small>${e(z.producto)}${z.nota ? ' · ' + e(z.nota) : ''}</small></div>
             <div class="val-q"><span class="rsvm-s ${resSedeK(sd)}">${e(sd)}</span><b>${nn(z.cantidad)}</b><small>${e(z.um || '')}</small></div>
-            ${VAL_UI.ver === 'pend' ? `<div class="val-acc tres"><button type="button" class="ok" data-valok="${z.id}">✓ Aceptar todo</button><button type="button" class="obs" data-valobs="${z.id}">⚠ Parcial</button><button type="button" class="no" data-valno="${z.id}">✕ No hay</button></div>`
+            ${VAL_UI.ver === 'pend' ? `<div class="val-acc"><button type="button" class="ok" data-valok="${z.id}">✓ Aceptar todo</button><button type="button" class="no" data-valobs="${z.id}">✕ No hay</button></div>`
               : `<div class="val-acc">${rsvVB(z)}${z.val_nota ? `<small class="val-nota">${e(z.val_nota)}</small>` : ''}<button type="button" class="des" data-valdes="${z.id}">Deshacer</button></div>`}</div>`; }).join('')}</div>`; }).join('');
   return `<div class="val">
     <div class="val-head"><div class="rsvm-hi">${'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'}</div>
-      <div><h2>Validar reservas</h2><p>Revisa cada ítem en el almacén: <b>Aceptar todo</b> si está completo, <b>Parcial</b> si solo hay una parte o <b>No hay</b> si no está. Lo que falta pasa directo a Compras y Mary lo pasa a pedido en Nisira.</p></div>${APP.vista !== 'operario' ? '<button type="button" class="val-volver" data-rsvmvolver="1" title="Volver a Reservas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Reservas</button>' : ''}</div>
+      <div><h2>Validar reservas</h2><p>Revisa cada ítem en el almacén: <b>Aceptar todo</b> si está completo o <b>No hay</b> si falta algo; te pregunta cuánto no hay y eso pasa directo a Compras para que Mary lo pase a pedido en Nisira.</p></div>${APP.vista !== 'operario' ? '<button type="button" class="val-volver" data-rsvmvolver="1" title="Volver a Reservas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Reservas</button>' : ''}</div>
     <div class="val-ks"><button type="button" data-valver="pend" class="${VAL_UI.ver === 'pend' ? 'on' : ''}"><b>${appN(pend.length)}</b><small>por validar</small></button><button type="button" data-valver="ok" class="${VAL_UI.ver !== 'pend' ? 'on' : ''}"><b>${appN(hechas.length)}</b><small>validadas</small></button></div>
     <input type="search" class="rsvm-bus" id="valQ" placeholder="Buscar req., código o producto" value="${e(VAL_UI.q)}" autocomplete="off">
     <div class="val-l" id="valL">${lista}</div></div>`; }
 function valObservar(id){ const z = RES.l.find(function(y){ return String(y.id) === String(id); }); if(!z) return; const e = escapeHtml;
-  // Parcial (19.11.2026, Piero: "que salga la observación cuando se tiene parcial y el restante que no se tiene pase directo a Compras")
+  // "No hay" y luego cuánto no hay (19.11.2026, Piero: "que la opción sea 'no hay' y que luego pregunte cuánto no hay; ya no dejes lo de
+  // parcial"): lo que no hay pasa directo a Compras; si no hay nada, todo lo reservado.
   const c = +z.cantidad || 0, um = e(z.um || ''), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
-  const f = rsvModal(`<header><div><small>Reserva parcial</small><h3>${e(z.descripcion || z.producto)}</h3><p>${e(z.producto)} · reservado ${e(nn(c))} ${um} en ${e(resSede(z))}</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
-    <label class="rsv-lbl">¿Cuánto hay separado?<span><input type="number" id="valQ2" min="0" max="${c}" step="any" value="" placeholder="0" class="val-in" inputmode="decimal"> ${um} <small>de ${e(nn(c))}</small></span></label>
+  const f = rsvModal(`<header><div><small>No hay</small><h3>${e(z.descripcion || z.producto)}</h3><p>${e(z.producto)} · reservado ${e(nn(c))} ${um} en ${e(resSede(z))}</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
+    <label class="rsv-lbl">¿Cuánto no hay?<span><input type="number" id="valQ2" min="0" max="${c}" step="any" value="${c}" class="val-in" inputmode="decimal"> ${um} <small>de ${e(nn(c))}</small></span></label>
     <div class="val-falta" id="valFalta"></div>
     <label class="rsv-lbl">Comentario (opcional)<input type="text" id="valN" placeholder="Ej. el resto está dañado"></label>
-    <footer><button type="button" class="rsv-b" data-rsvx="1">Cancelar</button><button type="button" class="rsv-b ok" id="valOk" disabled>Guardar parcial</button></footer>`);
+    <footer><button type="button" class="rsv-b" data-rsvx="1">Cancelar</button><button type="button" class="rsv-b ok" id="valOk" disabled>Guardar</button></footer>`);
   const iq = f.querySelector('#valQ2'), bt = f.querySelector('#valOk'), fa = f.querySelector('#valFalta');
-  const ver = function(){ const t = iq.value.trim(), q = +t, ok = t !== '' && isFinite(q) && q >= 0 && q < c - 0.0001; bt.disabled = !ok;
-    fa.innerHTML = t === '' ? `Escribe cuánto encontraste; lo que falte pasa directo a Compras.` : !isFinite(q) || q < 0 ? 'Cantidad no válida.' : q >= c - 0.0001 ? 'Si está todo, marca <b>Conforme</b>.' : `Faltan <b>${e(nn(c - q))} ${um}</b>: pasan directo a Compras.`;
+  const ver = function(){ const t = iq.value.trim(), q = +t, ok = t !== '' && isFinite(q) && q > 0.0001 && q <= c + 0.0001; bt.disabled = !ok;
+    fa.innerHTML = t === '' ? 'Escribe cuánto no hay; eso pasa directo a Compras.' : !isFinite(q) || q < 0 || q > c + 0.0001 ? 'Cantidad no válida: como máximo ' + e(nn(c)) + ' ' + um + '.' : q <= 0.0001 ? 'Si está todo, marca <b>Aceptar todo</b>.'
+      : q >= c - 0.0001 ? `No hay nada: los <b>${e(nn(c))} ${um}</b> pasan directo a Compras.` : `Hay ${e(nn(c - q))} ${um}; los <b>${e(nn(q))} ${um}</b> que no hay pasan directo a Compras.`;
     fa.className = 'val-falta' + (ok ? ' si' : ''); };
-  iq.addEventListener('input', ver); ver(); setTimeout(function(){ iq.focus(); }, 50);
-  bt.addEventListener('click', function(){ const q = +iq.value; if(bt.disabled) return; const n = f.querySelector('#valN').value.trim();
-    rsvCerrar(); rsvValidar([z.id], 'obs', q, (n ? n + ' · ' : '') + 'Parcial: hay ' + nn(q) + ' de ' + nn(c) + '; faltan ' + nn(c - q) + ' → Compras'); }); }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-valver],[data-valok],[data-valobs],[data-valtodo],[data-valdes],[data-valdestodo],[data-valsi],[data-valno]'); if(!b) return;
+  iq.addEventListener('input', ver); ver(); setTimeout(function(){ iq.focus(); iq.select(); }, 50);
+  bt.addEventListener('click', function(){ if(bt.disabled) return; const q = Math.min(c, +iq.value), n = f.querySelector('#valN').value.trim();
+    rsvCerrar(); rsvValidar([z.id], 'obs', Math.max(0, Math.round((c - q) * 1000) / 1000), (n ? n + ' · ' : '') + 'No hay ' + nn(q) + ' de ' + nn(c) + ' → Compras'); }); }
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-valver],[data-valok],[data-valobs],[data-valtodo],[data-valdes],[data-valdestodo],[data-valsi]'); if(!b) return;
   if(b.dataset.valsi){ b.disabled = true; return rsvValidar(b.dataset.valsi.split(','), 'ok', null, null); }
-  if(b.dataset.valno){ b.disabled = true; return rsvValidar(b.dataset.valno.split(','), 'obs', 0, 'No hay en almacén: pasa a Compras'); }
   if(b.dataset.valver){ VAL_UI.ver = b.dataset.valver; return appRenderInicio(); }
   if(b.dataset.valok){ b.disabled = true; const z = RES.l.find(function(y){ return String(y.id) === b.dataset.valok; }); return rsvValidar([b.dataset.valok], 'ok', z ? +z.cantidad : null, null); }
   if(b.dataset.valtodo){ b.disabled = true; return rsvValidar(b.dataset.valtodo.split(','), 'ok', null, null); }
