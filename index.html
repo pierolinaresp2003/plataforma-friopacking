@@ -15844,6 +15844,21 @@ function rqPreparar(){
     r.estadoCalc = rqEstadoReal(r);
     if(r.via) (vias[r.codRequerimiento + '|' + r.idProducto] = vias[r.codRequerimiento + '|' + r.idProducto] || {})[r.via] = 1;
   });
+  // Lo que no se pasó a pedido (19.11.2026, Piero: "cuando se pasa un parcial a compra el restante debe salir como pendiente para generar
+  // el pedido, en revisión"): req 44 y pedido 42 → la línea queda en 42 (su OC sigue su camino) y aparece otra de 2 "En revisión".
+  // Por requerimiento + producto + cantidad requerida (las tandas de un mismo ítem se suman, cada pedido una vez); nada si el ítem ya
+  // salió del almacén o llegó a obra, si el pedido o el requerimiento están archivados, o si lo que falta es solo redondeo.
+  const G = new Map(); RQ.filas.forEach(function(r){ if(!r.codPedido || !(r.cantidad > 0) || !(r.cantPedido > 0)) return; const k = r.codRequerimiento + '|' + r.idProducto + '|' + r.cantidad; (G.get(k) || G.set(k, []).get(k)).push(r); });
+  const resto = [], VACIO = { codPedido:'', cantPedido:null, fPedido:null, estadoPedido:'', responsablePedido:'', codOrden:'', usuarioCompras:'', estadoOrden:'', fOrden:null, fAprob:null, fCompromiso:null, fRecep:null,
+    cantOrden:null, cantRecep:null, guia:'', factura:'', fSalida:null, cantSalida:null, docSalida:'', sedeSalida:'', fObra:null, cantObra:null, docObra:'', ocFin:false, via:'', partido:false, mixtoItem:false };
+  G.forEach(function(L){ const r0 = L[0], tot = r0.cantidad; if(!r0.fReq || r0.fReq < PD_PARCIAL_DESDE) return;   // solo requerimientos de 2026
+    if(L.some(function(r){ return r.fSalida || r.fObra || r.estadoCalc === 'Recibido en Obra' || r.estadoCalc === 'Enviado a Obra'; })) return;
+    if(L.every(function(r){ return r.estadoCalc === 'Archivado'; }) || /archiv/i.test(String(r0.estado || ''))) return;
+    const vistos = new Set(); let ped = 0; L.forEach(function(r){ if(!r.codOrden && /archiv|anul/i.test(String(r.estadoPedido || ''))) return; const k = r.codPedido + '|' + r.cantPedido; if(!vistos.has(k)){ vistos.add(k); ped += r.cantPedido; } });
+    if(!ped) return; const q = Math.round((tot - ped) * 1000) / 1000; if(q <= 0.001 || q < tot * 0.02) return;
+    L.forEach(function(r){ r.cantReqTotal = tot; r.cantidad = r.cantPedido; });
+    resto.push(Object.assign({}, r0, VACIO, { cantidad:q, cantReqTotal:tot, estado:'En revisión de Almacén', estadoCalc:'En Revisión', resto:true })); });
+  if(resto.length) RQ.filas = RQ.filas.concat(resto);
   RQ.filas.forEach(function(r){
     // Solo se marca cuando es el MISMO ítem el que se partió: una parte salió del stock del almacén
     // y la otra se compró con OC. Que el requerimiento tenga unos ítems directos y otros por pedido
@@ -21960,7 +21975,7 @@ async function rqComprasExcel(){ const L = rqComprasLista._L || []; if(!L.length
   descargarBlob(new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), 'Para pasar a Compras ' + rqFecha(corte).replace(/\./g, '') + ' - Grupo Friopacking.xlsx'); appToast('Excel listo ✔'); }
 document.addEventListener('click', function(ev){ if(ev.target.closest && ev.target.closest('[data-compxls]')) rqComprasExcel(); });
 function rqEstadoCorto(r){ const k = supPaso(r), dh = function(f){ const d = f ? Math.max(0, busdayCount(f, appIndCorte()) || 0) : 0; return d ? d + ' d.h.' : 'hoy'; };
-  return [k].concat({ rev:['En revisión', 'hace ' + dh(r.fReq)], com:['En Compras', 'sin OC · ' + dh(r.fPedido || r.fReq)],
+  return [k].concat({ rev:['En revisión', r.resto ? 'falta pasar a pedido · de ' + appN(r.cantReqTotal) : 'hace ' + dh(r.fReq)], com:['En Compras', 'sin OC · ' + dh(r.fPedido || r.fReq)],
     oc:['OC en camino', r.fCompromiso ? 'llega ' + rqFecha(r.fCompromiso) : 'sin fecha pactada'], alm:['En almacén', 'por despachar'],
     sal:['En camino a obra', r.fSalida ? 'salió ' + rqFecha(r.fSalida) : ''], obra:['En obra', r.fObra ? rqFecha(r.fObra) : ''], arch:['Archivado', ''] }[k]); }
 // Devoluciones de proyecto al almacén: salidas S02 "Salida por devolución de proyecto" (y transferencias S80/S81 a una sucursal) de la hoja Movimientos, desde el almacén del PRY
