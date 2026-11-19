@@ -4593,6 +4593,7 @@ html[data-theme="dark"] .rtp-mk circle, html[data-theme="dark"] .rtp-pin path{st
 .val-ch{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;} .val-ch b{display:block;font-size:16px;color:var(--ink);} .val-ch small{display:block;font-size:12px;color:var(--ink-soft);}
 .val-todo{border:0;background:#15803d;color:#fff;border-radius:12px;padding:10px 14px;font:800 13.5px Inter,sans-serif;cursor:pointer;white-space:nowrap;}
 /* Aceptar todo / parcial / no hay por ítem (19.11.2026) */
+.rsvm-val.rsvm-fotos{color:var(--ink);} .rsvm-fotos + .rsvm-val{margin-left:0;}
 /* Aviso de datos nuevos (en vivo, 19.11.2026) */
 .vivo-datos{position:fixed;top:76px;left:50%;transform:translateX(-50%);z-index:90;border:0;border-radius:999px;padding:9px 18px;background:#0a1e64;color:#fff;font:600 13px Inter,sans-serif;cursor:pointer;box-shadow:0 12px 28px -12px rgba(10,30,100,.6);animation:pzSube .3s var(--pz-ease) both;}
 .vivo-datos b{font-weight:800;text-decoration:underline;} html[data-theme="dark"] .vivo-datos{background:#2dd4bf;color:#06201d;box-shadow:0 0 22px -4px rgba(45,212,191,.6);}
@@ -21436,7 +21437,7 @@ document.addEventListener('input', function(ev){ const i = ev.target; if(!i.data
 // dejan de descontar (y se liberan solas) y el stock vuelve a basarse solo en la data real.
 const RSV_UI = { ver:'act', sede:'', q:'' };
 async function resHistCargar(forzar){ if(RES.hCargando || (RES.hOk && !forzar)) return; RES.hCargando = true;
-  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.liberada&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota,lote,val_estado,val_nombre,val_en,val_nota,val_q&order=creado.desc&limit=300');
+  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.liberada&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota,lote,val_estado,val_nombre,val_en,val_nota,val_q' + (RES.sinFoto ? '' : ',val_foto') + '&order=creado.desc&limit=300');
     if(r.ok){ RES.h = await r.json(); RES.hOk = true; } }catch(e){}
   RES.hCargando = false; if(APP.enInicio && APP.pantalla === 'almrsv') appRenderFondo(); }
 // Quién puede anular (liberar) reservas (19.11.2026, Piero: "el poder para anular las reservas solo lo tiene mcondori, jcenteno, plinares y
@@ -21461,11 +21462,11 @@ function rsvmLista(){ const e = escapeHtml, nn = function(v){ return Number(v ||
       nPv = g.l.filter(function(z){ return resValida(z) && (z.val_estado || 'pendiente') === 'pendiente'; }).length, tono = !act ? 'gris' : nNo ? 'rojo' : nPv ? 'ambar' : 'verde';
     return `<div class="rsvm-c rsvm-g ${tono}" style="animation-delay:${Math.min(gi, 12) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><span class="rsvm-num"><small>Req.</small><b>${e(nR)}</b></span><span class="rsvm-cli"><b>${e(cliDe(z0) || '—')}</b><small>${r0 && r0.idProyecto && !/^SIN/i.test(r0.idProyecto) ? e(r0.idProyecto) + ' · ' : ''}${g.l.length} ítem${g.l.length === 1 ? '' : 's'} · reservó ${e(String(z0.usuario || '').split('@')[0])} · ${e(rsvmHora({ creado:g.t }))}</small>
         ${act ? `<span class="rsvm-res">${nOk ? `<i class="ok">✓ ${nOk} con VB</i>` : ''}${nPv ? `<i class="pv">${nPv} por validar</i>` : ''}${nNo ? `<i class="no">✕ ${nNo} no hay</i>` : ''}</span>` : ''}</span></div>
-      <div class="rsvm-acc"><button type="button" data-rsvmreq="${e(g.req)}">Ver req.</button><button type="button" data-rsvmpdf="${e(g.req)}">PDF hoja</button>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="lib" data-rsvmlibreq="${e(g.req)}">Liberar…</button>` : ''}</div></div>
+      <div class="rsvm-acc">${g.l.some(function(z){ return z.val_foto; }) ? `<button type="button" data-rsvmfotos="${e(g.req)}" title="Descargar las fotos de este requerimiento">📷 Fotos (${g.l.filter(function(z){ return z.val_foto; }).length})</button>` : ''}<button type="button" data-rsvmreq="${e(g.req)}">Ver req.</button><button type="button" data-rsvmpdf="${e(g.req)}">PDF hoja</button>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="lib" data-rsvmlibreq="${e(g.req)}">Liberar…</button>` : ''}</div></div>
       ${g.l.map(function(z){ const r = resFila(z), pend = resPend(r), reg = /regularizar/i.test(z.nota || ''), sd = resSede(z);
         const est = act ? (pend ? ['on', sd === 'En camino' ? 'Compromete lo que llega' : 'Descuenta del stock'] : ['ok', 'Salida en Nisira ✓']) : (r && !pend ? ['ok', 'Salió en Nisira ✓'] : ['off', 'Liberada']);
         return `<div class="rsvm-f"><span class="rsvm-t"><b>${e(z.descripcion || (r && r.producto) || z.producto)}</b><small>${e(z.producto)}${z.nota ? ' · ' + e(z.nota) : ''}</small></span><span class="rsvm-q"><b>${nn(z.cantidad)}</b><small>${e(z.um || '')}</small></span>
-          <span class="rsvm-s ${resSedeK(sd)}">${e(sd)}</span><span class="rsvm-e ${est[0]}">${reg && act ? '⚠ por regularizar · ' : ''}${est[1]}${act ? '<br>' + rsvVB(z, 1) + (z.val_foto ? ' ' + fotoImg(z.val_foto, 'chip') : '') : ''}</span>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="rsvm-x" data-rsvlib="${z.id}" title="Liberar esta reserva" aria-label="Liberar">×</button>` : '<span></span>'}</div>`; }).join('')}</div>`; }).join(''); }
+          <span class="rsvm-s ${resSedeK(sd)}">${e(sd)}</span><span class="rsvm-e ${est[0]}">${reg && act ? '⚠ por regularizar · ' : ''}${est[1]}${act || z.val_estado === 'ok' || z.val_estado === 'obs' ? '<br>' + rsvVB(z, 1) : ''}${z.val_foto ? ' ' + fotoImg(z.val_foto, 'chip') : ''}</span>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="rsvm-x" data-rsvlib="${z.id}" title="Liberar esta reserva" aria-label="Liberar">×</button>` : '<span></span>'}</div>`; }).join('')}</div>`; }).join(''); }
 function appReservasHtml(){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(!RQ.filas.length){ rqPreparar(); }
   const A = RES.l.filter(function(z){ return resPend(resFila(z)); }), U = { 'Lurín':0, 'Trujillo':0, 'Ica':0, 'En camino':0 }; A.forEach(function(z){ U[resSede(z)] = (U[resSede(z)] || 0) + (+z.cantidad || 0); });
@@ -21478,9 +21479,13 @@ function appReservasHtml(){ const e = escapeHtml, nn = function(v){ return Numbe
     <div class="rsvm-bar"><div class="rsvm-seg"><button type="button" data-rsvmver="act" class="${RSV_UI.ver === 'act' ? 'on' : ''}">Activas <b>${appN(RES.l.length)}</b></button><button type="button" data-rsvmver="lib" class="${RSV_UI.ver === 'lib' ? 'on' : ''}">Liberadas${RES.hOk ? ` <b>${appN((RES.h || []).length)}</b>` : ''}</button></div>
       <div class="rsvm-sedes">${[['', 'Todos'], ['Lurín', 'Lurín'], ['Trujillo', 'Trujillo'], ['Ica', 'Ica'], ['En camino', 'En camino']].map(function(o){ return `<button type="button" data-rsvmsede="${o[0]}" class="${RSV_UI.sede === o[0] ? 'on' : ''}">${o[1]}</button>`; }).join('')}</div>
       <input type="search" class="rsvm-bus" id="rsvmQ" placeholder="Buscar req., código, producto o usuario" value="${e(RSV_UI.q)}" autocomplete="off">
+      <button type="button" class="rsvm-val rsvm-fotos" data-rsvmfotos="*" title="Descargar en un .zip las fotos de la lista que estás viendo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Fotos</span></button>
       <button type="button" class="rsvm-val${nVal ? ' hay' : ''}" data-rsvmval="1" title="Validación de los operarios${nVal ? ' · ' + nVal + ' por validar' : ''}" aria-label="Abrir Validación"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Validación</span>${nVal ? `<b>${appN(nVal)}</b>` : ''}</button></div>
     <div class="rsvm-l rsvm-gl" id="rsvmL">${rsvmLista()}</div></div>`; }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-rsvmver],[data-rsvmsede],[data-rsvmreq],[data-rsvmpdf],[data-rsvmlibreq],[data-rsvmval],[data-rsvmvolver]'); if(!b) return;
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-rsvmver],[data-rsvmsede],[data-rsvmreq],[data-rsvmpdf],[data-rsvmlibreq],[data-rsvmval],[data-rsvmvolver],[data-rsvmfotos]'); if(!b) return;
+  if(b.dataset.rsvmfotos){ const act = RSV_UI.ver === 'act', base = act ? RES.l : (RES.h || []), q = crtNorm(RSV_UI.q.trim()), k = b.dataset.rsvmfotos;
+    const Z = base.filter(function(z){ return k !== '*' ? z.req === k : (!RSV_UI.sede || resSede(z) === RSV_UI.sede) && (!q || crtNorm([z.req, z.producto, z.descripcion, z.usuario, z.nota].join(' ')).indexOf(q) !== -1); });
+    return fotosBajar(Z, k !== '*' ? 'Fotos Req ' + String(k).replace(/^000\d-0*/, '') : 'Fotos validación ' + (act ? 'activas' : 'liberadas') + ' ' + new Date().toISOString().slice(0, 10), b); }
   if(b.dataset.rsvmval) return appInicio('almval');   // Validación dentro de Reservas (17.11.2026, Piero)
   if(b.dataset.rsvmvolver) return appInicio('almrsv');
   if(b.dataset.rsvmver){ RSV_UI.ver = b.dataset.rsvmver; if(RSV_UI.ver === 'lib') resHistCargar(true); return appRenderInicio(); }
@@ -21720,9 +21725,22 @@ function fotoImg(p, cls){ if(!p) return ''; setTimeout(fotoCargar, 0); const u =
 function fotoCargar(){ document.querySelectorAll('img[data-fotop]:not([src])').forEach(async function(im){ const p = im.dataset.fotop; if(FOTO.url.has(p)){ im.src = FOTO.url.get(p); return; } if(FOTO.bajando.has(p)) return; FOTO.bajando.add(p);
   try{ const r = await sbFetch('/storage/v1/object/authenticated/almacen-fotos/' + p); if(!r.ok) throw new Error(r.status); const u = URL.createObjectURL(await r.blob()); FOTO.url.set(p, u);
     document.querySelectorAll('img[data-fotop]').forEach(function(x){ if(x.dataset.fotop === p) x.src = u; }); }catch(e){} FOTO.bajando.delete(p); }); }
+// Descargar fotos (19.11.2026, Piero: "debes dejar una opción para descargar esas fotos"): una sola desde la vista grande, o todas las de
+// un requerimiento o de la lista en un .zip con nombres claros (Req, código, quién validó y fecha).
+async function fotoBlob(p){ const r = await sbFetch('/storage/v1/object/authenticated/almacen-fotos/' + p); if(!r.ok) throw new Error('No se pudo bajar una foto (' + r.status + ').'); return r.blob(); }
+function fotoNombre(z, i){ const d = z.val_en ? new Date(z.val_en) : null, f = d && !isNaN(d) ? d.toISOString().slice(0, 10) : '';
+  return ['Req ' + String(z.req || '').replace(/^000\d-0*/, ''), z.producto, titleCase(String(z.val_nombre || '').split(' ')[0] || ''), f].filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, ' ') + (i ? ' (' + i + ')' : '') + '.jpg'; }
+async function fotosBajar(Z, nombre, btn){ Z = Z.filter(function(z){ return z.val_foto; }); if(!Z.length) return appToast('No hay fotos para descargar.');
+  const txt = btn ? btn.textContent : ''; if(btn){ btn.disabled = true; btn.textContent = '⏳ 0/' + Z.length; }
+  try{ if(Z.length === 1){ descargarBlob(await fotoBlob(Z[0].val_foto), fotoNombre(Z[0])); return; }
+    if(typeof JSZip === 'undefined') throw new Error('No se pudo armar el .zip: revisa tu conexión.');
+    const zip = new JSZip(), usados = {}; let n = 0;
+    for(const z of Z){ let nm = fotoNombre(z); if(usados[nm]){ usados[nm]++; nm = fotoNombre(z, usados[nm]); } else usados[nm] = 1; zip.file(nm, await fotoBlob(z.val_foto)); n++; if(btn) btn.textContent = '⏳ ' + n + '/' + Z.length; }
+    descargarBlob(await zip.generateAsync({ type:'blob', compression:'STORE' }), nombre + '.zip'); appToast(Z.length + ' fotos descargadas ✔');
+  }catch(err){ appToast(err.message || 'No se pudo descargar.'); } finally{ if(btn){ btn.disabled = false; btn.textContent = txt; } } }
 function fotoAchicar(f){ return new Promise(function(ok, mal){ const im = new Image(), u = URL.createObjectURL(f);
-  im.onload = function(){ const k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
-    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(function(b){ b ? ok(b) : mal(new Error('No se pudo leer la foto.')); }, 'image/jpeg', 0.8); };
+  im.onload = function(){ const k = Math.min(1, 1280 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); c.toBlob(function(b){ b ? ok(b) : mal(new Error('No se pudo leer la foto.')); }, 'image/jpeg', 0.72); };
   im.onerror = function(){ URL.revokeObjectURL(u); mal(new Error('No se pudo leer la foto.')); }; im.src = u; }); }
 async function valFotoSubir(id, f, lab){ const z = RES.l.find(function(y){ return String(y.id) === String(id); }); if(!z || !f) return;
   if(lab) lab.classList.add('subiendo');
@@ -21735,8 +21753,11 @@ async function valFotoSubir(id, f, lab){ const z = RES.l.find(function(y){ retur
   }catch(err){ appToast(err.message || 'No se pudo subir la foto.'); if(lab) lab.classList.remove('subiendo'); } }
 document.addEventListener('change', function(ev){ const i = ev.target; if(!i.dataset || !i.dataset.valfoto) return; const f = i.files && i.files[0]; i.value = ''; valFotoSubir(i.dataset.valfoto, f, i.closest('label')); });
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-fotover]'); if(!b) return; ev.preventDefault(); ev.stopPropagation(); const p = b.dataset.fotover;
-  const f = rsvModal(`<header><div><small>Foto de la validación</small></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header><div class="foto-big"><img data-fotop="${escapeHtml(p)}"${FOTO.url.has(p) ? ` src="${FOTO.url.get(p)}"` : ''} alt="Foto"></div>`);
-  f.querySelector('.rsv-box').classList.add('foto-box'); fotoCargar(); }, true);
+  const z = (RES.l || []).concat(RES.h || []).find(function(y){ return y.val_foto === p; }), e = escapeHtml;
+  const f = rsvModal(`<header><div><small>Foto de la validación</small>${z ? `<h3>${e(z.descripcion || z.producto)}</h3><p>Req. ${e(String(z.req).replace(/^000\d-0*/, ''))} · ${e(z.producto)}${z.val_nombre ? ' · validó ' + e(titleCase(z.val_nombre)) : ''}${z.val_en ? ' · ' + e(rsvmHora({ creado:z.val_en })) : ''}</p>` : ''}</div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header><div class="foto-big"><img data-fotop="${e(p)}"${FOTO.url.has(p) ? ` src="${FOTO.url.get(p)}"` : ''} alt="Foto"></div>
+    <footer><button type="button" class="rsv-b" data-rsvx="1">Cerrar</button><button type="button" class="rsv-b ok" id="fotoBaja">⬇ Descargar</button></footer>`);
+  f.querySelector('.rsv-box').classList.add('foto-box'); fotoCargar();
+  f.querySelector('#fotoBaja').addEventListener('click', function(){ fotosBajar([z || { val_foto:p, req:'', producto:'foto' }], 'Foto', this); }); }, true);
 function valCamHtml(z){ return `<label class="val-cam${z.val_foto ? ' si' : ''}" title="${z.val_foto ? 'Cambiar la foto' : 'Tomar foto'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>${z.val_foto ? 'Cambiar' : 'Foto'}</span><input type="file" accept="image/*" capture="environment" data-valfoto="${escapeHtml(String(z.id))}" hidden></label>`; }
 
 // ---- Despachos (Almacén, 19.11.2026, Piero: "una vez que se valida todo, que pase a un módulo antes de Rutas que sea Despachos, y aquí se
