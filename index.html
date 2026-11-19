@@ -18029,7 +18029,9 @@ function appEsInv(){ try{ return !!(APP.usuario && APP.usuario.invitado); }catch
 function appInvUsuario(){ return { correo:'invitado', nombre:'Invitado', tipo:'supervisor', invitado:true }; }
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
 // Gerencia de Logística (15.10.2026, Piero): entran primero al módulo Gerencial; también tienen Compras, Almacén y Supervisor.
-const APP_GERENCIAL_USR = ['kalegria', 'mlujan', 'apl', 'rcarlos', 'jascama'];   // rcarlos = Renato Carlos Sarmiento (05.11.2026, Piero) · jascama = Jesús Ascama, TI (16.11.2026, Piero)
+const APP_GERENCIAL_USR = ['kalegria', 'mlujan', 'apl', 'rcarlos', 'jascama'];
+// Usuarios que, además de su acceso normal, pueden entrar a la vista Supervisor para revisar cómo se ve (19.11.2026, Piero: "para PLINARES añade la vista supervisor")
+const APP_SUPER_EXTRA = ['plinares'];   // rcarlos = Renato Carlos Sarmiento (05.11.2026, Piero) · jascama = Jesús Ascama, TI (16.11.2026, Piero)
 // Respaldo: copia de DB Supervisores del 29.09.2026 (nombre, correo y Acceso; sin DNI), para que cada uno
 // entre con su acceso y se le salude por su nombre aunque el link publicado todavía no traiga la base.
 // Cuando se publica con la base cargada, manda la publicada (SUPERVISOR_ROL).
@@ -18085,7 +18087,9 @@ if(APP.usuario){
 function appVistasPermitidas(){
   if(!APP.usuario) return ['supervisor'];
   if(GD_MODO) return ['gerencial'];   // el link gerencial solo tiene Gerencial (11.11.2026)
-  return (APP_ACCESO[APP.usuario.tipo] || []).filter(function(v){ return v !== 'gerencial'; });   // y el aplicativo ya no lo tiene
+  const l = (APP_ACCESO[APP.usuario.tipo] || []).filter(function(v){ return v !== 'gerencial'; });   // y el aplicativo ya no lo tiene
+  if(APP_SUPER_EXTRA.indexOf(appUsuarioDe(APP.usuario.correo)) !== -1 && l.indexOf('super') === -1) l.push('super');
+  return l;
 }
 
 function appLogo(){ const l = document.querySelector('.sidebar-brand .logo-lockup'); return l ? l.src : ''; }
