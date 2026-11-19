@@ -21444,10 +21444,17 @@ async function resHistCargar(forzar){ if(RES.hCargando || (RES.hOk && !forzar)) 
 // kalbujar; por ahora nadie más"). Los demás las ven, pero sin los botones de liberar. La liberación automática al salir en Nisira sigue igual.
 const RSV_LIBERAN = ['mcondori', 'jcenteno', 'plinares', 'kalbujar'];
 function rsvPuedeLiberar(){ const c = String((APP.usuario && APP.usuario.correo) || '').toLowerCase().split('@')[0]; return RSV_LIBERAN.indexOf(c) !== -1; }
+// Al anular una reserva su foto ya no sirve (19.11.2026, Piero: "si tomé una foto y libero la reserva, esa foto ya no la necesito y no se debe
+// guardar en Supabase"): se borra el archivo y se limpia val_foto. Lo que sale en Nisira (liberación automática) conserva su foto como registro.
+function rsvLibCuerpo(){ return Object.assign({ estado:'liberada' }, RES.sinFoto ? {} : { val_foto:null }); }
+async function fotosBorrar(P){ P = (P || []).filter(Boolean); if(!P.length) return;
+  try{ await sbFetch('/storage/v1/object/almacen-fotos', { method:'DELETE', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ prefixes:P }) }); }catch(e){}
+  P.forEach(function(p){ FOTO.url.delete(p); }); }
 function rsvSinPermiso(){ if(rsvPuedeLiberar()) return false; appToast('Solo Mary, Javier, Piero o Katherine pueden anular reservas.'); return true; }
 async function rsvLiberarReq(cod){ if(rsvSinPermiso()) return; const n = RES.l.filter(function(y){ return y.req === cod; }).length; if(!n || !window.confirm('¿Liberar las ' + n + ' reservas del Req. ' + String(cod).replace(/^000\d-0*/, '') + '?')) return;
-  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&req=eq.' + encodeURIComponent(cod), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
-    if(!r.ok) throw new Error(r.status); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar.'); } }
+  const fotos = RES.l.filter(function(y){ return y.req === cod; }).map(function(y){ return y.val_foto; });
+  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&req=eq.' + encodeURIComponent(cod), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(rsvLibCuerpo()) });
+    if(!r.ok) throw new Error(r.status); fotosBorrar(fotos); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar.'); } }
 function rsvmHora(z){ const d = new Date(z.creado); return isNaN(d) ? '' : rqFecha(d) + ' · ' + d.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' }); }
 function rsvmLista(){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); }, act = RSV_UI.ver === 'act';
   const base = act ? RES.l : (RES.h || []), q = crtNorm(RSV_UI.q.trim());
@@ -21749,7 +21756,8 @@ async function valFotoSubir(id, f, lab){ const z = RES.l.find(function(y){ retur
     if(!up.ok) throw new Error(up.status === 400 || up.status === 404 ? 'Falta activar las fotos en Supabase (el SQL de Despachos).' : 'No se pudo subir la foto (' + up.status + ').');
     const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(z.id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ val_foto:p }) });
     if(!r.ok) throw new Error('La foto se subió, pero falta la columna val_foto en Supabase (el SQL de Despachos).');
-    FOTO.url.set(p, URL.createObjectURL(b)); z.val_foto = p; RES.v++; appToast('Foto guardada ✔'); appRenderInicio();
+    const vieja = z.val_foto; FOTO.url.set(p, URL.createObjectURL(b)); z.val_foto = p; RES.v++; appToast('Foto guardada ✔'); appRenderInicio();
+    if(vieja && vieja !== p) fotosBorrar([vieja]);   // la foto cambiada ya no se guarda
   }catch(err){ appToast(err.message || 'No se pudo subir la foto.'); if(lab) lab.classList.remove('subiendo'); } }
 document.addEventListener('change', function(ev){ const i = ev.target; if(!i.dataset || !i.dataset.valfoto) return; const f = i.files && i.files[0]; i.value = ''; valFotoSubir(i.dataset.valfoto, f, i.closest('label')); });
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-fotover]'); if(!b) return; ev.preventDefault(); ev.stopPropagation(); const p = b.dataset.fotover;
@@ -22329,14 +22337,15 @@ function rsvLiberarSel(filtro, tit){ if(rsvSinPermiso()) return; const e = escap
   f.querySelector('#libTodo').addEventListener('click', function(){ L.forEach(function(z, i){ f.querySelector('[data-libi="' + i + '"]').checked = true; f.querySelector('[data-libq="' + i + '"]').value = +z.cantidad; }); pinta(); f.querySelector('#libOk').click(); });
   f.querySelector('#libOk').addEventListener('click', async function(){ const S = sel(), b = this; if(!S.length) return; b.disabled = true; b.textContent = 'Liberando…';
     try{ for(const x of S){ const total = x.q >= +x.z.cantidad - 1e-9;
-        const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(x.z.id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(total ? { estado:'liberada' } : { cantidad:Math.round((+x.z.cantidad - x.q) * 100) / 100 }) });
-        if(!r.ok) throw new Error(r.status); }
+        const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(x.z.id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(total ? rsvLibCuerpo() : { cantidad:Math.round((+x.z.cantidad - x.q) * 100) / 100 }) });
+        if(!r.ok) throw new Error(r.status); if(total) fotosBorrar([x.z.val_foto]); }
       rsvCerrar(); appToast('Liberado ✔'); RES.hOk = false; resCargar(true); }catch(err){ b.disabled = false; pinta(); const d = f.querySelector('#libErr'); d.hidden = false; d.textContent = 'No se pudo liberar (' + err.message + ').'; } }); }
 async function rsvLiberarLote(lote){ if(rsvSinPermiso()) return; const n = RES.l.filter(function(y){ return y.lote === lote; }).length; if(!window.confirm('¿Liberar las ' + n + ' reservas que se registraron juntas?')) return;
-  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&lote=eq.' + encodeURIComponent(lote), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
-    if(!r.ok) throw new Error(r.status); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar la hoja.'); } }
-async function rsvLiberar(id){ if(rsvSinPermiso()) return; try{ const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
-  if(!r.ok) throw new Error(r.status); appToast('Reserva liberada'); resCargar(true); }catch(e){ appToast('No se pudo liberar la reserva.'); } }
+  const fotos = RES.l.filter(function(y){ return y.lote === lote; }).map(function(y){ return y.val_foto; });
+  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&lote=eq.' + encodeURIComponent(lote), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(rsvLibCuerpo()) });
+    if(!r.ok) throw new Error(r.status); fotosBorrar(fotos); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar la hoja.'); } }
+async function rsvLiberar(id){ if(rsvSinPermiso()) return; const z0 = RES.l.find(function(y){ return String(y.id) === String(id); }); try{ const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(rsvLibCuerpo()) });
+  if(!r.ok) throw new Error(r.status); if(z0) fotosBorrar([z0.val_foto]); appToast('Reserva liberada'); resCargar(true); }catch(e){ appToast('No se pudo liberar la reserva.'); } }
 // Bloque del detalle: reservas de la fila + botón para reservar
 function rsvHtml(r){ const e = escapeHtml, L = resDeFila(r), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(!L.length) return '';
