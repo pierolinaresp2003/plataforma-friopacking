@@ -15956,7 +15956,9 @@ function rqEstadoReal(r){
     r.ocFin = !recibido && ocFinalizada(r.codOrden);
     return recibido ? 'Recibido en Almacén' : r.ocFin ? 'Archivado' : 'Enviado a pedido — cuenta con OC';
   }
-  if(r.codPedido) return (arch(r.estadoPedido) || arch(r.estado)) ? 'Archivado' : 'Pedido pendiente';
+  // Archivado es solo el req archivado (19.11.2026, Piero: "estos archivados corresponden a los pedidos archivados, eso está mal; deben
+  // corresponder a los req que se archivan"): si se archivó el pedido y el req sigue activo, queda En revisión como si no tuviera pedido.
+  if(r.codPedido){ if(arch(r.estado)) return 'Archivado'; if(arch(r.estadoPedido)){ r.pedArch = true; return 'En Revisión'; } return 'Pedido pendiente'; }
   if(arch(r.estado)) return 'Archivado';
   return /revisi/.test(sinAcentos(String(r.estado||'')).toLowerCase()) ? 'En Revisión' : (r.estado || '—');
 }
@@ -16039,7 +16041,13 @@ function rqPreparar(){
   const G = new Map(); RQ.filas.forEach(function(r){ if(!r.codPedido || !(r.cantidad > 0) || !(r.cantPedido > 0)) return; const k = r.codRequerimiento + '|' + r.idProducto + '|' + r.cantidad; (G.get(k) || G.set(k, []).get(k)).push(r); });
   const resto = [], VACIO = { codPedido:'', cantPedido:null, fPedido:null, estadoPedido:'', responsablePedido:'', codOrden:'', usuarioCompras:'', estadoOrden:'', fOrden:null, fAprob:null, fCompromiso:null, fRecep:null,
     cantOrden:null, cantRecep:null, guia:'', factura:'', fSalida:null, cantSalida:null, docSalida:'', sedeSalida:'', fObra:null, cantObra:null, docObra:'', ocFin:false, via:'', partido:false, mixtoItem:false };
-  G.forEach(function(L){ const r0 = L[0], tot = r0.cantidad; if(!r0.fReq || r0.fReq < PD_PARCIAL_DESDE) return;   // solo requerimientos de 2026
+  // Pedido archivado (19.11.2026): si el mismo ítem tiene otra línea con pedido vivo, OC o salida, esa otra ya lo representa (y lo que falte sale
+  // abajo como "En revisión"); si solo hay pedidos archivados, queda una sola línea En revisión, sin los datos del pedido.
+  G.forEach(function(L){ const pa = L.filter(function(r){ return r.pedArch; }); if(!pa.length) return;
+    const vivo = L.some(function(r){ return !r.pedArch && r.estadoCalc !== 'Archivado'; });
+    pa.forEach(function(r, k){ if(vivo || k > 0){ r.estadoCalc = 'Archivado'; r.pedReemp = true; } }); });
+  RQ.filas.forEach(function(r){ if(r.pedArch && !r.pedReemp) Object.assign(r, { pedArchCod:r.codPedido, codPedido:'', cantPedido:null, fPedido:null, estadoPedido:'', responsablePedido:'' }); });
+  G.forEach(function(L){ L = L.filter(function(r){ return !r.pedArch; }); if(!L.length) return; const r0 = L[0], tot = r0.cantidad; if(!r0.fReq || r0.fReq < PD_PARCIAL_DESDE) return;   // solo requerimientos de 2026
     if(L.some(function(r){ return r.fSalida || r.fObra || r.estadoCalc === 'Recibido en Obra' || r.estadoCalc === 'Enviado a Obra'; })) return;
     if(L.every(function(r){ return r.estadoCalc === 'Archivado'; }) || /archiv/i.test(String(r0.estado || ''))) return;
     const vistos = new Set(); let ped = 0; L.forEach(function(r){ if(!r.codOrden && /archiv|anul/i.test(String(r.estadoPedido || ''))) return; const k = r.codPedido + '|' + r.cantPedido; if(!vistos.has(k)){ vistos.add(k); ped += r.cantPedido; } });
@@ -16349,7 +16357,7 @@ function rqVistaTarjetas(cont, filas){
   // 30.09.2026 en todas las vistas del celular, no solo Supervisor ("igual debe agruparse").
   const soloFalta = true;
   const listos = soloFalta ? todo.filter(function(r){ return rqItemListo(r) && r.estadoCalc !== 'Archivado'; }) : [];
-  const archivados = soloFalta ? todo.filter(function(r){ return r.estadoCalc === 'Archivado'; }) : [];
+  const archivados = soloFalta ? todo.filter(function(r){ return r.estadoCalc === 'Archivado' && !r.pedReemp; }) : [];
   const orden = soloFalta ? todo.filter(function(r){ return !rqItemListo(r); }) : todo;
   // En el celular las tarjetas pesan: de 30 en 30 (cada "ver más" suma otras 30).
   // Todo a la vista, sin "Ver 30 más" (05.10.2026, Piero: "siempre mostrar todo completo... para todo el app").
