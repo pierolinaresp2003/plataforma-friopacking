@@ -3010,6 +3010,9 @@ html[data-theme="dark"] .pz-ic{background:rgba(255,255,255,.06);} html[data-them
 .bv-inv span{grid-row:span 2;font-size:22px;} .bv-inv b{font-size:14.5px;font-weight:800;} .bv-inv small{font-size:12px;color:var(--pz-soft);font-weight:600;}
 .bv-inv:hover{border-color:#1a9c86;background:#eef8f5;} .bv-inv.cargando{opacity:.6;pointer-events:none;}
 html[data-theme="dark"] .bv-inv{background:#1d1d3e;border-color:#2d2d55;color:#f4f4f9;}
+.bv-otp{margin-top:6px;} .bv-otp-abrir{margin-top:14px;} .bv-otp-box{margin-top:10px;padding:14px;border:1px dashed var(--border,#d9e2ef);border-radius:14px;background:var(--surface-3,#fbfcfd);text-align:left;}
+.bv-otp-txt{margin:0 0 10px;font-size:13px;line-height:1.45;color:var(--ink-soft,#5b6b7a);} .bv-otp-btn{margin-top:10px;} #bvOtpCod{margin-top:12px;}
+html[data-theme="dark"] .bv-otp-box{background:#1d1d3e;border-color:#2d2d55;}
 .app-bienv .bv-acceso{color:#0f6b60;} .app-bienv .bv-acceso b{color:#0e8a7c;}
 .app-bienv .bv-err{background:#fdecee;border-color:#ebd7d9;color:#a12a35;}
 .app-bienv .bv-in .bv-nota, .app-bienv .bv-pie{color:var(--pz-soft);opacity:1;}
@@ -6123,6 +6126,20 @@ async function sbAuth(grant, body){
   return { at:j.access_token, rt:j.refresh_token, exp:Date.now() + (j.expires_in || 3600) * 1000, correo:String((j.user && j.user.email) || '').toLowerCase() };
 }
 async function sbEntrar(correo, clave){ const x = await sbAuth('password', { email:correo, password:clave }); sbGuardar(x); return x; }
+// Entrar solo con el correo (19.11.2026, Piero: "los usuarios nuevos que no tengan cuenta pueden solo colocar su correo y que les des una
+// opción para que entren con un autenticador de Supabase en el correo... solo van a tener acceso a vista supervisor"). Supabase manda un
+// código de 6 dígitos al correo (OTP); al verificarlo queda la sesión. Solo correos @friopacking.pe / @grupofriopacking.pe (Piero, 19.11).
+function sbCorreoEmpresa(c){ return /@(friopacking|grupofriopacking)\.pe$/.test(String(c || '').trim().toLowerCase()); }
+async function sbOtpPedir(correo){
+  const r = await fetch(SB_URL + '/auth/v1/otp', { method:'POST', headers:{ apikey:SB_KEY, 'Content-Type':'application/json' }, body:JSON.stringify({ email:String(correo).trim().toLowerCase(), create_user:true }) });
+  const j = await r.json().catch(function(){ return {}; }); if(!r.ok) throw sbError(j, r.status); return true;
+}
+async function sbOtpVerificar(correo, codigo){
+  const r = await fetch(SB_URL + '/auth/v1/verify', { method:'POST', headers:{ apikey:SB_KEY, 'Content-Type':'application/json' }, body:JSON.stringify({ type:'email', email:String(correo).trim().toLowerCase(), token:String(codigo).trim() }) });
+  const j = await r.json().catch(function(){ return {}; }); if(!r.ok) throw sbError(j, r.status);
+  const x = { at:j.access_token, rt:j.refresh_token, exp:Date.now() + (j.expires_in || 3600) * 1000, correo:String((j.user && j.user.email) || correo).toLowerCase() };
+  sbGuardar(x); return x;
+}
 let sbRenovando = null;
 async function sbToken(){
   const x = sbSesion(); if(!x) return null;
@@ -18027,6 +18044,16 @@ const APP_INV_HASTA = 0;   // invitado desactivado (17.11.2026, revisión de seg
 function appInvVigente(){ return Date.now() <= APP_INV_HASTA; }
 function appEsInv(){ try{ return !!(APP.usuario && APP.usuario.invitado); }catch(e){ return false; } }   // APP todavía no existe en la 1.ª carga
 function appInvUsuario(){ return { correo:'invitado', nombre:'Invitado', tipo:'supervisor', invitado:true }; }
+// Supervisor que entró solo con su correo (OTP). Tiene sesión real de Supabase, pero no está en la base de usuarios: siempre vista Supervisor.
+function appEntrarAuto(correo){
+  const c = String(correo).trim().toLowerCase();
+  const nom = appNombrePorCorreo(c) || c.split('@')[0].replace(/[._-]+/g, ' ').replace(/(^|\s)(\S)/g, function(m, e, l){ return e + l.toUpperCase(); });
+  APP.usuario = { correo:c, nombre:nom, tipo:'supervisor', auto:true, recordar:true, creado:new Date().toISOString().slice(0, 10) };
+  try{ localStorage.setItem('fp-usuario', JSON.stringify(APP.usuario)); sessionStorage.setItem(APP_SESION, '1'); }catch(er){}
+  gerAbierto = false; try{ sessionStorage.removeItem(GER_SESION); }catch(er){}
+  updateGhStatus(); loadPublishedSnapshot(false);
+  setTimeout(function(){ appElegirVista('super'); appLanzador(); }, 420);
+}
 const APP_DOMINIOS = ['friopacking.pe', 'grupofriopacking.pe', 'friopacking.co'];
 // Gerencia de Logística (15.10.2026, Piero): entran primero al módulo Gerencial; también tienen Compras, Almacén y Supervisor.
 const APP_GERENCIAL_USR = ['kalegria', 'mlujan', 'apl', 'rcarlos', 'jascama'];
@@ -18060,11 +18087,13 @@ try{
   const u = JSON.parse(localStorage.getItem('fp-usuario') || 'null');
   // Frioteam puede tener otro dominio: se acepta lo guardado y appRevisarAcceso lo valida cuando llega la base.
   if(u) u.tipo = APP_GERENCIAL_USR.indexOf(appUsuarioDe(u.correo)) !== -1 ? 'gerencial' : appTipoNorm(u.tipo);
-  if(u && APP_ACCESO[u.tipo] && (appCorreoValido(u.correo) || (u.tipo === 'frioteam' && /^[^@\s]+@[^@\s]+$/.test(u.correo || '')))) APP.usuario = u;
+  if(u && u.auto && sbSesion() && sbCorreoEmpresa(u.correo)){ u.tipo = 'supervisor'; APP.usuario = u; }   // supervisor auto-registrado (OTP)
+  else if(u && APP_ACCESO[u.tipo] && (appCorreoValido(u.correo) || (u.tipo === 'frioteam' && /^[^@\s]+@[^@\s]+$/.test(u.correo || '')))) APP.usuario = u;
 }catch(err){}
 if(!APP.usuario){ try{ if(sessionStorage.getItem('fp-inv') === '1' && appInvVigente()){ APP.usuario = appInvUsuario(); loadPublishedSnapshot(false); } else sessionStorage.removeItem('fp-inv'); }catch(err){} }
 function appRevisarAcceso(){
   if(APP.usuario && APP.usuario.invitado){ if(!appInvVigente()) appCerrarUsuario(); return; }
+  if(APP.usuario && APP.usuario.auto) return;   // supervisor que entró solo con su correo: no está en la base a propósito
   if(!SUPERVISOR_ROL || !APP.usuario) return;
   if(!APP.usuario.nombre){
     APP.usuario.nombre = appNombrePorCorreo(APP.usuario.correo);
@@ -18617,8 +18646,21 @@ document.addEventListener('click', function(e){
   if(e.target.closest('#appCasaBtn') && APP.usuario){ appLanzador(true); return; }   // casa: a la pantalla de módulos (14.10.2026, Piero)
   if(e.target.closest('#appAtrasBtn')){ if(!appAtras() && APP.usuario) appLanzador(true); }
 });
+// Respaldo del OTP: si Supabase mandó un enlace mágico en vez del código, al volver a la app el token llega en el # de la URL (19.11.2026).
+function appOtpEnlace(){
+  try{
+    const h = (location.hash || '').replace(/^#/, ''); if(!/access_token=/.test(h)) return false;
+    const p = new URLSearchParams(h), at = p.get('access_token'), rt = p.get('refresh_token'); if(!at || !rt) return false;
+    let correo = ''; try{ correo = String((JSON.parse(atob(at.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) || {}).email || '').toLowerCase(); }catch(e){}
+    history.replaceState(null, '', location.pathname + location.search);
+    if(!sbCorreoEmpresa(correo)){ sbGuardar(null); return false; }
+    sbGuardar({ at:at, rt:rt, exp:Date.now() + (parseInt(p.get('expires_in'), 10) || 3600) * 1000, correo:correo });
+    appEntrarAuto(correo); return true;
+  }catch(e){ return false; }
+}
 function appArrancar(){
   appPcActivar();
+  if(appOtpEnlace()) return appSplashFuera();
   if(APP.usuario && APP.vista && appVistasPermitidas().indexOf(APP.vista) === -1){ APP.vista = appVistaInicial(appTipoNorm(APP.usuario.tipo)); try{ localStorage.setItem('fp-vista', APP.vista); }catch(err){} }
   if(!RQ_MOVIL.matches){ appSplashFuera(); return; }
   appAtrasPreparar();
@@ -18682,6 +18724,19 @@ function appBienvenida(correoFijo){
       ${correoFijo ? '<button type="button" class="bv-otro" id="bvOtro">Usar otro correo</button>' : ''}
     </form>
     ${!correoFijo && appInvVigente() ? `<button type="button" class="bv-inv" id="bvInv"><span>👀</span><b>Entrar como invitado</b><small>Supervisor · solo ver · hasta el ${new Date(APP_INV_HASTA).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', timeZone:'America/Lima' })}</small></button>` : ''}</div>
+    ${correoFijo ? '' : `<div class="bv-otp" id="bvOtp">
+      <button type="button" class="bv-otro bv-otp-abrir" id="bvOtpAbrir">¿No tienes cuenta? Entra solo con tu correo</button>
+      <div class="bv-otp-box" id="bvOtpBox" hidden>
+        <p class="bv-otp-txt">Te enviamos un código de 6 dígitos a tu correo <b>@friopacking.pe</b> o <b>@grupofriopacking.pe</b> y entras a la vista Supervisor.</p>
+        <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpPedir">Enviarme el código</button>
+        <div id="bvOtpCod" hidden>
+          <label class="bv-lbl" for="bvOtpInp">Código del correo</label>
+          <input type="text" id="bvOtpInp" class="bv-inp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6 dígitos" enterkeyhint="go">
+          <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpEntrar">Entrar a Supervisor</button>
+          <button type="button" class="bv-otro" id="bvOtpReenviar">Reenviar código</button>
+        </div>
+        <p class="bv-err" id="bvOtpErr" hidden></p>
+      </div></div>`}
     <p class="bv-nota">Entra con tu correo corporativo y tu clave. La primera vez toca <b>«Crea tu clave»</b> con el código de registro que te da Logística.</p>
     <p class="bv-pie">GRUPO FRIOPACKING · ${new Date().getFullYear()}</p></div>`;
   b.classList.add('abierto');
@@ -18722,6 +18777,32 @@ function appBienvenida(correoFijo){
     APP.usuario = appInvUsuario(); try{ sessionStorage.setItem('fp-inv', '1'); }catch(er){}
     loadPublishedSnapshot(false);
     setTimeout(function(){ appElegirVista('super'); appLanzador(); }, 420); };
+  // Entrar solo con el correo (OTP): pide el código, lo verifica y entra a Supervisor (19.11.2026)
+  (function(){
+    const abrir = document.getElementById('bvOtpAbrir'); if(!abrir) return;
+    const box = document.getElementById('bvOtpBox'), pedir = document.getElementById('bvOtpPedir'), codW = document.getElementById('bvOtpCod'),
+      inp = document.getElementById('bvOtpInp'), entrar = document.getElementById('bvOtpEntrar'), reenviar = document.getElementById('bvOtpReenviar'), errO = document.getElementById('bvOtpErr');
+    const eo = function(t){ errO.textContent = t || ''; errO.hidden = !t; };
+    abrir.onclick = function(){ const ab = box.hidden; box.hidden = !ab; abrir.textContent = ab ? '‹ Volver a entrar con mi clave' : '¿No tienes cuenta? Entra solo con tu correo';
+      if(ab){ correo.focus(); eo(''); } };
+    const correoOk = function(){ const c = correo.value.trim().toLowerCase();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c)){ eo('Escribe tu correo arriba primero.'); return null; }
+      if(!sbCorreoEmpresa(c)){ eo('Solo correos @friopacking.pe o @grupofriopacking.pe.'); return null; } return c; };
+    const pedirCod = async function(bt){ const c = correoOk(); if(!c) return; bt.disabled = true; bt.classList.add('cargando'); eo('');
+      try{ await sbOtpPedir(c); codW.hidden = false; pedir.hidden = true; eo(''); inp.focus();
+        const m = document.getElementById('bvOtpTxt') || box.querySelector('.bv-otp-txt'); if(m) m.innerHTML = 'Te enviamos un código de 6 dígitos a <b>' + escapeHtml(c) + '</b>. Escríbelo aquí abajo.'; }
+      catch(er){ eo(er.message && er.message !== 'Failed to fetch' ? er.message : 'No hay conexión. Inténtalo de nuevo.'); }
+      finally{ bt.disabled = false; bt.classList.remove('cargando'); } };
+    pedir.onclick = function(){ pedirCod(pedir); };
+    reenviar.onclick = function(){ pedirCod(pedir); };
+    entrar.onclick = async function(){ const c = correoOk(); if(!c) return; const cod = inp.value.trim();
+      if(!/^\d{4,8}$/.test(cod)){ eo('Escribe el código de 6 dígitos del correo.'); return; }
+      entrar.disabled = true; entrar.classList.add('cargando'); eo('');
+      try{ await sbOtpVerificar(c, cod); appEntrarAuto(c); }
+      catch(er){ entrar.disabled = false; entrar.classList.remove('cargando');
+        eo(er.status === 403 || /expired|invalid|token/i.test(er.message || '') ? 'Código incorrecto o vencido. Pide uno nuevo.' : (er.message && er.message !== 'Failed to fetch' ? er.message : 'No hay conexión. Inténtalo de nuevo.')); } };
+    inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); entrar.click(); } });
+  })();
   const alta = function(c){
     err('Tu correo no está registrado todavía.');
     const msg = 'Hola, quiero acceso a la App de Logística de Grupo Friopacking. Mi correo es ' + c + '. ¿Me pueden agregar a la base de usuarios?';
