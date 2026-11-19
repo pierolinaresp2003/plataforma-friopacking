@@ -4070,6 +4070,23 @@ html[data-theme="dark"] .pz::before{opacity:.08;} html[data-theme="dark"] .pz-mo
 .rsvm-s{justify-self:start;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;} .rsvm-s.L{background:#e2f4e6;color:#15803d;} .rsvm-s.T{background:#ddf3ef;color:#0b6e63;} .rsvm-s.I{background:#e3ecfb;color:#2f5fb3;} .rsvm-s.C{background:#efe8fd;color:#6d28d9;} .rsvm-k.C b{color:#6d28d9;} .vb.cam{background:#efe8fd;color:#6d28d9;} .val-todo.des{background:var(--card);color:var(--ink-soft);border:1px solid var(--border);}
 .rsvm-e{font-size:11.5px;font-weight:700;} .rsvm-e.on{color:#0b6e63;} .rsvm-e.ok{color:#15803d;} .rsvm-e.off{color:var(--ink-soft);}
 .rsvm-x{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:#b4231a;font-size:16px;cursor:pointer;}
+/* Reservas: un bloque por requerimiento, fácil de distinguir (19.11.2026) */
+.rsvm-gl{gap:14px;}
+.rsvm-g{--rc:#15803d;--rc-bg:#e2f4e6;padding:0;gap:0;overflow:hidden;border-left:5px solid var(--rc);box-shadow:0 10px 24px -20px rgba(16,24,40,.45);}
+.rsvm-g.ambar{--rc:#c27803;--rc-bg:#fff1d6;} .rsvm-g.rojo{--rc:#d92d20;--rc-bg:#fde8e6;} .rsvm-g.gris{--rc:#94a3b8;--rc-bg:var(--surface-2);}
+.rsvm-g .rsvm-ch{background:var(--surface-2);padding:12px 16px;border-bottom:1px solid var(--border);}
+.rsvm-g .rsvm-ct{display:flex;align-items:center;gap:14px;min-width:0;}
+.rsvm-num{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:76px;padding:6px 10px;border-radius:12px;background:var(--rc-bg);color:var(--rc);line-height:1.1;}
+.rsvm-g .rsvm-num small{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:inherit;opacity:.85;} .rsvm-g .rsvm-num b{font-size:20px;font-weight:900;color:inherit;letter-spacing:-.01em;}
+.rsvm-cli{min-width:0;} .rsvm-g .rsvm-cli b{font-size:15px;} .rsvm-g .rsvm-cli small{display:block;margin-top:2px;}
+.rsvm-res{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;} .rsvm-res i{font-style:normal;font-size:11px;font-weight:800;border-radius:999px;padding:2px 9px;}
+.rsvm-res i.ok{background:#e2f4e6;color:#15803d;} .rsvm-res i.pv{background:#fff1d6;color:#9a5b00;} .rsvm-res i.no{background:#fde8e6;color:#b4231a;}
+.rsvm-g .rsvm-f{padding:9px 16px;} .rsvm-g .rsvm-f + .rsvm-f{border-top:1px solid var(--border);}
+@media (min-width:1500px){ .rsvm-gl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;} .rsvm-gl > .pmf-vacio{grid-column:1 / -1;} }
+html[data-theme="dark"] .rsvm-g{--rc:#4ade80;--rc-bg:rgba(74,222,128,.13);box-shadow:none;} html[data-theme="dark"] .rsvm-g.ambar{--rc:#f5b54a;--rc-bg:rgba(245,181,74,.14);}
+html[data-theme="dark"] .rsvm-g.rojo{--rc:#f6a19c;--rc-bg:rgba(240,102,95,.15);} html[data-theme="dark"] .rsvm-g.gris{--rc:#8b90b9;--rc-bg:rgba(255,255,255,.05);}
+html[data-theme="dark"] .rsvm-e.on{color:#5eead4;} html[data-theme="dark"] .rsvm-e.ok{color:#7fe0a6;} html[data-theme="dark"] .rsvm-acc button.lib, html[data-theme="dark"] .rsvm-x{color:#f6a19c;}
+html[data-theme="dark"] .rsvm-res i.ok{background:rgba(74,222,128,.13);color:#7fe0a6;} html[data-theme="dark"] .rsvm-res i.pv{background:rgba(245,181,74,.14);color:#f5c97a;} html[data-theme="dark"] .rsvm-res i.no{background:rgba(240,102,95,.15);color:#f6a19c;}
 @media (max-width:900px){ .rsvm-head{grid-template-columns:auto minmax(0,1fr);padding:16px;} .rsvm-hi{width:48px;height:48px;} .rsvm-ks{grid-column:1 / -1;} .rsvm-f{grid-template-columns:minmax(0,1fr) auto 28px;} .rsvm-s{grid-column:1;grid-row:2;} .rsvm-e{grid-column:2 / 4;grid-row:2;justify-self:end;} .rsvm-bus{min-width:100%;} }
 .reg-hi{background:linear-gradient(135deg,#e3ecfb,#d3e1fa);color:#2f5fb3;} .reg-k.ok b{color:#15803d;} .reg-k.prob b{color:#b26a00;} .reg-k.pend b{color:#b4231a;}
 .reg-c.pend{border-left:4px solid #e4655c;} .reg-c.prob{border-left:4px solid #e8a33a;} .reg-c.ok{border-left:4px solid #3aa86b;}
@@ -21358,7 +21375,12 @@ function rsvmLista(){ const e = escapeHtml, nn = function(v){ return Number(v ||
   if(!L.length) return `<div class="pmf-vacio">${act ? (RES.ok ? 'No hay reservas activas con ese filtro.' : '⏳ Cargando las reservas…') : (RES.hOk ? 'No hay reservas liberadas con ese filtro.' : '⏳ Cargando el historial…')}</div>`;
   const G = new Map(); L.forEach(function(z){ const g = G.get(z.req) || { req:z.req, l:[], t:'' }; g.l.push(z); if(String(z.creado) > g.t) g.t = String(z.creado); G.set(z.req, g); });
   return [...G.values()].sort(function(a, b){ return b.t.localeCompare(a.t); }).map(function(g, gi){ const z0 = g.l[0], r0 = resFila(z0), nR = String(g.req).replace(/^000\d-0*/, '');
-    return `<div class="rsvm-c" style="animation-delay:${Math.min(gi, 12) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><b>Req. ${e(nR)} · ${e(cliDe(z0) || '—')}</b><small>${r0 && r0.idProyecto && !/^SIN/i.test(r0.idProyecto) ? e(r0.idProyecto) + ' · ' : ''}${g.l.length} reserva${g.l.length === 1 ? '' : 's'} · ${e(String(z0.usuario || '').split('@')[0])} · ${e(rsvmHora({ creado:g.t }))}</small></div>
+    // Cada req. bien separado (19.11.2026, Piero: "cuando hayan varios requerimientos reservados que se separen bien y sea fácil de identificar"):
+    // el N° de req. grande a la izquierda, una franja de color según cómo va la validación y el resumen en la cabecera.
+    const nOk = g.l.filter(function(z){ return z.val_estado === 'ok'; }).length, nNo = g.l.filter(function(z){ return z.val_estado === 'obs'; }).length,
+      nPv = g.l.filter(function(z){ return resValida(z) && (z.val_estado || 'pendiente') === 'pendiente'; }).length, tono = !act ? 'gris' : nNo ? 'rojo' : nPv ? 'ambar' : 'verde';
+    return `<div class="rsvm-c rsvm-g ${tono}" style="animation-delay:${Math.min(gi, 12) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><span class="rsvm-num"><small>Req.</small><b>${e(nR)}</b></span><span class="rsvm-cli"><b>${e(cliDe(z0) || '—')}</b><small>${r0 && r0.idProyecto && !/^SIN/i.test(r0.idProyecto) ? e(r0.idProyecto) + ' · ' : ''}${g.l.length} ítem${g.l.length === 1 ? '' : 's'} · reservó ${e(String(z0.usuario || '').split('@')[0])} · ${e(rsvmHora({ creado:g.t }))}</small>
+        ${act ? `<span class="rsvm-res">${nOk ? `<i class="ok">✓ ${nOk} con VB</i>` : ''}${nPv ? `<i class="pv">${nPv} por validar</i>` : ''}${nNo ? `<i class="no">✕ ${nNo} no hay</i>` : ''}</span>` : ''}</span></div>
       <div class="rsvm-acc"><button type="button" data-rsvmreq="${e(g.req)}">Ver req.</button><button type="button" data-rsvmpdf="${e(g.req)}">PDF hoja</button>${act && rqAnalista() ? `<button type="button" class="lib" data-rsvmlibreq="${e(g.req)}">Liberar…</button>` : ''}</div></div>
       ${g.l.map(function(z){ const r = resFila(z), pend = resPend(r), reg = /regularizar/i.test(z.nota || ''), sd = resSede(z);
         const est = act ? (pend ? ['on', sd === 'En camino' ? 'Compromete lo que llega' : 'Descuenta del stock'] : ['ok', 'Salida en Nisira ✓']) : (r && !pend ? ['ok', 'Salió en Nisira ✓'] : ['off', 'Liberada']);
@@ -21377,7 +21399,7 @@ function appReservasHtml(){ const e = escapeHtml, nn = function(v){ return Numbe
       <div class="rsvm-sedes">${[['', 'Todos'], ['Lurín', 'Lurín'], ['Trujillo', 'Trujillo'], ['Ica', 'Ica'], ['En camino', 'En camino']].map(function(o){ return `<button type="button" data-rsvmsede="${o[0]}" class="${RSV_UI.sede === o[0] ? 'on' : ''}">${o[1]}</button>`; }).join('')}</div>
       <input type="search" class="rsvm-bus" id="rsvmQ" placeholder="Buscar req., código, producto o usuario" value="${e(RSV_UI.q)}" autocomplete="off">
       <button type="button" class="rsvm-val${nVal ? ' hay' : ''}" data-rsvmval="1" title="Validación de los operarios${nVal ? ' · ' + nVal + ' por validar' : ''}" aria-label="Abrir Validación"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Validación</span>${nVal ? `<b>${appN(nVal)}</b>` : ''}</button></div>
-    <div class="rsvm-l" id="rsvmL">${rsvmLista()}</div></div>`; }
+    <div class="rsvm-l rsvm-gl" id="rsvmL">${rsvmLista()}</div></div>`; }
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-rsvmver],[data-rsvmsede],[data-rsvmreq],[data-rsvmpdf],[data-rsvmlibreq],[data-rsvmval],[data-rsvmvolver]'); if(!b) return;
   if(b.dataset.rsvmval) return appInicio('almval');   // Validación dentro de Reservas (17.11.2026, Piero)
   if(b.dataset.rsvmvolver) return appInicio('almrsv');
