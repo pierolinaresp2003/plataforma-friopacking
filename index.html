@@ -4593,6 +4593,9 @@ html[data-theme="dark"] .rtp-mk circle, html[data-theme="dark"] .rtp-pin path{st
 .val-ch{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;} .val-ch b{display:block;font-size:16px;color:var(--ink);} .val-ch small{display:block;font-size:12px;color:var(--ink-soft);}
 .val-todo{border:0;background:#15803d;color:#fff;border-radius:12px;padding:10px 14px;font:800 13.5px Inter,sans-serif;cursor:pointer;white-space:nowrap;}
 /* Aceptar todo / parcial / no hay por ítem (19.11.2026) */
+/* Aviso de datos nuevos (en vivo, 19.11.2026) */
+.vivo-datos{position:fixed;top:76px;left:50%;transform:translateX(-50%);z-index:90;border:0;border-radius:999px;padding:9px 18px;background:#0a1e64;color:#fff;font:600 13px Inter,sans-serif;cursor:pointer;box-shadow:0 12px 28px -12px rgba(10,30,100,.6);animation:pzSube .3s var(--pz-ease) both;}
+.vivo-datos b{font-weight:800;text-decoration:underline;} html[data-theme="dark"] .vivo-datos{background:#2dd4bf;color:#06201d;box-shadow:0 0 22px -4px rgba(45,212,191,.6);}
 /* Fotos de la validación y Despachos (19.11.2026) */
 .foto-th{flex:none;width:52px;height:52px;padding:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface-2);cursor:zoom-in;display:block;}
 .foto-th img{width:100%;height:100%;object-fit:cover;display:block;} .foto-th img:not([src]){visibility:hidden;}
@@ -21436,7 +21439,12 @@ async function resHistCargar(forzar){ if(RES.hCargando || (RES.hOk && !forzar)) 
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.liberada&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota,lote,val_estado,val_nombre,val_en,val_nota,val_q&order=creado.desc&limit=300');
     if(r.ok){ RES.h = await r.json(); RES.hOk = true; } }catch(e){}
   RES.hCargando = false; if(APP.enInicio && APP.pantalla === 'almrsv') appRenderFondo(); }
-async function rsvLiberarReq(cod){ const n = RES.l.filter(function(y){ return y.req === cod; }).length; if(!n || !window.confirm('¿Liberar las ' + n + ' reservas del Req. ' + String(cod).replace(/^000\d-0*/, '') + '?')) return;
+// Quién puede anular (liberar) reservas (19.11.2026, Piero: "el poder para anular las reservas solo lo tiene mcondori, jcenteno, plinares y
+// kalbujar; por ahora nadie más"). Los demás las ven, pero sin los botones de liberar. La liberación automática al salir en Nisira sigue igual.
+const RSV_LIBERAN = ['mcondori', 'jcenteno', 'plinares', 'kalbujar'];
+function rsvPuedeLiberar(){ const c = String((APP.usuario && APP.usuario.correo) || '').toLowerCase().split('@')[0]; return RSV_LIBERAN.indexOf(c) !== -1; }
+function rsvSinPermiso(){ if(rsvPuedeLiberar()) return false; appToast('Solo Mary, Javier, Piero o Katherine pueden anular reservas.'); return true; }
+async function rsvLiberarReq(cod){ if(rsvSinPermiso()) return; const n = RES.l.filter(function(y){ return y.req === cod; }).length; if(!n || !window.confirm('¿Liberar las ' + n + ' reservas del Req. ' + String(cod).replace(/^000\d-0*/, '') + '?')) return;
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&req=eq.' + encodeURIComponent(cod), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
     if(!r.ok) throw new Error(r.status); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar.'); } }
 function rsvmHora(z){ const d = new Date(z.creado); return isNaN(d) ? '' : rqFecha(d) + ' · ' + d.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' }); }
@@ -21453,11 +21461,11 @@ function rsvmLista(){ const e = escapeHtml, nn = function(v){ return Number(v ||
       nPv = g.l.filter(function(z){ return resValida(z) && (z.val_estado || 'pendiente') === 'pendiente'; }).length, tono = !act ? 'gris' : nNo ? 'rojo' : nPv ? 'ambar' : 'verde';
     return `<div class="rsvm-c rsvm-g ${tono}" style="animation-delay:${Math.min(gi, 12) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><span class="rsvm-num"><small>Req.</small><b>${e(nR)}</b></span><span class="rsvm-cli"><b>${e(cliDe(z0) || '—')}</b><small>${r0 && r0.idProyecto && !/^SIN/i.test(r0.idProyecto) ? e(r0.idProyecto) + ' · ' : ''}${g.l.length} ítem${g.l.length === 1 ? '' : 's'} · reservó ${e(String(z0.usuario || '').split('@')[0])} · ${e(rsvmHora({ creado:g.t }))}</small>
         ${act ? `<span class="rsvm-res">${nOk ? `<i class="ok">✓ ${nOk} con VB</i>` : ''}${nPv ? `<i class="pv">${nPv} por validar</i>` : ''}${nNo ? `<i class="no">✕ ${nNo} no hay</i>` : ''}</span>` : ''}</span></div>
-      <div class="rsvm-acc"><button type="button" data-rsvmreq="${e(g.req)}">Ver req.</button><button type="button" data-rsvmpdf="${e(g.req)}">PDF hoja</button>${act && rqAnalista() ? `<button type="button" class="lib" data-rsvmlibreq="${e(g.req)}">Liberar…</button>` : ''}</div></div>
+      <div class="rsvm-acc"><button type="button" data-rsvmreq="${e(g.req)}">Ver req.</button><button type="button" data-rsvmpdf="${e(g.req)}">PDF hoja</button>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="lib" data-rsvmlibreq="${e(g.req)}">Liberar…</button>` : ''}</div></div>
       ${g.l.map(function(z){ const r = resFila(z), pend = resPend(r), reg = /regularizar/i.test(z.nota || ''), sd = resSede(z);
         const est = act ? (pend ? ['on', sd === 'En camino' ? 'Compromete lo que llega' : 'Descuenta del stock'] : ['ok', 'Salida en Nisira ✓']) : (r && !pend ? ['ok', 'Salió en Nisira ✓'] : ['off', 'Liberada']);
         return `<div class="rsvm-f"><span class="rsvm-t"><b>${e(z.descripcion || (r && r.producto) || z.producto)}</b><small>${e(z.producto)}${z.nota ? ' · ' + e(z.nota) : ''}</small></span><span class="rsvm-q"><b>${nn(z.cantidad)}</b><small>${e(z.um || '')}</small></span>
-          <span class="rsvm-s ${resSedeK(sd)}">${e(sd)}</span><span class="rsvm-e ${est[0]}">${reg && act ? '⚠ por regularizar · ' : ''}${est[1]}${act ? '<br>' + rsvVB(z, 1) + (z.val_foto ? ' ' + fotoImg(z.val_foto, 'chip') : '') : ''}</span>${act && rqAnalista() ? `<button type="button" class="rsvm-x" data-rsvlib="${z.id}" title="Liberar esta reserva" aria-label="Liberar">×</button>` : '<span></span>'}</div>`; }).join('')}</div>`; }).join(''); }
+          <span class="rsvm-s ${resSedeK(sd)}">${e(sd)}</span><span class="rsvm-e ${est[0]}">${reg && act ? '⚠ por regularizar · ' : ''}${est[1]}${act ? '<br>' + rsvVB(z, 1) + (z.val_foto ? ' ' + fotoImg(z.val_foto, 'chip') : '') : ''}</span>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="rsvm-x" data-rsvlib="${z.id}" title="Liberar esta reserva" aria-label="Liberar">×</button>` : '<span></span>'}</div>`; }).join('')}</div>`; }).join(''); }
 function appReservasHtml(){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(!RQ.filas.length){ rqPreparar(); }
   const A = RES.l.filter(function(z){ return resPend(resFila(z)); }), U = { 'Lurín':0, 'Trujillo':0, 'Ica':0, 'En camino':0 }; A.forEach(function(z){ U[resSede(z)] = (U[resSede(z)] || 0) + (+z.cantidad || 0); });
@@ -21740,8 +21748,10 @@ const PAL = { l:[], ok:false, cargando:false, falta:false };
 const DESP_UI = { ver:'armar', q:'' };
 const DESP_SEL = new Map();   // id de la reserva → cantidad a poner en el pallet
 async function palCargar(forzar){ if(PAL.cargando || (PAL.ok && !forzar)) return; PAL.cargando = true;
+  const antes = PAL.ok ? JSON.stringify(PAL.l) + PAL.falta : null;
   try{ const r = await sbFetch('/rest/v1/fp_pallets?select=*&order=numero.asc'); if(r.ok){ PAL.l = await r.json(); PAL.ok = true; PAL.falta = false; } else if(r.status === 404 || r.status === 400){ PAL.falta = true; PAL.ok = true; } }catch(e){}
-  PAL.cargando = false; if(APP.enInicio && APP.pantalla === 'almdesp') appRenderFondo(); }
+  PAL.cargando = false; if(antes !== null && antes === JSON.stringify(PAL.l) + PAL.falta) return;   // sin cambios: no se repinta
+  if(APP.enInicio && APP.pantalla === 'almdesp') appRenderFondo(); }
 function despCli(z){ const r = resFila(z), c = r ? appImpNombre(r.proyecto || '') || r.proyecto || '' : ''; return SUP_CLI_UNIR[c] || c || '—'; }
 function despPry(z){ const r = resFila(z); return r && r.idProyecto && !/^SIN/i.test(r.idProyecto) ? r.idProyecto : ''; }
 function despClave(z){ return despCli(z) + '|' + despPry(z); }
@@ -22282,7 +22292,7 @@ document.addEventListener('click', function(ev){ const b = ev.target.closest && 
   if(D.rtdes){ const x = RT.m[D.rtdes]; if(!x) return; return rtRecPaso(D.rtdes, { prog:'val', val:'pend', rec:'prog', obs:'pend' }[x.estado] || 'pend'); }
   if(D.rtedit){ const x = RT.m[D.rtedit]; if(x) rtRecAbrir(x.oc, x.id); } });
 // ---- Liberar a elección (13.11.2026, Piero: "liberar de forma personalizada, no que se libere todo") ----
-function rsvLiberarSel(filtro, tit){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
+function rsvLiberarSel(filtro, tit){ if(rsvSinPermiso()) return; const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   const L = RES.l.filter(filtro); if(!L.length) return appToast('No hay reservas activas para liberar.');
   const f = rsvModal(`<header><div><small>Liberar reservas</small><h3>${e(tit)}</h3><p>Marca qué liberar y cuánto. Lo que liberes vuelve a quedar libre en el stock.</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
     <div class="lib-l">${L.map(function(z, i){ return `<label class="lib-it"><input type="checkbox" data-libi="${i}"><span class="lib-t"><b>${e(z.descripcion || z.producto)}</b><small>${e(z.producto)} · ${e(resSede(z))} · reservado ${nn(z.cantidad)} ${e(z.um || '')} ${rsvVB(z, 1)}</small></span>
@@ -22301,16 +22311,16 @@ function rsvLiberarSel(filtro, tit){ const e = escapeHtml, nn = function(v){ ret
         const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(x.z.id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(total ? { estado:'liberada' } : { cantidad:Math.round((+x.z.cantidad - x.q) * 100) / 100 }) });
         if(!r.ok) throw new Error(r.status); }
       rsvCerrar(); appToast('Liberado ✔'); RES.hOk = false; resCargar(true); }catch(err){ b.disabled = false; pinta(); const d = f.querySelector('#libErr'); d.hidden = false; d.textContent = 'No se pudo liberar (' + err.message + ').'; } }); }
-async function rsvLiberarLote(lote){ const n = RES.l.filter(function(y){ return y.lote === lote; }).length; if(!window.confirm('¿Liberar las ' + n + ' reservas que se registraron juntas?')) return;
+async function rsvLiberarLote(lote){ if(rsvSinPermiso()) return; const n = RES.l.filter(function(y){ return y.lote === lote; }).length; if(!window.confirm('¿Liberar las ' + n + ' reservas que se registraron juntas?')) return;
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&lote=eq.' + encodeURIComponent(lote), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
     if(!r.ok) throw new Error(r.status); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar la hoja.'); } }
-async function rsvLiberar(id){ try{ const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
+async function rsvLiberar(id){ if(rsvSinPermiso()) return; try{ const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada' }) });
   if(!r.ok) throw new Error(r.status); appToast('Reserva liberada'); resCargar(true); }catch(e){ appToast('No se pudo liberar la reserva.'); } }
 // Bloque del detalle: reservas de la fila + botón para reservar
 function rsvHtml(r){ const e = escapeHtml, L = resDeFila(r), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(!L.length) return '';
   return `<div class="rsv-blq">${L.map(function(z){ return `<div class="rsv-it"><span class="rsv-lock">🔒</span><span><b>${nn(z.cantidad)} ${e(z.um || '')} reservado${+z.cantidad === 1 ? '' : 's'} · ${e(resSede(z))} ${rsvVB(z, 1)}</b><small>${e(String(z.usuario || '').split('@')[0])} · ${rqFecha(new Date(z.creado))}${z.nota ? ' · ' + e(z.nota) : ''}</small></span>
-      ${rqAnalista() ? `<button type="button" class="rsv-mini" data-rsvlib="${z.id}">Liberar</button>` : ''}${(function(){ const n = z.lote && rqAnalista() ? RES.l.filter(function(y){ return y.lote === z.lote; }).length : 0; return n > 1 ? `<button type="button" class="rsv-mini" data-rsvlote="${e(z.lote)}" title="Elegir qué reservas de este registro liberar">Liberar… (${n})</button>` : ''; })()}</div>`; }).join('')}</div>`; }
+      ${rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="rsv-mini" data-rsvlib="${z.id}">Liberar</button>` : ''}${(function(){ const n = z.lote && rqAnalista() && rsvPuedeLiberar() ? RES.l.filter(function(y){ return y.lote === z.lote; }).length : 0; return n > 1 ? `<button type="button" class="rsv-mini" data-rsvlote="${e(z.lote)}" title="Elegir qué reservas de este registro liberar">Liberar… (${n})</button>` : ''; })()}</div>`; }).join('')}</div>`; }
 // ---- Alternativas cuando no hay stock ----
 function altCorreoSup(nom){ const k = claveNombre(nom || ''); if(!k) return '';
   if(SUPERVISOR_MAIL && SUPERVISOR_MAIL[k]) return SUPERVISOR_MAIL[k];
@@ -25919,6 +25929,48 @@ function appAgCargar(forzar){
   }).catch(function(){}).then(function(){ APP_AG.cargando = false; APP_AG.t = Date.now(); });
   return APP_AG.prom;
 }
+// ---- En vivo (19.11.2026, Piero: "los cambios que hace otro usuario no se actualizan en automático… que sí se vean mientras los hace") ----
+// Un solo websocket a Supabase Realtime (protocolo Phoenix, sin librerías): avisa cuando cambia una reserva, un pallet, una ruta, una OC por
+// agencia o la publicación de datos, y se vuelve a leer solo eso. Si alguien está escribiendo o tiene una ventana abierta, se espera a que
+// termine para no borrarle lo que está haciendo. Sin conexión en vivo, se revisa cada 30 s mientras la app está a la vista.
+const VIVO = { ws:null, ref:0, join:'', hb:null, tok:null, re:null, espera:2000, ok:false, ultimo:0, pend:{}, t:null, oculto:0 };
+const VIVO_TABLAS = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia', 'fp_publicacion'];
+function vivoEnviar(topic, event, payload){ if(!VIVO.ws || VIVO.ws.readyState !== 1) return ''; const ref = String(++VIVO.ref); VIVO.ws.send(JSON.stringify({ topic:topic, event:event, payload:payload || {}, ref:ref, join_ref:topic === 'phoenix' ? undefined : VIVO.join })); return ref; }
+async function vivoConectar(){ if(VIVO.ws || VIVO.re || !window.WebSocket || !sbSesion() || !APP.usuario) return; let t; try{ t = await sbToken(); }catch(e){ return; } if(!t || VIVO.ws) return;
+  const ws = new WebSocket(SB_URL.replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' + encodeURIComponent(SB_KEY) + '&vsn=1.0.0'); VIVO.ws = ws; VIVO.ok = false;
+  ws.onopen = function(){ VIVO.ref = 0; VIVO.join = String(++VIVO.ref); VIVO.ultimo = Date.now();
+    ws.send(JSON.stringify({ topic:'realtime:fp-vivo', event:'phx_join', ref:VIVO.join, join_ref:VIVO.join, payload:{ access_token:t, config:{ broadcast:{ self:false }, presence:{ key:'' },
+      postgres_changes:VIVO_TABLAS.map(function(x){ return { event:'*', schema:'public', table:x }; }) } } }));
+    VIVO.hb = setInterval(function(){ if(Date.now() - VIVO.ultimo > 70000){ try{ ws.close(); }catch(e){} return; } vivoEnviar('phoenix', 'heartbeat', {}); }, 25000);
+    VIVO.tok = setInterval(function(){ sbToken().then(function(n){ if(n) vivoEnviar('realtime:fp-vivo', 'access_token', { access_token:n }); }).catch(function(){}); }, 300000); };
+  ws.onmessage = function(m){ VIVO.ultimo = Date.now(); let d; try{ d = JSON.parse(m.data); }catch(e){ return; }
+    if(d.event === 'phx_reply' && d.ref === VIVO.join){ VIVO.ok = !!(d.payload && d.payload.status === 'ok'); if(VIVO.ok) VIVO.espera = 2000; return; }
+    if(d.event === 'system' && d.payload && d.payload.status === 'ok' && /subscribed/i.test(d.payload.message || '')){ VIVO.ok = true; return; }
+    if(d.event === 'phx_error' || d.event === 'phx_close'){ VIVO.ok = false; try{ ws.close(); }catch(e){} return; }
+    if(d.event === 'postgres_changes'){ const x = d.payload && d.payload.data; if(x && x.table) vivoCambio(x.table); } };
+  ws.onclose = function(){ clearInterval(VIVO.hb); clearInterval(VIVO.tok); VIVO.ws = null; VIVO.ok = false;
+    VIVO.re = setTimeout(function(){ VIVO.re = null; vivoConectar(); }, VIVO.espera); VIVO.espera = Math.min(VIVO.espera * 2, 60000); };
+  ws.onerror = function(){}; }
+function vivoCambio(t){ VIVO.pend[t] = 1; clearTimeout(VIVO.t); VIVO.t = setTimeout(vivoAplicar, 700); }
+// Ocupado: escribiendo en un campo de la pantalla o con una ventana abierta (reserva, foto, No hay…)
+function vivoOcupado(){ const a = document.activeElement; return !!document.getElementById('rsvFondo') || !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && !a.closest('#appTabbar')); }
+function vivoAplicar(){ if(document.hidden) return; if(vivoOcupado()){ clearTimeout(VIVO.t); VIVO.t = setTimeout(vivoAplicar, 2000); return; }
+  const P = VIVO.pend; VIVO.pend = {};
+  if(P.fp_reservas){ RES.hOk = false; resCargar(true); }
+  if(P.fp_pallets && PAL.ok) palCargar(true);
+  if(P.fp_rutas) rtCargar(true);
+  if(P.fp_oc_agencia) appAgCargar(true);
+  if(P.fp_publicacion) vivoDatosNuevos(); }
+// Datos nuevos de Nisira publicados por otra persona: aviso para actualizar cuando quiera (no se cambia la pantalla de golpe).
+function vivoDatosNuevos(){ if(document.getElementById('vivoDatos')) return;
+  document.body.insertAdjacentHTML('beforeend', '<button type="button" id="vivoDatos" class="vivo-datos">🔄 Hay datos nuevos de Nisira · <b>Actualizar</b></button>'); }
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('#vivoDatos'); if(!b) return; b.remove(); appToast('Actualizando datos…'); loadPublishedSnapshot(false); });
+// Sin conexión en vivo (o al volver a la app después de un rato): se vuelve a leer lo que cambia entre usuarios.
+function vivoRefrescar(){ if(!sbSesion() || !APP.usuario || vivoOcupado()) return; resCargar(true); if(PAL.ok) palCargar(true); rtCargar(true); appAgCargar(true); }
+setInterval(function(){ if(document.hidden) return; if(!VIVO.ws && !VIVO.re) vivoConectar(); if(!VIVO.ok) vivoRefrescar(); }, 30000);
+document.addEventListener('visibilitychange', function(){ if(document.hidden){ VIVO.oculto = Date.now(); return; }
+  if(VIVO.oculto && Date.now() - VIVO.oculto > 20000){ vivoRefrescar(); if(VIVO.ws && Date.now() - VIVO.ultimo > 60000){ try{ VIVO.ws.close(); }catch(e){} } } if(!VIVO.ws && !VIVO.re) vivoConectar(); if(Object.keys(VIVO.pend).length) vivoAplicar(); });
+setTimeout(function(){ vivoConectar(); }, 4000);
 function ocPorAgencia(oc){ return !!(oc && APP_AG && APP_AG.m[oc]); }
 // Las OC enviadas por agencia no cuentan en el resumen ni en los indicadores del comprador (17.11.2026, Piero: "son casos aislados, solo
 // que sí se debe registrar esta trazabilidad para hacer las regularizaciones"): sus filas quedan sin d4 (entrega a tiempo), como una
