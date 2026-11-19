@@ -18438,6 +18438,14 @@ function appLanzador(forzar){
     ? fila('gerencial', 0) + `<div class="lz-grupo">${fila('logistica', 1, true)}<div class="lz-subs">${resto.map(function(k, i){ return fila(k, i + 2); }).join('')}</div></div>`
     : vs.map(function(k, i){ return fila(k, i); }).join('');
   const hoy = R && R.linea ? R.linea : (appHayDatos() ? 'Elige un módulo para empezar.' : 'Cargando lo importante de hoy…');
+  // Ya abierta (llegaron los datos): solo se cambian los textos, sin volver a armar la pantalla (19.11.2026, Piero: "se actualiza mal,
+  // se carga 2 veces"): antes se rehacía todo y la foto de fondo volvía a entrar y "Logística" se cerraba.
+  const pz0 = el.classList.contains('abierto') && el.querySelector('.pz');
+  if(pz0 && el._filas === filas && el._correo === correo){
+    const pon = function(sel, html){ const x = pz0.querySelector(sel); if(x && x.innerHTML !== html) x.innerHTML = html; };
+    pon('.pz-fecha', escapeHtml(fecha)); pon('.pz-hola', sal[0] + (sal[1] ? ', <b>' + sal[1] + '</b>' : '')); pon('.pz-sub', hoy);
+    el._desdeLogo = !!forzar; return; }
+  el._filas = filas; el._correo = correo;
   el.innerHTML = `<div class="pz"><header class="pz-top"><span class="pz-logos"><img class="pz-logo" src="${LOGO_AREA_B64}" alt="Logística y Almacén"><i class="pz-div"></i><img class="pz-logo emp" src="fotos/logo-friopacking.png" alt="Grupo Friopacking" onerror="this.onerror=null;this.src='${LOGO_GRUPOFRIOPACKING_WHITEBG_B64}'"></span><span class="pz-sp"></span>
       ${correo ? `<span class="pz-usr">${escapeHtml(correo)}</span>` : ''}<button type="button" class="pz-salir" data-lzusr="1">Cambiar de usuario</button></header>
     <main class="pz-main"><p class="pz-fecha">${escapeHtml(fecha)}</p><h1 class="pz-hola">${sal[0]}${sal[1] ? ', <b>' + sal[1] + '</b>' : ''}</h1><p class="pz-sub">${hoy}</p>
