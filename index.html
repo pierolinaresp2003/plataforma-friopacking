@@ -54,7 +54,10 @@
   // Aplica el tema guardado ANTES de pintar la página, para que no haya parpadeo.
   (function(){
     try{
-      const saved = localStorage.getItem("fp-theme");
+      let saved = localStorage.getItem("fp-theme");
+      // El diseño nuevo para todos (19.11.2026, Piero: "no lo aplicaste para el módulo de todos?"): quien había elegido el claro antes
+      // del cambio entra una vez en modo noche; si luego vuelve a elegir el claro con la luna, se respeta.
+      if(!localStorage.getItem("fp-tema-noche")){ localStorage.setItem("fp-tema-noche", "1"); if(saved === "light"){ localStorage.removeItem("fp-theme"); saved = null; } }
       // Abre en modo noche salvo que la persona haya elegido el claro (19.11.2026, Piero).
       if(saved !== "light") document.documentElement.setAttribute("data-theme", "dark");
     }catch(e){}
