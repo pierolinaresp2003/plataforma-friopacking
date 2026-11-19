@@ -21224,8 +21224,10 @@ function rqZonaCli(){ return appMemo('rqZonaCli', function(){ const M = new Map(
 function rsvOtraSede(r){ const t = rqSedeVale(r, 'T') ? rsvLibre(r, 'T') : 0, i = rqSedeVale(r, 'I') ? rsvLibre(r, 'I') : 0; return t > 0 || i > 0 ? (t >= i ? { s:'Trujillo', q:t } : { s:'Ica', q:i }) : null; }
 // Situación de stock de un ítem en revisión o en Compras: ok (Lurín cubre todo) · par (una parte) · sede (Trujillo/Ica) · cam (OC en camino) · comp (pasará a Compras)
 function rqSkDe(r, k){ const fx = k === 'rev' || k === 'com' ? rqFifoDe(r) : null, um = escapeHtml(r.unidad || ''), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
-  const fv = !!fx && fx.faltaVal > 0, sk = !fv && fx && fx.falta > 0 && fx.asig > 0 ? (fx.asig >= fx.falta - 0.001 ? ['ok', nn(fx.asig), 'Hay stock en Lurín para atender todo: ' + nn(fx.asig) + ' ' + um] : ['par', nn(fx.asig) + '/' + nn(fx.falta), 'Hay stock en Lurín para ' + nn(fx.asig) + ' de ' + nn(fx.falta) + ' ' + um]) : null;
-  const sd = !sk && !fv && fx && fx.falta > 0 ? rsvOtraSede(r) : null, aCompras = !sd && !!rqPasaCompras(r), cam = !sk && !sd && !aCompras && fx && fx.falta > 0 && fx.camQ > 0;
+  // Ya pasó a pedido (19.11.2026, Piero: "si ya pasó a pedido por el total no debe salir en el filtro con stock porque ya pasó a compras")
+  const com = k === 'com';
+  const fv = !!fx && fx.faltaVal > 0, sk = !com && !fv && fx && fx.falta > 0 && fx.asig > 0 ? (fx.asig >= fx.falta - 0.001 ? ['ok', nn(fx.asig), 'Hay stock en Lurín para atender todo: ' + nn(fx.asig) + ' ' + um] : ['par', nn(fx.asig) + '/' + nn(fx.falta), 'Hay stock en Lurín para ' + nn(fx.asig) + ' de ' + nn(fx.falta) + ' ' + um]) : null;
+  const sd = !com && !sk && !fv && fx && fx.falta > 0 ? rsvOtraSede(r) : null, aCompras = !sd && !!rqPasaCompras(r), cam = !com && !sk && !sd && !aCompras && fx && fx.falta > 0 && fx.camQ > 0;
   const ob = fv ? rsvObsDe(r) : null;
   return { fx:fx, sk:sk, sd:sd, aCompras:aCompras, cam:cam, ob:ob, skc:ob ? 'obs' : sk ? sk[0] : sd ? 'sede' : aCompras ? 'comp' : cam ? 'cam' : 'no' }; }
 const RQ_SVG_CAJA = '<svg viewBox="0 0 24 24"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z" fill="currentColor" opacity=".18"/><path d="M3 7.5 12 12l9-4.5M12 12v9M3 7.5v9L12 21l9-4.5v-9L12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
@@ -25558,16 +25560,18 @@ async function rqHojaPdf(cod){
   const nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   const r0 = items[0], nRq = cod.replace(/^000\d-0*/, ''), partes = String(cod).split('-'), cli = appImpNombre(r0.proyecto || '') || r0.proyecto || '';
   const logo = appLogo();
-  // Atención por ítem según las reservas registradas en la app
-  const LET = { 'Lurín':'L', 'Trujillo':'T', 'Ica':'I', 'En camino':'C' };
+  // Atención por ítem según las reservas registradas en la app. En palabras, sin letras resumidas (19.11.2026, Piero: "no debe tener esas
+  // nomenclaturas en reservado... debe estar tal cual como las letras del pdf indicando bien las cosas"); si ya pasó a pedido queda En Compras.
+  const SEDES = ['Lurín', 'Trujillo', 'Ica', 'En camino'], enSede = function(sd){ sd = sd === 'Lima' ? 'Lurín' : sd; return sd === 'En camino' ? 'EN CAMINO (OC)' : 'EN ' + String(sd || 'Lurín').toUpperCase(); };
   const aten = function(r){ const k = supPaso(r), f0 = Math.max(0, (r.cantidad || 0) - (r.cantSalida || 0));
-    if(k !== 'rev' && k !== 'com'){ const sd = LET[r.sedeSalida] || ''; return r.codOrden ? { alm:'', at:rqOcCorta(r.codOrden), c:AZUL, res:'—', comp:'—' } : { alm:sd, at:'OK', c:VERDE, res:'—', comp:'—' }; }   // con OC: se muestra la OC (13.11.2026, Piero)   // con OC = se compró; sin OC = salió del stock
-    const por = {}; resDeFila(r).forEach(function(z){ const l = LET[resSede(z)] || 'L'; por[l] = (por[l] || 0) + (+z.cantidad || 0); });
-    const ks = ['L', 'T', 'I', 'C'].filter(function(l){ return por[l] > 0; }), ya = ks.reduce(function(a, l){ return a + por[l]; }, 0), resto = Math.max(0, Math.round((f0 - ya) * 100) / 100);
-    const res = ks.length ? ks.map(function(l){ return l + ' ' + nn(por[l]); }).join(' · ') : '—', alm = ks.join(' ');
-    if(ya >= f0 - 0.001 && ya > 0) return { alm:alm, at:'OK', c:VERDE, res:res, comp:'—' };
-    if(ya > 0) return { alm:alm, at:'PED (' + nn(ya) + ')', c:AMBAR, res:res, comp:nn(resto) };
-    const cat = supSkCat(r); return cat === 'stock' ? { alm:'', at:'POR RESERVAR', c:GRIS, res:'—', comp:'—' } : { alm:'', at:'PED', c:ROJO, res:'—', comp:nn(resto) }; };
+    if(k !== 'rev' && k !== 'com') return r.codOrden ? { at:'COMPRADO CON ' + rqOcCorta(r.codOrden), res:'—', comp:'—' } : { at:'ATENDIDO DEL STOCK' + (r.sedeSalida ? ' ' + enSede(r.sedeSalida) : ''), res:'—', comp:'—' };   // con OC = se compró; sin OC = salió del stock
+    const por = {}; resDeFila(r).forEach(function(z){ const sd = resSede(z); por[sd] = (por[sd] || 0) + resQ(z); });
+    const ks = SEDES.filter(function(sd){ return por[sd] > 0; }), ya = ks.reduce(function(t, sd){ return t + por[sd]; }, 0), resto = Math.max(0, Math.round((f0 - ya) * 100) / 100);
+    const res = ks.length ? ks.map(function(sd){ return nn(por[sd]) + ' ' + enSede(sd); }) : ['—'];
+    if(k === 'com') return { at:'YA PASÓ A PEDIDO' + (r.codPedido ? ' ' + String(r.codPedido).replace(/^000\d-0*/, '') : '') + ': EN COMPRAS', res:res, comp:resto > 0 ? nn(resto) : '—' };
+    if(ya >= f0 - 0.001 && ya > 0) return { at:'SE ATIENDE DEL STOCK', res:res, comp:'—' };
+    if(ya > 0) return { at:nn(ya) + (ya === 1 ? ' SALE' : ' SALEN') + ' DEL STOCK Y ' + nn(resto) + (resto === 1 ? ' PASA' : ' PASAN') + ' A PEDIDO DE COMPRA', res:res, comp:nn(resto) };
+    const cat = supSkCat(r); return cat === 'stock' ? { at:'HAY STOCK: POR RESERVAR', res:res, comp:'—' } : cat === 'obs' ? { at:'NO HAY EN ALMACÉN: PASA A PEDIDO DE COMPRA', res:res, comp:nn(resto) } : { at:'PASA A PEDIDO DE COMPRA', res:res, comp:nn(resto) }; };
   let y = 0, pag = 1;
   const cabecera = function(){
     try{ pdf.addImage(LOGO_AREA_B64, 'PNG', M + 1, 12, 42, 14.8); pdf.setDrawColor(200, 200, 200); pdf.setLineWidth(0.3); pdf.line(M + 47, 13.5, M + 47, 25.5); pdf.addImage(LOGO_GRUPOFRIOPACKING_WHITEBG_B64, 'PNG', M + 51, 14.5, 32, 10.1); }catch(err){ fuente('helvetica', 'bold', 18, INK); pdf.text('Friopacking', M + 2, 22); }
@@ -25592,19 +25596,19 @@ async function rqHojaPdf(cod){
   fuente('courier', 'bold', 7, INK); pdf.text('DATOS AL', W - M - 52, y + 15.6); pdf.text(':', W - M - 34, y + 15.6); fuente('courier', 'normal', 7, INK); pdf.text(rqFecha(appIndCorte()), W - M - 31, y + 15.6);
   y += hDG + 5;
   // Tabla de ítems
-  const C = [['ITEM', 9], ['DESCRIPCIÓN', 62], ['U.M.', 10], ['CANT.', 15], ['RESERVADO', 25], ['A COMPRA', 16], ['ATENCIÓN', 22], ['ESTADO', 23]];
+  const C = [['ITEM', 9], ['DESCRIPCIÓN', 55], ['U.M.', 10], ['CANT.', 13], ['RESERVADO', 25], ['A COMPRA', 16], ['ATENCIÓN', 31], ['ESTADO', 23]];
   const X = []; C.reduce(function(a, c){ X.push(a); return a + c[1]; }, M);
   const tcab = function(){ pdf.setLineWidth(0.4); pdf.rect(M, y, CW, 7); X.slice(1).forEach(function(x){ pdf.line(x, y, x, y + 7); });
     fuente('courier', 'bold', 7.5, INK); C.forEach(function(c, i){ pdf.text(c[0], X[i] + c[1] / 2, y + 4.7, { align:'center' }); }); y += 11.5; };
   tcab();
-  items.forEach(function(r, i){ fuente('courier', 'normal', 7.5, INK); const a = aten(r), d = pdf.splitTextToSize(T(r.idProducto) + '  ' + T(r.producto), C[1][1] - 2), h = Math.max(1, d.length) * 3.5 + 2.6;
+  items.forEach(function(r, i){ fuente('courier', 'normal', 7.5, INK); const a = aten(r), d = pdf.splitTextToSize(T(r.idProducto) + '  ' + T(r.producto), C[1][1] - 2);
+    fuente('courier', 'normal', 7, INK); const lr = [].concat.apply([], a.res.map(function(t){ return t === '—' ? [t] : pdf.splitTextToSize(T(t), C[4][1] - 2); })), la = pdf.splitTextToSize(T(a.at), C[6][1] - 2), le = pdf.splitTextToSize(T(rqEstadoCorto(r)[1]).toUpperCase(), C[7][1] - 2);
+    const h = Math.max(Math.max(1, d.length) * 3.5, Math.max(lr.length, la.length, le.length) * 3.1) + 2.6;
     if(y + h > BOT){ pdf.addPage(); pag++; y = cabecera(); tcab(); }
     fuente('courier', 'normal', 7.5, INK); pdf.text(String(i + 1).padStart(3, '0'), X[0] + 2, y); pdf.text(d, X[1] + 1, y);
     pdf.text(T(r.unidad || ''), X[2] + C[2][1] / 2, y, { align:'center' }); pdf.text(nn(r.cantidad), X[3] + C[3][1] - 2, y, { align:'right' });
-    fuente('helvetica', 'bold', 8, a.res === '—' ? GRIS : AZUL); pdf.text(a.res, X[4] + C[4][1] / 2, y, { align:'center' });
-    fuente('helvetica', 'bold', 8, a.comp === '—' ? GRIS : ROJO); pdf.text(a.comp, X[5] + C[5][1] / 2, y, { align:'center' });
-    fuente('helvetica', 'bold', a.at.length > 6 ? 7 : 11, a.c); pdf.text(a.at, X[6] + C[6][1] / 2, y + (a.at.length > 6 ? 0 : 0.6), { align:'center' });
-    fuente('helvetica', 'normal', 6.8, GRIS); pdf.text(pdf.splitTextToSize(T(rqEstadoCorto(r)[1]), C[7][1] - 2), X[7] + C[7][1] / 2, y, { align:'center' });
+    fuente('courier', 'normal', 7, INK); pdf.setLineHeightFactor(1.25); pdf.text(lr, X[4] + C[4][1] / 2, y, { align:'center' }); pdf.text(a.comp, X[5] + C[5][1] / 2, y, { align:'center' });
+    pdf.text(la, X[6] + C[6][1] / 2, y, { align:'center' }); pdf.text(le, X[7] + C[7][1] / 2, y, { align:'center' }); pdf.setLineHeightFactor(1.15);
     y += h; });
   // Detalle de las reservas: cada separación con su almacén, cantidad, quién y cuándo (13.11.2026, Piero: "que explique esas reservas")
   const DR = []; items.forEach(function(r, i){ resDeFila(r).forEach(function(z){ DR.push({ i:i, r:r, z:z }); }); });
@@ -25614,21 +25618,19 @@ async function rqHojaPdf(cod){
     fuente('courier', 'bold', 7, INK); D.forEach(function(c, k){ pdf.text(c[0], XD[k] + 1, y); }); pdf.setLineWidth(0.2); pdf.line(M, y + 1.5, W - M, y + 1.5); y += 5.5;
     DR.forEach(function(x){ if(y + 5 > BOT){ pdf.addPage(); pag++; y = cabecera(); }
       const d = new Date(x.z.creado), hm = function(t){ return String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'); }, f = isNaN(d) ? '' : rqFecha(d) + ' ' + hm(d), dv = x.z.val_en ? new Date(x.z.val_en) : null;
-      const vb = x.z.val_estado === 'ok' ? 'OK ' + T(titleCase(String(x.z.val_nombre || '').split(' ')[0])) + (dv ? ' ' + rqFecha(dv).slice(0, 6) : '') : x.z.val_estado === 'obs' ? 'OBS ' + T(titleCase(String(x.z.val_nombre || '').split(' ')[0])) : resSede(x.z) === 'En camino' ? 'POR LLEGAR' : resValida(x.z) ? 'POR VALIDAR' : '—';
+      const quien = T(String(x.z.val_nombre || '').split(' ')[0]).toUpperCase(), vb = x.z.val_estado === 'ok' ? 'CONFORME' + (quien ? ' · ' + quien : '') + (dv ? ' · ' + rqFecha(dv).slice(0, 6).toUpperCase() : '') : x.z.val_estado === 'obs' ? 'CON OBSERVACIÓN' + (quien ? ' · ' + quien : '') : resSede(x.z) === 'En camino' ? 'POR LLEGAR' : resValida(x.z) ? 'POR VALIDAR' : 'NO SE VALIDA';
       fuente('courier', 'normal', 7, INK); pdf.text(String(x.i + 1).padStart(3, '0'), XD[0] + 1, y); pdf.text(T(x.r.idProducto), XD[1] + 1, y);
-      fuente('helvetica', 'bold', 7.5, AZUL); pdf.text(T(resSede(x.z)), XD[2] + 1, y); fuente('courier', 'bold', 7.5, INK); pdf.text(nn(x.z.cantidad) + ' ' + T(x.z.um || ''), XD[3] + 1, y);
-      fuente('courier', 'normal', 7, INK); pdf.text(T(String(x.z.usuario || '').split('@')[0]), XD[4] + 1, y); pdf.text(T(f), XD[5] + 1, y); fuente('helvetica', 'bold', 7, x.z.val_estado === 'ok' ? VERDE : x.z.val_estado === 'obs' ? AMBAR : GRIS); pdf.text(vb, XD[6] + 1, y); fuente('courier', 'normal', 6.6, INK); const nl = pdf.splitTextToSize(T([x.z.nota, x.z.val_estado === 'obs' ? x.z.val_nota : ''].filter(Boolean).join(' · ') || '—'), D[7][1] + 2).slice(0, 3); pdf.text(nl, XD[7] + 1, y); y += 4.6 + (nl.length - 1) * 2.8; });
+      pdf.text(T(resSede(x.z) === 'En camino' ? 'EN CAMINO' : resSede(x.z)).toUpperCase(), XD[2] + 1, y); pdf.text(nn(x.z.cantidad) + ' ' + T(x.z.um || ''), XD[3] + 1, y);
+      fuente('courier', 'normal', 7, INK); pdf.text(T(String(x.z.usuario || '').split('@')[0]), XD[4] + 1, y); pdf.text(T(f), XD[5] + 1, y); const vl = pdf.splitTextToSize(vb, D[6][1] - 1).slice(0, 2); pdf.text(vl, XD[6] + 1, y); fuente('courier', 'normal', 6.6, INK); const nl = pdf.splitTextToSize(T([x.z.nota, x.z.val_estado === 'obs' ? x.z.val_nota : ''].filter(Boolean).join(' · ') || '—'), D[7][1] + 2).slice(0, 3); pdf.text(nl, XD[7] + 1, y); y += 4.6 + (Math.max(nl.length, vl.length) - 1) * 2.8; });
     const S = { 'Lurín':0, 'Trujillo':0, 'Ica':0 }; DR.forEach(function(x){ S[resSede(x.z)] = (S[resSede(x.z)] || 0) + (+x.z.cantidad || 0); });
     y += 1.5; pdf.setLineWidth(0.2); pdf.line(M, y - 3, W - M, y - 3); fuente('courier', 'bold', 7.2, INK);
-    pdf.text('TOTAL RESERVADO: ' + Object.keys(S).filter(function(k){ return S[k] > 0; }).map(function(k){ return k + ' ' + nn(S[k]); }).join(' · ') + '   ·   ' + DR.length + ' reserva' + (DR.length === 1 ? '' : 's') + ' en ' + new Set(DR.map(function(x){ return x.i; })).size + ' ítem' + (new Set(DR.map(function(x){ return x.i; })).size === 1 ? '' : 's'), M, y + 1); y += 4; }
+    pdf.text('TOTAL RESERVADO: ' + Object.keys(S).filter(function(k){ return S[k] > 0; }).map(function(k){ return nn(S[k]) + ' ' + enSede(k); }).join(' · ') + '   ·   ' + DR.length + ' reserva' + (DR.length === 1 ? '' : 's') + ' en ' + new Set(DR.map(function(x){ return x.i; })).size + ' ítem' + (new Set(DR.map(function(x){ return x.i; })).size === 1 ? '' : 's'), M, y + 1); y += 4; }
   // Pie: leyenda y firma
   if(y + 30 > BOT){ pdf.addPage(); pag++; y = cabecera(); }
   y += 4; pdf.setDrawColor(150, 150, 150); pdf.setLineWidth(0.2); pdf.line(M, y, W - M, y); y += 4.5;
-  fuente('courier', 'normal', 6.8, GRIS); pdf.text('RESERVADO: L Lurín · T Trujillo · I Ica · C en camino (OC por llegar).  A COMPRA: lo que no se reservó.', M, y);
-  pdf.text('ATENCIÓN: OK se atiende todo del stock · PED pasa a pedido de compra · OC ya tiene orden de compra', M, y + 3.6);
-  pdf.text('          PED (N): N unidades salen del stock y el resto pasa a compra.', M, y + 7.2);
-  pdf.text('Las cantidades separadas son reservas de la plataforma: descuentan el stock solo hasta que la salida se registra en Nisira.', M, y + 10.8);
-  pdf.text('VB OPERARIO: validación en el almacén de Lurín (OK conforme · OBS con observación · POR VALIDAR); Trujillo, Ica y en camino no se validan.', M, y + 14.4);
+  fuente('courier', 'normal', 6.8, GRIS); pdf.text('RESERVADO: cantidad separada para el ítem y el almacén de donde sale.  A COMPRA: lo que no se reservó y va a pedido de compra.', M, y);
+  pdf.text('Las cantidades separadas son reservas de la plataforma: descuentan el stock solo hasta que la salida se registra en Nisira.', M, y + 3.6);
+  pdf.text('VB OPERARIO: validación en el almacén de Lurín; las reservas de Trujillo, Ica y en camino no se validan.', M, y + 7.2);
   pdf.setDrawColor(60, 60, 60); pdf.setLineDashPattern([0.6, 0.6], 0); pdf.line(M + 6, BOT + 6, M + 66, BOT + 6); pdf.setLineDashPattern([], 0);
   fuente('helvetica', 'normal', 7.5, INK); pdf.text('HECHO POR', M + 24, BOT + 10); fuente('helvetica', 'bold', 7.5, INK); pdf.text(T(titleCase(String((APP.usuario && APP.usuario.nombre) || '')).split(' ').slice(0, 2).join(' ')), M + 36, BOT + 13.5, { align:'center' });
   for(let k = 1; k <= pag; k++){ pdf.setPage(k); fuente('courier', 'normal', 6.5, GRIS); pdf.text('Pág. ' + k + ' de ' + pag, W - M, 290, { align:'right' }); }
