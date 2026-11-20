@@ -14827,8 +14827,8 @@ async function crtBorrarDeDrive(url){
   let token = ''; try{ token = await sbToken(); }catch(err){}
   try{
     const r = await fetch(CRT_DRIVE.url, { method:'POST', body: JSON.stringify({ clave:CRT_DRIVE.clave, accion:'borrar', url:url, token:token || '' }) });
-    const t = await r.text(); let d; try{ d = JSON.parse(t); }catch(e){ return { ok:false, error:'el enlace de Drive (Apps Script) no responde' }; }
-    if(d && !d.ok && /sin destinos|sin archivo/.test(d.error || '')) return { ok:false, error:'falta actualizar el Apps Script de Certificados para poder eliminar' };
+    const t = await r.text(); let d; try{ d = JSON.parse(t); }catch(e){ return { ok:false, error:'El Apps Script no está actualizado: pégalo y vuelve a desplegarlo como Nueva versión.' }; }
+    if(d && !d.ok && /sin destinos|sin archivo/.test(d.error || '')) return { ok:false, error:'El Apps Script no está actualizado: pégalo y vuelve a desplegarlo como Nueva versión.' };
     return d;
   }catch(err){ return { ok:false, error:'no hay conexión con Drive' }; }
 }
@@ -15039,20 +15039,27 @@ function crtMailto(clave){
     ((crtProvDe(x) || {}).oc === d.oc));
   const prods = lista.length ? lista : [f];
   const pry = (f.idPry && f.idPry !== 'SIN PROYECTO') ? (f.idPry + ' — ' + f.nomPry) : f.nomPry;
+  const ocN = String(d.oc).replace(/^000\d-0*/, ''), prov = f.proveedor || (crtProvDe(f) || {}).nombre || '';
+  const linea = '\u2500'.repeat(44);
+  // Correo claro para copiar/pegar (20.11.2026, Piero: "un cuadro del producto con el detalle de lo que falte... aclarando cuál es la OC"):
+  // la OC bien visible en un recuadro y abajo cada producto con lo que falta.
   const L = [];
   L.push(d.contacto ? ('Estimado(a) ' + d.contacto + ':') : 'Estimados:');
   L.push('');
-  L.push('Solicitamos la documentación de calidad correspondiente al siguiente despacho:');
+  L.push('Les solicitamos la documentación de calidad (certificado de calidad y/o ficha técnica) correspondiente a esta orden de compra:');
   L.push('');
-  L.push('Orden de compra: ' + d.oc);
-  L.push('Requerimiento:   ' + f.req);
-  L.push('Proyecto:        ' + pry);
+  L.push(linea);
+  L.push('  Orden de compra (OC): ' + d.oc);
+  if(prov) L.push('  Proveedor:            ' + prov);
+  L.push('  Proyecto:             ' + pry);
+  L.push('  Requerimiento:        ' + f.req);
+  L.push(linea);
   L.push('');
-  L.push(prods.length === 1 ? 'Producto:' : ('Productos (' + prods.length + '):'));
-  prods.forEach(x => L.push('  \u00b7 ' + x.codigo + ' — ' + x.producto + '  ->  falta ' + falta(x)));
+  L.push(prods.length === 1 ? 'Producto y lo que falta:' : ('Productos y lo que falta (' + prods.length + '):'));
+  prods.forEach(function(x){ L.push('  \u2022 ' + x.codigo + ' \u2014 ' + x.producto); L.push('       Falta: ' + falta(x)); });
   L.push('');
-  L.push('Agradeceremos enviarlos en respuesta a este correo.');
-  L.push('Saludos cordiales,');
+  L.push('Por favor envíennoslos en respuesta a este correo, indicando la OC ' + ocN + '.');
+  L.push('Gracias. Saludos cordiales,');
   const q = [];
   const cc = crtCopias(prods, d.to, d.cc);
   if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
@@ -15700,7 +15707,7 @@ function ct2Pill(f, tipo){ const e = escapeHtml, clave = crtClave(f), et = tipo 
     ${ver ? '' : `<button type="button" class="ct2-ib mas" data-crtsube="${e(clave)}" data-tipo="${tipo}" title="Subir más archivos de ${et.toLowerCase()}" aria-label="Subir más">${CT2_ICO.mas}</button>`}${ver || !uno ? '' : `<button type="button" class="ct2-ib del" data-crtborrar="${e(lista[0].url)}" data-nom="${e(nom(lista[0], 0))}" data-tipo="${tipo}" title="Eliminar ${et.toLowerCase()}" aria-label="Eliminar">${CT2_ICO.del}</button>`}</span>`; }
   const sub = f[crtCampo(tipo)]; if(sub) return `<span class="ct2-p si" title="${e(sub.nombre)}">${CT2_ICO.ok}${et}</span>`;
   const her = crtHeredado(f, tipo);
-  if(her) return her.url ? `<span class="crt-grupo ct2-gr"><span class="ct2-p si her ct2-pd"><a class="ct2-pdl" href="${e(crtDescargaUrl(her.url))}" target="_blank" rel="noopener" title="Descargar" aria-label="Descargar">${CT2_ICO.dl}</a><button type="button" class="ct2-pv" data-crtprev="${e(her.url)}" data-nom="${e(et + ' · lote de la OC ' + her.oc)}" title="Del lote de la OC ${e(her.oc)}${her.probable ? ' (probable)' : ''}">${et}</button></span></span>` : `<span class="ct2-p si her" title="De la OC ${e(her.oc)}">${CT2_ICO.ok}${et}</span>`;
+  if(her) return her.url ? `<span class="crt-grupo ct2-gr"><span class="ct2-p si her ct2-pd"><a class="ct2-pdl" href="${e(crtDescargaUrl(her.url))}" target="_blank" rel="noopener" title="Descargar" aria-label="Descargar">${CT2_ICO.dl}</a><button type="button" class="ct2-pv" data-crtprev="${e(her.url)}" data-nom="${e(et + ' · lote de la OC ' + her.oc)}" title="Del lote de la OC ${e(her.oc)}${her.probable ? ' (probable)' : ''}">${et}</button></span>${ver ? '' : `<button type="button" class="ct2-ib del" data-crtborrar="${e(her.url)}" data-nom="${e(et + ' de la OC ' + her.oc)}" data-tipo="${tipo}" title="Eliminar ${et.toLowerCase()} (está en la OC ${e(her.oc)})" aria-label="Eliminar">${CT2_ICO.del}</button>`}</span>` : `<span class="ct2-p si her" title="De la OC ${e(her.oc)}">${CT2_ICO.ok}${et}</span>`;
   if(ver) return `<span class="ct2-p no ver">${et}</span>`;
   return `<button type="button" class="ct2-p no${tipo === 'ficha' ? ' lev' : ''}" data-crtsube="${e(clave)}" data-tipo="${tipo}" title="Subir ${et.toLowerCase()} de este producto (o arrastra aquí el archivo)">${CT2_ICO.up}${et}</button>`; }
 // Plazo para subir los documentos (18.11.2026, Piero: "a partir del lunes 23/11… máximo deben ser 5 días hábiles para subir estos documentos"):
