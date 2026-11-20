@@ -24516,10 +24516,12 @@ function appPendComprasHtml(soloLista, sinCaras){
       else { via.p = 1 + appOcTramo(ii.etd, o.f); via.ico = OC2_ICO.barco; tono = 'cam'; big = o.f ? (o.d === 0 ? ['Hoy', 'llega'] : [-o.d, 'd.h. para llegar']) : ['—', 'ETA por definir']; }
     } else {
       via = { n:[['Emitida', o.fo ? e2(o.fo) : ''], ['Aprobada', o.fb ? e2(o.fb) : 'pendiente'], ['Entrega', o.f ? e2(o.f) : 'sin fecha'], [RT_SEDE[ncSede(ncUbi(o.prov))].n, '']] };   // su almacén (18.11.2026)
-      if(o.est === 'Sin aprobar'){ via.p = 0; via.ico = OC2_ICO.firma; tono = k === 'venc' ? 'mal' : 'prox'; }
-      else if(o.est === 'Llegó parcial'){ via.p = 2; via.ico = OC2_ICO.caja; tono = k === 'venc' ? 'mal' : 'prox'; }
-      else if(k === 'venc'){ via.p = 2; via.ico = OC2_ICO.reloj; tono = 'mal'; }
-      else { via.p = o.f ? 1 + appOcTramo(o.fb || o.fo, o.f) : 1; via.ico = OC2_ICO.camion; tono = o.f && o.d >= -2 ? 'prox' : 'cam'; }
+      // Color por aprobada/enviada o no, no por días hábiles (20.11.2026, Piero: "los colores deben ser para los aprobados y los que no... para diferenciar cuáles ya se enviaron o no"):
+      // ámbar = sin aprobar (todavía no se envía al proveedor) · azul = aprobada/enviada (en camino).
+      if(o.est === 'Sin aprobar'){ via.p = 0; via.ico = OC2_ICO.firma; tono = 'prox'; }
+      else if(o.est === 'Llegó parcial'){ via.p = 2; via.ico = OC2_ICO.caja; tono = 'cam'; }
+      else if(k === 'venc'){ via.p = 2; via.ico = OC2_ICO.reloj; tono = 'cam'; }
+      else { via.p = o.f ? 1 + appOcTramo(o.fb || o.fo, o.f) : 1; via.ico = OC2_ICO.camion; tono = 'cam'; }
       big = k === 'venc' ? [o.d, 'd.h. de atraso'] : !o.f ? ['—', 'sin fecha'] : o.d === 0 ? ['Hoy', 'vence'] : [-o.d, 'd.h. faltan'];
     }
     return appOcCard({ cls:S[k][2], tono:tono, big:big, est:EST[k], flag:flag, codLbl:'OC',
