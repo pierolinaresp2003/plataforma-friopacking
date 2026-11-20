@@ -3956,6 +3956,11 @@ html.app-modo #section-certificados > p{display:none;}
 .ct2-pf.sin{opacity:.6;} .ct2-pf-a{display:flex;align-items:center;gap:8px;}
 /* productos por OC */
 .ct2-lista{display:flex;flex-direction:column;gap:12px;}
+.ct2-sec{margin:0 0 22px;}
+.ct2-sec-h{display:flex;align-items:center;gap:9px;margin:0 0 11px;font-size:14px;font-weight:800;letter-spacing:.2px;color:var(--tx);}
+.ct2-sec-h .ct2-sec-p{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none;}
+.ct2-sec.mal .ct2-sec-p{background:#e5484d;}.ct2-sec.prox .ct2-sec-p{background:#f5a623;}.ct2-sec.ok .ct2-sec-p{background:#30a46c;}
+.ct2-sec-h em{font-style:normal;font-weight:700;font-size:12px;color:var(--muted);background:var(--chip,rgba(128,128,128,.14));padding:1px 9px;border-radius:999px;}
 .ct2-g{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;animation:pzSube .35s var(--pz-ease) both;content-visibility:auto;contain-intrinsic-size:auto 160px;}
 /* Con la lista de archivos abierta (varios certificados o fichas) la tarjeta no la recorta (19.11.2026) */
 .ct2-g:has(.ct2-menu:not([hidden])){overflow:visible;content-visibility:visible;position:relative;z-index:6;}
@@ -14927,6 +14932,13 @@ function crtPedidoMarcar(k, si){
 // "cuando mande el correo que quede marcado en el ícono para saber que ya se envió"). Se guarda en este navegador.
 function crtMailClaveEnv(clave){ return 'mail|' + clave; }
 function crtMailEnviado(f){ return CRT_PEDIDOS.has(crtMailClaveEnv(crtClave(f))); }
+// El estado "ya se envió correo" se comparte entre todos los usuarios (20.11.2026, Piero: "que se muestre para todos
+// que se envió por correo"). Se guarda en el maestro 'crt_correo' de Supabase y, si falla, queda solo en este navegador.
+let CRT_MAIL_LEIDO = false;
+function crtMailSync(){ try{ const ks = [...CRT_PEDIDOS].filter(function(k){ return k.indexOf('mail|') === 0; }); sbMaestroGuardar('crt_correo', ks).catch(function(){}); }catch(e){} }
+function crtMailCargar(){ if(CRT_MAIL_LEIDO || !sbSesion()) return; CRT_MAIL_LEIDO = true;
+  sbMaestroLeer('crt_correo').then(function(ks){ if(!Array.isArray(ks)) return; let camb = false; ks.forEach(function(k){ if(typeof k === 'string' && k.indexOf('mail|') === 0 && !CRT_PEDIDOS.has(k)){ CRT_PEDIDOS.add(k); camb = true; } });
+    if(camb){ try{ localStorage.setItem(CRT_PEDIDO, JSON.stringify([...CRT_PEDIDOS])); }catch(e){} crtDibujar(); } }).catch(function(){}); }
 /** La casilla que va al lado del botón de correo, tanto en la fila como en el panel azul. */
 function crtCheckPedido(k, texto){
   const si = CRT_PEDIDOS.has(k);
@@ -15243,6 +15255,7 @@ function crtCorreoProducto(clave, soloEste){
   const filas = soloEste ? [f] : CRT.filas.filter(function(x){ if(x.idPry !== f.idPry) return false; if(crtTiene(x, 'cert') && crtTiene(x, 'ficha')) return false; const q = crtProvDe(x) || {}; return ruc ? q.ruc === ruc : String(q.nombre || x.proveedor || '').trim().toUpperCase() === nom; });
   const usar = filas.length ? filas : [f];
   usar.forEach(function(x){ crtPedidoMarcar(crtMailClaveEnv(crtClave(x)), true); });   // deja marcado el ícono de correo de cada ítem
+  crtMailSync();   // comparte el estado "enviado" con todos los usuarios
   crtCorreoRico({ clave:ruc || nom, nombre: pf.nombre || f.proveedor || '(sin proveedor)', filas: usar, correo: crtCorreoDe(f) });
   if(typeof crtDibujar === 'function') crtDibujar();
 }
@@ -15707,9 +15720,18 @@ function crtVer(url, nombre){ const e = escapeHtml, id = crtDriveId(url), src = 
     <iframe src="${e(src)}" title="${e(nom)}" allow="autoplay"></iframe>`); f.classList.add('crt-visor'); }
 function ct2Pct(n, d){ return d ? Math.round(n / d * 100) : 0; }
 // Agrupado por PROVEEDOR para la lista de Certificados (20.11.2026, Piero: "agrupados por proveedores sin perder la trazabilidad... la oc, el responsable, el requerimiento, la fecha").
-function ct2GruposProv(filas){ const M = new Map();
-  filas.forEach(function(f){ const pr = crtProvDe(f) || {}; const nom = pr.nombre || f.proveedor || 'Sin proveedor'; const k = (pr.ruc || '').trim() || ('n|' + nom.toUpperCase().trim());
-    if(!M.has(k)) M.set(k, { k:k, prov:nom, ruc:(pr.ruc || '').trim(), filas:[], fecha:'' });
+// Agrupa por proveedor sin separar al mismo (20.11.2026, Piero: "Coldtainer no está junto"). El bug era que
+// unas filas traían RUC y otras no (OC vs "de stock") → dos grupos. Ahora: se normaliza el nombre (sin acentos,
+// signos ni la forma legal SAC/SA/EIRL…) y, si alguna fila del proveedor trae RUC, todas sus filas lo heredan.
+function ct2ProvNom(f){ const pr = crtProvDe(f) || {}; return pr.nombre || f.proveedor || 'Sin proveedor'; }
+function ct2ProvRuc(f){ return ((crtProvDe(f) || {}).ruc || '').trim(); }
+function ct2ProvKey(n){ return String(n || '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\b(SAC|SA|SAA|EIRL|SRL|SCRL|SACS|EIRLTDA)\b/g, '').replace(/\s+/g, ' ').trim(); }
+function ct2GruposProv(filas){
+  const rucPorNom = {};
+  filas.forEach(function(f){ const nk = ct2ProvKey(ct2ProvNom(f)), r = ct2ProvRuc(f); if(r && nk && !rucPorNom[nk]) rucPorNom[nk] = r; });
+  const M = new Map();
+  filas.forEach(function(f){ const nom = ct2ProvNom(f), nk = ct2ProvKey(nom), ruc = ct2ProvRuc(f) || rucPorNom[nk] || ''; const k = ruc || ('n|' + nk);
+    if(!M.has(k)) M.set(k, { k:k, prov:nom, ruc:ruc, filas:[], fecha:'' });
     const g = M.get(k); g.filas.push(f); if(f.fecha && ct2OrdenK(f.fecha) > ct2OrdenK(g.fecha)) g.fecha = f.fecha; });
   return [...M.values()]; }
 function ct2OrdenK(f){ return String(f || '').split('/').reverse().join(''); }
@@ -15788,6 +15810,7 @@ function ct2UpHtml(delPry){ const e = escapeHtml, U = CT2.up;
     <div class="ct2-up-f"><span>${n ? `<b>${appN(n)}</b> producto${n === 1 ? '' : 's'} marcado${n === 1 ? '' : 's'}` : 'Marca uno o más productos'}</span><button type="button" class="ct2-btn sec" data-ct2cancel="1">Cancelar</button><button type="button" class="ct2-btn" data-ct2guardar="1"${n ? '' : ' disabled'}>Guardar ${U.files.length > 1 ? U.files.length + ' archivos ' : ''}en Drive</button></div></div>`; }
 function ct2VistaProyecto(cont){
   crtLeerProyecto(CRT.pry);
+  crtMailCargar();   // trae de Supabase el estado "enviado" compartido (una sola vez por sesión)
   const e = escapeHtml, delPry = CRT.filas.filter(function(f){ return f.idPry === CRT.pry; }), vis = delPry.filter(crtPasaChip).filter(crtPasaTexto);
   document.getElementById('crtConteo').textContent = appN(vis.length) + ' de ' + appN(delPry.length) + ' productos';
   const nC = delPry.filter(function(f){ return crtTiene(f, 'cert'); }).length, nF = delPry.filter(function(f){ return crtTiene(f, 'ficha'); }).length, ley = CRT.leyendo || CRT.leyendoPry;
@@ -15802,10 +15825,20 @@ function ct2VistaProyecto(cont){
   const panelPed = pend.length && CRT.pedAbierto ? `<div class="ct2-ped"><div class="ct2-ped-h"><b>Un correo por proveedor con todo lo que falta</b><button type="button" class="ct2-x" data-ct2ped="1" aria-label="Cerrar">${CT2_ICO.x}</button></div>
       ${pend.map(function(g){ return `<div class="ct2-pf${g.correo && g.correo.to ? '' : ' sin'}"><span><b>${e(g.nombre)}</b><small>${g.filas.length} producto${g.filas.length === 1 ? '' : 's'} · ${g.ocs.size} OC${g.correo && g.correo.to ? ' · ' + e(g.correo.to) : ' · sin correo en DB Proveedores'}</small></span>
         ${g.correo && g.correo.to ? `<span class="ct2-pf-a"><button type="button" class="ct2-btn sec" data-crtmailm="${e(g.clave)}">${CT2_ICO.mail}Generar correo</button>${crtCheckPedido('g|' + CRT.pry + '|' + g.clave, 'Pedido')}</span>` : ''}</div>`; }).join('')}</div>` : '';
-  const G = ct2GruposProv(vis).sort(ct2Orden);
-  const lista = G.length ? `<div class="ct2-lista">${G.slice(0, CT2.tope).map(function(g, i){ const c = g.filas.filter(function(f){ return crtTiene(f, 'cert'); }).length, nOc = new Set(g.filas.map(function(f){ return (crtProvDe(f) || {}).oc || ''; }).filter(Boolean)).size;
+  // Tres grupos por estado (20.11.2026, Piero): falta enviar correo · enviado por correo · finalizados.
+  // Finalizado = tiene certificado Y ficha. Enviado = ya se generó la solicitud (compartido vía maestro). Si no, falta enviar.
+  const ct2Fin = function(f){ return crtTiene(f, 'cert') && crtTiene(f, 'ficha'); };
+  const cardG = function(g, i){ const c = g.filas.filter(function(f){ return crtTiene(f, 'cert'); }).length, nOc = new Set(g.filas.map(function(f){ return (crtProvDe(f) || {}).oc || ''; }).filter(Boolean)).size;
       return `<div class="ct2-g" style="animation-delay:${Math.min(i, 12) * 25}ms"><div class="ct2-gh"><b>${crtMarca(g.prov || 'Sin proveedor')}</b><small>${g.filas.length} producto${g.filas.length === 1 ? '' : 's'}${nOc ? ' · ' + nOc + ' OC' : ''}</small>${crtSoloVer() ? '' : (function(){ var fg = g.filas.some(function(ff){ return !crtTiene(ff, 'cert') || !crtTiene(ff, 'ficha'); }); return fg ? ('<button type="button" class="ct2-gmail" data-crtmailprov="' + e(crtClave(g.filas[0])) + '" title="Un solo correo al proveedor con TODO lo que le falta">' + CT2_ICO.mail + 'Correo completo</button>') : ''; })()}<em class="${c === g.filas.length ? 'ok' : c ? 'prox' : 'mal'}">${c}/${g.filas.length} con certificado</em></div>
-        ${g.filas.map(ct2Item).join('')}</div>`; }).join('')}</div>${G.length > CT2.tope ? `<button type="button" class="ini-link" data-ct2mas="1">Ver más (${appN(G.length - CT2.tope)} OC) ›</button>` : ''}`
+        ${g.filas.map(ct2Item).join('')}</div>`; };
+  const secciones = [
+    { id:'falta', t:'Falta enviar correo', cls:'mal', fs:vis.filter(function(f){ return !ct2Fin(f) && !crtMailEnviado(f); }) },
+    { id:'env',   t:'Enviado por correo',  cls:'prox', fs:vis.filter(function(f){ return !ct2Fin(f) && crtMailEnviado(f); }) },
+    { id:'fin',   t:'Finalizados',         cls:'ok', fs:vis.filter(ct2Fin) }
+  ];
+  const lista = vis.length ? secciones.map(function(s){ if(!s.fs.length) return '';
+      const Gs = ct2GruposProv(s.fs).sort(ct2Orden);
+      return `<section class="ct2-sec ${s.cls}"><h3 class="ct2-sec-h"><span class="ct2-sec-p"></span>${s.t}<em>${appN(s.fs.length)}</em></h3><div class="ct2-lista">${Gs.map(cardG).join('')}</div></section>`; }).join('')
     : '<div class="pmf-vacio">Nada con este filtro.</div>';
   cont.innerHTML = `<div class="ct2">${hero}${crtSoloVer() ? '' : ct2UpHtml(delPry)}${panelPed}${lista}</div>`;
   ct2Enlazar(cont, delPry);
