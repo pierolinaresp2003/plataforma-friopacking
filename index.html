@@ -3961,6 +3961,15 @@ html.app-modo #section-certificados > p{display:none;}
 .ct2-sec-h .ct2-sec-p{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none;}
 .ct2-sec.mal .ct2-sec-p{background:#e5484d;}.ct2-sec.prox .ct2-sec-p{background:#f5a623;}.ct2-sec.ok .ct2-sec-p{background:#30a46c;}
 .ct2-sec-h em{font-style:normal;font-weight:700;font-size:12px;color:var(--muted);background:var(--chip,rgba(128,128,128,.14));padding:1px 9px;border-radius:999px;}
+.ct2-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px;}
+.ct2-tab{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--tx);font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;}
+.ct2-tab:hover:not(:disabled){border-color:var(--muted);}
+.ct2-tab:disabled{opacity:.4;cursor:default;}
+.ct2-tab .ct2-tab-p{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none;}
+.ct2-tab.mal .ct2-tab-p{background:#e5484d;}.ct2-tab.prox .ct2-tab-p{background:#f5a623;}.ct2-tab.ok .ct2-tab-p{background:#30a46c;}
+.ct2-tab em{font-style:normal;font-weight:800;font-size:12px;color:var(--muted);}
+.ct2-tab.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+.ct2-tab.on .ct2-tab-p{background:#fff;}.ct2-tab.on em{color:rgba(255,255,255,.85);}
 .ct2-g{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;animation:pzSube .35s var(--pz-ease) both;content-visibility:auto;contain-intrinsic-size:auto 160px;}
 /* Con la lista de archivos abierta (varios certificados o fichas) la tarjeta no la recorta (19.11.2026) */
 .ct2-g:has(.ct2-menu:not([hidden])){overflow:visible;content-visibility:visible;position:relative;z-index:6;}
@@ -15697,7 +15706,7 @@ function crtVistaProyectos(cont){
 // técnica" (arrastras el PDF, eliges si es certificado o ficha y marcas a qué productos corresponde) y abajo los productos
 // agrupados por OC con dos botones claros: Certificado y Ficha técnica (verde si ya está, rojo para subirlo).
 // ============================================================================
-const CT2 = { tope:40, topeP:60, up:null };
+const CT2 = { tope:40, topeP:60, up:null, estado:'todos' };
 function crtChipsContar(){ const base = CRT.filas.filter(function(f){ return (!CRT.cli || f.cli === CRT.cli) && (!CRT.pry || f.idPry === CRT.pry) && crtPasaTexto(f); });
   const n = { todos:base.length, sincert:0, sinficha:0, completos:0 }; base.forEach(function(f){ n[crtEstado(f)]++; });
   const T = { todos:'Todos', sincert:'Falta certificado', sinficha:'Solo falta ficha', completos:'Completos' };
@@ -15836,9 +15845,15 @@ function ct2VistaProyecto(cont){
     { id:'env',   t:'Enviado por correo',  cls:'prox', fs:vis.filter(function(f){ return !ct2Fin(f) && crtMailEnviado(f); }) },
     { id:'fin',   t:'Finalizados',         cls:'ok', fs:vis.filter(ct2Fin) }
   ];
-  const lista = vis.length ? secciones.map(function(s){ if(!s.fs.length) return '';
-      const Gs = ct2GruposProv(s.fs).sort(ct2Orden);
-      return `<section class="ct2-sec ${s.cls}"><h3 class="ct2-sec-h"><span class="ct2-sec-p"></span>${s.t}<em>${appN(s.fs.length)}</em></h3><div class="ct2-lista">${Gs.map(cardG).join('')}</div></section>`; }).join('')
+  // Pestañas tipo filtro (20.11.2026, Piero: "quería que esté como por tarjetas, como filtro"): Todos + los 3 estados.
+  // Al tocar una, la lista muestra solo ese estado. "Todos" apila los 3. Un estado vacío queda deshabilitado.
+  if(CT2.estado !== 'todos' && !secciones.some(function(s){ return s.id === CT2.estado && s.fs.length; })) CT2.estado = 'todos';
+  const tabs = `<div class="ct2-tabs">${[{ id:'todos', t:'Todos', cls:'', n:vis.length }].concat(secciones.map(function(s){ return { id:s.id, t:s.t, cls:s.cls, n:s.fs.length }; })).map(function(x){
+      return `<button type="button" class="ct2-tab ${x.cls}${CT2.estado === x.id ? ' on' : ''}" data-ct2est="${x.id}"${x.n || x.id === 'todos' ? '' : ' disabled'}><span class="ct2-tab-p"></span>${x.t}<em>${appN(x.n)}</em></button>`; }).join('')}</div>`;
+  const pinta = function(s){ const Gs = ct2GruposProv(s.fs).sort(ct2Orden);
+      return `<section class="ct2-sec ${s.cls}">${CT2.estado === 'todos' ? `<h3 class="ct2-sec-h"><span class="ct2-sec-p"></span>${s.t}<em>${appN(s.fs.length)}</em></h3>` : ''}<div class="ct2-lista">${Gs.map(cardG).join('')}</div></section>`; };
+  const mostrar = CT2.estado === 'todos' ? secciones.filter(function(s){ return s.fs.length; }) : secciones.filter(function(s){ return s.id === CT2.estado; });
+  const lista = vis.length ? (tabs + (mostrar.length ? mostrar.map(pinta).join('') : '<div class="pmf-vacio">Nada en este estado.</div>'))
     : '<div class="pmf-vacio">Nada con este filtro.</div>';
   cont.innerHTML = `<div class="ct2">${hero}${crtSoloVer() ? '' : ct2UpHtml(delPry)}${panelPed}${lista}</div>`;
   ct2Enlazar(cont, delPry);
@@ -15855,6 +15870,7 @@ function ct2Enlazar(cont, delPry){
   cont.querySelectorAll('[data-crtpedido]').forEach(function(c){ c.addEventListener('change', function(){ crtPedidoMarcar(c.dataset.crtpedido, c.checked); const h = c.closest('.crt-hecho'); if(h) h.classList.toggle('si', c.checked); }); });
   cont.querySelectorAll('[data-ct2ped]').forEach(function(b){ b.addEventListener('click', function(){ CRT.pedAbierto = !CRT.pedAbierto; crtDibujar(); }); });
   const mas = cont.querySelector('[data-ct2mas]'); if(mas) mas.addEventListener('click', function(){ CT2.tope += 40; crtDibujar(); });
+  cont.querySelectorAll('[data-ct2est]').forEach(function(b){ b.addEventListener('click', function(){ CT2.estado = b.dataset.ct2est; crtDibujar(); }); });
   // Panel de subida
   const drop = document.getElementById('ct2Drop'), inp = document.getElementById('ct2Arch');
   const iniciar = function(fs){ fs = [...(fs || [])]; if(!fs.length) return; CT2.up = { files:fs, tipo:'cert', sel:new Set(), q:'', todos:false }; crtDibujar(); const q = document.getElementById('ct2Q'); if(q) q.focus(); };
