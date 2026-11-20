@@ -18816,7 +18816,7 @@ function appBienvenida(correoFijo){
     const pedirCod = async function(bt){ const c = correoOk(); if(!c) return; bt.disabled = true; bt.classList.add('cargando'); eo('');
       try{ await sbOtpPedir(c); codW.hidden = false; pedir.hidden = true; eo(''); setTimeout(function(){ inp.focus(); }, 30);
         if(txt) txt.innerHTML = 'Te enviamos un código de 6 dígitos a <b>' + escapeHtml(c) + '</b>. Escríbelo aquí abajo.'; }
-      catch(er){ eo(er.message && er.message !== 'Failed to fetch' ? er.message : 'No hay conexión. Inténtalo de nuevo.'); }
+      catch(er){ eo(er.status === 429 || /rate limit/i.test(er.message || '') ? 'Se pidieron muchos códigos seguidos. Espera unos minutos y vuelve a intentar.' : (er.message && er.message !== 'Failed to fetch' ? er.message : 'No hay conexión. Inténtalo de nuevo.')); }
       finally{ bt.disabled = false; bt.classList.remove('cargando'); } };
     pedir.onclick = function(){ pedirCod(pedir); };
     reenviar.onclick = function(){ pedirCod(pedir); };
