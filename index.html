@@ -6142,7 +6142,8 @@ async function sbEntrar(correo, clave){ const x = await sbAuth('password', { ema
 // código de 6 dígitos al correo (OTP); al verificarlo queda la sesión. Solo correos @friopacking.pe / @grupofriopacking.pe (Piero, 19.11).
 function sbCorreoEmpresa(c){ return /@(friopacking|grupofriopacking)\.pe$/.test(String(c || '').trim().toLowerCase()); }
 async function sbOtpPedir(correo){
-  const r = await fetch(SB_URL + '/auth/v1/otp', { method:'POST', headers:{ apikey:SB_KEY, 'Content-Type':'application/json' }, body:JSON.stringify({ email:String(correo).trim().toLowerCase(), create_user:true }) });
+  const volver = location.origin + location.pathname;   // que el enlace del correo vuelva a la app, no al Site URL por defecto
+  const r = await fetch(SB_URL + '/auth/v1/otp?redirect_to=' + encodeURIComponent(volver), { method:'POST', headers:{ apikey:SB_KEY, 'Content-Type':'application/json' }, body:JSON.stringify({ email:String(correo).trim().toLowerCase(), create_user:true, options:{ email_redirect_to:volver } }) });
   const j = await r.json().catch(function(){ return {}; }); if(!r.ok) throw sbError(j, r.status); return true;
 }
 async function sbOtpVerificar(correo, codigo){
