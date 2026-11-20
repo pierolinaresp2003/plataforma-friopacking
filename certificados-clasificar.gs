@@ -22,7 +22,7 @@
  *       - Si el proveedor nombró el archivo con el N° de la tabla ("3 - Certificado"), manda eso.
  *   · Si el asunto no trae SOL pero sí el PRY, usa todo lo pedido en ese proyecto.
  *   · Si sirve para varios productos, queda una copia en la carpeta de cada uno.
- *   · Si el certificado dice por dentro otra OC que la del nombre, NO se archiva:
+ *   · Si el certificado dice por dentro otra OC que la del nombre, NO se archiva (v2, 20.11.2026):
  *     queda en la raíz como "REVISAR — …" para pedirlo de nuevo al proveedor.
  *   · Lo que no se pueda ubicar se queda en la raíz (la app lo mostrará "Por clasificar").
  *
@@ -37,7 +37,7 @@
 
 const CL_ETQ = { cert:'CERTIFICADO', ficha:'FICHA TECNICA' };
 const CL_MIN_IMG = 30 * 1024;          // imágenes más chicas son logos de firma: se ignoran
-const CL_ESPERA_INDICE_MIN = 120;      // minutos que se espera a que Drive lea el texto del PDF
+const CL_ESPERA_INDICE_MIN = 15;       // minutos que se espera a que Drive lea el texto del PDF (solo certificados)
 
 /** Ejecútala una vez: deja a organizarTodo corriendo cada 10 minutos (y quita el disparador viejo). */
 function instalarDisparador(){
@@ -150,19 +150,20 @@ function clArchivar(f, carpeta, raiz, cache){
     if(!items.length) return 'queda';
     const m = clEmparejar(orig, tipo, items);
     tipo = m.tipo;
-    // Certificado: lo que diga el PDF por dentro manda sobre el nombre.
-    if(tipo === 'cert'){
+    // Certificado: se revisa lo que dice el PDF por dentro (la búsqueda de Drive también mira el NOMBRE del archivo,
+    // así que solo cuentan las OC que no están en el nombre). Se espera 15 min a que Drive lea el texto del PDF.
+    if(tipo === 'cert' && !m.porNumero){
+      if((Date.now() - f.getDateCreated().getTime()) < CL_ESPERA_INDICE_MIN * 60000) return 'esperar';
       const ocs = [...new Set(items.map(function(x){ return x.oc; }).filter(Boolean))];
-      const enTexto = ocs.filter(function(oc){ return clTextoTiene(f, carpeta, oc); });
-      if(enTexto.length){
-        const ocNombre = m.items.map(function(x){ return x.oc; });
-        if(m.porOc && ocNombre.length && !ocNombre.some(function(oc){ return enTexto.indexOf(oc) !== -1; })){
-          f.setName(clLimpiar('REVISAR — dice OC ' + enTexto.join(', ') + ' — ' + orig, 200));
-          return 'revisar';
-        }
-        if(!m.porNumero) m.items = items.filter(function(x){ return enTexto.indexOf(x.oc) !== -1; });
-      }else if(m.porOc && (Date.now() - f.getDateCreated().getTime()) < CL_ESPERA_INDICE_MIN * 60000){
-        return 'esperar';   // Drive todavía no leyó el texto del PDF: se revisa en la próxima pasada
+      const enNombre = clTieneOc(clNorm(nombre), items).map(function(x){ return x.oc; });
+      const enTexto = ocs.filter(function(oc){ return enNombre.indexOf(oc) === -1 && clTextoTiene(f, carpeta, oc); });
+      if(m.porOc && m.items.length){
+        // El nombre dice una OC y el PDF habla de otra: no se archiva, se marca para pedirlo de nuevo.
+        if(enTexto.length){ f.setName(clLimpiar('REVISAR — dice OC ' + enTexto.join(', ') + ' — ' + orig, 200)); return 'revisar'; }
+      }else{
+        // Sin OC en el nombre del adjunto: la del PDF, o la del asunto (correo de una sola OC).
+        const usar = enTexto.length ? enTexto : enNombre;
+        if(usar.length) m.items = items.filter(function(x){ return usar.indexOf(x.oc) !== -1; });
       }
     }
     destino = m.items;
