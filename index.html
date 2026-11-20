@@ -15282,7 +15282,13 @@ function crtCorreoRico(g){
   L.push('Saludos cordiales,');
   const q = [], cc = crtCopias(g.filas, d.to, d.cc);
   if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
-  q.push('subject=' + encodeURIComponent('Certificados de calidad — ' + (porOc.size === 1 ? 'OC ' + [...porOc.keys()][0] : porOc.size + ' órdenes de compra') + ' — ' + pry));
+  let asunto = 'Certificados de calidad — ' + (porOc.size === 1 ? 'OC ' + [...porOc.keys()][0] : porOc.size + ' órdenes de compra') + ' — ' + pry;
+  // Referencia para el archivado automático (20.11.2026): solo en el correo de UN producto. El proveedor la
+  // conserva al responder, y Power Automate + Apps Script la usan para dejar el PDF en su carpeta exacta (PRY/Req/Código).
+  if(g.filas.length === 1 && f0.idPry && f0.idPry !== 'SIN PROYECTO' && f0.codigo){
+    asunto += ' [ref ' + f0.idPry + '|' + (f0.req || '') + '|' + f0.codigo + ']';
+  }
+  q.push('subject=' + encodeURIComponent(asunto));
   const e = escapeHtml, AZ = '#0a1e64', VE = '#2bbf9f', bo = 'border:1px solid #c5cae0;';
   const p = (t) => '<p style="margin:0 0 12pt;">' + t + '</p>';
   // Títulos en una celda: al pegar, Outlook quita el color del texto suelto pero respeta el de las celdas.
