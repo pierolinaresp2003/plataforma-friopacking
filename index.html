@@ -15268,6 +15268,17 @@ function crtCorreoProducto(clave, soloEste){
   crtCorreoRico({ clave:ruc || nom, nombre: pf.nombre || f.proveedor || '(sin proveedor)', filas: usar, correo: crtCorreoDe(f) });
   if(typeof crtDibujar === 'function') crtDibujar();
 }
+// Pedido al proveedor para que cada archivo se archive solo en su carpeta (20.11.2026).
+const CRT_NOMBRAR_TXT = 'Para ubicar cada documento, por favor nombre cada archivo con el N° del material en la tabla, por ejemplo: «3 - Certificado.pdf» o «3 - Ficha técnica.pdf».';
+const CRT_NOMBRAR_HTML = 'Para ubicar cada documento, por favor nombre cada archivo con el <b>N°</b> del material en la tabla, por ejemplo: <b>«3 - Certificado.pdf»</b> o <b>«3 - Ficha técnica.pdf»</b>.';
+/** Id corto y fijo por proyecto y proveedor: el mismo correo vuelto a generar usa la misma referencia. */
+function crtSolId(pry, clave){ let h = 2166136261; const s = String(pry) + '|' + String(clave); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36).toUpperCase().padStart(6, '0').slice(-6); }
+/** Le pasa al Apps Script lo pedido en el correo (N°, OC, Req., Código, Producto) para archivar solo la respuesta. */
+function crtRegistrarSolicitud(id, f0, lineas){
+  if(!CRT_DRIVE.url) return;
+  const items = lineas.map(function(y, i){ return { n:i + 1, oc:y.oc === 'sin OC' ? '' : String(y.oc || ''), req:y.x.req || '', codigo:y.x.codigo || '', producto:String(y.x.producto || '').slice(0, 90) }; });
+  try{ fetch(CRT_DRIVE.url, { method:'POST', keepalive:true, body:JSON.stringify({ clave:CRT_DRIVE.clave, accion:'solicitud', id:id, pry:f0.idPry, nomPry:f0.nomPry || '', items:items }) }).catch(function(){}); }catch(err){}
+}
 function crtCorreoRico(g){
   const d = g.correo;
   const porOc = new Map();
@@ -15295,8 +15306,10 @@ function crtCorreoRico(g){
   docs.forEach(t => L.push('   - ' + t[0] + t[1]));
   L.push('');
   L.push('2. Materiales');
-  lineas.forEach((y, n) => L.push('   ' + (n + 1) + '. OC ' + y.oc + ' — ' + y.x.producto + ' — ' + cant(y.x) + ' ' + (y.x.um || '') + '  → Falta: ' + faltaTxt(y.x)));
+  lineas.forEach((y, n) => L.push('   ' + (n + 1) + '. OC ' + y.oc + (y.x.req ? ' — Req. ' + y.x.req : '') + ' — ' + y.x.producto + ' — ' + cant(y.x) + ' ' + (y.x.um || '') + '  → Falta: ' + faltaTxt(y.x)));
   L.push('');
+  const varios = lineas.length > 1;
+  if(varios){ L.push(CRT_NOMBRAR_TXT); L.push(''); }
   L.push('Agradeceremos nos los remitan a la brevedad posible, respondiendo a este correo. Si algún documento no estuviera disponible, por favor indíquenoslo para coordinar.');
   L.push('');
   L.push('Quedamos atentos. Muchas gracias.');
@@ -15307,9 +15320,16 @@ function crtCorreoRico(g){
   let asunto = 'Certificados de calidad — ' + (porOc.size === 1 ? 'OC ' + [...porOc.keys()][0] : porOc.size + ' órdenes de compra') + ' — ' + pry;
   // Referencia para el archivado automático (20.11.2026): solo en el correo de UN producto. El proveedor la
   // conserva al responder, y Power Automate + Apps Script la usan para dejar el PDF en su carpeta exacta (PRY/Req/Código).
-  if(g.filas.length === 1 && f0.idPry && f0.idPry !== 'SIN PROYECTO' && f0.codigo){
+  const conPry = f0.idPry && f0.idPry !== 'SIN PROYECTO';
+  if(g.filas.length === 1 && conPry && f0.codigo){
     asunto += ' [ref ' + f0.idPry + '|' + (f0.req || '') + '|' + f0.codigo + ']';
+  }else if(conPry){
+    // Correo de varios productos (20.11.2026, Piero: "que en el correo masivo se pueda leer y luego guardar en su ubicación"):
+    // [ref PRY|SOL id] en el asunto y la lista de lo pedido (N°, OC, Req., Código) va al Apps Script, que con eso
+    // deja cada PDF de la respuesta en PRY / Req. / Producto, igual que lo que se sube desde la app.
+    asunto += ' [ref ' + f0.idPry + '|SOL ' + crtSolId(f0.idPry, g.clave || g.nombre) + ']';
   }
+  if(conPry) crtRegistrarSolicitud(crtSolId(f0.idPry, g.clave || g.nombre), f0, lineas);
   q.push('subject=' + encodeURIComponent(asunto));
   const e = escapeHtml, AZ = '#0a1e64', VE = '#2bbf9f', bo = 'border:1px solid #c5cae0;';
   const p = (t) => '<p style="margin:0 0 12pt;">' + t + '</p>';
@@ -15331,9 +15351,10 @@ function crtCorreoRico(g){
   docs.forEach(t => H.push('<table style="border-collapse:collapse;margin:0 0 6pt;"><tr><td style="border-left:4px solid ' + VE + ';padding:3px 0 3px 10px;font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;"><b>' + t[0] + '</b>' + t[1] + '</td></tr></table>'));
   H.push('<p style="margin:0;font-size:5pt;">&nbsp;</p>');
   H.push(tit('2. Materiales'));
-  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10pt;margin:0 0 12pt;"><tr>' + th('N°') + th('N° OC') + th('Descripción') + th('Cantidad') + th('U.M') + th('Certificado') + th('Ficha técnica') + '</tr>');
-  lineas.forEach((y, n) => H.push('<tr>' + td(n + 1, 'center') + td(e(y.oc)) + td(e(y.x.producto)) + td(e(cant(y.x)), 'right') + td(e(y.x.um || ''), 'center') + tdFalta(!crtTiene(y.x, 'cert')) + tdFalta(!crtTiene(y.x, 'ficha')) + '</tr>'));
+  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10pt;margin:0 0 12pt;"><tr>' + th('N°') + th('N° OC') + th('Req.') + th('Descripción') + th('Cantidad') + th('U.M') + th('Certificado') + th('Ficha técnica') + '</tr>');
+  lineas.forEach((y, n) => H.push('<tr>' + td(n + 1, 'center') + td(e(y.oc)) + td(e(y.x.req || '—'), 'center') + td(e(y.x.producto)) + td(e(cant(y.x)), 'right') + td(e(y.x.um || ''), 'center') + tdFalta(!crtTiene(y.x, 'cert')) + tdFalta(!crtTiene(y.x, 'ficha')) + '</tr>'));
   H.push('</table>');
+  if(varios) H.push(p(CRT_NOMBRAR_HTML));
   H.push(p('Agradeceremos nos los remitan a la brevedad posible, respondiendo a este correo. Si algún documento no estuviera disponible, por favor indíquenoslo para coordinar.'));
   H.push(p('Quedamos atentos. Muchas gracias.'));
   H.push('<p style="margin:0;">Saludos cordiales,</p>');
