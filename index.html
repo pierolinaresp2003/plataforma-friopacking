@@ -3964,6 +3964,9 @@ html.app-modo #section-certificados > p{display:none;}
 .ct2-it .ct2-oc{font-weight:800;color:#1f4fd1;}
 html[data-theme="dark"] .ct2-it .ct2-oc{color:#8fb3ff;}
 .ct2-gh em{margin-left:auto;font-style:normal;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;} .ct2-gh em.ok{background:#ebf2ee;color:#1e7a45;} .ct2-gh em.prox{background:#f7f3ea;color:#9a5b00;} .ct2-gh em.mal{background:#fdecea;color:#b4231a;}
+/* Botón "Correo completo" por proveedor (20.11.2026): un solo correo con todo lo que le falta a ese proveedor. */
+.ct2-gh .ct2-gmail{align-self:center;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--brand);background:var(--brand);color:#fff;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;line-height:1;white-space:nowrap;}
+.ct2-gh .ct2-gmail:hover{filter:brightness(1.08);} .ct2-gh .ct2-gmail svg{width:14px;height:14px;}
 .ct2-it{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center;padding:12px 16px;border-top:1px solid var(--border);}
 .ct2-it-t{min-width:0;display:flex;flex-direction:column;gap:2px;} .ct2-it-t b{font-size:13.5px;font-weight:800;color:var(--ink);line-height:1.3;} .ct2-it-t small{font-size:12px;color:var(--ink-soft);} .ct2-stk{font-weight:800;color:#9a5b00;}
 .ct2-docs{display:flex;align-items:center;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
@@ -15223,11 +15226,13 @@ function crtCorreoSeleccion(clave){
   return crtCorreoRico(g);
 }
 // Arma el correo con el diseño (1. Documentos solicitados, 2. Materiales en tabla), lo copia al portapapeles como HTML y abre Outlook (20.11.2026, Piero: "el diseño del mensaje debe ser así igual... ponlo copia en portapapeles para que en Outlook se pegue no más").
-// Correo del botón de cada producto: junta todo lo que le falta a ese MISMO proveedor en el proyecto y usa el diseño con tabla (20.11.2026, Piero).
-function crtCorreoProducto(clave){
+// Correo del producto (20.11.2026, Piero: "línea por línea… a parte el correo completo a proveedor").
+//  soloEste = true  → correo con SOLO ese producto (botón ✉ de cada fila).
+//  soloEste = false → correo con TODO lo que le falta a ese proveedor en el proyecto (botón "Correo completo").
+function crtCorreoProducto(clave, soloEste){
   const f = CRT.filas.find(function(x){ return crtClave(x) === clave; }); if(!f) return;
   const pf = crtProvDe(f) || {}, ruc = pf.ruc || '', nom = String(pf.nombre || f.proveedor || '').trim().toUpperCase();
-  const filas = CRT.filas.filter(function(x){ if(x.idPry !== f.idPry) return false; if(crtTiene(x, 'cert') && crtTiene(x, 'ficha')) return false; const q = crtProvDe(x) || {}; return ruc ? q.ruc === ruc : String(q.nombre || x.proveedor || '').trim().toUpperCase() === nom; });
+  const filas = soloEste ? [f] : CRT.filas.filter(function(x){ if(x.idPry !== f.idPry) return false; if(crtTiene(x, 'cert') && crtTiene(x, 'ficha')) return false; const q = crtProvDe(x) || {}; return ruc ? q.ruc === ruc : String(q.nombre || x.proveedor || '').trim().toUpperCase() === nom; });
   crtCorreoRico({ clave:ruc || nom, nombre: pf.nombre || f.proveedor || '(sin proveedor)', filas: filas.length ? filas : [f], correo: crtCorreoDe(f) });
 }
 function crtCorreoRico(g){
@@ -15246,6 +15251,8 @@ function crtCorreoRico(g){
   const lineas = [];
   porOc.forEach(function(l, oc){ l.forEach(function(x){ lineas.push({ oc:oc, x:x }); }); });
   const cant = (x) => x.cant == null ? '' : String(x.cant);
+  // Qué le falta a cada producto, para no pedir lo que ya tiene (20.11.2026, Piero: "si ya tiene certificado y falta ficha, eso sí especificarlo").
+  const faltaTxt = (x) => { const c = !crtTiene(x, 'cert'), fi = !crtTiene(x, 'ficha'); return c && fi ? 'certificado de calidad y ficha técnica' : c ? 'certificado de calidad' : 'ficha técnica'; };
   const L = [];
   L.push('Estimados, ' + g.nombre + ':');
   L.push('');
@@ -15255,7 +15262,7 @@ function crtCorreoRico(g){
   docs.forEach(t => L.push('   - ' + t[0] + t[1]));
   L.push('');
   L.push('2. Materiales');
-  lineas.forEach((y, n) => L.push('   ' + (n + 1) + '. OC ' + y.oc + ' — ' + y.x.producto + ' — ' + cant(y.x) + ' ' + (y.x.um || '')));
+  lineas.forEach((y, n) => L.push('   ' + (n + 1) + '. OC ' + y.oc + ' — ' + y.x.producto + ' — ' + cant(y.x) + ' ' + (y.x.um || '') + '  → Falta: ' + faltaTxt(y.x)));
   L.push('');
   L.push('Agradeceremos nos los remitan a la brevedad posible, respondiendo a este correo. Si algún documento no estuviera disponible, por favor indíquenoslo para coordinar.');
   L.push('');
@@ -15276,6 +15283,8 @@ function crtCorreoRico(g){
     return '<td align="center" bgcolor="' + AZ + '" style="' + bo + 'background:' + AZ + ';color:#ffffff;padding:6px 9px;text-align:center;font-weight:bold;">' +
       (im ? '<img src="' + im.src + '" width="' + im.w + '" height="' + im.h + '" alt="' + t + '" style="display:inline-block;border:0;vertical-align:middle;">' : '<span style="color:#ffffff;"><b>' + t + '</b></span>') + '</td>'; };
   const td = (t, al) => '<td align="' + (al || 'left') + '" style="' + bo + 'padding:6px 9px;vertical-align:top;text-align:' + (al || 'left') + ';">' + t + '</td>';
+  // Columnas "Certificado" y "Ficha técnica": marcan por producto qué falta ("Falta" con fondo rojo) o qué ya tenemos ("✔").
+  const tdFalta = (f) => '<td align="center" ' + (f ? 'bgcolor="#fde7e7" ' : '') + 'style="' + bo + 'padding:6px 9px;text-align:center;font-weight:bold;' + (f ? 'background:#fde7e7;color:#b3261e;' : 'color:#2e7d32;') + '">' + (f ? 'Falta' : '✔') + '</td>';
   const H = [];
   H.push(p('Estimados, <b>' + e(g.nombre) + '</b>:'));
   H.push(p('Reciban un cordial saludo. Por el proceso de certificación de nuestro proyecto <b>' + e(pryTxt) + '</b>, solicitamos su apoyo con el envío de los siguientes documentos de los materiales que nos suministraron:'));
@@ -15283,8 +15292,8 @@ function crtCorreoRico(g){
   docs.forEach(t => H.push('<table style="border-collapse:collapse;margin:0 0 6pt;"><tr><td style="border-left:4px solid ' + VE + ';padding:3px 0 3px 10px;font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;"><b>' + t[0] + '</b>' + t[1] + '</td></tr></table>'));
   H.push('<p style="margin:0;font-size:5pt;">&nbsp;</p>');
   H.push(tit('2. Materiales'));
-  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10pt;margin:0 0 12pt;"><tr>' + th('N°') + th('N° OC') + th('Descripción') + th('Cantidad') + th('U.M') + '</tr>');
-  lineas.forEach((y, n) => H.push('<tr>' + td(n + 1, 'center') + td(e(y.oc)) + td(e(y.x.producto)) + td(e(cant(y.x)), 'right') + td(e(y.x.um || ''), 'center') + '</tr>'));
+  H.push('<table style="border-collapse:collapse;font-family:Aptos,Calibri,Arial,sans-serif;font-size:10pt;margin:0 0 12pt;"><tr>' + th('N°') + th('N° OC') + th('Descripción') + th('Cantidad') + th('U.M') + th('Certificado') + th('Ficha técnica') + '</tr>');
+  lineas.forEach((y, n) => H.push('<tr>' + td(n + 1, 'center') + td(e(y.oc)) + td(e(y.x.producto)) + td(e(cant(y.x)), 'right') + td(e(y.x.um || ''), 'center') + tdFalta(!crtTiene(y.x, 'cert')) + tdFalta(!crtTiene(y.x, 'ficha')) + '</tr>'));
   H.push('</table>');
   H.push(p('Agradeceremos nos los remitan a la brevedad posible, respondiendo a este correo. Si algún documento no estuviera disponible, por favor indíquenoslo para coordinar.'));
   H.push(p('Quedamos atentos. Muchas gracias.'));
@@ -15739,7 +15748,7 @@ function crtPlazoHtml(f){ const p = crtPlazo(f); if(!p) return ''; const que = p
     : p.quedan <= 2 ? `<span class="crt-plazo ojo" title="Máximo ${CRT_PLAZO_DH} días hábiles desde que llegó">Quedan ${Math.max(0, p.quedan)} día${p.quedan === 1 ? '' : 's'} hábil${p.quedan === 1 ? '' : 'es'} para subir ${que}</span>` : ''; }
 function ct2Item(f){ const e = escapeHtml, falta = !crtTiene(f, 'cert') || !crtTiene(f, 'ficha'), c = !crtSoloVer() && falta ? crtCorreoDe(f) : null;
   return `<div class="ct2-it ${crtEstado(f)}" data-crtk="${e(crtClave(f))}"><div class="ct2-it-t"><b>${crtMarca(f.producto)}</b><small>${crtMarca(f.codigo)}${f.oc ? ' · <b class="ct2-oc">OC ' + crtMarca(String(f.oc).replace(/^000\d-0*/, '')) + '</b>' : (f.lotes && f.lotes[0] && f.lotes[0][0] ? ' · <span class="ct2-stk">de stock</span> · <b class="ct2-oc">OC ' + crtMarca(String(f.lotes[0][0]).replace(/^000\d-0*/, '')) + '</b>' : ' · <span class="ct2-stk">de stock</span>')} · Req. ${crtMarca(String(f.req).replace(/^000\d-0*/, ''))}${f.fecha ? ' · ' + e(f.fecha) : ''}${(function(){ const r = rqNomUsr(f.usuario); return r ? ' · 👤 ' + e(r) : ''; })()}${f.stock && !f.lotes ? ' · ' + e(crtMotivoLote(f)) : ''}</small>${crtPlazoHtml(f)}</div>
-    <div class="ct2-docs">${ct2Pill(f, 'cert')}${ct2Pill(f, 'ficha')}${c ? `<button type="button" class="ct2-mail${c.sin ? ' sin' : ''}" data-crtmail="${e(crtClave(f))}" title="${c.sin ? 'El proveedor no tiene correo en DB Proveedores' : 'Pedir al proveedor lo que falta'}">${CT2_ICO.mail}</button>` : ''}</div>
+    <div class="ct2-docs">${ct2Pill(f, 'cert')}${ct2Pill(f, 'ficha')}${c ? `<button type="button" class="ct2-mail${c.sin ? ' sin' : ''}" data-crtmail="${e(crtClave(f))}" title="${c.sin ? 'El proveedor no tiene correo en DB Proveedores' : 'Pedir solo este producto al proveedor (línea por línea)'}">${CT2_ICO.mail}</button>` : ''}</div>
     ${f.nota ? `<div class="crt-nota">${f.nota.html}</div>` : ''}</div>`; }
 // Panel para subir: archivo → tipo → productos → Guardar
 function ct2UpHtml(delPry){ const e = escapeHtml, U = CT2.up;
@@ -15778,7 +15787,7 @@ function ct2VistaProyecto(cont){
         ${g.correo && g.correo.to ? `<span class="ct2-pf-a"><button type="button" class="ct2-btn sec" data-crtmailm="${e(g.clave)}">${CT2_ICO.mail}Generar correo</button>${crtCheckPedido('g|' + CRT.pry + '|' + g.clave, 'Pedido')}</span>` : ''}</div>`; }).join('')}</div>` : '';
   const G = ct2GruposProv(vis).sort(ct2Orden);
   const lista = G.length ? `<div class="ct2-lista">${G.slice(0, CT2.tope).map(function(g, i){ const c = g.filas.filter(function(f){ return crtTiene(f, 'cert'); }).length, nOc = new Set(g.filas.map(function(f){ return (crtProvDe(f) || {}).oc || ''; }).filter(Boolean)).size;
-      return `<div class="ct2-g" style="animation-delay:${Math.min(i, 12) * 25}ms"><div class="ct2-gh"><b>${crtMarca(g.prov || 'Sin proveedor')}</b><small>${g.filas.length} producto${g.filas.length === 1 ? '' : 's'}${nOc ? ' · ' + nOc + ' OC' : ''}</small><em class="${c === g.filas.length ? 'ok' : c ? 'prox' : 'mal'}">${c}/${g.filas.length} con certificado</em></div>
+      return `<div class="ct2-g" style="animation-delay:${Math.min(i, 12) * 25}ms"><div class="ct2-gh"><b>${crtMarca(g.prov || 'Sin proveedor')}</b><small>${g.filas.length} producto${g.filas.length === 1 ? '' : 's'}${nOc ? ' · ' + nOc + ' OC' : ''}</small>${crtSoloVer() ? '' : (function(){ var fg = g.filas.some(function(ff){ return !crtTiene(ff, 'cert') || !crtTiene(ff, 'ficha'); }); return fg ? ('<button type="button" class="ct2-gmail" data-crtmailprov="' + e(crtClave(g.filas[0])) + '" title="Un solo correo al proveedor con TODO lo que le falta">' + CT2_ICO.mail + 'Correo completo</button>') : ''; })()}<em class="${c === g.filas.length ? 'ok' : c ? 'prox' : 'mal'}">${c}/${g.filas.length} con certificado</em></div>
         ${g.filas.map(ct2Item).join('')}</div>`; }).join('')}</div>${G.length > CT2.tope ? `<button type="button" class="ini-link" data-ct2mas="1">Ver más (${appN(G.length - CT2.tope)} OC) ›</button>` : ''}`
     : '<div class="pmf-vacio">Nada con este filtro.</div>';
   cont.innerHTML = `<div class="ct2">${hero}${crtSoloVer() ? '' : ct2UpHtml(delPry)}${panelPed}${lista}</div>`;
@@ -15790,7 +15799,8 @@ function ct2Enlazar(cont, delPry){
   cont.querySelectorAll('[data-crtsube]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); crtPedirArchivo([b.dataset.crtsube], b.dataset.tipo); }); });
   cont.querySelectorAll('[data-crtver],[data-crtdlm]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); const m = b.closest('.crt-grupo').querySelector('.crt-menu'), abrir = m.hidden; crtCerrarMenus(); m.hidden = !abrir; }); });
   cont.querySelectorAll('[data-crtprev]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); crtCerrarMenus(); crtVer(b.dataset.crtprev, b.dataset.nom); }); });
-  cont.querySelectorAll('[data-crtmail]').forEach(function(b){ b.addEventListener('click', function(){ crtCorreoProducto(b.dataset.crtmail); }); });
+  cont.querySelectorAll('[data-crtmail]').forEach(function(b){ b.addEventListener('click', function(){ crtCorreoProducto(b.dataset.crtmail, true); }); });
+  cont.querySelectorAll('[data-crtmailprov]').forEach(function(b){ b.addEventListener('click', function(){ crtCorreoProducto(b.dataset.crtmailprov, false); }); });
   cont.querySelectorAll('[data-crtmailm]').forEach(function(b){ b.addEventListener('click', function(){ crtCorreoYExcel(b.dataset.crtmailm); }); });
   cont.querySelectorAll('[data-crtpedido]').forEach(function(c){ c.addEventListener('change', function(){ crtPedidoMarcar(c.dataset.crtpedido, c.checked); const h = c.closest('.crt-hecho'); if(h) h.classList.toggle('si', c.checked); }); });
   cont.querySelectorAll('[data-ct2ped]').forEach(function(b){ b.addEventListener('click', function(){ CRT.pedAbierto = !CRT.pedAbierto; crtDibujar(); }); });
