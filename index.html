@@ -3244,6 +3244,8 @@ html[data-theme="dark"] .tlh-tr::before{background:#1f3a48;}
 .pmm-res{position:absolute;top:52px;left:0;z-index:5;width:380px;max-height:calc(100vh - 220px);overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:8px;box-shadow:0 18px 40px -18px rgba(16,24,40,.35);animation:pzSube .2s var(--pz-ease) both;}
 .pmm-res small{display:block;padding:6px 10px;color:var(--ink-soft);font-size:12px;} .pmm-res .pmm-card{animation:none;}
 .pm-v-mapa:has(.pmm-pop) .pmm-res{display:none;}
+.m-prod-stock .m-desc{display:block;font-size:11px;font-weight:700;color:var(--amber-ink);margin-top:2px;line-height:1.2;}
+html[data-theme="dark"] .m-prod-stock .m-desc{color:#f0c36b;}
 @media (max-width:900px){ .pmm-bar{position:static;max-width:none;margin-bottom:8px;} .pmm-q, .pmm-q:focus-within{width:auto;flex:1 1 200px;} .pmm-res{position:static;width:auto;margin-bottom:8px;max-height:50vh;} }
 
 /* Mapa más legible (v334): más contraste entre departamentos, círculos azules y nombre de los que tienen proyectos */
@@ -21484,6 +21486,17 @@ function resLimpiar(){ if(!rqAnalista()) return; RES.l.forEach(function(z){ cons
 // Si el mismo código se repite en el req., la reserva cuenta en una sola fila (la de resFila), no en todas (13.11.2026)
 function resDeFila(r){ const S = appMemo('resSet' + (RQ.filas || []).length, function(){ return new Set(RQ.filas || []); });
   return RES.l.filter(function(z){ if(z.req !== r.codRequerimiento || z.producto !== r.idProducto) return false; const f = resFila(z); return !f || f === r || !S.has(r); }); }
+// Reservas de un producto para el kardex (20.11.2026, Piero: "al reservar que descuente del número grande del kardex... cuando validan, se pone como
+// una salida ficticia hasta que se haga la salida en Nisira"): total reservado en todas las sedes y cuánto ya está validado (la salida ficticia).
+function resProdInfo(codigos){
+  const ks = (codigos && codigos.length ? codigos : []).join(',');
+  return appMemo('resPI' + RES.v + '|' + (RQ.filas || []).length + '|' + ks, function(){
+    const set = new Set(codigos && codigos.length ? codigos : []); let rsv = 0, val = 0;
+    RES.l.forEach(function(z){ if(!set.has(z.producto) || !resPend(resFila(z))) return; const q = +z.cantidad || 0;
+      if(z.val_estado === 'ok'){ val += q; } else if(z.val_estado === 'obs'){ const v = resQ(z); val += v; rsv += Math.max(0, q - v); } else { rsv += q; } });
+    const r2 = function(v){ return Math.round(v * 100) / 100; }; return { rsv:r2(rsv), val:r2(val), tot:r2(rsv + val) };
+  });
+}
 function resProd(cod, sede){ sede = sede || 'Lurín'; return appMemo('resP' + RES.v + '|' + (RQ.filas || []).length, function(){ const M = new Map(); RES.l.forEach(function(z){ if(!resPend(resFila(z))) return; const k = resSede(z) + '|' + z.producto; M.set(k, (M.get(k) || 0) + (+z.cantidad || 0)); }); return M; }).get(sede + '|' + cod) || 0; }
 // Ventana simple (reserva, foto y alternativas)
 function rsvModal(html){ rsvCerrar(); document.body.insertAdjacentHTML('beforeend', `<div class="rsv-fondo" id="rsvFondo"><div class="rsv-box" role="dialog" aria-modal="true">${html}</div></div>`);
@@ -23937,7 +23950,7 @@ function appInvFamRows(fam){ return appInvIndice().items.filter(function(x){ ret
 // Supervisor: solo lo que hay (stock por sede y en camino), sin Pareto, reposición ni consumo
 function invSupFila(x){ const r = x.r, e = escapeHtml, n = function(v, t, cls){ return `<span class="td-n k-${t === 'Lurín' ? 'l' : 'o'} ${v > 0 ? cls || 'si' : 'no'}"><b>${v > 0 ? appN(v, 2) : '—'}</b><small>${t}</small></span>`; };
   return `<div class="rqm-card td-c td-fila iv-sf"><span class="td-fi">${iconForFamilia(sinAcentos(x.famU || ''))}</span><span class="td-ft"><b>${e(r.descripcion || r.codigo)}</b><small><span class="cod">${e(r.codigo)}</span> · ${e(r.unidad || '')}</small></span>
-    ${n(r.lima, 'Lurín', 'l')}${n(r.ica, 'Ica')}${n(r.trujillo, 'Trujillo')}${n(r.transito, 'En camino', 'c')}<span class="iv-sf-t"><b>${appN(x.tot, 2)}</b><small>${e(r.unidad || '')} en total</small>${(function(){ const q = (r.codigos || [r.codigo]).reduce(function(a, c){ return a + resProd(c); }, 0), qi = (r.codigos || [r.codigo]).reduce(function(a, c){ return a + resProd(c, 'Ica'); }, 0), qt = (r.codigos || [r.codigo]).reduce(function(a, c){ return a + resProd(c, 'Trujillo'); }, 0);
+    ${n(r.lima, 'Lurín', 'l')}${n(r.ica, 'Ica')}${n(r.trujillo, 'Trujillo')}${n(r.transito, 'En camino', 'c')}<span class="iv-sf-t"><b>${appN(Math.max(0, Math.round((x.tot - resProdInfo(r.codigos || [r.codigo]).tot) * 100) / 100), 2)}</b><small>${e(r.unidad || '')} libre</small>${(function(){ const q = (r.codigos || [r.codigo]).reduce(function(a, c){ return a + resProd(c); }, 0), qi = (r.codigos || [r.codigo]).reduce(function(a, c){ return a + resProd(c, 'Ica'); }, 0), qt = (r.codigos || [r.codigo]).reduce(function(a, c){ return a + resProd(c, 'Trujillo'); }, 0);
       return q > 0 || qi > 0 || qt > 0 ? `<em class="iv-res" title="Reservado con foto; se descuenta como referencia hasta la salida en Nisira">🔒 ${[[q, 'Lurín'], [qi, 'Ica'], [qt, 'Trujillo']].filter(function(a){ return a[0] > 0; }).map(function(a){ return a[1] + ' ' + appN(a[0], 2); }).join(' · ')} reservado</em>` : ''; })()}</span></div>`; }
 function invSupLista(L, tit){ const l = L.filter(function(x){ return x.tot > 0 || x.r.transito > 0; }).sort(function(a, b){ return (b.r.lima || 0) - (a.r.lima || 0) || b.tot - a.tot; });
   return `<div class="td rqm iv-sup">${tit || ''}${l.slice(0, 400).map(invSupFila).join('') || '<div class="pmf-vacio">Sin stock.</div>'}${l.length > 400 ? `<div class="td-res">Mostrando 400 de ${appN(l.length)}: busca por código o descripción para afinar.</div>` : ''}</div>`; }
@@ -23982,6 +23995,9 @@ function appInvCompletar(){
 }
 function appInvTarjeta(x){
   const r = x.r, um = escapeHtml(r.unidad || ''), est = APP_INV_EST[x.e] || ['gris', ''];
+  // El número grande descuenta lo reservado en la app (en vivo), y lo validado cuenta como salida ficticia hasta la salida en Nisira (20.11.2026, Piero).
+  const RI = resProdInfo(r.codigos || [r.codigo]), neto = Math.max(0, Math.round((x.tot - RI.tot) * 100) / 100);
+  const descTxt = RI.tot > 0 ? '−' + appN(RI.tot, 2) + ' ' + um + ' (' + [RI.rsv > 0 ? appN(RI.rsv, 2) + ' reservado' : '', RI.val > 0 ? appN(RI.val, 2) + ' por salir' : ''].filter(Boolean).join(' · ') + ')' : '';
   const pct = x.cob == null ? (x.tot > 0 ? 100 : 0) : Math.min(100, x.cob / 3 * 100);
   const alcanza = r.sinRop ? (x.tot > 0 ? 'no entra en la reposición' : 'sin stock') : x.cob == null ? (x.tot > 0 ? 'sin consumo registrado' : 'sin stock ni consumo') : x.cob <= 0 ? (x.tot > 0 ? 'Lima sin stock (lo de sedes no cuenta)' : 'no alcanza: sin stock') : x.cob < 1 ? (Math.round(x.cob * 30) <= 1 ? 'alcanza ~1 día' : 'alcanza ~' + Math.round(x.cob * 30) + ' días') : 'alcanza ~' + appN(x.cob, 1) + ' meses';
   const abierto = APP_INV.sel === r.codigo;
@@ -23989,7 +24005,7 @@ function appInvTarjeta(x){
     <button type="button" class="m-prod-cab" data-invsel="${escapeHtml(r.codigo)}">
       <span class="m-prod-nom">${escapeHtml(r.descripcion || r.codigo)}</span>
       <span class="m-prod-lin"><span class="mono">${escapeHtml(r.codigo)}</span><span class="m-badge ${est[0]}">${est[1]}</span>${x.camino ? '<span class="m-badge azul">🚚 En camino</span>' : ''}</span>
-      <span class="m-prod-stock"><b>${appN(x.tot, 2)}</b> ${um}<small>${alcanza}</small></span>
+      <span class="m-prod-stock"><b>${appN(neto, 2)}</b> ${um}<small>${alcanza}</small>${descTxt ? `<em class="m-desc" title="Reservado en la app: se descuenta del stock hasta la salida en Nisira. Lo validado cuenta como salida (ficticia) hasta registrarse en Nisira.">🔒 ${descTxt}</em>` : ''}</span>
       <span class="m-gauge"><em class="${est[0]}" style="width:${pct.toFixed(0)}%"></em></span>
       <span class="m-sedes">${[['Lima', 'Lurín', r.lima], ['Trujillo', 'Trujillo', r.trujillo], ['Ica', 'Ica', r.ica]].map(function(k){ const q = (r.codigos || [r.codigo]).reduce(function(a, c){ return a + resProd(c, k[1]); }, 0);   // kárdex menos lo reservado en la app (13.11.2026)
         return `<span>${k[0]} <b>${appN(k[2], 2)}</b>${q > 0 ? `<i class="m-rsv" title="Reservado en la app hasta la salida en Nisira">🔒 ${appN(q, 2)} · libre ${appN(Math.max(0, (k[2] || 0) - q), 2)}</i>` : ''}</span>`; }).join('')}${x.pedir ? `<span class="pedir">Pedir ≈ <b>${appN(Math.round(x.pedir))}</b></span>` : ''}</span>
