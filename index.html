@@ -3010,9 +3010,15 @@ html[data-theme="dark"] .pz-ic{background:rgba(255,255,255,.06);} html[data-them
 .bv-inv span{grid-row:span 2;font-size:22px;} .bv-inv b{font-size:14.5px;font-weight:800;} .bv-inv small{font-size:12px;color:var(--pz-soft);font-weight:600;}
 .bv-inv:hover{border-color:#1a9c86;background:#eef8f5;} .bv-inv.cargando{opacity:.6;pointer-events:none;}
 html[data-theme="dark"] .bv-inv{background:#1d1d3e;border-color:#2d2d55;color:#f4f4f9;}
-.bv-otp{margin-top:6px;} .bv-otp-abrir{margin-top:14px;} .bv-otp-box{margin-top:10px;padding:14px;border:1px dashed var(--border,#d9e2ef);border-radius:14px;background:var(--surface-3,#fbfcfd);text-align:left;}
-.bv-otp-txt{margin:0 0 10px;font-size:13px;line-height:1.45;color:var(--ink-soft,#5b6b7a);} .bv-otp-btn{margin-top:10px;} #bvOtpCod{margin-top:12px;}
-html[data-theme="dark"] .bv-otp-box{background:#1d1d3e;border-color:#2d2d55;}
+.bv-otp-abrir{margin-top:14px;}
+.bv-otp-card{text-align:left;margin-top:0;}
+.bv-otp-h{margin:4px 0 6px;font-size:20px;font-weight:800;color:var(--pz-ink);letter-spacing:-.01em;}
+.bv-otp-txt{margin:0 0 14px;font-size:13px;line-height:1.5;color:var(--ink-soft,#5b6b7a);} .bv-otp-btn{margin-top:12px;} #bvOtpCod{margin-top:14px;}
+.bv-otp-volver{border:0;background:none;color:#0e8a7c;font-weight:700;font-family:inherit;font-size:13.5px;cursor:pointer;padding:2px 0;margin-bottom:4px;}
+/* Pantalla aparte: al elegir "solo con tu correo" se oculta el login y queda solo esta tarjeta (20.11.2026, Piero) */
+#appBienv.bv-otp-on .bv-tarjeta:not(.bv-otp-card), #appBienv.bv-otp-on #bvOtpAbrir, #appBienv.bv-otp-on .bv-inv, #appBienv.bv-otp-on .bv-nota{display:none;}
+#appBienv.bv-otp-on #bvOtpPanel{display:block !important;}
+html[data-theme="dark"] .bv-otp-h{color:#f4f4f9;} html[data-theme="dark"] .bv-otp-volver{color:#5fd0b9;}
 .app-bienv .bv-acceso{color:#0f6b60;} .app-bienv .bv-acceso b{color:#0e8a7c;}
 .app-bienv .bv-err{background:#fdecee;border-color:#ebd7d9;color:#a12a35;}
 .app-bienv .bv-in .bv-nota, .app-bienv .bv-pie{color:var(--pz-soft);opacity:1;}
@@ -18736,19 +18742,22 @@ function appBienvenida(correoFijo){
       ${correoFijo ? '<button type="button" class="bv-otro" id="bvOtro">Usar otro correo</button>' : ''}
     </form>
     ${!correoFijo && appInvVigente() ? `<button type="button" class="bv-inv" id="bvInv"><span>👀</span><b>Entrar como invitado</b><small>Supervisor · solo ver · hasta el ${new Date(APP_INV_HASTA).toLocaleDateString('es-PE', { day:'2-digit', month:'2-digit', timeZone:'America/Lima' })}</small></button>` : ''}</div>
-    ${correoFijo ? '' : `<div class="bv-otp" id="bvOtp">
-      <button type="button" class="bv-otro bv-otp-abrir" id="bvOtpAbrir">¿No tienes cuenta? Entra solo con tu correo</button>
-      <div class="bv-otp-box" id="bvOtpBox" hidden>
-        <p class="bv-otp-txt">Te enviamos un código de 6 dígitos a tu correo <b>@friopacking.pe</b> o <b>@grupofriopacking.pe</b> y entras a la vista Supervisor.</p>
-        <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpPedir">Enviarme el código</button>
-        <div id="bvOtpCod" hidden>
-          <label class="bv-lbl" for="bvOtpInp">Código del correo</label>
-          <input type="text" id="bvOtpInp" class="bv-inp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6 dígitos" enterkeyhint="go">
-          <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpEntrar">Entrar</button>
-          <button type="button" class="bv-otro" id="bvOtpReenviar">Reenviar código</button>
-        </div>
-        <p class="bv-err" id="bvOtpErr" hidden></p>
-      </div></div>`}
+    ${correoFijo ? '' : `<button type="button" class="bv-otro bv-otp-abrir" id="bvOtpAbrir">¿No tienes cuenta? Entra solo con tu correo</button>
+    <div class="bv-tarjeta bv-otp-card" id="bvOtpPanel" hidden>
+      <button type="button" class="bv-otp-volver" id="bvOtpVolver">‹ Volver</button>
+      <h3 class="bv-otp-h">Entra con tu correo</h3>
+      <p class="bv-otp-txt">Pon tu correo <b>@friopacking.pe</b> o <b>@grupofriopacking.pe</b>, te enviamos un código de 6 dígitos y entras a la vista Supervisor.</p>
+      <label class="bv-lbl" for="bvOtpCorreo">Correo corporativo</label>
+      <input type="email" id="bvOtpCorreo" class="bv-inp" placeholder="usuario@friopacking.pe" inputmode="email" autocapitalize="off" autocomplete="email" enterkeyhint="go">
+      <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpPedir">Enviarme el código</button>
+      <div id="bvOtpCod" hidden>
+        <label class="bv-lbl" for="bvOtpInp">Código del correo</label>
+        <input type="text" id="bvOtpInp" class="bv-inp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6 dígitos" enterkeyhint="go">
+        <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpEntrar">Entrar</button>
+        <button type="button" class="bv-otro" id="bvOtpReenviar">Reenviar código</button>
+      </div>
+      <p class="bv-err" id="bvOtpErr" hidden></p>
+    </div>`}
     <p class="bv-nota">Entra con tu correo corporativo y tu clave. La primera vez toca <b>«Crea tu clave»</b> con el código de registro que te da Logística.</p>
     <p class="bv-pie">GRUPO FRIOPACKING · ${new Date().getFullYear()}</p></div>`;
   b.classList.add('abierto');
@@ -18792,21 +18801,26 @@ function appBienvenida(correoFijo){
   // Entrar solo con el correo (OTP): pide el código, lo verifica y entra a Supervisor (19.11.2026)
   (function(){
     const abrir = document.getElementById('bvOtpAbrir'); if(!abrir) return;
-    const box = document.getElementById('bvOtpBox'), pedir = document.getElementById('bvOtpPedir'), codW = document.getElementById('bvOtpCod'),
-      inp = document.getElementById('bvOtpInp'), entrar = document.getElementById('bvOtpEntrar'), reenviar = document.getElementById('bvOtpReenviar'), errO = document.getElementById('bvOtpErr');
+    const bienv = document.getElementById('appBienv'), panel = document.getElementById('bvOtpPanel'), volver = document.getElementById('bvOtpVolver'),
+      correoO = document.getElementById('bvOtpCorreo'), pedir = document.getElementById('bvOtpPedir'), codW = document.getElementById('bvOtpCod'),
+      inp = document.getElementById('bvOtpInp'), entrar = document.getElementById('bvOtpEntrar'), reenviar = document.getElementById('bvOtpReenviar'),
+      errO = document.getElementById('bvOtpErr'), txt = panel.querySelector('.bv-otp-txt');
     const eo = function(t){ errO.textContent = t || ''; errO.hidden = !t; };
-    abrir.onclick = function(){ const ab = box.hidden; box.hidden = !ab; abrir.textContent = ab ? '‹ Volver a entrar con mi clave' : '¿No tienes cuenta? Entra solo con tu correo';
-      if(ab){ correo.focus(); eo(''); } };
-    const correoOk = function(){ const c = correo.value.trim().toLowerCase();
-      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c)){ eo('Escribe tu correo arriba primero.'); return null; }
+    const reset = function(){ codW.hidden = true; pedir.hidden = false; pedir.disabled = false; pedir.classList.remove('cargando');
+      inp.value = ''; eo(''); if(txt) txt.innerHTML = 'Pon tu correo <b>@friopacking.pe</b> o <b>@grupofriopacking.pe</b>, te enviamos un código de 6 dígitos y entras a la vista Supervisor.'; };
+    abrir.onclick = function(){ reset(); bienv.classList.add('bv-otp-on'); correoO.value = correo.value.trim(); setTimeout(function(){ correoO.focus(); }, 30); };
+    volver.onclick = function(){ bienv.classList.remove('bv-otp-on'); };
+    const correoOk = function(){ const c = correoO.value.trim().toLowerCase();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c)){ eo('Escribe tu correo corporativo.'); correoO.focus(); return null; }
       if(!sbCorreoEmpresa(c)){ eo('Solo correos @friopacking.pe o @grupofriopacking.pe.'); return null; } return c; };
     const pedirCod = async function(bt){ const c = correoOk(); if(!c) return; bt.disabled = true; bt.classList.add('cargando'); eo('');
-      try{ await sbOtpPedir(c); codW.hidden = false; pedir.hidden = true; eo(''); inp.focus();
-        const m = document.getElementById('bvOtpTxt') || box.querySelector('.bv-otp-txt'); if(m) m.innerHTML = 'Te enviamos un código de 6 dígitos a <b>' + escapeHtml(c) + '</b>. Escríbelo aquí abajo.'; }
+      try{ await sbOtpPedir(c); codW.hidden = false; pedir.hidden = true; eo(''); setTimeout(function(){ inp.focus(); }, 30);
+        if(txt) txt.innerHTML = 'Te enviamos un código de 6 dígitos a <b>' + escapeHtml(c) + '</b>. Escríbelo aquí abajo.'; }
       catch(er){ eo(er.message && er.message !== 'Failed to fetch' ? er.message : 'No hay conexión. Inténtalo de nuevo.'); }
       finally{ bt.disabled = false; bt.classList.remove('cargando'); } };
     pedir.onclick = function(){ pedirCod(pedir); };
     reenviar.onclick = function(){ pedirCod(pedir); };
+    correoO.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); if(!codW.hidden) entrar.click(); else pedir.click(); } });
     entrar.onclick = async function(){ const c = correoOk(); if(!c) return; const cod = inp.value.trim();
       if(!/^\d{4,8}$/.test(cod)){ eo('Escribe el código de 6 dígitos del correo.'); return; }
       entrar.disabled = true; entrar.classList.add('cargando'); eo('');
