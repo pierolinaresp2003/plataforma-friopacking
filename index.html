@@ -3974,7 +3974,11 @@ html[data-theme="dark"] .ct2-it .ct2-oc{color:#8fb3ff;}
 .ct2-p svg{width:15px;height:15px;flex:none;} .ct2-p em{font-style:normal;font-size:11px;background:rgba(255,255,255,.6);border-radius:999px;padding:0 6px;}
 .ct2-p.si{background:#ebf2ee;color:#1e7a45;} .ct2-p.si.her{background:#eef7f1;} .ct2-p.no{background:#d1453b;color:#fff;} .ct2-p.no.lev{background:#f7f3ea;color:#9a5b00;} .ct2-p.no.ver{background:var(--surface-2);color:var(--ink-soft);cursor:default;}
 .ct2-p:hover{transform:translateY(-1px);filter:brightness(.97);}
-.ct2-mail{all:unset;cursor:pointer;width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:var(--surface-2);color:#1f4fd1;} .ct2-mail svg{width:17px;height:17px;} .ct2-mail.sin{color:var(--ink-soft);}
+.ct2-mail{all:unset;position:relative;cursor:pointer;width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:var(--surface-2);color:#1f4fd1;} .ct2-mail svg{width:17px;height:17px;} .ct2-mail.sin{color:var(--ink-soft);}
+/* Ícono de correo marcado cuando ya se generó la solicitud (20.11.2026). */
+.ct2-mail.enviado{background:#e7f5ec;color:#1e7a45;box-shadow:inset 0 0 0 1px #9ed0b2;}
+.ct2-mail .ct2-mail-ok{position:absolute;top:-4px;right:-4px;width:15px;height:15px;border-radius:50%;background:#1e7a45;color:#fff;font-size:10px;font-weight:900;font-style:normal;display:grid;place-items:center;line-height:1;}
+html[data-theme="dark"] .ct2-mail.enviado{background:rgba(45,138,79,.2);color:#66c38d;box-shadow:inset 0 0 0 1px rgba(45,138,79,.5);}
 .ct2-it .crt-nota{grid-column:1 / -1;}
 /* Arrastrar y soltar (19.11.2026): dónde va a caer el archivo */
 #crtVista .ct2-dz{outline:2px dashed #1f4fd1;outline-offset:2px;background:color-mix(in srgb,#1f4fd1 10%,var(--card));border-radius:12px;}
@@ -14919,6 +14923,10 @@ function crtPedidoMarcar(k, si){
   si ? CRT_PEDIDOS.add(k) : CRT_PEDIDOS.delete(k);
   try{ localStorage.setItem(CRT_PEDIDO, JSON.stringify([...CRT_PEDIDOS])); }catch(err){}
 }
+// Marca en el ícono de correo de cada ítem que ya se le generó la solicitud al proveedor (20.11.2026, Piero:
+// "cuando mande el correo que quede marcado en el ícono para saber que ya se envió"). Se guarda en este navegador.
+function crtMailClaveEnv(clave){ return 'mail|' + clave; }
+function crtMailEnviado(f){ return CRT_PEDIDOS.has(crtMailClaveEnv(crtClave(f))); }
 /** La casilla que va al lado del botón de correo, tanto en la fila como en el panel azul. */
 function crtCheckPedido(k, texto){
   const si = CRT_PEDIDOS.has(k);
@@ -15233,7 +15241,10 @@ function crtCorreoProducto(clave, soloEste){
   const f = CRT.filas.find(function(x){ return crtClave(x) === clave; }); if(!f) return;
   const pf = crtProvDe(f) || {}, ruc = pf.ruc || '', nom = String(pf.nombre || f.proveedor || '').trim().toUpperCase();
   const filas = soloEste ? [f] : CRT.filas.filter(function(x){ if(x.idPry !== f.idPry) return false; if(crtTiene(x, 'cert') && crtTiene(x, 'ficha')) return false; const q = crtProvDe(x) || {}; return ruc ? q.ruc === ruc : String(q.nombre || x.proveedor || '').trim().toUpperCase() === nom; });
-  crtCorreoRico({ clave:ruc || nom, nombre: pf.nombre || f.proveedor || '(sin proveedor)', filas: filas.length ? filas : [f], correo: crtCorreoDe(f) });
+  const usar = filas.length ? filas : [f];
+  usar.forEach(function(x){ crtPedidoMarcar(crtMailClaveEnv(crtClave(x)), true); });   // deja marcado el ícono de correo de cada ítem
+  crtCorreoRico({ clave:ruc || nom, nombre: pf.nombre || f.proveedor || '(sin proveedor)', filas: usar, correo: crtCorreoDe(f) });
+  if(typeof crtDibujar === 'function') crtDibujar();
 }
 function crtCorreoRico(g){
   const d = g.correo;
@@ -15746,9 +15757,9 @@ function crtPlazo(f){ if(!f.recep || Date.now() < +CRT_PLAZO_DESDE) return null;
 function crtPlazoHtml(f){ const p = crtPlazo(f); if(!p) return ''; const que = p.falta.map(function(t){ return t === 'cert' ? 'certificado' : 'ficha técnica'; }).join(' y ');
   return p.vencido ? `<span class="crt-plazo mal" title="Máximo ${CRT_PLAZO_DH} días hábiles desde que llegó">⚠ Vencido: ${p.d} días hábiles sin ${que}</span>`
     : p.quedan <= 2 ? `<span class="crt-plazo ojo" title="Máximo ${CRT_PLAZO_DH} días hábiles desde que llegó">Quedan ${Math.max(0, p.quedan)} día${p.quedan === 1 ? '' : 's'} hábil${p.quedan === 1 ? '' : 'es'} para subir ${que}</span>` : ''; }
-function ct2Item(f){ const e = escapeHtml, falta = !crtTiene(f, 'cert') || !crtTiene(f, 'ficha'), c = !crtSoloVer() && falta ? crtCorreoDe(f) : null;
+function ct2Item(f){ const e = escapeHtml, falta = !crtTiene(f, 'cert') || !crtTiene(f, 'ficha'), c = !crtSoloVer() && falta ? crtCorreoDe(f) : null, env = c && crtMailEnviado(f);
   return `<div class="ct2-it ${crtEstado(f)}" data-crtk="${e(crtClave(f))}"><div class="ct2-it-t"><b>${crtMarca(f.producto)}</b><small>${crtMarca(f.codigo)}${f.oc ? ' · <b class="ct2-oc">OC ' + crtMarca(String(f.oc).replace(/^000\d-0*/, '')) + '</b>' : (f.lotes && f.lotes[0] && f.lotes[0][0] ? ' · <span class="ct2-stk">de stock</span> · <b class="ct2-oc">OC ' + crtMarca(String(f.lotes[0][0]).replace(/^000\d-0*/, '')) + '</b>' : ' · <span class="ct2-stk">de stock</span>')} · Req. ${crtMarca(String(f.req).replace(/^000\d-0*/, ''))}${f.fecha ? ' · ' + e(f.fecha) : ''}${(function(){ const r = rqNomUsr(f.usuario); return r ? ' · 👤 ' + e(r) : ''; })()}${f.stock && !f.lotes ? ' · ' + e(crtMotivoLote(f)) : ''}</small>${crtPlazoHtml(f)}</div>
-    <div class="ct2-docs">${ct2Pill(f, 'cert')}${ct2Pill(f, 'ficha')}${c ? `<button type="button" class="ct2-mail${c.sin ? ' sin' : ''}" data-crtmail="${e(crtClave(f))}" title="${c.sin ? 'El proveedor no tiene correo en DB Proveedores' : 'Pedir solo este producto al proveedor (línea por línea)'}">${CT2_ICO.mail}</button>` : ''}</div>
+    <div class="ct2-docs">${ct2Pill(f, 'cert')}${ct2Pill(f, 'ficha')}${c ? `<button type="button" class="ct2-mail${c.sin ? ' sin' : ''}${env ? ' enviado' : ''}" data-crtmail="${e(crtClave(f))}" title="${c.sin ? 'El proveedor no tiene correo en DB Proveedores' : (env ? 'Ya se generó la solicitud al proveedor · clic para volver a generar' : 'Pedir solo este producto al proveedor (línea por línea)')}">${CT2_ICO.mail}${env ? '<i class="ct2-mail-ok" aria-label="ya solicitado">✓</i>' : ''}</button>` : ''}</div>
     ${f.nota ? `<div class="crt-nota">${f.nota.html}</div>` : ''}</div>`; }
 // Panel para subir: archivo → tipo → productos → Guardar
 function ct2UpHtml(delPry){ const e = escapeHtml, U = CT2.up;
