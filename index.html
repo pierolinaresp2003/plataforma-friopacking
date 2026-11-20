@@ -3254,6 +3254,12 @@ html[data-theme="dark"] .tlh-tr::before{background:#1f3a48;}
 .pm-pin:hover circle, .pm-pin.sel circle{fill:#14b8a6;stroke:#fff;}
 .pm-pin text.pm-lbl{fill:#0f1b2d;font:700 11px Inter,sans-serif;paint-order:stroke;stroke:rgba(255,255,255,.92);stroke-width:3.5px;stroke-linejoin:round;}
 html[data-theme="dark"] .pm-dep{stroke:#13132c;} html[data-theme="dark"] .pm-dep.t0{fill:#29294f;} html[data-theme="dark"] .pm-pin text.pm-lbl{fill:#f4f4f9;stroke:rgba(19,19,44,.9);}
+/* Vista Supervisor: mapa más gerencial y legible (19.11.2026, Piero: "en la vista clara no se ve bien el mapa por el color de fondo") — el mapa va sobre un panel tipo "mar" para que el país resalte, y se quitaron los logos de fruta. */
+.pmm .pm-mapa{background:linear-gradient(168deg,#eef4fc 0%,#dce8f7 100%);border:1px solid #cfdcee;border-radius:24px;padding:6px 8px 2px;box-shadow:0 10px 30px -18px rgba(10,30,100,.25), inset 0 1px 0 rgba(255,255,255,.7);}
+.pmm .pm-mapa svg{height:calc(100vh - 134px);}
+html:not([data-theme="dark"]) .pm-dep.t0{fill:#c6d4e6;}
+html[data-theme="dark"] .pmm .pm-mapa{background:linear-gradient(168deg,#1a1a3b 0%,#141430 100%);border-color:#2a2a52;box-shadow:0 10px 30px -18px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);}
+@media (max-width:900px){ .pmm .pm-mapa{border-radius:18px;padding:4px 6px 0;} .pmm .pm-mapa svg{height:auto;} }
 /* Ítems de un día */
 .tlh-card[data-tld]{cursor:pointer;transition:box-shadow .2s,transform .2s;} .tlh-card[data-tld]:hover{transform:translateY(-2px);box-shadow:0 14px 30px -14px rgba(16,24,40,.4);}
 .tlh-mas{color:#1f56b8 !important;font-weight:700;}
@@ -21247,12 +21253,12 @@ function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
   // Frutas alrededor del mapa, nunca encima (17.11.2026, Piero: "más dinámicos, mejor colocados"): cada departamento con su grupo de
   // burbujas (más grandes las de más proyectos, en zigzag), a cerca o a más distancia para que se vean sueltas, unidas con una curva
   // animada a su departamento y flotando suave. Norte y centro van al mar (izquierda); el sur, pasado el borde este (derecha).
-  const FR = pmFrutasPorDep(l).D;
-  const OFS = { TUMBES:[-60, -6], PIURA:[-62, -8], LAMBAYEQUE:[-150, 4], 'LA LIBERTAD':[-62, 2], ANCASH:[-150, 6], LIMA:[-66, 4], CALLAO:[-150, 14], ICA:[-70, 36], AREQUIPA:[-50, 64], MOQUEGUA:[-46, 60], TACNA:[-40, 52] };
+  const FR = {};
+  const OFS_X = { TUMBES:[-60, -6], PIURA:[-62, -8], LAMBAYEQUE:[-150, 4], 'LA LIBERTAD':[-62, 2], ANCASH:[-150, 6], LIMA:[-66, 4], CALLAO:[-150, 14], ICA:[-70, 36], AREQUIPA:[-50, 64], MOQUEGUA:[-46, 60], TACNA:[-40, 52] };
   const nMax = Math.max.apply(null, [1].concat([].concat.apply([], Object.keys(FR).map(function(k){ return Object.keys(FR[k]).map(function(f){ return FR[k][f]; }); }))));
   const radio = function(n){ return 19 + 9 * Math.sqrt(n / nMax); };
   let x0 = 0, x1 = M.w, ani = 0;
-  const llamadas = deps.filter(function(k){ return por[k] && FR[k]; }).sort(function(a, b){ return M.dep[a].c[1] - M.dep[b].c[1]; }).map(function(k, ik){
+  const llamadas = [].filter(function(k){ return por[k] && FR[k]; }).sort(function(a, b){ return M.dep[a].c[1] - M.dep[b].c[1]; }).map(function(k, ik){
     const c = M.dep[k].c, rp = 9 + 9 * Math.sqrt(por[k].n / mx), fs = pmFrutasOrden(FR[k]).filter(function(f){ return f !== 'otros' || Object.keys(FR[k]).length === 1; }).slice(0, 4);
     const izq = !!OFS[k] && c[1] < 600, o = izq ? OFS[k] : [0, OFS[k] ? 10 : 0], y = c[1] + o[1];
     const rs = fs.map(function(f){ return radio(FR[k][f]); });
@@ -21268,7 +21274,7 @@ function pmMapaHtml(l){ const e = escapeHtml, M = PM_PERU, por = {};
         return `<g class="pm-fb" style="--f:${(ani++ % 7) * 0.45}s"><title>${e(pmFrutaNom(b.f))} · ${n} proyecto${n === 1 ? '' : 's'} en ${e(titleCase(k))}</title><circle class="pm-fb-c" cx="${b.cx.toFixed(1)}" cy="${b.cy.toFixed(1)}" r="${b.r.toFixed(1)}"/><svg x="${(b.cx - ic / 2).toFixed(1)}" y="${(b.cy - ic / 2).toFixed(1)}" width="${ic.toFixed(1)}" height="${ic.toFixed(1)}" viewBox="0 0 24 24">${fr[3]}</svg>
           <circle class="pm-fb-n" cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="8.5"/><text class="pm-fb-t" x="${bx.toFixed(1)}" y="${(by + 3.5).toFixed(1)}" text-anchor="middle">${n}</text></g>`; }).join('')}</g>`; }).join('');
   const vb = `${Math.floor(x0)} 0 ${Math.ceil(x1 - x0)} ${M.h}`;
-  return `<div class="pm-mapa"><svg viewBox="${vb}" role="img" aria-label="Mapa del Perú con los proyectos por departamento"><g class="pm-deps">${paths}</g><g class="pm-frutas">${llamadas}</g><g class="pm-pins">${pins}</g></svg>
+  return `<div class="pm-mapa"><svg viewBox="0 0 ${M.w} ${M.h}" role="img" aria-label="Mapa del Perú con los proyectos por departamento"><g class="pm-deps">${paths}</g><g class="pm-pins">${pins}</g></svg>
     <div class="pm-tip" id="pmTip" hidden></div>
     </div>`; }
 function pmCardHtml(p, i){ const e = escapeHtml;
@@ -21281,7 +21287,7 @@ function pmCardHtml(p, i){ const e = escapeHtml;
 // pantalla; al tocar un departamento se abre a un lado (abajo en el celular) la lista de sus proyectos.
 function pmCardMin(p, i){ const e = escapeHtml, d = [];
   if(p.venc) d.push(`<i class="mal" title="OC vencidas">${p.venc}</i>`); if(p.n[1]) d.push(`<i class="oc" title="Sin OC">${p.n[1]}</i>`); if(p.n[3]) d.push(`<i class="alm" title="Por despachar">${p.n[3]}</i>`);
-  return `<button type="button" class="pmm-card" data-pmver="${e(p.id)}" style="--i:${Math.min(i, 12)}">${pmDona(p.pct, 52, 11)}<span><b>${e(polarCorta(p.cli, 40))}</b><small>${pmFrutasDe(p).filter(function(f){ return f !== 'otros'; }).map(function(f){ return pmFrutaIco(f, 14); }).join('')}${e(polarCorta(p.x.n || p.id, 48))}</small></span><span class="pmm-dots">${d.join('')}</span></button>`; }
+  return `<button type="button" class="pmm-card" data-pmver="${e(p.id)}" style="--i:${Math.min(i, 12)}">${pmDona(p.pct, 52, 11)}<span><b>${e(polarCorta(p.cli, 40))}</b><small>${e(polarCorta(p.x.n || p.id, 48))}</small></span><span class="pmm-dots">${d.join('')}</span></button>`; }
 function pmMapaVista(l){ const e = escapeHtml, sel = APP_PM.dep, L = sel ? l.filter(function(p){ return pmDepK(p.x.dep) === sel; }) : [];
   const q = (APP_PM.q || '').trim(), res = q ? `<div class="pmm-res">${l.slice(0, 8).map(pmCardMin).join('') || '<div class="ini-vacio">Sin coincidencias.</div>'}${l.length > 8 ? `<small>${appN(l.length - 8)} más · toca un departamento para verlos</small>` : ''}</div>` : '';
   // Leyenda simple en el espacio libre del mapa (12.11.2026, Piero): cómo leer el mapa y los colores que se ven al entrar a un proyecto
@@ -21290,7 +21296,7 @@ function pmMapaVista(l){ const e = escapeHtml, sel = APP_PM.dep, L = sel ? l.fil
   // Con una descripción corta (17.11.2026, Piero: "falta en la leyenda una descripción corta").
   const EST = [['#5b3fb0', 'En revisión', 'Logística lo revisa'], ['#9a5b00', 'Sin OC', 'En Compras, sin orden'], ['#1f4fd1', 'OC en camino', 'El proveedor aún no entrega'], ['#b4231a', 'OC vencida', 'Pasó la fecha pactada'], ['#0b6e63', 'Por despachar', 'En almacén, falta enviar'], ['#15803d', 'En obra', 'Salió o ya llegó a obra']];
   const li = function(ic, t, d){ return `<li>${ic}<span><b>${t}</b><small>${d}</small></span></li>`; };
-  const ley = `<aside class="pmm-ley"><b>Leyenda</b><ul class="pmm-ley-s">${li('<i class="g"></i>', 'Más proyectos', 'Color más oscuro')}${li('<i class="n"></i>', 'Proyectos en curso', 'Cuántos hay en el departamento')}${li(pmFrutaIco('arandano', 18), 'Fruta', 'Qué se procesa y en cuántos')}${li('<i class="zn"></i>', 'Norte · Centro · Sur', 'Proyectos por zona; toca para filtrar')}</ul>
+  const ley = `<aside class="pmm-ley"><b>Leyenda</b><ul class="pmm-ley-s">${li('<i class="g"></i>', 'Más proyectos', 'Color más oscuro')}${li('<i class="n"></i>', 'Proyectos en curso', 'Cuántos hay en el departamento')}${li('<i class="zn"></i>', 'Norte · Centro · Sur', 'Proyectos por zona; toca para filtrar')}</ul>
     <ul class="pmm-ley-s">${EST.map(function(x){ return li(`<i style="background:${x[0]}"></i>`, x[1], x[2]); }).join('')}</ul>
     <ul class="pmm-ley-s">${li('<i class="a">!</i>', 'Cerca del límite', 'Actuar pronto')}${li('<i class="r">!</i>', 'Pasó el límite', 'Atrasado, requiere acción')}</ul></aside>`;
   // Leyenda escondida en un ícono que se abre al tocarlo (17.11.2026, Piero: "la leyenda debe estar oculta como un ícono").
@@ -21307,7 +21313,7 @@ function pmMapaVista(l){ const e = escapeHtml, sel = APP_PM.dep, L = sel ? l.fil
       const L2 = baseZ.filter(function(p){ return p.zona === z; }); let tot = 0, ok = 0; L2.forEach(function(p){ tot += p.tot; ok += p.ok; });
       return `<button type="button" class="pmm-av-z${tot ? '' : ' vacio'}${APP_PM.zona === z ? ' on' : ''}" data-pmzona="${APP_PM.zona === z ? '' : z}" data-pmz="${z}" style="--zc:${ZN[z][1]}" title="${tot ? `${ZN[z][0]}: ${appN(ok)} de ${appN(tot)} ítems en obra` : 'Sin proyectos en curso'}">${pmDona(tot ? ok / tot * 100 : 0, 72, 11)}<span><i></i>${ZN[z][0]}</span><small>${appN(L2.length)} proy.</small></button>`; }).join('')}</div></div>`;
   return `<div class="pmm${sel ? ' con' : ''}">${res}${leyW}${sel ? '' : `<div class="pmm-der">${avance}</div>`}<div class="pmm-mapa">${pmMapaHtml(l)}</div>
-    ${sel ? `<aside class="pmm-panel"><header><div><h3>${e(titleCase(sel))}</h3><span>${appN(L.length)} proyecto${L.length === 1 ? '' : 's'}</span>${FD.D[sel] ? `<span class="pmf-cs">${chipsF(FD.D[sel])}</span>` : ''}</div><button type="button" class="pmm-x" data-pmdep="" aria-label="Cerrar">×</button></header>
+    ${sel ? `<aside class="pmm-panel"><header><div><h3>${e(titleCase(sel))}</h3><span>${appN(L.length)} proyecto${L.length === 1 ? '' : 's'}</span></div><button type="button" class="pmm-x" data-pmdep="" aria-label="Cerrar">×</button></header>
       <div class="pmm-cards">${L.map(pmCardMin).join('') || '<div class="ini-vacio">Sin proyectos en curso.</div>'}</div></aside>` : ''}</div>`; }
 function appSupPryHtml(){
   const e = escapeHtml;
