@@ -17619,7 +17619,9 @@ function pdFilasCalc(){
   parc.forEach(function(rows){
     const ep = function(r){ return String(r.estadoPedido || '').trim().toLowerCase(); }, conOC = function(r){ return r.codOrden && !/anul/i.test(r.estadoOrden || ''); };
     if(!rows.some(function(x){ return conOC(x.r); })) return;
-    if(!rows.some(function(x){ const e = ep(x.r); return e === 'pendiente' || (e === 'atendido parcial' && x.r.fPedido && x.r.fPedido >= PD_PARCIAL_DESDE); })) return;
+    // También "Con orden de compra" (20.11.2026, Piero: "no está leyendo bien todos los parciales"): Nisira deja así el pedido aunque la OC
+    // cubra solo una parte (ej. RZ1-K 3G1.5: pedido 8,036 m, OC 4,962 m). "Atendido Total" y "Archivado" sí se cerraron en Nisira: no cuentan.
+    if(!rows.some(function(x){ const e = ep(x.r); return e === 'pendiente' || ((e === 'atendido parcial' || e === 'con orden de compra') && x.r.fPedido && x.r.fPedido >= PD_PARCIAL_DESDE); })) return;
     const L = new Map(), vistos = new Set(), ocs = []; let ocTot = 0;
     rows.forEach(function(x){ const r = x.r, q = +r.cantPedido || 0, e = ep(r);
       if(q > 0 && (r.codOrden || e === 'pendiente' || e === 'atendido parcial' || e === 'con orden de compra')){ const l = L.get(q) || L.set(q, { q:q, x:x, oc:false, pend:false }).get(q); if(conOC(r)){ l.oc = true; l.x = x; } if(!r.codOrden && e === 'pendiente') l.pend = true; }
