@@ -14840,13 +14840,24 @@ function crtQuitarDoc(url){
     f[c] = L.filter(function(d){ return d.url !== url; }); if(!f[c].length) f[c] = null; f[t] = f[c] ? f[c][0].url : null; }); });
   const pr = crtCacheLeer(); if(pr) crtCacheGuardar(pr.docs.filter(function(d){ return d.url !== url; }));
 }
+// Para eliminar hace falta sesión de Supabase (correo+clave u OTP). Si venció o no hay, el token sale vacío y
+// Drive responde "inicia sesión": en vez de dejar el mensaje sin salida, se reabre el ingreso (23.11.2026).
+async function crtSesionBorrar(){ let tk = ''; try{ tk = await sbToken(); }catch(err){} if(tk) return true;
+  appToast('Tu sesión se venció. Entra con tu correo para poder eliminar.');
+  try{ if(typeof appBienvenida === 'function') appBienvenida((typeof APP !== 'undefined' && APP.usuario && APP.usuario.correo) || ''); }catch(err){}
+  return false; }
 document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-crtborrar]'); if(!b) return; ev.preventDefault(); ev.stopPropagation();
   if(crtSoloVer()) return; const nom = b.dataset.nom || 'este archivo', url = b.dataset.crtborrar;
+  if(!(await crtSesionBorrar())) return;
   const n = CRT.filas.filter(function(f){ return crtDocs(f, b.dataset.tipo).some(function(d){ return d.url === url; }); }).length;
   if(!window.confirm('¿Eliminar "' + nom + '"?' + (n > 1 ? '\nEstá cargado en ' + n + ' productos: se quita de todos.' : '') + '\nSe va a la papelera de Drive (se puede recuperar 30 días).')) return;
   b.disabled = true; crtCerrarMenus(); appToast('Eliminando…');
   const r = await crtBorrarDeDrive(url);
-  if(!r || !r.ok){ b.disabled = false; appToast('No se pudo eliminar: ' + ((r && r.error) || 'error de red') + '.'); return; }
+  if(!r || !r.ok){ b.disabled = false;
+    if(r && /sesi[oó]n|inicia sesi/i.test(r.error || '')){ appToast('Tu sesión se venció. Entra con tu correo para poder eliminar.');
+      try{ if(typeof appBienvenida === 'function') appBienvenida((APP.usuario && APP.usuario.correo) || ''); }catch(err){} }
+    else appToast('No se pudo eliminar: ' + ((r && r.error) || 'error de red') + '.');
+    return; }
   crtQuitarDoc(url); crtDibujar(); appToast('Eliminado ✔'); }, true);
 /** Trae de Drive los documentos que ya existen en un proyecto. */
 /** Marca en las filas los documentos que devolvió Drive. */
