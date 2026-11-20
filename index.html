@@ -15215,6 +15215,17 @@ function crtCorreoSeleccion(clave){
     document.querySelectorAll('[data-crtselmail]').forEach(function(b){ b.addEventListener('click', function(){ crtCorreoSeleccion(b.dataset.crtselmail); }); });
     return;
   }
+  return crtCorreoRico(g);
+}
+// Arma el correo con el diseño (1. Documentos solicitados, 2. Materiales en tabla), lo copia al portapapeles como HTML y abre Outlook (20.11.2026, Piero: "el diseño del mensaje debe ser así igual... ponlo copia en portapapeles para que en Outlook se pegue no más").
+// Correo del botón de cada producto: junta todo lo que le falta a ese MISMO proveedor en el proyecto y usa el diseño con tabla (20.11.2026, Piero).
+function crtCorreoProducto(clave){
+  const f = CRT.filas.find(function(x){ return crtClave(x) === clave; }); if(!f) return;
+  const pf = crtProvDe(f) || {}, ruc = pf.ruc || '', nom = String(pf.nombre || f.proveedor || '').trim().toUpperCase();
+  const filas = CRT.filas.filter(function(x){ if(x.idPry !== f.idPry) return false; if(crtTiene(x, 'cert') && crtTiene(x, 'ficha')) return false; const q = crtProvDe(x) || {}; return ruc ? q.ruc === ruc : String(q.nombre || x.proveedor || '').trim().toUpperCase() === nom; });
+  crtCorreoRico({ clave:ruc || nom, nombre: pf.nombre || f.proveedor || '(sin proveedor)', filas: filas.length ? filas : [f], correo: crtCorreoDe(f) });
+}
+function crtCorreoRico(g){
   const d = g.correo;
   const porOc = new Map();
   g.filas.forEach(function(f){ const oc = (crtProvDe(f) || {}).oc || 'sin OC'; if(!porOc.has(oc)) porOc.set(oc, []); porOc.get(oc).push(f); });
@@ -15282,6 +15293,7 @@ function crtCorreoSeleccion(clave){
   };
   crtCopiarHtml(html, L.join('\r\n')).then(abrir, function(){ abrir(false); });
 }
+
 // Copia HTML con formato al portapapeles (con texto plano de respaldo). Si el navegador no deja, cae al método antiguo.
 /** Texto blanco en negrita sobre el color dado, como imagen PNG (data URI) nítida en pantallas 2x. */
 function crtImgTexto(t, fondo){
@@ -15316,18 +15328,12 @@ function crtCopiarHtml(html, texto){
 function crtCorreoYExcel(clave){
   const g = crtPendientesPorProveedor().find(x => x.clave === clave);
   if(!g || !g.correo || !g.correo.to) return;
-  const c = crtCorreoMasivo(g);
   const nombreBase = 'Documentacion pendiente - ' + limpiarNombreArchivo(CRT.pry + ' - ' + g.nombre);
   const bin = atob(crtExcelPendientes(g));
   const bytes = new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
   descargarBlob(new Blob([bytes], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nombreBase + '.xlsx');
-  const q = [];
-  const cc = crtCopias(g.filas, g.correo.to, g.correo.cc);
-  if(cc.length) q.push('cc=' + encodeURIComponent(cc.join(',')));
-  q.push('subject=' + encodeURIComponent(c.asunto));
-  q.push('body=' + encodeURIComponent(c.cuerpo));
-  window.location.href = 'mailto:' + g.correo.to + '?' + q.join('&');
+  crtCorreoRico(g);   // mismo diseño con tabla + copia al portapapeles (20.11.2026, Piero)
 }
 function limpiarNombreArchivo(t){
   return String(t||'').replace(/[\/\\:*?"<>|]/g,'-').replace(/\s+/g,' ').trim().slice(0,90);
@@ -15772,7 +15778,7 @@ function ct2Enlazar(cont, delPry){
   cont.querySelectorAll('[data-crtsube]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); crtPedirArchivo([b.dataset.crtsube], b.dataset.tipo); }); });
   cont.querySelectorAll('[data-crtver],[data-crtdlm]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); const m = b.closest('.crt-grupo').querySelector('.crt-menu'), abrir = m.hidden; crtCerrarMenus(); m.hidden = !abrir; }); });
   cont.querySelectorAll('[data-crtprev]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); crtCerrarMenus(); crtVer(b.dataset.crtprev, b.dataset.nom); }); });
-  cont.querySelectorAll('[data-crtmail]').forEach(function(b){ b.addEventListener('click', function(){ const u = crtMailto(b.dataset.crtmail); if(u) window.location.href = u; }); });
+  cont.querySelectorAll('[data-crtmail]').forEach(function(b){ b.addEventListener('click', function(){ crtCorreoProducto(b.dataset.crtmail); }); });
   cont.querySelectorAll('[data-crtmailm]').forEach(function(b){ b.addEventListener('click', function(){ crtCorreoYExcel(b.dataset.crtmailm); }); });
   cont.querySelectorAll('[data-crtpedido]').forEach(function(c){ c.addEventListener('change', function(){ crtPedidoMarcar(c.dataset.crtpedido, c.checked); const h = c.closest('.crt-hecho'); if(h) h.classList.toggle('si', c.checked); }); });
   cont.querySelectorAll('[data-ct2ped]').forEach(function(b){ b.addEventListener('click', function(){ CRT.pedAbierto = !CRT.pedAbierto; crtDibujar(); }); });
