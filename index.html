@@ -18497,7 +18497,7 @@ function appConstruir(){
 let appAtrasListo = false, appAtrasUltimo = 0;
 // Historial dentro de la app (13.10.2026, Piero: "el botón de retroceder debe funcionar, no solo es para salir de la
 // aplicación"): cada cambio de pantalla o sección guarda dónde se estaba y "atrás" vuelve ahí.
-const APP_NAV = []; let appNavAtras = false;
+const APP_NAV = []; let appNavAtras = false, appNavYa = false;
 function appNavAqui(){ const s = document.querySelector('.section.active');
   return { v:APP.vista, p:APP.enInicio ? APP.pantalla : null, s:!APP.enInicio && s ? s.id.replace(/^section-/, '') : null, rq:!APP.enInicio && s && s.classList.contains('rq-solo') ? document.getElementById('rqBuscar').value : '' }; }
 function appNavPush(){
@@ -19109,7 +19109,10 @@ function appInicio(pantalla){
   if(APP.vista === 'compras' && pantalla === 'pendlog' && appVistasPermitidas().indexOf('comex') !== -1){ APP.vista = 'comex'; try{ localStorage.setItem('fp-vista', 'comex'); }catch(err){} }   // Importaciones vive en Comex (18.11.2026)
   if(APP.vista === 'comex' && ['pendcompras', 'cmpeq', 'indicadores'].indexOf(pantalla) !== -1 && appVistasPermitidas().indexOf('compras') !== -1){ APP.vista = 'compras'; try{ localStorage.setItem('fp-vista', 'compras'); }catch(err){} if(pantalla === 'indicadores') pantalla = 'pendcompras'; }   // desde Leo
   else if(APP.vista === 'comex' && pantalla !== 'pendlog' && pantalla !== 'impnav') pantalla = 'pendlog';   // el Daily está en Gerencial (09.11.2026)
-  if(!(APP.enInicio && APP.pantalla === (APP_PANTALLAS[pantalla] ? pantalla : 'inicio'))) appNavPush();
+  // La 1.ª pantalla del app no tiene a dónde volver (23.11.2026, Piero: "al darle para atrás luego de gerencial te lleva a eso, eso no debería
+  // ya existir"): al arrancar, lo que está debajo es la página web antigua (Indicadores) y "atrás" la mostraba.
+  if(appNavYa && !(APP.enInicio && APP.pantalla === (APP_PANTALLAS[pantalla] ? pantalla : 'inicio'))) appNavPush();
+  appNavYa = true;
   if(APP.vista === 'supervisor' && RQ_MOVIL.matches){ irASeccion('requerimientos'); polarAbrir(undefined, true); APP.entrada = false; return; }
   const tabs = ((APP_VISTAS[APP.vista] || APP_VISTAS.supervisor).tabs || []).map(function(t){ return t[0]; });
   const antes = APP.enInicio ? APP.pantalla : null, nueva = APP_PANTALLAS[pantalla] ? pantalla : 'inicio';
