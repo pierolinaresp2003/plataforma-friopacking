@@ -2359,7 +2359,7 @@
       background:linear-gradient(180deg,transparent 52%,rgba(8,24,60,.30)),linear-gradient(135deg,var(--g1),var(--g2));box-shadow:0 20px 40px -22px rgba(18,48,100,.75),inset 0 0 0 1px rgba(255,255,255,.28);}
     .gd-holo::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(280px 170px at 30% 0%,rgba(255,255,255,.30),transparent 70%),linear-gradient(115deg,transparent 32%,rgba(255,255,255,.14) 42%,rgba(224,232,243,.18) 49%,rgba(255,255,255,.08) 56%,transparent 66%);background-size:auto,230% 100%;transition:background-position .6s;}
     button.gd-holo{cursor:pointer;text-align:left;font:inherit;display:block;width:100%;transition:transform .2s,box-shadow .2s;} button.gd-holo:hover{transform:translateY(-3px);box-shadow:0 30px 50px -24px rgba(18,48,100,.8),inset 0 0 0 1px rgba(255,255,255,.42);} button.gd-holo:hover::before{background-position:center,-25% 0;}
-    .gd-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:0 0 18px;} .gd-kpis > .gd-holo:nth-child(even){--g1:#14509E;--g2:#0A7F85;}
+    .gd-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:0 0 18px;} .gd-kpis.gd-k5{grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;} .gd-kpis > .gd-holo:nth-child(even){--g1:#14509E;--g2:#0A7F85;}
     .gd-kc{padding:16px 18px 14px;display:flex!important;flex-direction:column;gap:3px;min-height:230px;}
     .gd-kt{display:flex;align-items:flex-start;gap:9px;} .gd-num{flex-shrink:0;width:26px;height:26px;border-radius:9px;background:rgba(255,255,255,.22);display:grid;place-items:center;font-weight:800;font-size:13px;}
     .gd-kn{flex:1;font-weight:800;font-size:15px;line-height:1.22;} .gd-kn small{display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;margin-top:3px;font-weight:800;}
@@ -2538,7 +2538,7 @@
     @media (max-width:1100px){ .gd-tb span{display:none;} .gd-tb{padding:8px 10px;} }
     @media (max-width:759px){ /* 759 y no 760: las reglas de 760px se copian a la PC (ver APP_PC_CSS) */ .gd-nav{margin:-14px -14px 16px;position:static;} .gd-top{display:none;} .gd-menu{padding:8px 10px;gap:2px;min-height:0;} .gd-mi{padding:8px 10px;font-size:13.5px;} .gd-pager{display:none;}
       .gd-op.abierto .gd-sub{position:fixed;left:12px;right:12px;top:auto;} .gd-ag{grid-template-columns:1fr;} .gd-agn{font-size:44px;} }
-    @media (max-width:1250px){ .gd-kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .gd-band{grid-template-columns:repeat(3,minmax(0,1fr));} .gd-obj{grid-template-columns:minmax(180px,1fr) minmax(150px,1fr) minmax(200px,1.4fr) 34px;} .gd-obj .gd-or{display:none;} }
+    @media (max-width:1250px){ .gd-kpis, .gd-kpis.gd-k5{grid-template-columns:repeat(2,minmax(0,1fr));} .gd-band{grid-template-columns:repeat(3,minmax(0,1fr));} .gd-obj{grid-template-columns:minmax(180px,1fr) minmax(150px,1fr) minmax(200px,1.4fr) 34px;} .gd-obj .gd-or{display:none;} }
     @media (max-width:900px){ .gd-head{flex-direction:column;} .gd-lado{width:100%;max-width:none;min-height:150px;max-height:190px;} .gd-g2,.gd-g2 + .gd-g2{grid-template-columns:1fr;} .gd-pt{grid-template-columns:1fr;} .gd-pt-foto{min-height:220px;max-height:260px;}
       .gd-kan{grid-template-columns:1fr;} .gd-decb{grid-template-columns:1fr 1fr;} .gd-rks{grid-template-columns:1fr;} .gd-band{grid-template-columns:1fr 1fr;}
       .gd-obj{grid-template-columns:1fr;gap:6px;padding:0 0 14px;} .gd-obj > *:not(.gd-ol){padding:0 18px;} .gd-obj .gd-or{display:block;} .gd-oa{display:none;} .gd-ol{min-height:0;} }
@@ -18551,6 +18551,8 @@ function appAtras(){
   if(appNavVolver()) return true;
   const casa = APP.vista === 'super' ? 'suppry' : APP.vista === 'compras' ? 'pendcompras' : APP.vista === 'almacen' ? 'almseg' : APP.vista === 'gerencial' ? 'gdport' : 'inicio';
   if(!APP.enInicio || APP.pantalla !== casa){ appInicio(); return true; }
+  // Desde el reporte gerencial, "atrás" vuelve a la lista de módulos del aplicativo (23.11.2026, Piero: "al retroceder de gerencial no te lleva a la lista de todos los módulos").
+  if(GD_MODO){ location.href = './?app'; return true; }
   if(appVistasPermitidas().length > 1){ appLanzador(true); lz && (lz._desdeLogo = false); const l2 = document.getElementById('appLanz'); if(l2) l2._desdeLogo = false; return true; }
   return false;
 }
@@ -18779,7 +18781,7 @@ document.addEventListener('click', function(e){
   if(e.target.closest('.app-top .app-logo, .app-side-logo img') && APP.usuario) appLanzador(true);   // también con un solo módulo: ahí está "Cambiar de usuario"
   // Volver en la barra de arriba, a la izquierda del título (14.10.2026, Piero: "el botón para retroceder debe estar
   // en la barra de arriba ... ya no coloques ahí el logo"). Sin nada atrás, abre la pantalla de módulos.
-  if(e.target.closest('#appCasaBtn') && APP.usuario){ appLanzador(true); return; }   // casa: a la pantalla de módulos (14.10.2026, Piero)
+  if(e.target.closest('#appCasaBtn') && APP.usuario){ if(GD_MODO){ location.href = './?app'; return; } appLanzador(true); return; }   // casa: a la pantalla de módulos (14.10.2026, Piero); desde Gerencial, a la del aplicativo (23.11.2026)
   if(e.target.closest('#appAtrasBtn')){ if(!appAtras() && APP.usuario) appLanzador(true); }
 });
 // Respaldo del OTP: si Supabase mandó un enlace mágico en vez del código, al volver a la app el token llega en el # de la URL (19.11.2026).
@@ -18794,6 +18796,9 @@ function appOtpEnlace(){
     appEntrarAuto(correo); return true;
   }catch(e){ return false; }
 }
+// Al volver con "atrás" del navegador desde Gerencial, la página puede salir de la memoria tal como se dejó: se abre la lista de módulos (23.11.2026).
+window.addEventListener('pageshow', function(ev){ if(GD_MODO) return; let s = null; try{ s = sessionStorage.getItem('fp-gd-salto'); sessionStorage.removeItem('fp-gd-salto'); }catch(err){}
+  if(s && ev.persisted && APP.usuario){ appLanzador(true); const l = document.getElementById('appLanz'); if(l) l._desdeLogo = false; } });
 function appArrancar(){
   appPcActivar();
   if(appOtpEnlace()) return appSplashFuera();
@@ -19006,7 +19011,7 @@ function appCerrarUsuario(){
 }
 
 function appElegirVista(v){
-  if(v === 'gerencial' && !GD_MODO){ location.href = GD_LINK; return; }   // Gerencial vive en su link (11.11.2026)
+  if(v === 'gerencial' && !GD_MODO){ try{ sessionStorage.setItem('fp-gd-salto', '1'); }catch(err){} location.href = GD_LINK; return; }   // Gerencial vive en su link (11.11.2026)
   if(appVistasPermitidas().indexOf(v) === -1) return;
   appNavPush();
   APP.vista = v;
@@ -28599,6 +28604,73 @@ const GD_K = {
     val:function(){ return geImp().tr; }, detT:'En tránsito', det:function(){ return gdImpGrupos(function(g, k){ return k === 'tr'; }); } },
   eta:{ n:'Con ETA pasada', fr:'gdcex', fmt:'n', corte:1, bajo:1, meta:function(){ return 0; }, u:'OC en tránsito con la llegada vencida',
     val:function(){ return geImp().venc; }, detT:'En tránsito con ETA pasada', det:function(){ return gdImpGrupos(function(g, k){ return k === 'tr' && g.dEta != null && g.dEta < 0; }); } } };
+// Los 5 KPI de cada área (23.11.2026, Piero: "los principales KPI de compras, almacén y comercio exterior… 5 de cada área").
+// Compras: emisión, aprobación, proveedores, SKU sin OC con atraso y certificados. Almacén: pedido, despacho, despacho interno,
+// disponibilidad e inventario lento. Comex: ingreso vs ETA, lead time, ETA → ingreso, embarques atrasados y seguimiento completo.
+const GD_ETA_TOL = 7;   // días calendario después de la ETA para la aduana y el traslado a Lurín
+// Certificados: se arman con los datos de Compras y lo que contestó Drive (la última respuesta guardada y, de fondo, la de ahora).
+function gdCrtListo(){
+  if(!getProcesoRows().length) return false;
+  if(!CRT.listo || !CRT.filas.length){ crtCargar(); CRT.listo = true; const c = crtCacheLeer(); if(c) crtAplicarDocs(c.docs); }
+  if(!gdCrtListo.pedido && CRT_DRIVE.url){ gdCrtListo.pedido = true;
+    Promise.resolve(crtLeerDeDrive()).then(function(){ for(const k of [...APP_MEMO.m.keys()]) if(k.indexOf('gdvcrt') === 0) APP_MEMO.m.delete(k);
+      if(APP.enInicio && /^gd/.test(APP.pantalla || '')) appRenderInicio(); }).catch(function(){}); }
+  return true; }
+function gdCrt(d, h){ return appMemo('gdCrt' + d + h + (CRT.filas || []).length, function(){ const o = { tot:0, ok:0, L:[] }; if(!gdCrtListo()) return null;
+  if(!CRT.filas.some(function(f){ return (f.certs && f.certs.length) || (f.fichas && f.fichas.length); })) return null;   // Drive todavía no contestó: sin dato, no 0%
+  CRT.filas.forEach(function(f){ const k = String(f.fecha || '').split('/').reverse().join('-'); if(!gxEn(k, d, h)) return; o.tot++;
+    const c = crtTiene(f, 'cert'), fi = crtTiene(f, 'ficha'); if(c && fi){ o.ok++; return; }
+    o.L.push({ a:f.producto || f.codigo, b:(f.oc ? 'OC ' + gxCorto(f.oc) : 'Atendido de stock') + ' · ' + (f.proveedor || 'sin proveedor') + ' · ' + (f.idPry || '') , c:'falta ' + (!c && !fi ? 'certificado y ficha' : !c ? 'certificado' : 'ficha'), g:f.proveedor || 'Sin proveedor' }); });
+  return o; }); }
+// Despacho interno: de la recepción en almacén a la salida a obra (la parte que depende solo de Almacén).
+function gdDespInt(d, h){ return appMemo('gdDint' + d + h, function(){ const o = { dias:[], L:[] }, vis = new Set();
+  getProcesoRows().forEach(function(r){ if(!r.fRecep || !r.fSalida) return; const fs = isoDay(r.fSalida), fr = isoDay(r.fRecep); if(!gxEn(fs, d, h) || fs < fr) return;
+    const k = (r.codRequerimiento || '') + '|' + (r.idProducto || '') + '|' + (r.codOrden || ''); if(vis.has(k)) return; vis.add(k);
+    const dd = busdayCount(new Date(fr + 'T12:00:00Z'), new Date(fs + 'T12:00:00Z')) || 0; o.dias.push(dd);
+    o.L.push({ a:r.producto || r.idProducto, b:'Req. ' + gxCorto(r.codRequerimiento) + (r.codOrden ? ' · OC ' + gxCorto(r.codOrden) : '') + (r.proyecto ? ' · ' + appImpNombre(r.proyecto) : ''), c:dd + ' d.h. · llegó ' + fr.split('-').reverse().join('/') + ' · salió ' + fs.split('-').reverse().join('/'), d:dd }); });
+  o.L.sort(function(a, b){ return b.d - a.d; }); return o; }); }
+// Embarques del Excel de Camila con su ETA y el ingreso a Lurín de sus OC (Nisira).
+function gdEmbIngresos(d, h){ return appMemo('gdEmbIng' + d + h, function(){ const G = new Map(), o = { ok:[], tarde:[], dias:[] };
+  gxOCs().forEach(function(g){ if(g.imp) G.set(g.oc, g); });
+  const vis = new Set();
+  (EMB_DATA.rows || []).forEach(function(e){ if(!e.ea || !e.oc || !e.oc.length) return; const k = (e.rf || '') + '|' + e.oc.join(','); if(vis.has(k)) return; vis.add(k);
+    const gs = e.oc.map(function(c){ return G.get(c); }); if(gs.some(function(g){ return !g || g.abierta || !g.rec; })) return;
+    const ing = gs.map(function(g){ return g.rec; }).sort().pop(); if(!gxEn(ing, d, h)) return;
+    const dias = Math.round((new Date(ing + 'T12:00:00Z') - new Date(e.ea + 'T12:00:00Z')) / 864e5);
+    const it = { a:'OC ' + e.oc.map(gxCorto).join(', ') + (e.rf ? ' · Ref ' + e.rf : ''), b:(gs[0].prov || '') + (e.ds ? ' · ' + e.ds : ''), c:'ETA ' + e.ea.split('-').reverse().join('/') + ' · ingresó ' + ing.split('-').reverse().join('/') + ' (' + (dias >= 0 ? dias + ' días después' : (-dias) + ' días antes') + ')', g:e.ds || 'Sin país', d:dias };
+    o.dias.push(Math.max(0, dias)); (dias <= GD_ETA_TOL ? o.ok : o.tarde).push(it); });
+  o.tarde.sort(function(a, b){ return b.d - a.d; }); return o; }); }
+// Embarques en curso: atrasados (ETA o ETD vencida) y seguimiento completo en el Excel de Camila.
+function gdEmbCurso(){ return appMemo('gdEmbCurso', function(){ const hoy = isoDay(new Date()), o = { atr:[], tot:0, comp:0, falta:[] }, vis = new Set();
+  (EMB_DATA.rows || []).forEach(function(e){ const es = String(e.es || ''), tr = /TRANSITO/.test(es), em = /POR EMBARCAR|BOOKING/.test(es); if(!tr && !em) return;
+    const k = (e.rf || '') + '|' + (e.oc || []).join(','); if(vis.has(k)) return; vis.add(k);
+    const it = { a:'OC ' + (e.oc || []).map(gxCorto).join(', ') + (e.rf ? ' · Ref ' + e.rf : ''), b:(e.ds || '') + (e.nv ? ' · ' + e.nv : '') + (e.nave ? ' · ' + e.nave : ''), g:tr ? 'En tránsito' : 'Por embarcar' };
+    if(tr && e.ea && e.ea < hoy) o.atr.push(Object.assign({}, it, { c:'ETA ' + e.ea.split('-').reverse().join('/') + ' vencida' }));
+    if(em && e.et && e.et < hoy) o.atr.push(Object.assign({}, it, { c:'Zarpe (ETD) ' + e.et.split('-').reverse().join('/') + ' vencido sin embarcar' }));
+    const req = tr ? [['nv', 'naviera'], ['bk', 'booking'], ['nave', 'nave'], ['ea', 'ETA']] : [['nv', 'naviera'], ['bk', 'booking'], ['et', 'ETD']];
+    const fal = req.filter(function(q){ return !e[q[0]]; }).map(function(q){ return q[1]; }); o.tot++;
+    if(fal.length) o.falta.push(Object.assign({}, it, { c:'falta ' + fal.join(', ') })); else o.comp++; });
+  return o; }); }
+Object.assign(GD_K, {
+  apr:{ n:'Tiempo de aprobación de OC', fr:'gdcom', fmt:'d', bajo:1, meta:function(){ return gdInd('d3').meta; }, u:'días hábiles promedio, OC → aprobación',
+    val:function(r){ return gdSt(r, 'd3').promedio; }, detT:'Casos fuera de meta', det:function(r){ return gxIndCasos(gdInd('d3'), r, true); } },
+  bkl5:{ n:'SKU sin OC con más de 5 días', fr:'gdcom', fmt:'n', bajo:1, meta:function(){ return 0; }, u:'SKU con pedido y sin OC hace más de 5 días hábiles, al cierre',
+    val:function(r){ return gxFlujo(r.desde, r.hasta).bkl.filter(function(x){ return x.d > 5; }).length; }, detT:'SKU sin OC hace más de 5 días hábiles',
+    det:function(r){ return gxFlujo(r.desde, r.hasta).bkl.filter(function(x){ return x.d > 5; }).sort(function(a, b){ return b.d - a.d; }); } },
+  crt:{ n:'Cobertura de certificados y fichas', fr:'gdcom', fmt:'pct', meta:function(){ return 90; }, metaRef:1, u:'% de productos del mes con certificado y ficha técnica (al día de hoy)',
+    val:function(r){ const o = gdCrt(r.desde, r.hasta); return o ? gxPct(o.ok, o.tot) : null; }, detT:'Productos sin certificado o sin ficha', det:function(r){ const o = gdCrt(r.desde, r.hasta); return o ? o.L : []; } },
+  dint:{ n:'Despacho interno', fr:'gdalm', fmt:'d', bajo:1, meta:function(){ return 2; }, metaRef:1, u:'días hábiles promedio, recepción en almacén → salida a obra',
+    val:function(r){ return gdProm(gdDespInt(r.desde, r.hasta).dias); }, detT:'Despachos que tardaron más de 2 días hábiles', det:function(r){ return gdDespInt(r.desde, r.hasta).L.filter(function(x){ return x.d > 2; }); } },
+  disp:{ punto:1, n:'Disponibilidad de stock', fr:'gdalm', fmt:'pct', meta:function(){ return 100 - GD_INV.meta.falt; }, metaRef:1, u:'% de productos de consumo frecuente con stock al cierre',
+    val:function(r){ const o = gdInvFalt(gdYm(r.hasta)); return o && o.act ? (o.act - o.L.length) / o.act * 100 : null; }, detT:'Productos de consumo frecuente en cero al cierre', det:function(r){ return GD_K.falt.det(r); } },
+  impEta:{ n:'Ingreso a tiempo vs ETA', fr:'gdcex', fmt:'pct', meta:function(){ return GD_META_IMP; }, metaRef:1, u:'% de embarques que entraron a Lurín hasta ' + GD_ETA_TOL + ' días después de su ETA',
+    val:function(r){ const o = gdEmbIngresos(r.desde, r.hasta); return gxPct(o.ok.length, o.ok.length + o.tarde.length); }, detT:'Embarques que entraron después de la ETA + ' + GD_ETA_TOL + ' días', det:function(r){ return gdEmbIngresos(r.desde, r.hasta).tarde; } },
+  nac:{ n:'De la ETA al ingreso en Lurín', fr:'gdcex', fmt:'d', bajo:1, meta:function(){ return GD_ETA_TOL; }, metaRef:1, u:'días calendario promedio, ETA → ingreso (aduana y traslado)',
+    val:function(r){ return gdProm(gdEmbIngresos(r.desde, r.hasta).dias); }, detT:'Embarques ingresados en el período', det:function(r){ const o = gdEmbIngresos(r.desde, r.hasta); return o.tarde.concat(o.ok); } },
+  atr:{ n:'Embarques atrasados', fr:'gdcex', fmt:'n', corte:1, bajo:1, meta:function(){ return 0; }, u:'en tránsito con la ETA vencida o por embarcar con el zarpe vencido',
+    val:function(){ return gdEmbCurso().atr.length; }, detT:'Embarques atrasados hoy', det:function(){ return gdEmbCurso().atr; } },
+  seg:{ n:'Seguimiento completo', fr:'gdcex', fmt:'pct', corte:1, meta:function(){ return 100; }, u:'% de embarques en curso con naviera, booking, nave y ETA (o ETD) en el Excel de Camila',
+    val:function(){ const o = gdEmbCurso(); return gxPct(o.comp, o.tot); }, detT:'Embarques con datos por completar', det:function(){ return gdEmbCurso().falta; } } });
 function gdFmt(k, v){ const f = GD_K[k].fmt; if(f === 'x' || f === 'mes') return v == null || isNaN(v) ? '—' : appN(v, 1) + (f === 'x' ? ' veces' : ' meses'); return rptFmt(v, gdOpt(GD_K[k])); }
 function gdOpt(K){ return K.fmt === 'pct' ? { pct:1, libre:K.libre } : K.fmt === 'd' ? { d:1 } : K.fmt === 'sol' ? { sol:1 } : K.fmt === 'usd' ? { usd:1 } : {}; }
 function gdMeta(k){ return GD_K[k].meta ? GD_K[k].meta() : null; }
@@ -28680,24 +28752,25 @@ const GD_FR = {
   gdcom:function(P){ const F = gxFlujo(P.M.desde, P.M.hasta), ve = gdVal('emi', P.M), vp = gdVal('prov', P.M);
     return { h1:'Emisión de OC en <em>' + gdFmt('emi', ve) + '</em>' + (vp != null ? '; los proveedores cumplen el <em>' + gdFmt('prov', vp) + '</em>' : ''),
       sub:appN(F.ent.length) + ' SKU pedidos a Compras y ' + appN(F.sal.length) + ' puestos en ' + appN(F.ocL.length) + ' OC en ' + escapeHtml(P.M.nom) + '.',
-      cards:[{ k:'emi' }, { k:'prov' }, { k:'bkl' }, { k:'gas', acum:1 }], graf:'flujo', grafT:'Flujo de pedidos: SKU que entran a Compras y salen en OC',
+      cards:[{ k:'emi' }, { k:'apr' }, { k:'prov' }, { k:'bkl5' }, { k:'crt' }], graf:'flujo', grafT:'Flujo de pedidos: SKU que entran a Compras y salen en OC',
       desv:[gdDesvK('emi', P, function(){ const l = GD_K.emi.det(P.M); return appN(l.length) + ' casos tardaron más de ' + gdInd('d2').meta + ' días hábiles en salir en OC; el más largo: ' + escapeHtml((l[0] || {}).a || '—') + ' (' + escapeHtml((l[0] || {}).c || '') + ').'; }),
         gdDesvK('prov', P, function(){ const l = GD_K.prov.det(P.M); return appN(l.length) + ' OC llegaron tarde o siguen vencidas. Proveedores con más casos: ' + gdTop(l, 'b') + '.'; }),
         (function(){ const a = gdVal('bkl', P.M), b = gdVal('bkl', P.P); return a > b ? { s:'cerca', t:'SKU sin OC al cierre subió de ' + appN(b) + ' a ' + appN(a), c:'Entraron ' + appN(F.ent.length) + ' SKU y se pusieron en OC ' + appN(F.sal.length) + ' en el mes.', det:'det|bkl|M' } : null; })()] }; },
   gdalm:function(P){ const A = gxAlm(P.M.desde, P.M.hasta), v = gdVal('desp', P.M);
     return { h1:v == null ? 'Almacén en ' + escapeHtml(P.M.nom) : 'Despachos a tiempo en ' + escapeHtml(P.M.nom) + ': <em>' + gdFmt('desp', v) + '</em>',
       sub:appN(A.grr.size) + ' guías de salida y ' + appN(A.grc.size) + ' de recepción en el mes · ' + appN(A.py.size) + ' proyectos atendidos.',
-      cards:[{ k:'desp' }, { k:'gen' }, { k:'rot' }, { k:'lento' }], graf:'desp', grafT:'Despachos de requerimiento a tiempo, mes a mes',
+      cards:[{ k:'gen' }, { k:'desp' }, { k:'dint' }, { k:'disp' }, { k:'lento' }], graf:'desp', grafT:'Despachos de requerimiento a tiempo, mes a mes',
       desv:[gdDesvK('desp', P, function(){ const l = GD_K.desp.det(P.M); return appN(l.length) + ' despachos superaron los ' + gdInd('d6').meta + ' días hábiles; el más largo: ' + escapeHtml((l[0] || {}).a || '—') + ' (' + escapeHtml((l[0] || {}).c || '') + ').'; }),
         gdDesvK('gen', P, function(){ const l = GD_K.gen.det(P.M); return appN(l.length) + ' pedidos se generaron después de ' + gdInd('d1').meta + ' día hábil del requerimiento.'; }),
         gdInvBase() ? gdDesvK('lento', P, function(){ const o = gdInvLento(gdYm(P.M.hasta)); return rptFmt(o.le + o.ob, { usd:1 }) + ' sin consumo en 6 meses o más (' + rptFmt(o.ob, { usd:1 }) + ' obsoleto). El de más valor: ' + escapeHtml(((o.L[0] || {}).x || { r:{} }).r.descripcion || '—') + '.'; }) : null,
         gdInvBase() ? gdDesvK('falt', P, function(){ const o = gdInvFalt(gdYm(P.M.hasta)); return appN(o.L.length) + ' de ' + appN(o.act) + ' productos de consumo frecuente cerraron el mes en cero.'; }) : null] }; },
-  gdcex:function(P){ const im = geImp(), I = gxImport(P.M.desde, P.M.hasta);
-    return { h1:appN(im.tr) + ' importaciones en tránsito' + (im.venc ? '; <em>' + appN(im.venc) + ' con la ETA vencida</em>' : '; <em>ninguna con la ETA vencida</em>'),
+  gdcex:function(P){ const im = geImp(), I = gxImport(P.M.desde, P.M.hasta), na = gdEmbCurso().atr.length;
+    return { h1:appN(im.tr) + ' importaciones en tránsito' + (na ? '; <em>' + appN(na) + (na === 1 ? ' embarque atrasado' : ' embarques atrasados') + '</em>' : '; <em>ningún embarque atrasado</em>'),
       sub:appN(I.emi.length) + ' OC importadas emitidas y ' + appN(I.rec.length) + ' recibidas en ' + escapeHtml(P.M.nom) + ' · ' + appN(im.em) + ' por embarcar y ' + appN(im.bk) + ' en fabricación hoy.',
-      cards:[{ k:'imp' }, { k:'lti' }, { k:'trn' }, { k:'eta' }], graf:'imp', grafT:'Importaciones que llegaron en su fecha, mes a mes',
-      desv:[gdDesvK('imp', P, function(){ const l = GD_K.imp.det(P.M); return appN(l.length) + ' OC importadas llegaron tarde o siguen sin llegar. Proveedores: ' + gdTop(l, 'b') + '.'; }),
-        gdDesvK('eta', P, function(){ return 'Embarques que debían llegar y siguen en tránsito. Proveedores: ' + gdTop(GD_K.eta.det(), 'b') + '.'; })] }; } };
+      cards:[{ k:'impEta' }, { k:'lti' }, { k:'nac' }, { k:'atr' }, { k:'seg' }], graf:'impEta', grafT:'Embarques que entraron a Lurín a tiempo frente a su ETA, mes a mes',
+      desv:[gdDesvK('impEta', P, function(){ const l = GD_K.impEta.det(P.M); return appN(l.length) + ' embarques entraron a Lurín más de ' + GD_ETA_TOL + ' días después de su ETA. Origen: ' + gdTop(l, 'g') + '.'; }),
+        gdDesvK('atr', P, function(){ const l = GD_K.atr.det(); return 'Embarques con la ETA o el zarpe vencidos: ' + gdTop(l, 'g') + '.'; }),
+        gdDesvK('seg', P, function(){ const l = GD_K.seg.det(); return appN(l.length) + ' embarques en curso sin todos sus datos en el Excel de Camila (' + gdTop(l, 'c') + ').'; })] }; } };
 function gdGrafFlujo(P){ const W = P.serie.map(function(x){ return { etq:x.etq, dia:x.nom, parcial:x.parcial }; }), F = P.serie.map(function(x){ return gxFlujo(x.desde, x.hasta); });
   return rptCombo('gdflujo', W, { w:900, h:RQ_MQ.matches ? 190 : 250, alt:'Flujo de pedidos',
     bars:[{ k:'e', n:'SKU pedidos a Compras', c:'var(--gd-l)', v:F.map(function(f){ return f.ent.length; }) }, { k:'s', n:'SKU puestos en OC', c:'var(--gd-b)', v:F.map(function(f){ return f.sal.length; }) }],
@@ -28730,7 +28803,7 @@ function gdObjHtml(){ const P = gdPer(), O = gdObjetivos(P), e = escapeHtml, n =
       <div class="gd-ot">${gdTrack(o, P.M.y - 1)}</div>
       <div class="gd-or"><small>BRECHA FRENTE A LA META</small><b class="${o.est}">${brecha(o)}</b><span>Plazo 31/12/${P.M.y}</span><span>Resp.: ${e(GD_FRENTES[o.K.fr].resp)}</span></div>
       <button type="button" class="gd-oa" data-gd="ir|${o.K.fr}" aria-label="Ver ${e(GD_TIT[o.K.fr])}">→</button></div>`; }).join('')}</div></div>`; }
-const GD_PAN = ['otif', 'emi', 'prov', 'bkl', 'desp', 'gen', 'imp', 'gas'];
+const GD_PAN = ['otif', 'emi', 'apr', 'prov', 'bkl5', 'crt', 'gen', 'desp', 'dint', 'disp', 'lento', 'impEta', 'lti', 'nac', 'atr', 'seg'];   // OTIF y los 5 de cada área (23.11.2026)
 function gdPanHtml(){ const P = gdPer(), fv = GD.fv.gdpan || 'res', e = escapeHtml, pills = gdPills('fv|gdpan', fv, [['res', 'grid', 'Resumen'], ['tab', 'trend', 'Tablero de indicadores']]);
   if(fv === 'tab') return `<div class="gd">${gdHead('Panorama ejecutivo', 'grid', 'Tablero de indicadores de Logística', 'Mes a mes contra su meta, con las desviaciones y su plan de acción.', pills)}${gdBarra(P, [['Panorama', 'fv|gdpan|res'], ['Tablero']], true)}${gdAna('gobj|')}</div>`;
   const L = GD_PAN.map(function(k){ const v = gdVal(k, P.M), meta = gdMeta(k); return { k:k, v:v, meta:meta, est:gdEstado(v, meta, GD_K[k].bajo), gap:v == null || !meta ? 0 : GD_K[k].bajo ? (v - meta) / meta : (meta - v) / meta }; });
@@ -28748,7 +28821,7 @@ function gdFrenteHtml(fr){ const F = GD_FRENTES[fr], fv = GD.fv[fr] || 'res', P 
       ${F.tablas.length > 1 ? `<div class="gd-subt">${F.tablas.map(function(x){ return `<button type="button" class="${x[0] === t[0] ? 'on' : ''}" data-gd="fvt|${fr}|${x[0]}">${e(x[1])}</button>`; }).join('')}</div>` : ''}${gdAna(t[0])}</div>`; }
   const D = GD_FR[fr](P), desv = D.desv.filter(Boolean);
   return `<div class="gd">${gdHead(F.ey, F.ico, D.h1, D.sub, pills, gdFoto(F.foto, 'gd-lado'))}${gdBarra(P, [[F.n, 'fv|' + fr + '|res'], ['Resumen']])}
-    <div class="gd-kpis">${D.cards.map(function(c){ return gdCard(c.k, P, c); }).join('')}</div>
+    <div class="gd-kpis${D.cards.length === 5 ? ' gd-k5' : ''}">${D.cards.map(function(c){ return gdCard(c.k, P, c); }).join('')}</div>
     <div class="gd-g2"><section class="gd-pan ancho"><h3>${e(D.grafT)}</h3><small>Últimos 12 meses${P.serie[11].parcial ? ' · el último en curso' : ''}</small>${D.graf === 'flujo' ? gdGrafFlujo(P) : gdGraf('gd' + fr, P, D.graf)}</section>
       <section class="gd-pan"><h3>Desviaciones y causas</h3><small>Resultado de ${e(P.M.nom)} frente a su meta</small>${gdDesvHtml(desv)}</section></div>
     <div class="gd-g2"><section class="gd-pan"><h3>Acciones prioritarias</h3><small>Con responsable y fecha · se registran en Acuerdos</small>${gdAccHtml(fr)}</section>
@@ -28947,6 +29020,16 @@ const GD_DEF = {
   lti:['Días calendario desde la emisión de la OC importada hasta su llegada.', 'Promedio de días calendario (llegada − emisión de OC)', 'Consulta de OC y recepciones', 'b', 'Por proveedor'],
   trn:['OC importadas que hoy están en tránsito.', 'Conteo de OC en tránsito al corte', 'Seguimiento de contenedores y Consulta de OC', 'b', 'Por proveedor'],
   eta:['OC en tránsito cuya fecha de llegada (ETA) ya pasó.', 'Conteo de OC en tránsito con ETA < hoy', 'Seguimiento de contenedores', 'b', 'Por proveedor'] };
+Object.assign(GD_DEF, {
+  apr:['Días hábiles desde que se emite la OC hasta que se aprueba.', 'Promedio de días hábiles (fecha de aprobación − fecha de OC)', 'Reporte Maestro y Consulta de OC', 'dias', 'Distribución de días hábiles'],
+  bkl5:['SKU pedidos a Compras que al cierre llevan más de 5 días hábiles sin OC.', 'Conteo de SKU con pedido, sin OC y más de 5 días hábiles de espera al cierre', 'Reporte Maestro y Pedidos sin requerimiento', 'dias', 'Antigüedad (días hábiles sin OC)'],
+  crt:['Productos de los proyectos (comprados o atendidos de stock en el mes) que hoy ya tienen su certificado de calidad y su ficha técnica en Drive.', 'Productos con certificado y ficha / productos del mes × 100', 'Módulo Certificados (Reporte Maestro + carpetas de Drive)', function(x){ return x.g; }, 'Por proveedor'],
+  dint:['Días hábiles desde que el material comprado entra al almacén hasta que sale a obra. Es la parte que depende solo de Almacén.', 'Promedio de días hábiles (fecha de salida − fecha de recepción)', 'Reporte Maestro (recepción y salida)', 'dias', 'Distribución de días hábiles'],
+  disp:['Productos de consumo frecuente (con consumo en 6 o más de los últimos 12 meses) que cerraron el mes con stock en alguna sede.', '(Productos de consumo frecuente − los que cerraron en cero) / productos de consumo frecuente × 100', 'Reporte Almacén (kardex de Lurín, Trujillo e Ica)', function(x){ return x.fam || 'Sin familia'; }, 'Por familia'],
+  impEta:['Embarques del seguimiento de Camila cuyas OC entraron a Lurín, como máximo, ' + GD_ETA_TOL + ' días calendario después de la ETA (margen para aduana y traslado).', 'Embarques a tiempo / embarques ingresados en el período × 100', 'Seguimiento de contenedores (Camila) + recepciones de Nisira', function(x){ return x.g; }, 'Por origen'],
+  nac:['Días calendario entre la ETA del embarque y el ingreso de sus OC a Lurín: desaduanaje y traslado.', 'Promedio de días calendario (ingreso a Lurín − ETA)', 'Seguimiento de contenedores (Camila) + recepciones de Nisira', function(x){ return x.g; }, 'Por origen'],
+  atr:['Embarques en tránsito con la ETA ya pasada, o por embarcar con el zarpe (ETD) ya pasado.', 'Conteo de embarques atrasados al día de hoy', 'Seguimiento de contenedores (Camila)', function(x){ return x.g; }, 'Por estado'],
+  seg:['Embarques en curso con los datos que permiten seguirlos: en tránsito, naviera, booking, nave y ETA; por embarcar, naviera, booking y ETD.', 'Embarques con los datos completos / embarques en curso × 100', 'Seguimiento de contenedores (Camila)', function(x){ return x.g; }, 'Por estado'] });
 // ---- Piezas de gráfico ----
 function gdBig(t, v, sub, tag){ return `<div class="gd-holo gd-big3">${tag ? `<span class="gd-tag">${tag}</span>` : ''}<small>${t}</small><b>${v}</b><span>${sub || ''}</span></div>`; }
 function gdPan(t, sub, cuerpo, cls){ return `<section class="gd-pan ${cls || ''}"><h3>${t}</h3>${sub ? `<small>${sub}</small>` : '<small></small>'}${cuerpo}</section>`; }
