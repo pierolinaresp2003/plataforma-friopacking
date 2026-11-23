@@ -2948,6 +2948,7 @@
 .pz-hola{margin:10px 0 12px;font-size:clamp(34px,5.2vw,58px);font-weight:700;letter-spacing:-.035em;line-height:1.04;color:var(--pz-ink);}
 .pz-hola b{font-weight:900;color:#0a1e64;}
 .pz-sub{margin:0 0 38px;font-size:clamp(16px,1.6vw,19px);line-height:1.5;color:var(--pz-soft);max-width:660px;} .pz-sub b{color:var(--pz-ink);font-weight:700;}
+.pz-reint{margin-left:6px;padding:4px 12px;border:1px solid currentColor;border-radius:999px;background:none;color:inherit;font:inherit;font-size:.85em;font-weight:600;cursor:pointer;}
 .pz-mods{display:flex;flex-direction:column;border-top:1px solid var(--pz-line);}
 .pz-mod{display:grid;grid-template-columns:48px minmax(0,1fr) auto 24px;align-items:center;gap:18px;width:100%;padding:20px 10px;border:0;border-bottom:1px solid var(--pz-line);
   background:none;text-align:left;font:inherit;color:inherit;cursor:pointer;border-radius:0;transition:background .2s var(--pz-ease),padding .3s var(--pz-ease);-webkit-tap-highlight-color:transparent;}
@@ -6721,7 +6722,10 @@ async function loadPublishedSnapshot(manual){
       if(txt) snap = snapExpandir(JSON.parse(txt));
     }catch(e){
       SNAP_ESTADO = { error:(e && e.message) || String(e) };
-      if(e.status === 401 || e.status === 403){ if(appEsInv()) return appCerrarUsuario(); if(APP.usuario && RQ_MOVIL.matches) appBienvenida(APP.usuario.correo); return; }
+      // Sesión vencida (23.11.2026, Piero: "no carga en la web"): si Supabase ya no renueva la sesión (responde 400 y sbToken la borra),
+      // se pide la clave en vez de quedarse en "Cargando lo importante de hoy…".
+      if(e.status === 401 || e.status === 403 || !sbSesion()){ SNAP_ESTADO = null; if(appEsInv()) return appCerrarUsuario();
+        if(APP.usuario && RQ_MOVIL.matches){ const lz = document.getElementById('appLanz'); if(lz) lz.classList.remove('abierto', 'pz-ya'); appBienvenida(APP.usuario.correo); appSplashFuera(); } return; }
       if(e.status === 404){ SNAP_ESTADO = 'vacio'; return; }
       throw e;
     }
@@ -6734,6 +6738,7 @@ async function loadPublishedSnapshot(manual){
     SNAP_ESTADO = { error:(e && e.message) || String(e) };
     // sin snapshot publicado (o abierto como archivo local file://) — se queda en el estado vacío normal
     if(manual) showPublishBanner("No pude descargar la última versión de los datos. Revisa tu conexión a internet.", true);
+    const lz = document.getElementById('appLanz'); if(lz && lz.classList.contains('abierto')) appLanzador(lz._desdeLogo);   // la portada dice que no cargó y deja reintentar
   }
 }
 
@@ -18734,6 +18739,7 @@ function appLanzador(forzar){
   if(!el){ document.body.insertAdjacentHTML('beforeend', '<div id="appLanz" class="lz"></div>'); el = document.getElementById('appLanz');
     // Entrar al instante (13.10.2026, Piero): el lanzador se desvanece en el acto y el módulo se arma a la vez. En el historial queda el lanzador, así "atrás" vuelve a esta pantalla.
     el.addEventListener('click', function(e){ if(e.target.closest('[data-lzusr]')){ el.classList.remove('abierto', 'pz-ya'); return appCerrarUsuario(); }
+      if(e.target.closest('[data-lzreint]')){ SNAP_ESTADO = 'cargando'; appLanzador(el._desdeLogo); return loadPublishedSnapshot(true).then(function(){ if(el.classList.contains('abierto')) appLanzador(el._desdeLogo); }); }
       const gr = e.target.closest('[data-lzgrupo]'); if(gr){ gr.parentNode.classList.toggle('on'); return; }
       const b = e.target.closest('[data-lzv]'); if(!b || el._yendo) return;
       el._yendo = true; b.classList.add('pulsado'); el.classList.add('fuera');
@@ -18761,7 +18767,8 @@ function appLanzador(forzar){
   const filas = vs.indexOf('gerencial') !== -1 && resto.length
     ? fila('gerencial', 0) + `<div class="lz-grupo">${fila('logistica', 1, true)}<div class="lz-subs">${resto.map(function(k, i){ return fila(k, i + 2); }).join('')}</div></div>`
     : vs.map(function(k, i){ return fila(k, i); }).join('');
-  const hoy = R && R.linea ? R.linea : (appHayDatos() ? 'Elige un módulo para empezar.' : 'Cargando lo importante de hoy…');
+  const hoy = R && R.linea ? R.linea : (appHayDatos() ? 'Elige un módulo para empezar.' : SNAP_ESTADO && SNAP_ESTADO.error
+    ? 'No pude cargar los datos (' + escapeHtml(/failed to fetch|networkerror|load failed/i.test(SNAP_ESTADO.error) ? 'sin conexión con el servidor' : SNAP_ESTADO.error) + '). <button type="button" class="pz-reint" data-lzreint="1">Reintentar</button>' : 'Cargando lo importante de hoy…');
   // Ya abierta (llegaron los datos): solo se cambian los textos, sin volver a armar la pantalla (19.11.2026, Piero: "se actualiza mal,
   // se carga 2 veces"): antes se rehacía todo y la foto de fondo volvía a entrar y "Logística" se cerraba.
   const pz0 = el.classList.contains('abierto') && el.querySelector('.pz');
