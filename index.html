@@ -4140,6 +4140,11 @@ html[data-theme="dark"] .rsp-sel.si, html[data-theme="dark"] .rsp-tag{background
 .rsvm-x{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:#b4231a;font-size:16px;cursor:pointer;}
 /* Reservas: un bloque por requerimiento, fácil de distinguir (19.11.2026) */
 .rsvm-gl{gap:14px;}
+.desp-zona{display:flex;align-items:center;gap:10px;margin:10px 2px 0;padding:8px 14px;border-radius:12px;background:var(--surface-2);border-left:5px solid #9fb2c8;}
+.desp-zona b{font:800 14px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);} .desp-zona small{font:600 12px Inter,sans-serif;color:var(--ink-soft);}
+.desp-zona.norte{border-left-color:#2f7de1;background:#eaf2fd;} .desp-zona.centro{border-left-color:#e08a1e;background:#fdf3e6;} .desp-zona.sur{border-left-color:#8e44ad;background:#f4ecf8;}
+.desp-zona:first-child{margin-top:0;} .rsvm-gl > .desp-zona{grid-column:1 / -1;}
+html[data-theme="dark"] .desp-zona.norte{background:rgba(47,125,225,.16);} html[data-theme="dark"] .desp-zona.centro{background:rgba(224,138,30,.16);} html[data-theme="dark"] .desp-zona.sur{background:rgba(142,68,173,.2);}
 .rsvm-g{--rc:#15803d;--rc-bg:#ebf1ec;padding:0;gap:0;overflow:hidden;border-left:5px solid var(--rc);box-shadow:0 10px 24px -20px rgba(16,24,40,.45);}
 .rsvm-g.ambar{--rc:#c27803;--rc-bg:#f5f0e6;} .rsvm-g.rojo{--rc:#d92d20;--rc-bg:#fde8e6;} .rsvm-g.gris{--rc:#94a3b8;--rc-bg:var(--surface-2);}
 .rsvm-g .rsvm-ch{background:var(--surface-2);padding:12px 16px;border-bottom:1px solid var(--border);}
@@ -22158,6 +22163,14 @@ function despPorArmar(){ const A = despAsignado(), r2 = function(v){ return Math
     .map(function(z){ return { z:z, q:r2(resQ(z) - (A.get(String(z.id)) || 0)) }; }).filter(function(x){ return x.q > 0.001; }); }
 function palSalio(p){ const ids = new Set(RES.l.map(function(z){ return String(z.id); })); return (p.items || []).length && (p.items || []).every(function(it){ return !ids.has(String(it.r)); }); }
 function palEstado(p){ return palSalio(p) ? 'salio' : p.estado === 'listo' ? 'listo' : 'armando'; }
+// Agrupado por zona (24.11.2026, Piero: "el módulo de despachos debe estar agrupado por zona en base de qué proyecto vienen"): la zona sale del
+// departamento del proyecto (Norte/Centro/Sur); si el proyecto no lo trae, la zona del cliente; si tampoco, "Sin zona".
+const DESP_ZONAS = [['NORTE', 'Norte'], ['CENTRO', 'Centro'], ['SUR', 'Sur'], ['', 'Sin zona']];
+function despZona(pry, cli){ const pi = pry ? pryInfo(pry) : null, z = pi && pi.dep ? pmZona(pi.dep) : ''; if(z && z !== 'OTRAS') return z;
+  const zc = cli ? rqZonaCli().get(cli) || rqZonaCli().get(appImpNombre(cli)) || '' : ''; return ['NORTE', 'CENTRO', 'SUR'].indexOf(zc) !== -1 ? zc : ''; }
+function despPorZona(L, zonaDe, pinta, cuenta){ const Z = new Map(DESP_ZONAS.map(function(x){ return [x[0], []]; })); L.forEach(function(it){ Z.get(zonaDe(it) || '').push(it); }); let gi = 0;
+  return DESP_ZONAS.filter(function(x){ return Z.get(x[0]).length; }).map(function(x){ const l = Z.get(x[0]);
+    return `<div class="desp-zona ${x[0] ? x[0].toLowerCase() : 'sin'}"><b>${x[1]}</b><small>${cuenta(l)}</small></div>` + l.map(function(it){ return pinta(it, gi++); }).join(''); }).join(''); }
 function appDespHtml(){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(!RQ.filas.length) rqPreparar(); if(!PAL.ok) palCargar();
   const D = despPorArmar(), q = crtNorm(DESP_UI.q.trim()), nArm = PAL.l.filter(function(p){ return palEstado(p) === 'armando'; }).length, nLis = PAL.l.filter(function(p){ return palEstado(p) === 'listo'; }).length;
@@ -22169,24 +22182,25 @@ function appDespHtml(){ const e = escapeHtml, nn = function(v){ return Number(v 
     const L = D.filter(function(x){ return !q || crtNorm([x.z.req, x.z.producto, x.z.descripcion, despCli(x.z), despPry(x.z)].join(' ')).indexOf(q) !== -1; });
     const G = new Map(); L.forEach(function(x){ const k = despClave(x.z); if(!G.has(k)) G.set(k, []); G.get(k).push(x); });
     cuerpo = !L.length ? `<div class="pmf-vacio">${D.length ? 'Nada con esa búsqueda.' : '✅ No hay nada validado pendiente de armar en pallets.'}</div>`
-      : [...G.entries()].map(function(gx, gi){ const k = gx[0], l = gx[1], z0 = l[0].z, pry = despPry(z0), pi = pry ? pryInfo(pry) || {} : {}, abiertos = PAL.l.filter(function(p){ return p.cliente + '|' + (p.proyecto || '') === k && palEstado(p) === 'armando'; });
+      : despPorZona([...G.entries()], function(gx){ const z0 = gx[1][0].z, r = resFila(z0); return despZona(despPry(z0), r ? r.proyecto : despCli(z0)); }, function(gx, gi){ const k = gx[0], l = gx[1], z0 = l[0].z, pry = despPry(z0), pi = pry ? pryInfo(pry) || {} : {}, abiertos = PAL.l.filter(function(p){ return p.cliente + '|' + (p.proyecto || '') === k && palEstado(p) === 'armando'; });
         const nSel = l.filter(function(x){ return DESP_SEL.has(String(x.z.id)); }).length;
         return `<div class="rsvm-c rsvm-g desp-g" data-desgk="${e(k)}" style="animation-delay:${Math.min(gi, 10) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><span class="rsvm-num"><small>Ítems</small><b>${l.length}</b></span><span class="rsvm-cli"><b>${e(despCli(z0))}</b><small>${pry ? e(pry) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'} · ${new Set(l.map(function(x){ return x.z.req; })).size} req.</small></span></div>
           <div class="rsvm-acc"><button type="button" data-desptodo="${e(k)}">${nSel === l.length ? 'Desmarcar todo' : 'Marcar todo'}</button>${abiertos.map(function(p){ return `<button type="button" data-despmas="${p.id}"${nSel ? '' : ' disabled'}>+ Pallet ${p.numero}</button>`; }).join('')}<button type="button" class="ok" data-despnuevo="${e(k)}"${nSel ? '' : ' disabled'}>Armar pallet${nSel ? ' (' + nSel + ')' : ''}</button></div></div>
           ${l.map(function(x){ const z = x.z, id = String(z.id), on = DESP_SEL.has(id), r = resFila(z);
             return `<div class="desp-f${on ? ' on' : ''}" data-desid="${e(id)}"><button type="button" class="desp-x${on ? ' on' : ''}" data-despsel="${e(id)}" role="checkbox" aria-checked="${on}" title="Marcar para el pallet"></button>${z.val_foto ? fotoImg(z.val_foto, 'mini') : '<span class="foto-th vacio"></span>'}
               <span class="rsvm-t"><b>${e(z.descripcion || (r && r.producto) || z.producto)}</b><small>Req. ${e(String(z.req).replace(/^000\d-0*/, ''))} · ${e(z.producto)}</small></span>
-              <span class="desp-q">${on ? `<input type="number" min="0" max="${x.q}" step="any" value="${DESP_SEL.get(id)}" data-despq="${e(id)}" inputmode="decimal" aria-label="Cantidad para el pallet">` : `<b>${nn(x.q)}</b>`}<small>${e(z.um || '')}${on && x.q ? ' de ' + nn(x.q) : ''}</small></span>${rsvVB(z, 1)}</div>`; }).join('')}</div>`; }).join('');
+              <span class="desp-q">${on ? `<input type="number" min="0" max="${x.q}" step="any" value="${DESP_SEL.get(id)}" data-despq="${e(id)}" inputmode="decimal" aria-label="Cantidad para el pallet">` : `<b>${nn(x.q)}</b>`}<small>${e(z.um || '')}${on && x.q ? ' de ' + nn(x.q) : ''}</small></span>${rsvVB(z, 1)}</div>`; }).join('')}</div>`; },
+        function(l){ const n = l.reduce(function(t, gx){ return t + gx[1].length; }, 0); return appN(n) + ' ítem' + (n === 1 ? '' : 's') + ' · ' + appN(l.length) + ' cliente' + (l.length === 1 ? '' : 's'); });
   } else {
     const P = PAL.l.filter(function(p){ const est = palEstado(p); return (DESP_UI.ver === 'pal' ? est !== 'salio' : est === 'salio') && (!q || crtNorm([p.numero, p.cliente, p.proyecto, (p.items || []).map(function(it){ return it.req + ' ' + it.cod + ' ' + it.desc; }).join(' ')].join(' ')).indexOf(q) !== -1); })
       .sort(function(a, b){ return b.numero - a.numero; });
     const EST = { armando:['ambar', 'Armando'], listo:['verde', 'Listo para Rutas'], salio:['gris', 'Salió'] };
     cuerpo = !P.length ? `<div class="pmf-vacio">${DESP_UI.ver === 'pal' ? 'Todavía no hay pallets armados.' : 'Ningún pallet ha salido todavía.'}</div>`
-      : P.map(function(p, gi){ const est = palEstado(p), its = p.items || [], pi = p.proyecto ? pryInfo(p.proyecto) || {} : {};
+      : despPorZona(P, function(p){ return despZona(p.proyecto, p.cliente); }, function(p, gi){ const est = palEstado(p), its = p.items || [], pi = p.proyecto ? pryInfo(p.proyecto) || {} : {};
         return `<div class="rsvm-c rsvm-g pal-c ${EST[est][0]}" style="animation-delay:${Math.min(gi, 10) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><span class="rsvm-num"><small>Pallet</small><b>${e(String(p.numero))}</b></span><span class="rsvm-cli"><b>${e(p.cliente || '—')}</b><small>${p.proyecto ? e(p.proyecto) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'} · ${its.length} ítem${its.length === 1 ? '' : 's'} · ${e(String(p.usuario || '').split('@')[0])} · ${e(rsvmHora({ creado:p.creado }))}</small><span class="rsvm-res"><i class="${est === 'armando' ? 'pv' : 'ok'}">${EST[est][1]}</i></span></span></div>
           <div class="rsvm-acc">${est === 'armando' ? `<button type="button" class="ok" data-pallisto="${p.id}"${its.length ? '' : ' disabled'}>✓ Listo para Rutas</button><button type="button" class="lib" data-palborrar="${p.id}">Eliminar</button>` : est === 'listo' ? `<button type="button" data-palarmar="${p.id}">Volver a armar</button>` : ''}</div></div>
           ${its.length ? its.map(function(it, j){ const z = RES.l.find(function(y){ return String(y.id) === String(it.r); });
-            return `<div class="desp-f pal-f">${z && z.val_foto ? fotoImg(z.val_foto, 'mini') : '<span class="foto-th vacio"></span>'}<span class="rsvm-t"><b>${e(it.desc || it.cod)}</b><small>Req. ${e(String(it.req || '').replace(/^000\d-0*/, ''))} · ${e(it.cod || '')}</small></span><span class="desp-q"><b>${nn(it.q)}</b><small>${e(it.um || '')}</small></span>${est === 'armando' ? `<button type="button" class="rsvm-x" data-palquita="${p.id}|${j}" title="Sacar del pallet" aria-label="Sacar del pallet">×</button>` : '<span></span>'}</div>`; }).join('') : '<div class="desp-f pal-f vacio">Pallet vacío.</div>'}</div>`; }).join('');
+            return `<div class="desp-f pal-f">${z && z.val_foto ? fotoImg(z.val_foto, 'mini') : '<span class="foto-th vacio"></span>'}<span class="rsvm-t"><b>${e(it.desc || it.cod)}</b><small>Req. ${e(String(it.req || '').replace(/^000\d-0*/, ''))} · ${e(it.cod || '')}</small></span><span class="desp-q"><b>${nn(it.q)}</b><small>${e(it.um || '')}</small></span>${est === 'armando' ? `<button type="button" class="rsvm-x" data-palquita="${p.id}|${j}" title="Sacar del pallet" aria-label="Sacar del pallet">×</button>` : '<span></span>'}</div>`; }).join('') : '<div class="desp-f pal-f vacio">Pallet vacío.</div>'}</div>`; }, function(l){ return appN(l.length) + ' pallet' + (l.length === 1 ? '' : 's'); });
   }
   const nSalio = PAL.l.filter(function(p){ return palEstado(p) === 'salio'; }).length;
   return `<div class="rsvm desp">
