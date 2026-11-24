@@ -6230,7 +6230,8 @@ async function sbYo(){
 }
 function sbSalir(){
   const x = sbSesion(); sbGuardar(null); sbCache('snap', null);
-  if(x) fetch(SB_URL + '/auth/v1/logout', { method:'POST', headers:{ apikey:SB_KEY, Authorization:'Bearer ' + x.at } }).catch(function(){});
+  // scope=local (24.11.2026): "Salir" en un celular cerraba la sesión del mismo usuario en todos sus equipos (la PC quedaba en "Tu sesión terminó").
+  if(x) fetch(SB_URL + '/auth/v1/logout?scope=local', { method:'POST', headers:{ apikey:SB_KEY, Authorization:'Bearer ' + x.at } }).catch(function(){});
 }
 // Copia de los datos en el equipo (IndexedDB): se vuelve a descargar solo cuando hay una publicación nueva.
 function sbDb(){ return new Promise(function(ok, no){ const q = indexedDB.open('fp-datos', 1); q.onupgradeneeded = function(){ q.result.createObjectStore('k'); }; q.onsuccess = function(){ ok(q.result); }; q.onerror = function(){ no(q.error); }; }); }
