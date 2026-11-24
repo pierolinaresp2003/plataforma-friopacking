@@ -3746,7 +3746,7 @@ html[data-theme="dark"] .oc2.t-mal, html[data-theme="dark"] .ocx2-hero.t-mal{--t
 .rag-docs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
 .rag-doc{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--ink-soft);border:1.5px dashed #9fb2c8;border-radius:12px;padding:8px 12px;transition:border-color .2s,color .2s;} .rag-doc:hover{border-color:#1f6fd6;color:#1f6fd6;}
 .rag-doc svg{width:16px;height:16px;flex:none;} .rag-doc.si{border-style:solid;border-color:#1e8a4f;background:#ebf2ee;color:#1e7a45;cursor:default;} .rag-doc.si button{all:unset;cursor:pointer;font-weight:800;} .rag-doc.si button:hover{text-decoration:underline;}
-.rag-cam{cursor:pointer;font-size:11px;font-weight:700;color:var(--ink-soft);margin-left:4px;text-decoration:underline;}
+.rag-cam,.rag-doc.si button.rag-cam{cursor:pointer;font-size:11px;font-weight:700;color:var(--ink-soft);margin-left:4px;text-decoration:underline;}
 .rag-sig{margin-left:auto;font-size:12px;font-weight:700;color:var(--ink-soft);text-align:right;max-width:260px;}
 .rag-ok{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:12.5px;font-weight:800;color:#1e7a45;} .rag-ok svg{width:15px;height:15px;} .rag-ok button{all:unset;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--ink-soft);text-decoration:underline;margin-left:4px;}
 /* Zona de la OC por agencia (19.11.2026): mismos colores que "Avance por zona" */
@@ -21925,7 +21925,7 @@ function regVistas(){ const n = regAgLista().filter(function(x){ return x.est !=
   return `<div class="reg-vistas"><button type="button" data-regvista="s88" class="${REG_UI.vista !== 'ag' ? 'on' : ''}">Guías S88</button><button type="button" data-regvista="ag" class="${REG_UI.vista === 'ag' ? 'on' : ''}">${OC2_ICO.camion}OC por agencia${n ? ` <b>${appN(n)}</b>` : ''}</button></div>`; }
 function regAgCard(x, i){ const e = escapeHtml, a = x.a, inf = x.inf, fa = a.fecha ? rqFecha(fromIsoDay(String(a.fecha).slice(0, 10))) : '—', its = inf ? [...inf.items.values()] : [];
   const doc = function(tipo, nom){ const p = a[tipo], inp = `<input type="file" accept="application/pdf,image/*" data-ragsube="${tipo}" data-ragoc="${e(x.oc)}" hidden>`;
-    return p ? `<span class="rag-doc si">${OC2_ICO.check}<button type="button" data-ragver="${e(p)}" title="Ver ${nom.toLowerCase()}">${nom}</button><label class="rag-cam" title="Reemplazar">Cambiar${inp}</label></span>`
+    return p ? `<span class="rag-doc si">${OC2_ICO.check}<button type="button" data-ragver="${e(p)}" title="Ver ${nom.toLowerCase()}">${nom}</button><button type="button" class="rag-cam" data-ragbaja="${e(p)}" data-ragnom="${e(nom + ' OC ' + x.oc.replace(/^000\d-0*/, ''))}" title="Descargar ${nom.toLowerCase()}">Descargar</button><label class="rag-cam" title="Reemplazar">Cambiar${inp}</label></span>`
       : `<label class="rag-doc">${OC2_ICO.booking}<span>Subir ${nom.toLowerCase()}</span>${inp}</label>`; };
   const ESTX = { pend:'Faltan documentos', listo:'Lista para el ingreso', ok:'Regularizada · ingresó en Nisira' };
   return `<div class="rag-c ${x.est}" style="animation-delay:${Math.min(i, 12) * 35}ms">
@@ -21956,14 +21956,21 @@ document.addEventListener('change', async function(ev){ const i = ev.target; if(
     if(!r.ok) throw sbError(await r.json().catch(function(){ return {}; }), r.status);
     await regAgPatch(oc, tipo === 'guia' ? { guia:ruta } : { factura:ruta }); appToast('Documento guardado ✔'); appRenderInicio(); }
   catch(err){ appToast('No se pudo subir: ' + ((err && err.message) || err)); } });
-document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-regvista],[data-regagest],[data-regagzona],[data-ragver]'); if(!b) return;
+document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-regvista],[data-regagest],[data-regagzona],[data-ragver],[data-ragbaja]'); if(!b) return;
   if(b.dataset.regvista){ REG_UI.vista = b.dataset.regvista; if(REG_UI.vista === 'ag') appAgCargar(true); return appRenderInicio(); }
   if(b.dataset.regagest !== undefined){ REG_AG.est = b.dataset.regagest; return appRenderInicio(); }
   if(b.dataset.regagzona !== undefined){ REG_AG.zona = b.dataset.regagzona; return appRenderInicio(); }
   if(b.dataset.ragver){ const w = window.open('', '_blank');
     try{ const r = await sbFetch('/storage/v1/object/sign/regularizaciones/' + b.dataset.ragver, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ expiresIn:3600 }) }), j = await r.json().catch(function(){ return {}; });
       if(!r.ok || !j.signedURL) throw new Error(j.message || j.error || 'sin enlace'); const url = SB_URL + '/storage/v1' + j.signedURL; if(w) w.location = url; else window.open(url, '_blank', 'noopener'); }
-    catch(err){ if(w) w.close(); appToast('No se pudo abrir el documento: ' + ((err && err.message) || err)); } return; } });
+    catch(err){ if(w) w.close(); appToast('No se pudo abrir el documento: ' + ((err && err.message) || err)); } return; }
+  if(b.dataset.ragbaja){ // descarga directa (24.11.2026, Piero: "añade opción aquí para descargar los documentos directamente")
+    try{ const r = await sbFetch('/storage/v1/object/sign/regularizaciones/' + b.dataset.ragbaja, { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ expiresIn:600 }) }), j = await r.json().catch(function(){ return {}; });
+      if(!r.ok || !j.signedURL) throw new Error(j.message || j.error || 'sin enlace');
+      const ext = (b.dataset.ragbaja.match(/\.([a-z0-9]{1,5})$/i) || [0, 'pdf'])[1], a = document.createElement('a');
+      a.href = SB_URL + '/storage/v1' + j.signedURL + (j.signedURL.indexOf('?') === -1 ? '?' : '&') + 'download=' + encodeURIComponent(b.dataset.ragnom + '.' + ext);
+      document.body.appendChild(a); a.click(); a.remove(); }
+    catch(err){ appToast('No se pudo descargar: ' + ((err && err.message) || err)); } return; } });
 function appRegHtml(){ if(REG_UI.vista === 'ag'){ appAgCargar(false); return appRegAgHtml(); } const e = escapeHtml, D = regDatos();
   const ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9a8 8 0 0 1 14-4l2 2"/><path d="M20 3v4h-4"/><path d="M20 15a8 8 0 0 1-14 4l-2-2"/><path d="M4 21v-4h4"/></svg>';
   const head = function(ks){ return `<div class="rsvm-head reg-head"><div class="rsvm-hi reg-hi">${ICO}</div><div class="rsvm-meta"><h2>Regularizaciones S88</h2><p>Salidas de urgencia con guía S88 (traslado que no afecta el kárdex) y la salida que las regulariza después. Cada S88 se empareja con la salida que mejor coincide (guía citada, mismo PRY, cliente, glosa y días) y se indica qué tan probable es.</p></div>${ks || ''}</div>`; };
