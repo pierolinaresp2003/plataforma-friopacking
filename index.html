@@ -26306,19 +26306,19 @@ function appAgCargar(forzar){
 // agencia o la publicación de datos, y se vuelve a leer solo eso. Si alguien está escribiendo o tiene una ventana abierta, se espera a que
 // termine para no borrarle lo que está haciendo. Sin conexión en vivo, se revisa cada 30 s mientras la app está a la vista.
 var APP_VIVO_V = 0;   // sube cada vez que cambia algo que comparten los usuarios (reservas, pallets, rutas, agencias): la pantalla guardada ya no sirve
-const VIVO = { ws:null, ref:0, join:'', hb:null, tok:null, re:null, espera:2000, ok:false, ultimo:0, pend:{}, t:null, oculto:0 };
+const VIVO = { ws:null, ref:0, join:'', hb:null, tok:null, re:null, espera:2000, ok:false, ultimo:0, pend:{}, t:null, oculto:0, pon:false, rev:0 };
 const VIVO_TABLAS = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia', 'fp_publicacion', 'fp_gerencial'];
 function vivoEnviar(topic, event, payload){ if(!VIVO.ws || VIVO.ws.readyState !== 1) return ''; const ref = String(++VIVO.ref); VIVO.ws.send(JSON.stringify({ topic:topic, event:event, payload:payload || {}, ref:ref, join_ref:topic === 'phoenix' ? undefined : VIVO.join })); return ref; }
 async function vivoConectar(){ if(VIVO.ws || VIVO.re || !window.WebSocket || !sbSesion() || !APP.usuario) return; let t; try{ t = await sbToken(); }catch(e){ return; } if(!t || VIVO.ws) return;
   const ws = new WebSocket(SB_URL.replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' + encodeURIComponent(SB_KEY) + '&vsn=1.0.0'); VIVO.ws = ws; VIVO.ok = false;
-  ws.onopen = function(){ VIVO.ref = 0; VIVO.join = String(++VIVO.ref); VIVO.ultimo = Date.now();
+  ws.onopen = function(){ VIVO.ref = 0; VIVO.join = String(++VIVO.ref); VIVO.ultimo = Date.now(); VIVO.pon = true;
     ws.send(JSON.stringify({ topic:'realtime:fp-vivo', event:'phx_join', ref:VIVO.join, join_ref:VIVO.join, payload:{ access_token:t, config:{ broadcast:{ self:false }, presence:{ key:'' },
       postgres_changes:VIVO_TABLAS.map(function(x){ return { event:'*', schema:'public', table:x }; }) } } }));
     VIVO.hb = setInterval(function(){ if(Date.now() - VIVO.ultimo > 70000){ try{ ws.close(); }catch(e){} return; } vivoEnviar('phoenix', 'heartbeat', {}); }, 25000);
     VIVO.tok = setInterval(function(){ sbToken().then(function(n){ if(n) vivoEnviar('realtime:fp-vivo', 'access_token', { access_token:n }); }).catch(function(){}); }, 300000); };
   ws.onmessage = function(m){ VIVO.ultimo = Date.now(); let d; try{ d = JSON.parse(m.data); }catch(e){ return; }
-    if(d.event === 'phx_reply' && d.ref === VIVO.join){ VIVO.ok = !!(d.payload && d.payload.status === 'ok'); if(VIVO.ok) VIVO.espera = 2000; return; }
-    if(d.event === 'system' && d.payload && d.payload.status === 'ok' && /subscribed/i.test(d.payload.message || '')){ VIVO.ok = true; return; }
+    if(d.event === 'phx_reply' && d.ref === VIVO.join){ VIVO.ok = !!(d.payload && d.payload.status === 'ok'); if(VIVO.ok){ VIVO.espera = 2000; vivoPonerAlDia(); } return; }
+    if(d.event === 'system' && d.payload && d.payload.status === 'ok' && /subscribed/i.test(d.payload.message || '')){ VIVO.ok = true; vivoPonerAlDia(); return; }
     if(d.event === 'phx_error' || d.event === 'phx_close'){ VIVO.ok = false; try{ ws.close(); }catch(e){} return; }
     if(d.event === 'postgres_changes'){ const x = d.payload && d.payload.data; if(x && x.table) vivoCambio(x.table); } };
   ws.onclose = function(){ clearInterval(VIVO.hb); clearInterval(VIVO.tok); VIVO.ws = null; VIVO.ok = false;
@@ -26328,6 +26328,10 @@ async function vivoConectar(){ if(VIVO.ws || VIVO.re || !window.WebSocket || !sb
 function vivoRepintarInicio(){ const sec = document.getElementById('section-inicio'), ab = sec ? [...sec.querySelectorAll('.rqx-it')].filter(function(it){ const d = it.querySelector('.rqx-det'); return d && !d.hidden; }).map(function(it){ return it.dataset.i; }) : [];
   appRenderFondo(); if(ab.length) setTimeout(function(){ const s = document.getElementById('section-inicio'); ab.forEach(function(i){ const it = s && s.querySelector('.rqx-it[data-i="' + i + '"]'), d = it && it.querySelector('.rqx-det'); if(d && d.hidden){ const f = it.querySelector('.rqx-fila'); if(f) f.click(); } }); }, 300); }
 function vivoCambio(t){ VIVO.pend[t] = 1; clearTimeout(VIVO.t); VIVO.t = setTimeout(vivoAplicar, 700); }
+// Poner al día (24.11.2026, Piero: "no se jala en tiempo real"): lo que cambió mientras la conexión en vivo estaba caída o reconectando
+// (p. ej. un VB hecho en ese minuto) no llegaba nunca; al conectarse se vuelve a leer todo, y cada 2 min se revisa por si se perdió un aviso.
+const VIVO_LEER = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia'];
+function vivoPonerAlDia(){ if(!VIVO.pon) return; VIVO.pon = false; VIVO.rev = Date.now(); VIVO_LEER.forEach(vivoCambio); }
 // Ocupado: escribiendo en un campo de la pantalla o con una ventana abierta (reserva, foto, No hay…)
 function vivoOcupado(){ const a = document.activeElement; return !!document.getElementById('rsvFondo') || !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && !a.closest('#appTabbar')); }
 function vivoAplicar(){ if(document.hidden) return; if(vivoOcupado()){ clearTimeout(VIVO.t); VIVO.t = setTimeout(vivoAplicar, 2000); return; }
@@ -26346,7 +26350,7 @@ function vivoDatosNuevos(){ if(document.getElementById('vivoDatos')) return;
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('#vivoDatos'); if(!b) return; b.remove(); appToast('Actualizando datos…'); loadPublishedSnapshot(false); });
 // Sin conexión en vivo (o al volver a la app después de un rato): se vuelve a leer lo que cambia entre usuarios.
 function vivoRefrescar(){ if(!sbSesion() || !APP.usuario || vivoOcupado()) return; resCargar(true); if(PAL.ok) palCargar(true); rtCargar(true); appAgCargar(true); if(typeof GD !== 'undefined' && GD.items && APP.enInicio && (APP.pantalla === 'gdmej' || APP.pantalla === 'gdacu' || GD_FRENTES[APP.pantalla])) gdCargar(true); }
-setInterval(function(){ if(document.hidden) return; if(!VIVO.ws && !VIVO.re) vivoConectar(); if(!VIVO.ok) vivoRefrescar(); }, 30000);
+setInterval(function(){ if(document.hidden) return; if(!VIVO.ws && !VIVO.re) vivoConectar(); if(!VIVO.ok) vivoRefrescar(); else if(Date.now() - VIVO.rev > 120000){ VIVO.rev = Date.now(); VIVO_LEER.forEach(vivoCambio); } }, 30000);
 document.addEventListener('visibilitychange', function(){ if(document.hidden){ VIVO.oculto = Date.now(); return; }
   if(VIVO.oculto && Date.now() - VIVO.oculto > 20000){ vivoRefrescar(); if(VIVO.ws && Date.now() - VIVO.ultimo > 60000){ try{ VIVO.ws.close(); }catch(e){} } } if(!VIVO.ws && !VIVO.re) vivoConectar(); if(Object.keys(VIVO.pend).length) vivoAplicar(); });
 setTimeout(function(){ vivoConectar(); }, 4000);
