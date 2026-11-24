@@ -4127,7 +4127,12 @@ html[data-theme="dark"] .rqx-rsvb{background:rgba(45,212,191,.12);border-color:r
 .rsvm-bus{flex:1;min-width:220px;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:9px 12px;font:600 13.5px Inter,sans-serif;color:var(--ink);}
 .rsvm-l{display:flex;flex-direction:column;gap:10px;} .rsvm-c{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;animation:pzSube .35s var(--pz-ease) both;}
 .rsvm-ch{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:6px;border-bottom:1px solid var(--border);} .rsvm-ct b{display:block;font-size:14px;color:var(--ink);} .rsvm-ct small{font-size:11.5px;color:var(--ink-soft);}
-.rsvm-acc{display:flex;gap:6px;} .rsvm-acc button{border:1px solid var(--border);background:var(--surface-2);border-radius:10px;padding:6px 11px;font:700 12px Inter,sans-serif;color:var(--ink);cursor:pointer;} .rsvm-acc button.lib{color:#b4231a;}
+.rsvm-acc{display:flex;gap:6px;}
+.rsp-sel{display:inline-flex;align-items:center;gap:6px;border:1.5px dashed #9fb2c8;border-radius:10px;padding:0 4px 0 9px;color:var(--ink-soft);background:var(--surface-2);} .rsp-sel.si{border-style:solid;border-color:#0e8a7c;color:#0e6f64;background:#e6f4f1;}
+.rsp-sel svg{width:15px;height:15px;flex:none;} .rsp-sel select{border:0;background:transparent;font:700 12px Inter,sans-serif;color:inherit;padding:6px 2px;cursor:pointer;outline:none;max-width:150px;}
+.rsp-tag{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;margin-left:6px;padding:2px 8px;border-radius:999px;font:700 11px Inter,sans-serif;background:#e6f4f1;color:#0e6f64;} .rsp-tag svg{width:12px;height:12px;}
+.rsp-tag.yo{background:#0e8a7c;color:#fff;} .rsp-tag.sin{background:var(--surface-2);color:var(--ink-soft);border:1px dashed #9fb2c8;}
+html[data-theme="dark"] .rsp-sel.si, html[data-theme="dark"] .rsp-tag{background:rgba(45,212,191,.14);color:#5fd3c0;border-color:rgba(45,212,191,.5);} html[data-theme="dark"] .rsp-tag.yo{background:#2dd4bf;color:#06201d;} html[data-theme="dark"] .rsp-sel select option{background:#13203a;color:#e6ecf7;} .rsvm-acc button{border:1px solid var(--border);background:var(--surface-2);border-radius:10px;padding:6px 11px;font:700 12px Inter,sans-serif;color:var(--ink);cursor:pointer;} .rsvm-acc button.lib{color:#b4231a;}
 .rsvm-f{display:grid;grid-template-columns:minmax(0,1fr) 70px 80px 190px 28px;gap:10px;align-items:center;padding:6px 0;} .rsvm-t b{display:block;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .rsvm-t small{font-size:11px;color:var(--ink-soft);}
 .rsvm-q b{font-size:16px;font-weight:800;color:var(--ink);} .rsvm-q small{font-size:11px;color:var(--ink-soft);margin-left:3px;} .rsvm-q{text-align:right;}
 .rsvm-s{justify-self:start;font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;} .rsvm-s.L{background:#ebf1ec;color:#15803d;} .rsvm-s.T{background:#e7f0ee;color:#0b6e63;} .rsvm-s.I{background:#edf0f6;color:#2f5fb3;} .rsvm-s.C{background:#efe8fd;color:#6d28d9;} .rsvm-k.C b{color:#6d28d9;} .vb.cam{background:#efe8fd;color:#6d28d9;} .val-todo.des{background:var(--card);color:var(--ink-soft);border:1px solid var(--border);}
@@ -21784,6 +21789,31 @@ async function rsvLiberarReq(cod){ if(rsvSinPermiso()) return; const n = RES.l.f
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&req=eq.' + encodeURIComponent(cod), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(rsvLibCuerpo()) });
     if(!r.ok) throw new Error(r.status); fotosBorrar(fotos); appToast('Reservas liberadas · ' + n); RES.hOk = false; resCargar(true); }catch(e){ appToast('No se pudo liberar.'); } }
 function rsvmHora(z){ const d = new Date(z.creado); return isNaN(d) ? '' : rqFecha(d) + ' · ' + d.toLocaleTimeString('es-PE', { hour:'2-digit', minute:'2-digit' }); }
+// ---- Responsable por requerimiento (24.11.2026, Piero: "Mary reserva, Kathy ordena quién verá cada cosa en el módulo de reservas; se asigna
+// el responsable por requerimiento"): Almacén elige en Reservas qué operario valida cada req. (tabla fp_rsv_resp); en Validar cada operario
+// ve primero lo que le asignaron y debajo lo que todavía no tiene responsable (así nada se queda sin validar).
+const RSP = { m:{}, ops:[], ok:false, cargando:false };
+async function rspCargar(forzar){ if(RSP.cargando || (RSP.ok && !forzar) || !sbSesion()) return; RSP.cargando = true; const antes = RSP.ok ? JSON.stringify(RSP.m) : null;
+  try{ const r = await sbFetch('/rest/v1/fp_rsv_resp?select=req,resp,nombre,por,actualizado'); if(r.ok){ const m = {}; (await r.json()).forEach(function(x){ m[x.req] = x; }); RSP.m = m; RSP.ok = true; }
+    if(!RSP.ops.length){ const o = await sbFetch('/rest/v1/rpc/fp_operarios', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }); if(o.ok) RSP.ops = await o.json(); } }catch(e){}
+  RSP.cargando = false; if(!RSP.ok || (antes !== null && antes === JSON.stringify(RSP.m))) return;
+  APP_VIVO_V++; if(APP.enInicio && appHayDatos() && (APP.pantalla === 'almrsv' || APP.pantalla === 'almval')) appRenderFondo(); }
+function rspDe(req){ const x = RSP.m[req]; return x ? String(x.resp || '').toLowerCase() : ''; }
+function rspNom(c){ const o = RSP.ops.find(function(x){ return x.correo === c; }), x = Object.values(RSP.m).find(function(y){ return String(y.resp).toLowerCase() === c; });
+  return titleCase(String((o && o.nombre) || (x && x.nombre) || String(c).split('@')[0]).split(' ')[0]); }
+function rspPuede(){ return !!APP.usuario && rqAnalista() && !rqOperario(); }   // todo Almacén asigna; el operario no
+function rspSel(req){ const e = escapeHtml, c = rspDe(req), ops = RSP.ops.slice(); if(c && !ops.some(function(o){ return o.correo === c; })) ops.push({ correo:c, nombre:(RSP.m[req] || {}).nombre || c });
+  return `<label class="rsp-sel${c ? ' si' : ''}" title="Operario que valida este requerimiento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><select data-rspreq="${e(req)}" aria-label="Responsable de validar"><option value="">Sin asignar</option>${ops.map(function(o){ return `<option value="${e(o.correo)}"${o.correo === c ? ' selected' : ''}>${e(titleCase(o.nombre || o.correo))}</option>`; }).join('')}</select></label>`; }
+function rspTag(req, yo){ const c = rspDe(req); return c ? `<span class="rsp-tag${c === yo ? ' yo' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>${c === yo ? 'Asignado a ti' : escapeHtml(rspNom(c))}</span>` : '<span class="rsp-tag sin">Sin asignar</span>'; }
+document.addEventListener('change', async function(ev){ const s = ev.target; if(!s.dataset || !s.dataset.rspreq) return;
+  const req = s.dataset.rspreq, c = s.value, ant = RSP.m[req], nR = String(req).replace(/^000\d-0*/, ''), o = RSP.ops.find(function(x){ return x.correo === c; });
+  const fila = { req:req, resp:c, nombre:o ? o.nombre : null, por:(APP.usuario && APP.usuario.correo) || null, actualizado:new Date().toISOString() };
+  try{ const r = c ? await sbFetch('/rest/v1/fp_rsv_resp?on_conflict=req', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify(fila) })
+      : await sbFetch('/rest/v1/fp_rsv_resp?req=eq.' + encodeURIComponent(req), { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+    if(!r.ok) throw sbError(await r.json().catch(function(){ return {}; }), r.status);
+    if(c) RSP.m[req] = fila; else delete RSP.m[req]; APP_VIVO_V++;
+    appToast(c ? 'Req. ' + nR + ' → lo valida ' + rspNom(c) : 'Req. ' + nR + ' quedó sin responsable'); appRenderInicio(); }
+  catch(err){ s.value = ant ? ant.resp : ''; appToast('No se pudo asignar: ' + ((err && err.message) || err)); } });
 function rsvmLista(){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); }, act = RSV_UI.ver === 'act';
   const base = act ? RES.l : (RES.h || []), q = crtNorm(RSV_UI.q.trim());
   const cliDe = function(z){ const r = resFila(z), c = r ? appImpNombre(r.proyecto || '') || r.proyecto || '' : ''; return SUP_CLI_UNIR[c] || c; };
@@ -21797,13 +21827,13 @@ function rsvmLista(){ const e = escapeHtml, nn = function(v){ return Number(v ||
       nPv = g.l.filter(function(z){ return resValida(z) && (z.val_estado || 'pendiente') === 'pendiente'; }).length, tono = !act ? 'gris' : nNo ? 'rojo' : nPv ? 'ambar' : 'verde';
     return `<div class="rsvm-c rsvm-g ${tono}" style="animation-delay:${Math.min(gi, 12) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><span class="rsvm-num"><small>Req.</small><b>${e(nR)}</b></span><span class="rsvm-cli"><b>${e(cliDe(z0) || '—')}</b><small>${r0 && r0.idProyecto && !/^SIN/i.test(r0.idProyecto) ? e(r0.idProyecto) + ' · ' : ''}${g.l.length} ítem${g.l.length === 1 ? '' : 's'} · reservó ${e(String(z0.usuario || '').split('@')[0])} · ${e(rsvmHora({ creado:g.t }))}</small>
         ${act ? `<span class="rsvm-res">${nOk ? `<i class="ok">✓ ${nOk} con VB</i>` : ''}${nPv ? `<i class="pv">${nPv} por validar</i>` : ''}${nNo ? `<i class="no">✕ ${nNo} no hay</i>` : ''}</span>` : ''}</span></div>
-      <div class="rsvm-acc">${g.l.some(function(z){ return z.val_foto; }) ? `<button type="button" data-rsvmfotos="${e(g.req)}" title="Descargar las fotos de este requerimiento">📷 Fotos (${g.l.filter(function(z){ return z.val_foto; }).length})</button>` : ''}<button type="button" data-rsvmreq="${e(g.req)}">Ver req.</button><button type="button" data-rsvmpdf="${e(g.req)}">PDF hoja</button>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="lib" data-rsvmlibreq="${e(g.req)}">Liberar…</button>` : ''}</div></div>
+      <div class="rsvm-acc">${act ? (rspPuede() ? rspSel(g.req) : rspTag(g.req, '')) : ''}${g.l.some(function(z){ return z.val_foto; }) ? `<button type="button" data-rsvmfotos="${e(g.req)}" title="Descargar las fotos de este requerimiento">📷 Fotos (${g.l.filter(function(z){ return z.val_foto; }).length})</button>` : ''}<button type="button" data-rsvmreq="${e(g.req)}">Ver req.</button><button type="button" data-rsvmpdf="${e(g.req)}">PDF hoja</button>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="lib" data-rsvmlibreq="${e(g.req)}">Liberar…</button>` : ''}</div></div>
       ${g.l.map(function(z){ const r = resFila(z), pend = resPend(r), reg = /regularizar/i.test(z.nota || ''), sd = resSede(z);
         const est = act ? (pend ? ['on', sd === 'En camino' ? 'Compromete lo que llega' : 'Descuenta del stock'] : ['ok', 'Salida en Nisira ✓']) : (r && !pend ? ['ok', 'Salió en Nisira ✓'] : ['off', 'Liberada']);
         return `<div class="rsvm-f"><span class="rsvm-t"><b>${e(z.descripcion || (r && r.producto) || z.producto)}</b><small>${e(z.producto)}${z.nota ? ' · ' + e(z.nota) : ''}</small></span><span class="rsvm-q"><b>${nn(z.cantidad)}</b><small>${e(z.um || '')}</small></span>
           <span class="rsvm-s ${resSedeK(sd)}">${e(sd)}</span><span class="rsvm-e ${est[0]}">${reg && act ? '⚠ por regularizar · ' : ''}${est[1]}${act || z.val_estado === 'ok' || z.val_estado === 'obs' ? '<br>' + rsvVB(z, 1) : ''}${z.val_foto ? ' ' + fotoImg(z.val_foto, 'chip') : ''}</span>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="rsvm-x" data-rsvlib="${z.id}" title="Liberar esta reserva" aria-label="Liberar">×</button>` : '<span></span>'}</div>`; }).join('')}</div>`; }).join(''); }
 function appReservasHtml(){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
-  if(!RQ.filas.length){ rqPreparar(); }
+  if(!RQ.filas.length){ rqPreparar(); } if(!RSP.ok) rspCargar();
   const A = RES.l.filter(function(z){ return resPend(resFila(z)); }), U = { 'Lurín':0, 'Trujillo':0, 'Ica':0, 'En camino':0 }; A.forEach(function(z){ U[resSede(z)] = (U[resSede(z)] || 0) + (+z.cantidad || 0); });
   const nReq = new Set(A.map(function(z){ return z.req; })).size, nVal = A.filter(function(z){ return (z.val_estado || 'pendiente') === 'pendiente' && resValida(z); }).length;
   const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
@@ -22011,15 +22041,16 @@ async function rsvValidar(ids, est, q, nota){ const u = APP.usuario || {};
     if(!r.ok) throw new Error(r.status); appToast(est === 'ok' ? 'Validado ✔' : est === 'obs' ? 'Observación registrada' : 'Validación quitada'); resCargar(true); }catch(e){ appToast('No se pudo guardar la validación.'); } }
 const VAL_UI = { ver:'pend', q:'' };
 function appValHtml(){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
-  if(!RQ.filas.length) rqPreparar();
-  const A = RES.l.filter(function(z){ return resPend(resFila(z)) && resValida(z); }), pend = A.filter(function(z){ return (z.val_estado || 'pendiente') === 'pendiente'; }), hechas = A.filter(function(z){ return z.val_estado === 'ok' || z.val_estado === 'obs'; });
+  if(!RQ.filas.length) rqPreparar(); if(!RSP.ok) rspCargar();
+  const yo = rqOperario() && APP.usuario ? String(APP.usuario.correo || '').toLowerCase() : '';   // operario: lo suyo + lo sin asignar (24.11.2026)
+  const A = RES.l.filter(function(z){ if(!(resPend(resFila(z)) && resValida(z))) return false; const c = yo ? rspDe(z.req) : ''; return !c || c === yo; }), pend = A.filter(function(z){ return (z.val_estado || 'pendiente') === 'pendiente'; }), hechas = A.filter(function(z){ return z.val_estado === 'ok' || z.val_estado === 'obs'; });
   const base = VAL_UI.ver === 'pend' ? pend : hechas, q = crtNorm(VAL_UI.q.trim());
   const cli = function(z){ const r = resFila(z), c = r ? appImpNombre(r.proyecto || '') || r.proyecto || '' : ''; return SUP_CLI_UNIR[c] || c; };
   const L = base.filter(function(z){ return !q || crtNorm([z.req, z.producto, z.descripcion, cli(z)].join(' ')).indexOf(q) !== -1; });
   const G = new Map(); L.forEach(function(z){ if(!G.has(z.req)) G.set(z.req, []); G.get(z.req).push(z); });
   const lista = !RES.ok ? '<div class="pmf-vacio">⏳ Cargando las reservas…</div>' : !L.length ? `<div class="pmf-vacio">${VAL_UI.ver === 'pend' ? '✅ No hay reservas por validar.' : 'Todavía no hay reservas validadas.'}</div>`
-    : [...G.entries()].map(function(gx, gi){ const req = gx[0], l = gx[1], r0 = resFila(l[0]);
-      return `<div class="val-c" style="animation-delay:${Math.min(gi, 10) * 40}ms"><div class="val-ch"><div><b>Req. ${e(String(req).replace(/^000\d-0*/, ''))}</b><small>${e(polarCorta(cli(l[0]) || '—', 40))}${r0 && r0.idProyecto && !/^SIN/i.test(r0.idProyecto) ? ' · ' + e(r0.idProyecto) : ''}</small><small>Reservó ${e(String(l[0].usuario || '').split('@')[0])} · ${e(rsvmHora(l[0]))}</small></div>
+    : [...G.entries()].sort(function(a, b){ return (yo && rspDe(b[0]) === yo ? 1 : 0) - (yo && rspDe(a[0]) === yo ? 1 : 0); }).map(function(gx, gi){ const req = gx[0], l = gx[1], r0 = resFila(l[0]);
+      return `<div class="val-c" style="animation-delay:${Math.min(gi, 10) * 40}ms"><div class="val-ch"><div><b>Req. ${e(String(req).replace(/^000\d-0*/, ''))} ${rspTag(req, yo)}</b><small>${e(polarCorta(cli(l[0]) || '—', 40))}${r0 && r0.idProyecto && !/^SIN/i.test(r0.idProyecto) ? ' · ' + e(r0.idProyecto) : ''}</small><small>Reservó ${e(String(l[0].usuario || '').split('@')[0])} · ${e(rsvmHora(l[0]))}</small></div>
         ${VAL_UI.ver === 'pend' && l.length > 1 ? `<button type="button" class="val-todo" data-valtodo="${l.map(function(z){ return z.id; }).join(',')}">✓ Todo conforme</button>` : VAL_UI.ver !== 'pend' && l.length > 1 ? `<button type="button" class="val-todo des" data-valdestodo="${l.map(function(z){ return z.id; }).join(',')}">↺ Deshacer todo</button>` : ''}</div>
         ${l.map(function(z){ const sd = resSede(z);
           return `<div class="val-it${z.val_foto ? ' con-foto' : ''}" data-valit="${z.id}">${z.val_foto ? fotoImg(z.val_foto, 'val') : ''}<div class="val-t"><b>${e(z.descripcion || z.producto)}</b><small>${e(z.producto)}${z.nota ? ' · ' + e(z.nota) : ''}</small></div>
@@ -26307,7 +26338,7 @@ function appAgCargar(forzar){
 // termine para no borrarle lo que está haciendo. Sin conexión en vivo, se revisa cada 30 s mientras la app está a la vista.
 var APP_VIVO_V = 0;   // sube cada vez que cambia algo que comparten los usuarios (reservas, pallets, rutas, agencias): la pantalla guardada ya no sirve
 const VIVO = { ws:null, ref:0, join:'', hb:null, tok:null, re:null, espera:2000, ok:false, ultimo:0, pend:{}, t:null, oculto:0, pon:false, rev:0 };
-const VIVO_TABLAS = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia', 'fp_publicacion', 'fp_gerencial'];
+const VIVO_TABLAS = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia', 'fp_publicacion', 'fp_gerencial', 'fp_rsv_resp'];
 function vivoEnviar(topic, event, payload){ if(!VIVO.ws || VIVO.ws.readyState !== 1) return ''; const ref = String(++VIVO.ref); VIVO.ws.send(JSON.stringify({ topic:topic, event:event, payload:payload || {}, ref:ref, join_ref:topic === 'phoenix' ? undefined : VIVO.join })); return ref; }
 async function vivoConectar(){ if(VIVO.ws || VIVO.re || !window.WebSocket || !sbSesion() || !APP.usuario) return; let t; try{ t = await sbToken(); }catch(e){ return; } if(!t || VIVO.ws) return;
   const ws = new WebSocket(SB_URL.replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' + encodeURIComponent(SB_KEY) + '&vsn=1.0.0'); VIVO.ws = ws; VIVO.ok = false;
@@ -26330,7 +26361,7 @@ function vivoRepintarInicio(){ const sec = document.getElementById('section-inic
 function vivoCambio(t){ VIVO.pend[t] = 1; clearTimeout(VIVO.t); VIVO.t = setTimeout(vivoAplicar, 700); }
 // Poner al día (24.11.2026, Piero: "no se jala en tiempo real"): lo que cambió mientras la conexión en vivo estaba caída o reconectando
 // (p. ej. un VB hecho en ese minuto) no llegaba nunca; al conectarse se vuelve a leer todo, y cada 2 min se revisa por si se perdió un aviso.
-const VIVO_LEER = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia'];
+const VIVO_LEER = ['fp_reservas', 'fp_pallets', 'fp_rutas', 'fp_oc_agencia', 'fp_rsv_resp'];
 function vivoPonerAlDia(){ if(!VIVO.pon) return; VIVO.pon = false; VIVO.rev = Date.now(); VIVO_LEER.forEach(vivoCambio); }
 // Ocupado: escribiendo en un campo de la pantalla o con una ventana abierta (reserva, foto, No hay…)
 function vivoOcupado(){ const a = document.activeElement; return !!document.getElementById('rsvFondo') || !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && !a.closest('#appTabbar')); }
@@ -26340,6 +26371,7 @@ function vivoAplicar(){ if(document.hidden) return; if(vivoOcupado()){ clearTime
   if(P.fp_pallets && PAL.ok) palCargar(true);
   if(P.fp_rutas) rtCargar(true);
   if(P.fp_oc_agencia) appAgCargar(true);
+  if(P.fp_rsv_resp && RSP.ok) rspCargar(true);
   if(P.fp_gerencial && typeof GD !== 'undefined' && GD.items) gdCargar(true);
   if(P.fp_publicacion) vivoDatosNuevos(); }
 // Datos nuevos de Nisira publicados por otra persona: aviso para actualizar cuando quiera (no se cambia la pantalla de golpe).
@@ -26349,7 +26381,7 @@ function vivoDatosNuevos(){ if(document.getElementById('vivoDatos')) return;
   document.body.insertAdjacentHTML('beforeend', '<button type="button" id="vivoDatos" class="vivo-datos">🔄 Hay datos nuevos de Nisira · <b>Actualizar</b></button>'); }
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('#vivoDatos'); if(!b) return; b.remove(); appToast('Actualizando datos…'); loadPublishedSnapshot(false); });
 // Sin conexión en vivo (o al volver a la app después de un rato): se vuelve a leer lo que cambia entre usuarios.
-function vivoRefrescar(){ if(!sbSesion() || !APP.usuario || vivoOcupado()) return; resCargar(true); if(PAL.ok) palCargar(true); rtCargar(true); appAgCargar(true); if(typeof GD !== 'undefined' && GD.items && APP.enInicio && (APP.pantalla === 'gdmej' || APP.pantalla === 'gdacu' || GD_FRENTES[APP.pantalla])) gdCargar(true); }
+function vivoRefrescar(){ if(!sbSesion() || !APP.usuario || vivoOcupado()) return; resCargar(true); if(RSP.ok) rspCargar(true); if(PAL.ok) palCargar(true); rtCargar(true); appAgCargar(true); if(typeof GD !== 'undefined' && GD.items && APP.enInicio && (APP.pantalla === 'gdmej' || APP.pantalla === 'gdacu' || GD_FRENTES[APP.pantalla])) gdCargar(true); }
 setInterval(function(){ if(document.hidden) return; if(!VIVO.ws && !VIVO.re) vivoConectar(); if(!VIVO.ok) vivoRefrescar(); else if(Date.now() - VIVO.rev > 120000){ VIVO.rev = Date.now(); VIVO_LEER.forEach(vivoCambio); } }, 30000);
 document.addEventListener('visibilitychange', function(){ if(document.hidden){ VIVO.oculto = Date.now(); return; }
   if(VIVO.oculto && Date.now() - VIVO.oculto > 20000){ vivoRefrescar(); if(VIVO.ws && Date.now() - VIVO.ultimo > 60000){ try{ VIVO.ws.close(); }catch(e){} } } if(!VIVO.ws && !VIVO.re) vivoConectar(); if(Object.keys(VIVO.pend).length) vivoAplicar(); });
