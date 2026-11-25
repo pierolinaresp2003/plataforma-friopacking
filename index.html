@@ -19467,6 +19467,13 @@ function cmpAplModeloCalc(t, prov){ t = sinAcentos(String(t || '').toUpperCase()
   if(/KOBOL|FB-?LATAM/.test(prov) || /\bEVC-|\bCE-GC-/.test(t)) return [F, mo];   // evaporadores comerciales de cobre
   if(/GUNTNER/.test(prov) && /\bGACV\b/.test(t) && !/\bS-GACV/.test(t)) return [F, mo];   // Güntner GACV (la versión para NH3 es S-GACV)
   return null; }
+// A qué proyectos salió del almacén lo comprado: salidas del mismo código desde la fecha de la OC hasta 6 meses después, hasta completar
+// la cantidad comprada (25.11.2026, Piero: las compras de 2025 no tienen requerimiento en el Reporte Maestro, pero sí hay salidas).
+function cmpSalPry(cod, t, cant){ const S = ALMACEN_DATA && ALMACEN_DATA.almMov && ALMACEN_DATA.almMov.sp, L = S && S.c && S.c[cod]; if(!L) return null;
+  const n = function(ms){ const d = new Date(ms); return (d.getUTCFullYear() % 100) * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate(); }, a = n(t), b = n(t + 183 * 864e5), M = new Map();
+  let falta = cant > 0 ? cant : Infinity; for(const x of L){ if(x[0] < a) continue; if(x[0] > b || falta <= 0) break; const q = Math.min(x[2], falta), p = (S.p[x[1]] || [''])[0]; falta -= q; if(p) M.set(p, (M.get(p) || 0) + q); }
+  const T = [...M.values()].reduce(function(s, v){ return s + v; }, 0); if(!T) return null;
+  const E = [...M.entries()].sort(function(p, q){ return q[1] - p[1]; }); return { p:E.map(function(e){ return e[0]; }), w:E.map(function(e){ return e[1] / T; }) }; }
 function cmpXlsDatos(Y){
   const TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75, hoy = appIndCorte(), mesCorte = hoy.getUTCFullYear() === Y ? hoy.getUTCMonth() + 1 : 12;
   // OC + código → proyectos (para la aplicación) y unidad de medida
@@ -19481,14 +19488,15 @@ function cmpXlsDatos(Y){
   const famNom = function(c){ c = String(c || 'OTROS'); return c.charAt(0) + c.slice(1).toLowerCase(); };
   const L = ((GASTO_DATA && GASTO_DATA.rows) || []).filter(function(r){ return r.anio === Y && r.codigo; }).map(function(r){
     const q = Math.min(4, Math.ceil((r.mes || 1) / 3)), usd = (r.montoPEN || 0) / TC, pr = { idProducto:r.codigo, producto:r.producto || '' }, fam = pmCat(pr);
-    const ps = [...(pry.get(nk(r.oc) + '|' + r.codigo) || [])], mod = cmpAplModelo(r.producto, r.proveedor);
+    let ps = [...(pry.get(nk(r.oc) + '|' + r.codigo) || [])], pw = null; const mod = cmpAplModelo(r.producto, r.proveedor);
+    if(!ps.some(function(p){ return p && p !== 'SIN'; })){ const sl = cmpSalPry(r.codigo, Date.UTC(r.anio, (r.mes || 1) - 1, r.dia || 1), +r.cantidad || 0); if(sl){ ps = sl.p; pw = sl.w; } }
     // Primero lo que dice el propio equipo (descripción o modelo: un enfriador de glicol sigue siendo de glicol aunque el proyecto sea de
     // amoníaco); si no se sabe por el equipo, el refrigerante del proyecto. Lo que queda sin definir se completa luego por el mismo código.
     let apls = mod ? [mod[0]] : [...new Set(ps.map(aplDe))].sort(function(a, b){ return CMP_XLS_APL.indexOf(a) - CMP_XLS_APL.indexOf(b); }), src = mod ? mod[1] : '';
-    if(!mod && apls.some(function(a){ return a !== 'Stock / sin proyecto' && a !== 'Sin dato'; })) src = 'proyecto';
+    if(!mod && apls.some(function(a){ return a !== 'Stock / sin proyecto' && a !== 'Sin dato'; })) src = pw ? 'salidas a proyecto' : 'proyecto';
     const pais = pmPais(r.proveedor, r.oc) || (r.origen === 'importado' ? '' : 'pe');
     return { r:r, q:q, usd:usd, cant:+r.cantidad || 0, fam:famNom(fam), sub:pmSubfam(fam, pr), apl:apls.length ? apls.join(' / ') : (r.origen === 'importado' ? 'Sin dato' : 'Stock / sin proyecto'), apl0:apls[0] || (r.origen === 'importado' ? 'Sin dato' : 'Stock / sin proyecto'), aplSrc:src,
-      prys:ps.filter(function(x){ return x && x !== 'SIN'; }), pais:pais, org:pais === 'pe' || (!pais && r.origen !== 'importado') ? 'Nacional' : pais === 'cn' ? 'Importación China' : 'Importación (otros países)',
+      prys:ps.filter(function(x){ return x && x !== 'SIN'; }), pw:pw, pais:pais, org:pais === 'pe' || (!pais && r.origen !== 'importado') ? 'Nacional' : pais === 'cn' ? 'Importación China' : 'Importación (otros países)',
       paisNom:pais ? (PM_PAIS_NOM[pais] || pais.toUpperCase()) : (r.origen === 'importado' ? 'Exterior' : 'Perú'), f:new Date(Date.UTC(r.anio, (r.mes || 1) - 1, r.dia || 1)), um:um.get(r.codigo) || '' };
   });
   // Sin definir → si el mismo código se compró para un proyecto o tiene el refrigerante en el modelo, se usa ese
@@ -19790,7 +19798,7 @@ function cqOrigenHtml(fam){
     ${filas.length ? `<div class="cq-mw"><table class="cq-mat"><thead><tr><th>País del proveedor</th><th>Total</th>${CQ_APL.map(function(a){ return `<th style="--c:${a[2]}"><i></i>${a[1]}</th>`; }).join('')}</tr></thead>
       <tbody>${filas.map(fila).join('')}</tbody><tfoot><tr><th>Total</th><td class="cq-t"><button type="button" data-cqcel="*|*"><b>${cqM(X.t)}${C ? ' ' + cqVar(X.t, XB.t) : ''}</b>${C ? `<small>${F.yB}: ${cqM(XB.t)}</small>` : ''}</button></td>${CQ_APL.map(function(a){ const v = X.A[a[0]], vb = XB ? XB.A[a[0]] : 0; return `<td>${v || vb ? `<button type="button" class="cq-c tot" data-cqcel="*|${a[0]}"><b>${cqM(v)}</b>${C ? `<small>${F.yB}: ${cqM(vb)}</small>${cqVar(v, vb)}` : ''}</button>` : '<span class="cq-0">—</span>'}</td>`; }).join('')}</tr></tfoot></table></div>`
       : '<div class="ini-card"><div class="ini-vacio">No hay compras de este grupo en el período.</div></div>'}
-    <p class="cq-nota">Aplicación: primero por el equipo (descripción o modelo del fabricante: Frick, Mycom, Snowman, Hengchang, Thermofin, Alfa Laval…), luego por el refrigerante del proyecto (R.PRY) y, si no, por otra compra del mismo código. "Sin definir" = no se pudo saber. Montos en US$ al TC de la plataforma.</p></div>`;
+    <p class="cq-nota">Aplicación: primero por el equipo (descripción o modelo del fabricante: Frick, Mycom, Snowman, Hengchang, Thermofin, Alfa Laval…), luego por el refrigerante del proyecto (R.PRY: el del requerimiento o, si la compra no tiene requerimiento, el de las salidas de almacén a proyecto) y, si no, por otra compra del mismo código. "Sin definir" = no se pudo saber. Montos en US$ al TC de la plataforma.</p></div>`;
 }
 function cqSel(k){ const v = k.split('|'), F = cqFiltrar(), de = cqCtx().de, f = function(x){ return (v[0] === '*' || cqPaisK(x) === v[0]) && (v[1] === '*' || cqAplK(x) === v[1]) && (!v[2] || de(x) === v[2]); };
   return { v:v, F:F, L:F.L.concat(F.LB).filter(f).sort(function(a, b){ return b.f - a.f || b.usd - a.usd; }) }; }
@@ -19983,9 +19991,11 @@ function cfRankHtml(C){ const e = escapeHtml, D = cfD(), o = APP_CF.rt ? C.tipos
     <tbody>${R.map(fila).join('') || '<tr><td colspan="6" class="pmf-vacio">Sin compras.</td></tr>'}</tbody>
     <tfoot><tr><td></td><td>Total ${o ? e(o.lab.toLowerCase()) : 'de la familia'}</td><td class="r">${cqM(tB)}</td><td class="r cf-a"><b>${cqM(tA)}</b></td><td class="r ${tA - tB > 0 ? 'mas' : 'menos'}"><b>${cfDelta(tA - tB)}</b></td><td class="r">${cfChip(tA, tB)}</td></tr></tfoot></table></div>`; }
 function cfPryNom(id){ if(id === 'SIN') return ['Sin proyecto en Nisira', 'Stock o pedido directo']; if(/^ALMACEN/i.test(id)) return ['Almacén general (stock)', 'Varios clientes'];
-  const x = pryInfo(id); return x ? [titleCase(appImpNombre(x.cl || '') || x.cl || id), titleCase(x.n || id)] : [id, '']; }
+  const x = pryInfo(id); if(x) return [titleCase(appImpNombre(x.cl || '') || x.cl || id), titleCase(x.n || id)];
+  const S = ALMACEN_DATA && ALMACEN_DATA.almMov && ALMACEN_DATA.almMov.sp, c = appMemo('cfSalCli|' + (S && S.p ? S.p.length : 0), function(){ return new Map(((S && S.p) || []).map(function(p){ return [p[0], p[1]]; })); }).get(id);
+  return c ? [titleCase(appImpNombre(c) || c), id] : [id, '']; }
 function cfPrys(C, tipoK){ const f = function(x){ return !tipoK || C.T.de(x) === tipoK; }, M = new Map();
-  const add = function(x, k){ const ids = x.prys && x.prys.length ? x.prys : ['SIN']; ids.forEach(function(id){ const m = M.get(id) || { id:id, a:0, b:0 }; m[k] += x.usd / ids.length; M.set(id, m); }); };
+  const add = function(x, k){ const ids = x.prys && x.prys.length ? x.prys : ['SIN']; ids.forEach(function(id, i){ const m = M.get(id) || { id:id, a:0, b:0 }; m[k] += x.usd * (x.pw && x.prys.length ? x.pw[i] : 1 / ids.length); M.set(id, m); }); };
   C.A.forEach(function(x){ if(f(x)) add(x, 'a'); }); C.Bc.forEach(function(x){ if(f(x)) add(x, 'b'); });
   return [...M.values()].map(function(m){ m.d = m.a - m.b; const n = cfPryNom(m.id); m.cli = n[0]; m.pry = n[1]; return m; }); }
 function cfPryCmp(C){ let t = 0, c = 0; C.Bc.forEach(function(x){ t += x.usd; if(x.prys && x.prys.length) c += x.usd; }); return t > 0 && c / t >= 0.2; }
@@ -27941,7 +27951,13 @@ function parseAlmMov(wb){
   const lim = max ? (+max.slice(0, 4) - 1) + max.slice(4) : '';
   const rows = out.filter(function(m){ return !lim || m.f >= lim; }), n2 = {};
   rows.forEach(function(m){ if(nom[m.c]) n2[m.c] = nom[m.c]; });
-  return { rows:rows, max:max, nom:n2 };
+  // Salidas a proyecto desde el 1 de enero del año anterior: código → [fecha AAMMDD, proyecto, cantidad], para saber a qué proyecto fue cada
+  // compra que el Reporte Maestro no enlaza a un requerimiento, como las de 2025 (25.11.2026, Piero: "se tienen las salidas desde 2023").
+  const y0 = max ? (+max.slice(0, 4) - 1) + '-01-01' : '', SP = [], SK = new Map(), sc = {};
+  out.forEach(function(m){ if(m.t !== 's' || !m.py || !(m.q > 0) || (y0 && m.f < y0)) return; const p = m.py.replace(/\s+/g, '').toUpperCase(); let k = SK.get(p);
+    if(k === undefined){ k = SP.length; SP.push([p, m.cl || '']); SK.set(p, k); } (sc[m.c] = sc[m.c] || []).push([+m.f.replace(/-/g, '').slice(2), k, Math.round(m.q * 1000) / 1000]); });
+  Object.keys(sc).forEach(function(k){ sc[k].sort(function(a, b){ return a[0] - b[0]; }); });
+  return { rows:rows, max:max, nom:n2, sp:{ p:SP, c:sc } };
 }
 // ---------- Recepción y despacho: datos del período ----------
 const ALM_SEDES = { LIM:'CD Lurín', TRU:'CD Trujillo', ICA:'CD Ica' };
