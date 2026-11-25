@@ -22147,6 +22147,9 @@ function valCamHtml(z){ return `<label class="val-cam${z.val_foto ? ' si' : ''}"
 const PAL = { l:[], ok:false, cargando:false, falta:false };
 const DESP_UI = { ver:'armar', q:'' };
 const DESP_SEL = new Map();   // id de la reserva → cantidad a poner en el pallet
+// Deshacer un pallet (25.11.2026, Piero: "se debe poder deshacer un pallet, pero que este poder lo tenga Katherine y Piero por el momento")
+const PAL_DESHACEN = ['kalbujar@grupofriopacking.pe', 'plinares@friopacking.pe'];
+function palPuedeDeshacer(){ return !!APP.usuario && PAL_DESHACEN.indexOf(String(APP.usuario.correo || '').toLowerCase()) !== -1; }
 async function palCargar(forzar){ if(PAL.cargando || (PAL.ok && !forzar)) return; PAL.cargando = true;
   const antes = PAL.ok ? JSON.stringify(PAL.l) + PAL.falta : null;
   try{ const r = await sbFetch('/rest/v1/fp_pallets?select=*&order=numero.asc'); if(r.ok){ PAL.l = await r.json(); PAL.ok = true; PAL.falta = false; } else if(r.status === 404 || r.status === 400){ PAL.falta = true; PAL.ok = true; } }catch(e){}
@@ -22166,7 +22169,8 @@ function palEstado(p){ return palSalio(p) ? 'salio' : p.estado === 'listo' ? 'li
 // Agrupado por zona (24.11.2026, Piero: "el módulo de despachos debe estar agrupado por zona en base de qué proyecto vienen"): la zona sale del
 // departamento del proyecto (Norte/Centro/Sur); si el proyecto no lo trae, la zona del cliente; si tampoco, "Sin zona".
 const DESP_ZONAS = [['NORTE', 'Norte'], ['CENTRO', 'Centro'], ['SUR', 'Sur'], ['', 'Sin zona']];
-function despZona(pry, cli){ const pi = pry ? pryInfo(pry) : null, z = pi && pi.dep ? pmZona(pi.dep) : ''; if(z && z !== 'OTRAS') return z;
+function despZona(pry, cli){ if(/^(SIN|ALMACEN)/i.test(String(pry || '')) || /^(SIN PROYECTO|STOCK)/i.test(String(cli || ''))) return '';   // compra de almacén: no va a obra
+  const pi = pry ? pryInfo(pry) : null, z = pi && pi.dep ? pmZona(pi.dep) : ''; if(z && z !== 'OTRAS') return z;
   const zc = cli ? rqZonaCli().get(cli) || rqZonaCli().get(appImpNombre(cli)) || '' : ''; return ['NORTE', 'CENTRO', 'SUR'].indexOf(zc) !== -1 ? zc : ''; }
 function despPorZona(L, zonaDe, pinta, cuenta){ const Z = new Map(DESP_ZONAS.map(function(x){ return [x[0], []]; })); L.forEach(function(it){ Z.get(zonaDe(it) || '').push(it); }); let gi = 0;
   return DESP_ZONAS.filter(function(x){ return Z.get(x[0]).length; }).map(function(x){ const l = Z.get(x[0]);
@@ -22198,7 +22202,7 @@ function appDespHtml(){ const e = escapeHtml, nn = function(v){ return Number(v 
     cuerpo = !P.length ? `<div class="pmf-vacio">${DESP_UI.ver === 'pal' ? 'Todavía no hay pallets armados.' : 'Ningún pallet ha salido todavía.'}</div>`
       : despPorZona(P, function(p){ return despZona(p.proyecto, p.cliente); }, function(p, gi){ const est = palEstado(p), its = p.items || [], pi = p.proyecto ? pryInfo(p.proyecto) || {} : {};
         return `<div class="rsvm-c rsvm-g pal-c ${EST[est][0]}" style="animation-delay:${Math.min(gi, 10) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><span class="rsvm-num"><small>Pallet</small><b>${e(String(p.numero))}</b></span><span class="rsvm-cli"><b>${e(p.cliente || '—')}</b><small>${p.proyecto ? e(p.proyecto) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'} · ${its.length} ítem${its.length === 1 ? '' : 's'} · ${e(String(p.usuario || '').split('@')[0])} · ${e(rsvmHora({ creado:p.creado }))}</small><span class="rsvm-res"><i class="${est === 'armando' ? 'pv' : 'ok'}">${EST[est][1]}</i></span></span></div>
-          <div class="rsvm-acc">${est === 'armando' ? `<button type="button" class="ok" data-pallisto="${p.id}"${its.length ? '' : ' disabled'}>✓ Listo para Rutas</button><button type="button" class="lib" data-palborrar="${p.id}">Eliminar</button>` : est === 'listo' ? `<button type="button" data-palarmar="${p.id}">Volver a armar</button>` : ''}</div></div>
+          <div class="rsvm-acc">${est === 'armando' ? `<button type="button" class="ok" data-pallisto="${p.id}"${its.length ? '' : ' disabled'}>✓ Listo para Rutas</button>` : est === 'listo' ? `<button type="button" data-palarmar="${p.id}">Volver a armar</button>` : ''}${palPuedeDeshacer() ? `<button type="button" class="lib" data-palborrar="${p.id}">Deshacer pallet</button>` : ''}</div></div>
           ${its.length ? its.map(function(it, j){ const z = RES.l.find(function(y){ return String(y.id) === String(it.r); });
             return `<div class="desp-f pal-f">${z && z.val_foto ? fotoImg(z.val_foto, 'mini') : '<span class="foto-th vacio"></span>'}<span class="rsvm-t"><b>${e(it.desc || it.cod)}</b><small>Req. ${e(String(it.req || '').replace(/^000\d-0*/, ''))} · ${e(it.cod || '')}</small></span><span class="desp-q"><b>${nn(it.q)}</b><small>${e(it.um || '')}</small></span>${est === 'armando' ? `<button type="button" class="rsvm-x" data-palquita="${p.id}|${j}" title="Sacar del pallet" aria-label="Sacar del pallet">×</button>` : '<span></span>'}</div>`; }).join('') : '<div class="desp-f pal-f vacio">Pallet vacío.</div>'}</div>`; }, function(l){ return appN(l.length) + ' pallet' + (l.length === 1 ? '' : 's'); });
   }
@@ -22232,7 +22236,9 @@ document.addEventListener('click', async function(ev){ const b = ev.target.close
     if(b.dataset.pallisto || b.dataset.palarmar){ b.disabled = true; const est = b.dataset.pallisto ? 'listo' : 'armando'; const j = await palGuardar('PATCH', '?id=eq.' + P.id, { estado:est, actualizado:new Date().toISOString() }); Object.assign(P, j[0] || { estado:est });
       appToast(est === 'listo' ? 'Pallet ' + P.numero + ' listo para Rutas ✔' : 'Pallet ' + P.numero + ' vuelve a armarse'); return appRenderInicio(); }
     if(b.dataset.palquita){ const j0 = +b.dataset.palquita.split('|')[1], L = (P.items || []).filter(function(x, j){ return j !== j0; }); const j = await palGuardar('PATCH', '?id=eq.' + P.id, { items:L, actualizado:new Date().toISOString() }); Object.assign(P, j[0] || { items:L }); return appRenderInicio(); }
-    if(b.dataset.palborrar){ if((P.items || []).length && !window.confirm('¿Eliminar el pallet ' + P.numero + '? Sus ítems vuelven a "Por armar".')) return; await palGuardar('DELETE', '?id=eq.' + P.id); PAL.l = PAL.l.filter(function(x){ return x !== P; }); appToast('Pallet ' + P.numero + ' eliminado'); return appRenderInicio(); }
+    if(b.dataset.palborrar){ if(!palPuedeDeshacer()) return appToast('Solo Katherine o Piero pueden deshacer un pallet.');
+      if((P.items || []).length && !window.confirm('¿Deshacer el pallet ' + P.numero + '? ' + (palEstado(P) === 'salio' ? 'Sus ítems ya salieron en Nisira: solo se borra el pallet.' : 'Sus ítems vuelven a "Por armar".'))) return;
+      await palGuardar('DELETE', '?id=eq.' + P.id); PAL.l = PAL.l.filter(function(x){ return x !== P; }); appToast('Pallet ' + P.numero + ' deshecho'); return appRenderInicio(); }
   }catch(err){ appToast(err.message || 'No se pudo guardar.'); appRenderInicio(); } });
 document.addEventListener('input', function(ev){ const i = ev.target; if(i.dataset && i.dataset.despq){ const x = despPorArmar().find(function(y){ return String(y.z.id) === i.dataset.despq; }); if(!x) return; const v = +i.value; DESP_SEL.set(i.dataset.despq, Math.max(0, Math.min(isFinite(v) ? v : 0, x.q))); if(v > x.q) i.value = x.q; return; }
   if(i.id === 'despQ'){ DESP_UI.q = i.value; clearTimeout(appDespHtml._t); appDespHtml._t = setTimeout(function(){ const y = document.activeElement === i; appRenderInicio(); if(y){ const n = document.getElementById('despQ'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } } }, 250); } });
