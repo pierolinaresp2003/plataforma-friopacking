@@ -22285,7 +22285,7 @@ const PAL_DESHACEN = ['kalbujar@grupofriopacking.pe', 'plinares@friopacking.pe']
 function palPuedeDeshacer(){ return !!APP.usuario && PAL_DESHACEN.indexOf(String(APP.usuario.correo || '').toLowerCase()) !== -1; }
 async function palCargar(forzar){ if(PAL.cargando || (PAL.ok && !forzar)) return; PAL.cargando = true;
   const antes = PAL.ok ? JSON.stringify(PAL.l) + PAL.falta : null;
-  try{ const r = await sbFetch('/rest/v1/fp_pallets?select=*&order=numero.asc'); if(r.ok){ PAL.l = await r.json(); PAL.ok = true; PAL.falta = false; } else if(r.status === 404 || r.status === 400){ PAL.falta = true; PAL.ok = true; } }catch(e){}
+  try{ const r = await sbFetch('/rest/v1/fp_pallets?select=*&order=numero.asc'); if(r.ok){ const L = await r.json(); PAL.max = L.reduce(function(m, x){ return Math.max(m, +x.numero || 0); }, 0); PAL.l = L.filter(function(x){ return (x.items || []).length; }); PAL.ok = true; PAL.falta = false; } else if(r.status === 404 || r.status === 400){ PAL.falta = true; PAL.ok = true; } }catch(e){}
   PAL.cargando = false; if(antes !== null && antes === JSON.stringify(PAL.l) + PAL.falta) return;   // sin cambios: no se repinta
   APP_VIVO_V++;
   if(APP.enInicio && APP.pantalla === 'almdesp') appRenderFondo(); }
@@ -22415,7 +22415,7 @@ function despPalDet(p){ const e = escapeHtml, nn = function(v){ return Number(v 
         <div><dt>Armó</dt><dd>${e(valNomCorto(appNombrePorCorreo(p.usuario)) || String(p.usuario || '').split('@')[0])}</dd></div><div><dt>Fecha</dt><dd>${e(valFechaCorta(p.creado))}</dd></div></dl>
       ${est === 'armando' ? `<button type="button" class="val-todo" data-pallisto="${p.id}"${its.length ? '' : ' disabled'}>✓ Listo para Rutas</button>` : est === 'listo' ? `<button type="button" class="desp-mas" data-palarmar="${p.id}">Volver a armar</button>` : ''}</div>
     ${its.length ? its.map(function(it, j){ return `<div class="val-it pal-it"><div class="val-t"><b>${e(it.desc || it.cod)}</b><small>Req. ${e(String(it.req || '').replace(/^000\d-0*/, ''))} · Cód. ${e(it.cod || '')}</small></div>
-        <span class="desp-q"><b>${nn(it.q)}</b><small>${e(it.um || '')}</small></span>${est === 'armando' ? `<button type="button" class="rsvm-x" data-palquita="${p.id}|${j}" title="Sacar del pallet" aria-label="Sacar del pallet">×</button>` : '<span></span>'}
+        <span class="desp-q"><b>${nn(it.q)}</b><small>${e(it.um || '')}</small></span>${est === 'armando' && palPuedeDeshacer() ? `<button type="button" class="rsvm-x" data-palquita="${p.id}|${j}" title="Sacar del pallet" aria-label="Sacar del pallet">×</button>` : '<span></span>'}
         ${libera ? `<button type="button" class="desp-lib" data-pallibit="${p.id}|${j}">Liberar reserva</button>` : ''}</div>`; }).join('') : '<div class="pmf-vacio">Pallet vacío.</div>'}
     ${libera && its.length ? `<button type="button" class="desp-libtodo" data-pallibtodo="${p.id}">Liberar todo el pallet</button>` : ''}
     ${palPuedeDeshacer() ? `<button type="button" class="desp-deshacer" data-palborrar="${p.id}">Deshacer pallet</button>` : ''}`; }
@@ -22444,7 +22444,7 @@ document.addEventListener('click', async function(ev){ const b = ev.target.close
     l.forEach(function(x){ if(todos) DESP_SEL.delete(String(x.z.id)); else DESP_SEL.set(String(x.z.id), x.q); }); return appRenderInicio(); }
   try{
     if(b.dataset.despnuevo){ const its = despItemsSel(); if(!its.length) return appToast('Marca los ítems que van en el pallet.'); b.disabled = true;
-      const cab = palCabecera(its), n = PAL.l.reduce(function(m, x){ return Math.max(m, +x.numero || 0); }, 0) + 1;
+      const cab = palCabecera(its), n = PAL.l.reduce(function(m, x){ return Math.max(m, +x.numero || 0); }, PAL.max || 0) + 1;
       const j = await palGuardar('POST', '', { numero:n, cliente:cab.cliente, proyecto:cab.proyecto, items:its, estado:'armando' });
       PAL.l.push(j[0]); its.forEach(function(it){ DESP_SEL.delete(String(it.r)); }); appToast('Pallet ' + n + ' armado ✔ · ' + its.length + ' ítem' + (its.length === 1 ? '' : 's')); if(j[0]){ DESP_UI.k = ''; DESP_UI.pal = String(j[0].id); window.scrollTo(0, 0); } return appRenderInicio(); }
     if(b.dataset.despmas){ const p = PAL.l.find(function(x){ return String(x.id) === b.dataset.despmas; }); if(!p) return; const its = despItemsSel(); if(!its.length) return; b.disabled = true; rsvCerrar();
@@ -22454,7 +22454,10 @@ document.addEventListener('click', async function(ev){ const b = ev.target.close
     const P = PAL.l.find(function(x){ return String(x.id) === String(b.dataset.pallisto || b.dataset.palarmar || b.dataset.palborrar || String(b.dataset.palquita || '').split('|')[0]); }); if(!P) return;
     if(b.dataset.pallisto || b.dataset.palarmar){ b.disabled = true; const est = b.dataset.pallisto ? 'listo' : 'armando'; const j = await palGuardar('PATCH', '?id=eq.' + P.id, { estado:est, actualizado:new Date().toISOString() }); Object.assign(P, j[0] || { estado:est });
       appToast(est === 'listo' ? 'Pallet ' + P.numero + ' listo para Rutas ✔' : 'Pallet ' + P.numero + ' vuelve a armarse'); return appRenderInicio(); }
-    if(b.dataset.palquita){ const j0 = +b.dataset.palquita.split('|')[1], L = (P.items || []).filter(function(x, j){ return j !== j0; }); const j = await palGuardar('PATCH', '?id=eq.' + P.id, { items:L, actualizado:new Date().toISOString() }); Object.assign(P, j[0] || { items:L }); return appRenderInicio(); }
+    if(b.dataset.palquita){ if(!palPuedeDeshacer()) return appToast('Solo Katherine o Piero pueden sacar ítems del pallet.');
+      const j0 = +b.dataset.palquita.split('|')[1], L = (P.items || []).filter(function(x, j){ return j !== j0; });
+      if(!L.length){ await palGuardar('DELETE', '?id=eq.' + P.id); PAL.l = PAL.l.filter(function(x){ return x !== P; }); DESP_UI.pal = ''; appToast('Pallet ' + P.numero + ' quedó vacío y se quitó'); return appRenderInicio(); }
+      const j = await palGuardar('PATCH', '?id=eq.' + P.id, { items:L, actualizado:new Date().toISOString() }); Object.assign(P, j[0] || { items:L }); return appRenderInicio(); }
     if(b.dataset.palborrar){ if(!palPuedeDeshacer()) return appToast('Solo Katherine o Piero pueden deshacer un pallet.');
       if((P.items || []).length && !window.confirm('¿Deshacer el pallet ' + P.numero + '? ' + (palEstado(P) === 'salio' ? 'Sus ítems ya salieron en Nisira: solo se borra el pallet.' : 'Sus ítems vuelven a "Por armar".'))) return;
       await palGuardar('DELETE', '?id=eq.' + P.id); PAL.l = PAL.l.filter(function(x){ return x !== P; }); DESP_UI.pal = ''; appToast('Pallet ' + P.numero + ' deshecho'); return appRenderInicio(); }
