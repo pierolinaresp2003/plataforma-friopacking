@@ -4194,6 +4194,16 @@ html[data-theme="dark"] .valx-nota{background:rgba(212,161,76,.14);color:#d8ac5d
 body.app-pc .val:has(> .valx-cab){max-width:1000px;margin-left:auto;margin-right:auto;}
 .desp-libtodo{width:100%;border:1.5px solid #d92d20;background:var(--card);color:#b4231a;border-radius:12px;padding:12px;font:800 14.5px Inter,sans-serif;cursor:pointer;}
 html[data-theme="dark"] .val-it.pal-it .desp-lib{background:rgba(213,88,82,.14);border-color:rgba(213,88,82,.4);color:#f0a19c;} html[data-theme="dark"] .desp-libtodo{border-color:#db706a;color:#f0a19c;}
+.valx.desp-r{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0;padding:0;cursor:default;} .valx.desp-r > .desp-x{margin-left:14px;width:30px;height:30px;border-radius:8px;}
+.desp-rb{all:unset;box-sizing:border-box;display:grid;grid-template-columns:72px minmax(0,1fr) 22px;gap:12px;align-items:center;padding:12px 14px;cursor:pointer;min-width:0;} .desp-rb:focus-visible{outline:2px solid #0e8a7c;outline-offset:-2px;border-radius:12px;}
+.valx.desp-r.marcado{border-color:#15803d;box-shadow:0 0 0 2px rgba(21,128,61,.16);}
+.desp-x.parte{background:#0e8a7c;border-color:#0e8a7c;} .desp-x.parte::after{content:'';width:12px;height:3px;border-radius:2px;background:#fff;}
+.desp-sel{display:flex;align-items:center;justify-content:space-between;gap:10px;font:600 13.5px Inter,sans-serif;color:var(--ink);padding:2px 4px;} .desp-sel b{font-weight:800;}
+.desp-sel button{border:0;background:none;color:var(--ink-soft);font:700 12.5px Inter,sans-serif;text-decoration:underline;cursor:pointer;padding:4px;}
+.desp-elige{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow:auto;}
+.desp-elige button{display:grid;grid-template-columns:68px minmax(0,1fr);gap:12px;align-items:center;text-align:left;border:1px solid var(--border);background:var(--card);border-radius:14px;padding:10px 12px;cursor:pointer;font-family:Inter,sans-serif;color:var(--ink);--rc:#c27803;--rc-bg:#f5f0e6;}
+.desp-elige button:hover{border-color:#15803d;} .desp-elige b{display:block;font-size:14.5px;} .desp-elige small{display:block;font-size:12px;color:var(--ink-soft);}
+html[data-theme="dark"] .desp-x.parte{background:#2dd4bf;border-color:#2dd4bf;}
 .desp-deshacer{align-self:center;border:0;background:none;color:#b4231a;font:700 13.5px Inter,sans-serif;padding:10px;cursor:pointer;text-decoration:underline;}
 @media (max-width:900px){ .desp-armar{bottom:calc(env(safe-area-inset-bottom) + 84px);} }
 html[data-theme="dark"] .valx.z-norte,html[data-theme="dark"] .valx-cab.z-norte{--rc:#6aa3ef;--rc-bg:rgba(47,125,225,.16);} html[data-theme="dark"] .valx.z-centro,html[data-theme="dark"] .valx-cab.z-centro{--rc:#e9a25a;--rc-bg:rgba(224,138,30,.16);}
@@ -22268,7 +22278,7 @@ function valCamHtml(req, foto){ return `<label class="val-cam valx-cam${foto ? '
 // pueden ir juntos). Los pallets viven en fp_pallets (número, cliente, proyecto, ítems en JSON y estado armando/listo); cuando todas sus
 // reservas ya salieron en Nisira se ven como "Salió".
 const PAL = { l:[], ok:false, cargando:false, falta:false };
-const DESP_UI = { ver:'armar', q:'', zona:'', k:'', pal:'' };   // k: cliente|proyecto abierto · pal: pallet abierto   // zona: NORTE · CENTRO · SUR · SIN (sin zona) · '' todas
+const DESP_UI = { ver:'armar', q:'', zona:'', k:'', pal:'' };   // k: requerimiento abierto · pal: pallet abierto   // zona: NORTE · CENTRO · SUR · SIN (sin zona) · '' todas
 const DESP_SEL = new Map();   // id de la reserva → cantidad a poner en el pallet
 // Deshacer un pallet (25.11.2026, Piero: "se debe poder deshacer un pallet, pero que este poder lo tenga Katherine y Piero por el momento")
 const PAL_DESHACEN = ['kalbujar@grupofriopacking.pe', 'plinares@friopacking.pe'];
@@ -22305,36 +22315,52 @@ function despPorZona(L, zonaDe, pinta){ DESP_ZN = { '':L.length, NORTE:0, CENTRO
 const DESP_ZNOM = { NORTE:'Norte', CENTRO:'Centro', SUR:'Sur', '':'Sin proyecto' };   // todo PRY tiene departamento; sin zona = compra de almacén sin proyecto
 function despZonaDe(z0){ const r = resFila(z0); return despZona(despPry(z0), r ? r.proyecto : despCli(z0)); }
 function despZChip(zn){ return `<i class="zn zn-${zn ? zn.toLowerCase() : 'sin'}">${DESP_ZNOM[zn || '']}</i>`; }
+// Un pallet puede llevar varios requerimientos (25.11.2026, Piero: "yo puedo armar por varios requerimientos a un mismo pallet"): la lista va por
+// requerimiento; con la casilla se marca el req. completo (o se entra y se marcan ítems sueltos) y la selección se junta entre requerimientos;
+// abajo, "Armar pallet nuevo" o "Agregar a un pallet" con todo lo marcado.
+function palZonas(p){ const o = []; (p.items || []).forEach(function(it){ const z = RES.l.find(function(y){ return String(y.id) === String(it.r); }); if(z){ const zn = despZonaDe(z) || ''; if(o.indexOf(zn) === -1) o.push(zn); } });
+  if(!o.length) o.push(despZona(String(p.proyecto || '').split(/,\s*/)[0], p.cliente) || ''); return o.sort(function(a, b){ return (a ? 0 : 1) - (b ? 0 : 1); }); }
+function palZona(p){ return palZonas(p)[0] || ''; }
+function palZonasTxt(p){ return palZonas(p).map(function(zn){ return DESP_ZNOM[zn || '']; }).join(' · '); }
+// Cliente y proyecto del pallet según sus ítems (si hay varios, se juntan)
+function palCabecera(items, ant){ const cl = [], pr = []; (items || []).forEach(function(it){ const z = RES.l.find(function(y){ return String(y.id) === String(it.r); }); if(!z) return;
+    const c = despCli(z), q = despPry(z); if(c && cl.indexOf(c) === -1) cl.push(c); if(q && pr.indexOf(q) === -1) pr.push(q); });
+  if(!cl.length) return ant || { cliente:'—', proyecto:null };
+  return { cliente:cl.length === 1 ? cl[0] : cl.slice(0, 2).join(' · ') + (cl.length > 2 ? ' y ' + (cl.length - 2) + ' más' : ''), proyecto:pr.join(', ') || null }; }
+function despSelResumen(){ const S = despPorArmar().filter(function(x){ return DESP_SEL.has(String(x.z.id)); }); return { n:S.length, reqs:new Set(S.map(function(x){ return x.z.req; })).size }; }
+function despBarra(){ const r = despSelResumen(); if(!r.n) return ''; const nAb = PAL.l.filter(function(p){ return palEstado(p) === 'armando'; }).length;
+  return `<div class="desp-armar"><div class="desp-sel"><span><b>${appN(r.n)} ítem${r.n === 1 ? '' : 's'}</b> de ${appN(r.reqs)} req. marcado${r.n === 1 ? '' : 's'}</span><button type="button" data-despquitar="1">Quitar todo</button></div>
+    <button type="button" class="val-todo" data-despnuevo="1">Armar pallet nuevo</button>${nAb ? `<button type="button" class="desp-mas" data-despagregar="1">Agregar a un pallet armándose</button>` : ''}</div>`; }
 function appDespHtml(){ const e = escapeHtml;
   if(!RQ.filas.length) rqPreparar(); if(!PAL.ok) palCargar();
   const aviso = PAL.falta ? '<div class="desp-aviso">⚠ Para guardar los pallets falta crear la tabla en Supabase: corre el SQL de Despachos una vez y recarga.</div>' : '';
   if(!RES.ok || !PAL.ok) return `<div class="val desp">${aviso}<div class="pmf-vacio">Cargando…</div></div>`;
   const D = despPorArmar(), q = crtNorm(DESP_UI.q.trim());
-  if(DESP_UI.k){ const l = D.filter(function(x){ return despClave(x.z) === DESP_UI.k; }); if(l.length) return `<div class="val desp">${aviso}${despGrupoDet(DESP_UI.k, l)}</div>`; DESP_UI.k = ''; }
+  if(DESP_UI.k){ const l = D.filter(function(x){ return x.z.req === DESP_UI.k; }); if(l.length) return `<div class="val desp">${aviso}${despReqDet(DESP_UI.k, l)}</div>`; DESP_UI.k = ''; }
   if(DESP_UI.pal){ const p = PAL.l.find(function(x){ return String(x.id) === String(DESP_UI.pal); }); if(p) return `<div class="val desp">${aviso}${despPalDet(p)}</div>`; DESP_UI.pal = ''; }
   const nArm = PAL.l.filter(function(p){ return palEstado(p) === 'armando'; }).length, nLis = PAL.l.filter(function(p){ return palEstado(p) === 'listo'; }).length, nSalio = PAL.l.filter(function(p){ return palEstado(p) === 'salio'; }).length;
   let cuerpo = ''; DESP_ZN = {};
   if(DESP_UI.ver === 'armar'){
     const L = D.filter(function(x){ return !q || crtNorm([x.z.req, x.z.producto, x.z.descripcion, despCli(x.z), despPry(x.z)].join(' ')).indexOf(q) !== -1; });
-    const G = new Map(); L.forEach(function(x){ const k = despClave(x.z); if(!G.has(k)) G.set(k, []); G.get(k).push(x); });
+    const G = new Map(); L.forEach(function(x){ if(!G.has(x.z.req)) G.set(x.z.req, []); G.get(x.z.req).push(x); });
     cuerpo = !L.length ? (D.length ? '<div class="pmf-vacio">Nada con esa búsqueda.</div>' : '')
-      : despPorZona([...G.entries()], function(gx){ return despZonaDe(gx[1][0].z); }, function(gx, gi){ const k = gx[0], l = gx[1], z0 = l[0].z, pry = despPry(z0), zn = despZonaDe(z0);
-        const nReq = new Set(l.map(function(x){ return x.z.req; })).size, abierto = PAL.l.some(function(p){ return p.cliente + '|' + (p.proyecto || '') === k && palEstado(p) === 'armando'; });
-        return `<button type="button" class="valx z-${zn ? zn.toLowerCase() : 'sin'}" data-despk="${e(k)}" style="animation-delay:${Math.min(gi, 10) * 35}ms">
-          <span class="valx-n"><small>Ítems</small><b>${l.length}</b></span>
-          <span class="valx-t"><b>${e(titleCase(despCli(z0)))}</b><small>${pry ? e(pry) : 'Sin proyecto'} · ${nReq} req.</small>
-            <span class="valx-chips">${despZChip(zn)}${abierto ? '<i class="pv">Pallet armándose</i>' : ''}</span></span>
-          <span class="valx-ch">${RSV_FLECHA}</span></button>`; });
+      : despPorZona([...G.entries()], function(gx){ return despZonaDe(gx[1][0].z); }, function(gx, gi){ const req = gx[0], l = gx[1], z0 = l[0].z, pry = despPry(z0), zn = despZonaDe(z0);
+        const nSel = l.filter(function(x){ return DESP_SEL.has(String(x.z.id)); }).length, est = !nSel ? '' : nSel === l.length ? ' on' : ' parte';
+        return `<div class="valx desp-r z-${zn ? zn.toLowerCase() : 'sin'}${nSel ? ' marcado' : ''}" style="animation-delay:${Math.min(gi, 10) * 35}ms">
+          <button type="button" class="desp-x${est}" data-despreqsel="${e(req)}" aria-label="Marcar todo el requerimiento"></button>
+          <button type="button" class="desp-rb" data-despk="${e(req)}"><span class="valx-n"><small>Req.</small><b>${e(String(req).replace(/^000\d-0*/, ''))}</b></span>
+            <span class="valx-t"><b>${e(titleCase(despCli(z0)))}</b><small>${pry ? e(pry) : 'Sin proyecto'} · ${l.length} ítem${l.length === 1 ? '' : 's'}${nSel ? ' · ' + nSel + ' marcado' + (nSel === 1 ? '' : 's') : ''}</small>
+              <span class="valx-chips">${despZChip(zn)}</span></span><span class="valx-ch">${RSV_FLECHA}</span></button></div>`; });
   } else {
     const EST = { armando:['pv', 'Armando'], listo:['ok', 'Listo para Rutas'], salio:['gris', 'Salió'] };
     const P = PAL.l.filter(function(p){ const est = palEstado(p); return (DESP_UI.ver === 'pal' ? est !== 'salio' : est === 'salio') && (!q || crtNorm([p.numero, p.cliente, p.proyecto, (p.items || []).map(function(it){ return it.req + ' ' + it.cod + ' ' + it.desc; }).join(' ')].join(' ')).indexOf(q) !== -1); })
       .sort(function(a, b){ return b.numero - a.numero; });
     cuerpo = !P.length ? `<div class="pmf-vacio">${DESP_UI.ver === 'pal' ? 'Todavía no hay pallets armados.' : 'Ningún pallet ha salido todavía.'}</div>`
-      : despPorZona(P, function(p){ return despZona(p.proyecto, p.cliente); }, function(p, gi){ const est = palEstado(p), its = p.items || [], zn = despZona(p.proyecto, p.cliente);
+      : despPorZona(P, palZona, function(p, gi){ const est = palEstado(p), its = p.items || [], zn = palZona(p), nReq = new Set(its.map(function(it){ return it.req; })).size;
         return `<button type="button" class="valx ${EST[est][0]}" data-desppal="${p.id}" style="animation-delay:${Math.min(gi, 10) * 35}ms">
           <span class="valx-n"><small>Pallet</small><b>${e(String(p.numero))}</b></span>
-          <span class="valx-t"><b>${e(titleCase(p.cliente || '—'))}</b><small>${p.proyecto ? e(p.proyecto) : 'Sin proyecto'} · ${its.length} ítem${its.length === 1 ? '' : 's'}</small>
-            <span class="valx-chips">${despZChip(zn)}<i class="${EST[est][0]}">${EST[est][1]}</i></span></span>
+          <span class="valx-t"><b>${e(titleCase(p.cliente || '—'))}</b><small>${!p.proyecto ? 'Sin proyecto' : p.proyecto.indexOf(',') !== -1 ? p.proyecto.split(',').length + ' proyectos' : e(p.proyecto)} · ${its.length} ítem${its.length === 1 ? '' : 's'} · ${nReq} req.</small>
+            <span class="valx-chips">${palZonas(p).map(despZChip).join('')}<i class="${EST[est][0]}">${EST[est][1]}</i></span></span>
           <span class="valx-ch">${RSV_FLECHA}</span></button>`; });
   }
   const tab = function(v, t, n){ return `<button type="button" data-despver="${v}" class="${DESP_UI.ver === v ? 'on' : ''}">${t}${n ? ` <b>${appN(n)}</b>` : ''}</button>`; };
@@ -22342,21 +22368,19 @@ function appDespHtml(){ const e = escapeHtml;
     <div class="rsvm-seg desp-tabs">${tab('armar', 'Por armar', D.length)}${tab('pal', 'Pallets', nArm + nLis)}${tab('salio', 'Salieron', nSalio)}</div>
     <div class="rsvm-sedes desp-zonas">${[['', 'Todas'], ['NORTE', 'Norte'], ['CENTRO', 'Centro'], ['SUR', 'Sur'], ['SIN', 'Sin proyecto']].map(function(o){ return `<button type="button" data-despzona="${o[0]}" class="${DESP_UI.zona === o[0] ? 'on' : ''}">${o[1]}${o[0] && DESP_ZN[o[0]] ? ' · ' + appN(DESP_ZN[o[0]]) : ''}</button>`; }).join('')}</div>
     <input type="search" class="rsvm-bus" id="despQ" placeholder="Buscar req., cliente, código o producto" value="${e(DESP_UI.q)}" autocomplete="off">
-    <div class="val-l" id="despL">${cuerpo}</div></div>`; }
-// Detalle de un cliente/proyecto: sus ítems por armar (ya marcados) y el botón para armar el pallet
-function despGrupoDet(k, l){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
-  const z0 = l[0].z, pry = despPry(z0), pi = pry ? pryInfo(pry) || {} : {}, zn = despZonaDe(z0), reqs = [...new Set(l.map(function(x){ return String(x.z.req).replace(/^000\d-0*/, ''); }))];
-  const abiertos = PAL.l.filter(function(p){ return p.cliente + '|' + (p.proyecto || '') === k && palEstado(p) === 'armando'; }), sel = l.filter(function(x){ return DESP_SEL.has(String(x.z.id)); }), nSel = sel.length;
+    <div class="val-l" id="despL">${cuerpo}</div>${DESP_UI.ver === 'armar' ? despBarra() : ''}</div>`; }
+// Detalle de un requerimiento: se marcan sus ítems (o se cambia la cantidad); lo marcado se junta con lo de otros req.
+function despReqDet(req, l){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
+  const z0 = l[0].z, pry = despPry(z0), pi = pry ? pryInfo(pry) || {} : {}, zn = despZonaDe(z0), nSel = l.filter(function(x){ return DESP_SEL.has(String(x.z.id)); }).length;
   return `<div class="val-c valx-cab z-${zn ? zn.toLowerCase() : 'sin'}">
-      <div class="valx-top"><span class="valx-n"><small>Ítems</small><b>${l.length}</b></span><div class="valx-cli">${e(titleCase(despCli(z0)))}</div></div>
-      <dl class="valx-info"><div class="anc"><dt>Proyecto</dt><dd>${pry ? e(pry) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'}</dd></div><div><dt>Zona</dt><dd>${DESP_ZNOM[zn || '']}</dd></div><div><dt>Req.</dt><dd>${e(reqs.join(', '))}</dd></div></dl>
-      <button type="button" class="desp-todo" data-desptodo="${e(k)}">${nSel === l.length ? 'Desmarcar todo' : 'Marcar todo'}</button></div>
+      <div class="valx-top"><span class="valx-n"><small>Req.</small><b>${e(String(req).replace(/^000\d-0*/, ''))}</b></span><div class="valx-cli">${e(titleCase(despCli(z0)))}</div></div>
+      <dl class="valx-info"><div class="anc"><dt>Proyecto</dt><dd>${pry ? e(pry) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'}</dd></div><div><dt>Zona</dt><dd>${DESP_ZNOM[zn || '']}</dd></div><div><dt>Ítems por armar</dt><dd>${l.length}</dd></div></dl>
+      <button type="button" class="desp-todo" data-despreqsel="${e(req)}">${nSel === l.length ? 'Desmarcar todo' : 'Marcar todo'}</button></div>
     ${l.map(function(x){ const z = x.z, id = String(z.id), on = DESP_SEL.has(id);
       return `<div class="val-it desp-it${on ? ' on' : ''}" data-despsel="${e(id)}" role="checkbox" aria-checked="${on}"><span class="desp-x${on ? ' on' : ''}"></span>
-        <div class="val-t"><b>${e(z.descripcion || z.producto)}</b><small>Req. ${e(String(z.req).replace(/^000\d-0*/, ''))} · Cód. ${e(z.producto)}</small></div>
+        <div class="val-t"><b>${e(z.descripcion || z.producto)}</b><small>Cód. ${e(z.producto)}</small></div>
         <span class="desp-q">${on ? `<input type="number" min="0" max="${x.q}" step="any" value="${DESP_SEL.get(id)}" data-despq="${e(id)}" inputmode="decimal" aria-label="Cantidad para el pallet">` : `<b>${nn(x.q)}</b>`}<small>${e(z.um || '')}${on ? ' de ' + nn(x.q) : ''}</small></span></div>`; }).join('')}
-    <div class="desp-armar"><button type="button" class="val-todo" data-despnuevo="${e(k)}"${nSel ? '' : ' disabled'}>${nSel ? 'Armar pallet (' + nSel + ' ítem' + (nSel === 1 ? '' : 's') + ')' : 'Marca los ítems del pallet'}</button>
-      ${abiertos.map(function(p){ return `<button type="button" class="desp-mas" data-despmas="${p.id}"${nSel ? '' : ' disabled'}>Agregar al pallet ${e(String(p.numero))}</button>`; }).join('')}</div>`; }
+    ${despBarra()}`; }
 // Liberar desde el pallet (25.11.2026, Piero: "una vez armado un pallet, Katherine y Piero tienen el poder de liberar parte o la totalidad de ese
 // pallet y eso directamente se libera, ya no estaría reservado"): la reserva baja en esa cantidad (si es toda, queda liberada) y sale del pallet.
 async function palLiberar(P, sel){ if(!palPuedeDeshacer()) return appToast('Solo Katherine o Piero pueden liberar desde un pallet.');
@@ -22383,11 +22407,11 @@ function palLiberarItem(P, j){ const it = (P.items || [])[j]; if(!it) return; co
     try{ rsvCerrar(); await palLiberar(P, [{ j:j, q:q }]); }catch(err){ appToast(err.message || 'No se pudo liberar.'); } }); }
 // Detalle de un pallet: sus ítems y lo que se puede hacer según su estado
 function despPalDet(p){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
-  const est = palEstado(p), its = p.items || [], zn = despZona(p.proyecto, p.cliente), pi = p.proyecto ? pryInfo(p.proyecto) || {} : {};
+  const est = palEstado(p), its = p.items || [], zn = palZona(p), pi = p.proyecto ? pryInfo(p.proyecto) || {} : {};
   const EST = { armando:'Armando', listo:'Listo para Rutas', salio:'Salió' }, libera = est !== 'salio' && palPuedeDeshacer();
   return `<div class="val-c valx-cab ${est === 'armando' ? 'pv' : est === 'listo' ? 'ok' : 'gris'}">
       <div class="valx-top"><span class="valx-n"><small>Pallet</small><b>${e(String(p.numero))}</b></span><div class="valx-cli">${e(titleCase(p.cliente || '—'))}</div></div>
-      <dl class="valx-info"><div class="anc"><dt>Proyecto</dt><dd>${p.proyecto ? e(p.proyecto) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'}</dd></div><div><dt>Zona</dt><dd>${DESP_ZNOM[zn || '']}</dd></div><div><dt>Estado</dt><dd>${EST[est]}</dd></div>
+      <dl class="valx-info"><div class="anc"><dt>Proyecto</dt><dd>${p.proyecto ? e(p.proyecto) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'}</dd></div><div><dt>Zona</dt><dd>${palZonasTxt(p)}</dd></div><div><dt>Estado</dt><dd>${EST[est]}</dd></div>
         <div><dt>Armó</dt><dd>${e(valNomCorto(appNombrePorCorreo(p.usuario)) || String(p.usuario || '').split('@')[0])}</dd></div><div><dt>Fecha</dt><dd>${e(valFechaCorta(p.creado))}</dd></div></dl>
       ${est === 'armando' ? `<button type="button" class="val-todo" data-pallisto="${p.id}"${its.length ? '' : ' disabled'}>✓ Listo para Rutas</button>` : est === 'listo' ? `<button type="button" class="desp-mas" data-palarmar="${p.id}">Volver a armar</button>` : ''}</div>
     ${its.length ? its.map(function(it, j){ return `<div class="val-it pal-it"><div class="val-t"><b>${e(it.desc || it.cod)}</b><small>Req. ${e(String(it.req || '').replace(/^000\d-0*/, ''))} · Cód. ${e(it.cod || '')}</small></div>
@@ -22399,15 +22423,19 @@ async function palGuardar(metodo, url, cuerpo){ const r = await sbFetch('/rest/v
   if(!r.ok){ if(r.status === 404 || r.status === 400) PAL.falta = true; throw new Error(r.status === 404 ? 'Falta crear la tabla de pallets en Supabase.' : 'No se pudo guardar (' + r.status + ').'); } return metodo === 'DELETE' ? [] : r.json(); }
 function despItemsSel(k){ return despPorArmar().filter(function(x){ return DESP_SEL.has(String(x.z.id)) && (!k || despClave(x.z) === k); }).map(function(x){ const z = x.z, q = Math.min(+DESP_SEL.get(String(z.id)) || 0, x.q);
   return { r:z.id, req:z.req, cod:z.producto, desc:z.descripcion || '', q:Math.round(q * 1000) / 1000, um:z.um || '' }; }).filter(function(it){ return it.q > 0; }); }
-document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-despver],[data-despsel],[data-desptodo],[data-despnuevo],[data-despmas],[data-pallisto],[data-palarmar],[data-palborrar],[data-palquita],[data-despzona],[data-despk],[data-desppal],[data-pallibit],[data-pallibtodo]'); if(!b) return;
+document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-despver],[data-despsel],[data-desptodo],[data-despnuevo],[data-despmas],[data-pallisto],[data-palarmar],[data-palborrar],[data-palquita],[data-despzona],[data-despk],[data-desppal],[data-pallibit],[data-pallibtodo],[data-despreqsel],[data-despquitar],[data-despagregar]'); if(!b) return;
   if(b.dataset.pallibit){ const x = b.dataset.pallibit.split('|'), P = PAL.l.find(function(y){ return String(y.id) === x[0]; }); return P && palLiberarItem(P, +x[1]); }
   if(b.dataset.pallibtodo){ const P = PAL.l.find(function(y){ return String(y.id) === b.dataset.pallibtodo; }); if(!P) return; const n = (P.items || []).length;
     if(!window.confirm('¿Liberar todo el pallet ' + P.numero + '? Sus ' + n + ' ítem' + (n === 1 ? '' : 's') + ' dejan de estar reservados y el pallet se borra.')) return;
     b.disabled = true; return palLiberar(P, (P.items || []).map(function(it, j){ return { j:j, q:+it.q }; })).catch(function(err){ b.disabled = false; appToast(err.message || 'No se pudo liberar.'); }); }
   if(b.dataset.despsel && ev.target.closest('input')) return;   // escribir la cantidad no desmarca el ítem
-  if(b.dataset.despk){ const k = b.dataset.despk, l = despPorArmar().filter(function(x){ return despClave(x.z) === k; });
-    if(!l.some(function(x){ return DESP_SEL.has(String(x.z.id)); })) l.forEach(function(x){ DESP_SEL.set(String(x.z.id), x.q); });   // entra con todo marcado
-    DESP_UI.k = k; DESP_UI.pal = ''; window.scrollTo(0, 0); return appRenderInicio(); }
+  if(b.dataset.despk){ DESP_UI.k = b.dataset.despk; DESP_UI.pal = ''; window.scrollTo(0, 0); return appRenderInicio(); }
+  if(b.dataset.despreqsel){ const l = despPorArmar().filter(function(x){ return x.z.req === b.dataset.despreqsel; }), todos = l.every(function(x){ return DESP_SEL.has(String(x.z.id)); });
+    l.forEach(function(x){ if(todos) DESP_SEL.delete(String(x.z.id)); else DESP_SEL.set(String(x.z.id), x.q); }); return appRenderInicio(); }
+  if(b.dataset.despquitar){ DESP_SEL.clear(); return appRenderInicio(); }
+  if(b.dataset.despagregar){ const e = escapeHtml, A = PAL.l.filter(function(p){ return palEstado(p) === 'armando'; }).sort(function(a, c){ return c.numero - a.numero; });
+    rsvModal(`<header><div><small>Agregar lo marcado</small><h3>¿A qué pallet?</h3></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
+      <div class="desp-elige">${A.map(function(p){ const zn = palZona(p); return `<button type="button" data-despmas="${p.id}"><span class="valx-n"><small>Pallet</small><b>${e(String(p.numero))}</b></span><span><b>${e(titleCase(p.cliente || '—'))}</b><small>${p.proyecto ? e(p.proyecto) : 'Sin proyecto'} · ${(p.items || []).length} ítem${(p.items || []).length === 1 ? '' : 's'} · ${palZonasTxt(p)}</small></span></button>`; }).join('')}</div>`); return; }
   if(b.dataset.desppal){ DESP_UI.pal = b.dataset.desppal; DESP_UI.k = ''; window.scrollTo(0, 0); return appRenderInicio(); }
   if(b.dataset.despzona !== undefined){ DESP_UI.zona = b.dataset.despzona; return appRenderInicio(); }
   if(b.dataset.despver){ DESP_UI.ver = b.dataset.despver; DESP_UI.k = ''; DESP_UI.pal = ''; return appRenderInicio(); }
@@ -22415,13 +22443,13 @@ document.addEventListener('click', async function(ev){ const b = ev.target.close
   if(b.dataset.desptodo){ const k = b.dataset.desptodo, l = despPorArmar().filter(function(x){ return despClave(x.z) === k; }), todos = l.every(function(x){ return DESP_SEL.has(String(x.z.id)); });
     l.forEach(function(x){ if(todos) DESP_SEL.delete(String(x.z.id)); else DESP_SEL.set(String(x.z.id), x.q); }); return appRenderInicio(); }
   try{
-    if(b.dataset.despnuevo){ const k = b.dataset.despnuevo, its = despItemsSel(k); if(!its.length) return appToast('Marca los ítems que van en el pallet.'); b.disabled = true;
-      const p = k.split('|'), n = PAL.l.reduce(function(m, x){ return Math.max(m, +x.numero || 0); }, 0) + 1;
-      const j = await palGuardar('POST', '', { numero:n, cliente:p[0], proyecto:p[1] || null, items:its, estado:'armando' });
+    if(b.dataset.despnuevo){ const its = despItemsSel(); if(!its.length) return appToast('Marca los ítems que van en el pallet.'); b.disabled = true;
+      const cab = palCabecera(its), n = PAL.l.reduce(function(m, x){ return Math.max(m, +x.numero || 0); }, 0) + 1;
+      const j = await palGuardar('POST', '', { numero:n, cliente:cab.cliente, proyecto:cab.proyecto, items:its, estado:'armando' });
       PAL.l.push(j[0]); its.forEach(function(it){ DESP_SEL.delete(String(it.r)); }); appToast('Pallet ' + n + ' armado ✔ · ' + its.length + ' ítem' + (its.length === 1 ? '' : 's')); if(j[0]){ DESP_UI.k = ''; DESP_UI.pal = String(j[0].id); window.scrollTo(0, 0); } return appRenderInicio(); }
-    if(b.dataset.despmas){ const p = PAL.l.find(function(x){ return String(x.id) === b.dataset.despmas; }); if(!p) return; const its = despItemsSel(p.cliente + '|' + (p.proyecto || '')); if(!its.length) return; b.disabled = true;
+    if(b.dataset.despmas){ const p = PAL.l.find(function(x){ return String(x.id) === b.dataset.despmas; }); if(!p) return; const its = despItemsSel(); if(!its.length) return; b.disabled = true; rsvCerrar();
       const L = (p.items || []).map(function(x){ return Object.assign({}, x); }); its.forEach(function(it){ const y = L.find(function(x){ return String(x.r) === String(it.r); }); if(y) y.q = Math.round((+y.q + it.q) * 1000) / 1000; else L.push(it); });
-      const j = await palGuardar('PATCH', '?id=eq.' + p.id, { items:L, actualizado:new Date().toISOString() }); Object.assign(p, j[0] || { items:L }); its.forEach(function(it){ DESP_SEL.delete(String(it.r)); });
+      const cab = palCabecera(L, { cliente:p.cliente, proyecto:p.proyecto }), j = await palGuardar('PATCH', '?id=eq.' + p.id, { items:L, cliente:cab.cliente, proyecto:cab.proyecto, actualizado:new Date().toISOString() }); Object.assign(p, j[0] || { items:L }); its.forEach(function(it){ DESP_SEL.delete(String(it.r)); });
       appToast('Agregado al pallet ' + p.numero + ' ✔'); DESP_UI.k = ''; DESP_UI.pal = String(p.id); window.scrollTo(0, 0); return appRenderInicio(); }
     const P = PAL.l.find(function(x){ return String(x.id) === String(b.dataset.pallisto || b.dataset.palarmar || b.dataset.palborrar || String(b.dataset.palquita || '').split('|')[0]); }); if(!P) return;
     if(b.dataset.pallisto || b.dataset.palarmar){ b.disabled = true; const est = b.dataset.pallisto ? 'listo' : 'armando'; const j = await palGuardar('PATCH', '?id=eq.' + P.id, { estado:est, actualizado:new Date().toISOString() }); Object.assign(P, j[0] || { estado:est });
