@@ -4738,7 +4738,7 @@ html[data-theme="dark"] .val-falta.si{background:rgba(210,157,70,.16);color:#d8a
 html[data-theme="dark"] .vb.obs.no{background:rgba(213,88,82,.16);color:#db706a;} html[data-theme="dark"] .rq-cob small.rq-cob-fv{color:#d4a14c;}
 .val-it{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--surface-2);border-radius:14px;padding:12px 14px;} .val-t b{display:block;font-size:14.5px;color:var(--ink);} .val-t small{font-size:12px;color:var(--ink-soft);}
 .val-q{display:flex;align-items:center;gap:8px;justify-self:end;} .val-q b{font-size:24px;font-weight:800;color:var(--ink);} .val-q small{font-size:12px;color:var(--ink-soft);}
-.val-acc{grid-column:1 / -1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;} .val-acc button{flex:1;min-width:120px;border:0;border-radius:12px;padding:13px 14px;font:800 15px Inter,sans-serif;cursor:pointer;} .val-acc .ok{background:#15803d;color:#fff;} .val-acc .obs{background:#f5f0e6;color:#9a5b00;} .val-acc .des{flex:0;background:var(--card);border:1px solid var(--border);color:var(--ink-soft);font-size:12.5px;padding:8px 12px;} .val-acc .vb{font-size:13px;padding:5px 12px;} .val-nota{font-size:12px;color:var(--ink-soft);flex:1;} .val-in{width:110px;font-size:20px !important;font-weight:800;}
+.val-acc{grid-column:1 / -1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;} .val-acc button{flex:1;min-width:120px;border:0;border-radius:12px;padding:13px 14px;font:800 15px Inter,sans-serif;cursor:pointer;} .val-acc .ok{background:#15803d;color:#fff;} .val-acc .obs{background:#f5f0e6;color:#9a5b00;} .val-acc .des{flex:none;background:var(--card);border:1px solid var(--border);color:var(--ink-soft);font-size:12.5px;padding:8px 12px;} .val-acc .vb{font-size:13px;padding:5px 12px;} .val-nota{font-size:12px;color:var(--ink-soft);flex:1;} .val-in{width:110px;font-size:20px !important;font-weight:800;}
 .lib-l{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto;} .lib-it{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--surface-2);border-radius:12px;padding:10px 12px;cursor:pointer;border:2px solid transparent;} .lib-it.on{border-color:#c56e68;background:#fff5f4;} .lib-it > input{width:20px;height:20px;accent-color:#b4231a;}
 .lib-t b{display:block;font-size:13.5px;color:var(--ink);} .lib-t small{font-size:11.5px;color:var(--ink-soft);} .lib-q{display:flex;align-items:center;gap:5px;} .lib-q input{width:84px;height:36px;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;text-align:center;font:800 15px Inter,sans-serif;color:var(--ink);background:var(--card);} .lib-q small{font-size:11px;color:var(--ink-soft);}
 .rsv-b.lib{background:#b4231a;border-color:#b4231a;color:#fff;} #libTodo{color:#b4231a;border-color:#e7d6d5;}
@@ -18593,6 +18593,7 @@ function appAtrasInv(){
 }
 function appAtras(){
   if(appAtrasInv()) return true;
+  if(APP.enInicio && APP.pantalla === 'almval' && VAL_UI.req){ VAL_UI.req = ''; appRenderInicio(); window.scrollTo(0, 0); return true; }   // del detalle del req. a la lista de Validar (25.11.2026)
   if(APP.enInicio && APP.pantalla === 'equipo' && APP_GE.cod){ APP_GE.cod = ''; appRenderInicio(); window.scrollTo(0, 0); return true; }   // del resumen de una persona al equipo
   if(!RQ_MOVIL.matches) return false;
   const sheet = document.getElementById('appSheet'), asis = document.getElementById('asis'), bienv = document.getElementById('appBienv');
@@ -20286,7 +20287,7 @@ function appRenderInicio(){
   } else if(APP.pantalla === 'daily' || APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'almreg' || APP.pantalla === 'almval' || APP.pantalla === 'almdesp' || APP.pantalla === 'almrut' || APP.pantalla === 'suppry' || APP.pantalla === 'tienda' || APP.pantalla === 'equipo'){
     if((APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'almval' || APP.pantalla === 'almdesp' || APP.pantalla === 'suppry') && !RES.ok) resCargar();
     if(APP.pantalla === 'almrsv' && RSV_UI.ver === 'lib' && !RES.hOk) resHistCargar();
-    if(!appPonerInicio(cont, gdNavSi() + APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' && APP.pantalla !== 'almrut' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''))) return;
+    if(!appPonerInicio(cont, gdNavSi() + APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' && APP.pantalla !== 'almrut' && APP.pantalla !== 'almval' && APP.vista !== 'operario' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''))) return;
     if(APP.pantalla === 'almrut') setTimeout(function(){ rtsIniciar(); rtpIniciar(); }, 0);   // el zoom del mapa con su tamaño real
     return;
   } else if(APP.pantalla === 'cmpeq' || APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'almrep' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog' || APP.pantalla === 'impnav' || APP.pantalla === 'almseg' || APP.pantalla === 'reportes' || GX_MODS[APP.pantalla] || GD_PANT[APP.pantalla]){
@@ -21863,7 +21864,8 @@ function rspNom(c){ const o = RSP.ops.find(function(x){ return x.correo === c; }
 function rspPuede(){ return !!APP.usuario && rqAnalista() && !rqOperario(); }   // todo Almacén asigna; el operario no
 function rspSel(req){ const e = escapeHtml, c = rspDe(req), ops = RSP.ops.slice(); if(c && !ops.some(function(o){ return o.correo === c; })) ops.push({ correo:c, nombre:(RSP.m[req] || {}).nombre || c });
   return `<label class="rsp-sel${c ? ' si' : ''}" title="Operario que valida este requerimiento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><select data-rspreq="${e(req)}" aria-label="Responsable de validar"><option value="">Sin asignar</option>${ops.map(function(o){ return `<option value="${e(o.correo)}"${o.correo === c ? ' selected' : ''}>${e(titleCase(o.nombre || o.correo))}</option>`; }).join('')}</select></label>`; }
-function rspTag(req, yo){ const c = rspDe(req); return c ? `<span class="rsp-tag${c === yo ? ' yo' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>${c === yo ? 'Asignado a ti' : escapeHtml(rspNom(c))}</span>` : '<span class="rsp-tag sin">Sin asignar</span>'; }
+function rspTag(req, yo){ const c = rspDe(req); if(yo && c === yo) return '';   // el operario no ve "Asignado a ti": se sobreentiende (25.11.2026, Piero)
+  return c ? `<span class="rsp-tag${c === yo ? ' yo' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>${c === yo ? 'Asignado a ti' : escapeHtml(rspNom(c))}</span>` : '<span class="rsp-tag sin">Sin asignar</span>'; }
 document.addEventListener('change', async function(ev){ const s = ev.target; if(!s.dataset || !s.dataset.rspreq) return;
   const req = s.dataset.rspreq, c = s.value, ant = RSP.m[req], nR = String(req).replace(/^000\d-0*/, ''), o = RSP.ops.find(function(x){ return x.correo === c; });
   const fila = { req:req, resp:c, nombre:o ? o.nombre : null, por:(APP.usuario && APP.usuario.correo) || null, actualizado:new Date().toISOString() };
@@ -22147,15 +22149,14 @@ function valDetalle(req, l, yo){ const e = escapeHtml, nn = function(v){ return 
   const item = function(z){ const sd = resSede(z);
     return `<div class="val-it" data-valit="${z.id}"><div class="val-t"><b>${e(z.descripcion || z.producto)}</b><small>${e(z.producto)}${z.nota ? ' · ' + e(z.nota) : ''}</small></div>
       <div class="val-q"><span class="rsvm-s ${resSedeK(sd)}">${e(sd)}</span><b>${nn(z.cantidad)}</b><small>${e(z.um || '')}</small></div>
-      ${esP(z) ? `<div class="val-acc"><button type="button" class="ok" data-valok="${z.id}">✓ Aceptar todo</button><button type="button" class="no" data-valobs="${z.id}">✕ No hay</button></div>`
+      ${esP(z) ? `<div class="val-acc"><button type="button" class="no" data-valobs="${z.id}">✕ No hay</button><button type="button" class="ok" data-valok="${z.id}">✓ Aceptar todo</button></div>`
         : `<div class="val-acc">${rsvVB(z)}${z.val_nota ? `<small class="val-nota">${e(z.val_nota)}</small>` : ''}<button type="button" class="des" data-valdes="${z.id}">Deshacer</button></div>`}</div>`; };
-  return `<button type="button" class="valx-volver" data-valreq="">${RSV_ATRAS}Requerimientos</button>
-    <div class="val-c valx-cab ${tono}">
+  return `<div class="val-c valx-cab ${tono}">
       <div class="valx-cab-t"><span class="valx-n"><small>Req.</small><b>${e(String(req).replace(/^000\d-0*/, ''))}</b></span>
         <div><b>${e(rsvmCli(z0) || '—')}</b><small>${pry ? e(pry) + ' · ' : ''}${l.length} ítem${l.length === 1 ? '' : 's'}</small><small>Reservó ${e(String(z0.usuario || '').split('@')[0])} · ${e(rsvmHora(z0))}</small>${rspTag(req, yo)}</div></div>
       <div class="valx-foto">${foto ? fotoImg(foto, 'req') : ''}${valCamHtml(req, foto)}</div>
       ${P.length > 1 ? `<button type="button" class="val-todo" data-valtodo="${P.map(function(z){ return z.id; }).join(',')}">✓ Todo conforme (${P.length})</button>` : !P.length ? '<div class="valx-listo">✓ Todo validado</div>' : ''}</div>
-    ${P.length ? `<div class="valx-sec">Por validar · ${P.length}</div>${P.map(item).join('')}` : ''}
+    ${P.map(item).join('')}
     ${H.length ? `<div class="valx-sec">Validados · ${H.length}</div>${H.map(item).join('')}` : ''}`; }
 function valObservar(id){ const z = RES.l.find(function(y){ return String(y.id) === String(id); }); if(!z) return; const e = escapeHtml;
   // "No hay" y luego cuánto no hay (19.11.2026, Piero: "que la opción sea 'no hay' y que luego pregunte cuánto no hay; ya no dejes lo de
@@ -33368,6 +33369,13 @@ appArrancar();
     // Chrome/Edge avisan cuando se puede instalar; se guarda el aviso para el botón "Instalar la app" del menú ☰.
     window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); window.fpInstalar = e; });
     window.addEventListener('appinstalled', function(){ window.fpInstalar = null; window.fpInstalada = true; });
+    // Sin los botones del celular abajo (25.11.2026, Piero: "se deben quitar los botones del celular que salen por defecto abajo"): en la
+    // vista Revisión, al primer toque la app pasa a pantalla completa (instalada o en el navegador; el celular solo lo permite tras un
+    // toque). Deslizando desde abajo los botones vuelven por un momento. Solo Android: el iPhone no lo permite en páginas web.
+    const cel = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+    if(cel) document.addEventListener('pointerup', function(){ try{ const d = document.documentElement;
+      if(document.fullscreenElement || !d.requestFullscreen || localStorage.getItem('fp-vista') !== 'operario') return;
+      d.requestFullscreen({ navigationUI:'hide' }).catch(function(){}); }catch(e){} }, true);
   }catch(err){}
 })();
 </script>
