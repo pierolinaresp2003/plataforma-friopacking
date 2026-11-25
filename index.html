@@ -25931,7 +25931,7 @@ function appCotAbrir(){ const e = escapeHtml, L = appCotItems(); if(!L.length) r
   const provs = [...P.values()].map(function(p){ const x = cotProvDe(p.n, p.ruc); return Object.assign(p, { mail:x ? [x.to].concat(x.cc || []).join(',') : '', nom:x && x.nombre ? x.nombre : p.n }); });
   const it = cats.map(function(c){ const l = L.filter(function(r){ return skuCategoria(r) === c; });
     return `<div class="cot-c"><b>${e(c)}</b>${l.map(function(r){ return `<div><span>${e(r.producto || r.idProducto)}</span><em>${appN(r.cantPedido, 2)} ${e(r.unidad || '')}</em></div>`; }).join('')}</div>`; }).join('');
-  rsvModal(`<header><div><small>Solicitud de cotización</small><h3>${appN(L.length)} SKU · ${e(cats.length === 1 ? cats[0] : cats.length + ' categorías')}</h3><p>Elige a quién enviarla. El correo va con copia oculta: cada proveedor no ve a los demás.</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
+  rsvModal(`<header><div><small>Solicitud de cotización</small><h3>${appN(L.length)} SKU · ${e(cats.length === 1 ? cats[0] : cats.length + ' categorías')}</h3><p>Elige a quién enviarla. Va a M. Luján con copia a Compras y al supervisor del requerimiento; los proveedores en copia oculta (no se ven entre ellos). El asunto lleva el código COT para guardar las respuestas.</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
     <div class="cot-its">${it}</div>
     <div class="alt-l cot-pl">${provs.map(function(p, i){ return `<label class="alt-it"><input type="checkbox" data-cotprov="${i}" value="${e(p.mail)}"${p.mail && p.sug ? ' checked' : ''}${p.mail ? '' : ' disabled'}><span class="alt-t"><b>${e(p.nom)}</b><small>${p.mail ? e(p.mail) : 'Sin correo en DB Proveedores · escríbelo abajo'}</small></span><span class="alt-q"><small>${e(p.tag)}</small></span></label>`; }).join('') || '<p class="rsv-nota">No hay proveedores sugeridos para estas categorías: escribe los correos abajo.</p>'}</div>
     <label class="rsv-lbl">Otros correos<input id="cotOtros" placeholder="ventas@proveedor.com, …" autocomplete="off"></label>
@@ -25943,18 +25943,26 @@ function appCotAbrir(){ const e = escapeHtml, L = appCotItems(); if(!L.length) r
     const bcc = [...f.querySelectorAll('[data-cotprov]:checked')].map(function(x){ return x.value; }).concat(String(f.querySelector('#cotOtros').value || '').split(/[;,\s]+/)).filter(function(x){ return /@/.test(x); }).join(',');
     if(!bcc) return appToast('Elige al menos un proveedor con correo.');
     appCotCorreo(L, cats, bcc); }); }
-function appCotCorreo(L, cats, bcc){ const e = escapeHtml, cod = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
-  const asunto = 'Solicitud de cotización · ' + (cats.length === 1 ? cats[0] : cats.slice(0, 2).join(', ') + (cats.length > 2 ? '…' : '')) + ' · Grupo Friopacking';
+// Para M. Luján, con copia a Compras y al supervisor de cada requerimiento; los proveedores en copia oculta. Cada solicitud queda registrada en
+// Supabase con su código COT-AAAA-NNNN en el asunto, para guardar luego las respuestas y sus precios (25.11.2026, Piero).
+const COT_PARA = 'mlujan@grupofriopacking.pe', COT_CC = ['ccheca@friopacking.pe', 'msihuairo@friopacking.pe', 'jpomez@friopacking.pe', 'jaltamirano@friopacking.pe', 'plinares@friopacking.pe'];
+async function appCotCorreo(L, cats, bcc){ const e = escapeHtml, cod = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
+  const cc = [...new Set(COT_CC.concat(L.map(function(r){ return crtCorreoSupervisor(r.solicitante || ''); })).map(function(x){ return String(x || '').trim().toLowerCase(); }).filter(function(x){ return /@/.test(x) && x !== COT_PARA; }))].join(',');
+  const base = 'Solicitud de cotización · ' + (cats.length === 1 ? cats[0] : cats.slice(0, 2).join(', ') + (cats.length > 2 ? '…' : '')) + ' · Grupo Friopacking';
+  let cot = ''; try{ const r = await sbFetch('/rest/v1/rpc/fp_cot_crear', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ p:{ asunto:base, para:COT_PARA, cc:cc, cco:bcc,
+    items:L.map(function(r){ return { cod:r.idProducto || '', desc:r.producto || '', cant:+r.cantPedido || 0, um:r.unidad || '', req:r.req || '', pry:r.idProyecto || '', sol:r.solicitante || '' }; }) } }) }); if(r.ok) cot = String(await r.json() || ''); }catch(err){}
+  if(!cot) appToast('No se pudo registrar la solicitud: el correo sale sin código COT.');
+  const asunto = (cot ? cot + ' · ' : '') + base, nota = cot ? 'Al responder, mantener el código ' + cot + ' en el asunto y adjuntar la cotización en PDF.' : '';
   const T = ['Estimados:', '', 'Por favor, su cotización de los siguientes materiales:', ''].concat(L.map(function(r, i){ return (i + 1) + '. ' + (r.producto || r.idProducto) + ' — ' + appN(r.cantPedido, 2) + ' ' + (r.unidad || ''); }))
-    .concat(['', 'Indicar precio unitario (sin IGV), moneda, plazo de entrega, validez de la oferta y condiciones de pago.', '', 'Saludos cordiales,']);
+    .concat(['', 'Indicar precio unitario (sin IGV), moneda, plazo de entrega, validez de la oferta y condiciones de pago.'], nota ? ['', nota] : [], ['', 'Saludos cordiales,']);
   const th = function(x){ return '<th style="background:#25344a;color:#ffffff;border:1px solid #25344a;padding:5px 8px;font-size:10pt;text-align:left;">' + x + '</th>'; }, td = function(x, a){ return '<td style="border:1px solid #c9d2de;padding:4px 8px;font-size:10pt;' + (a ? 'text-align:' + a + ';' : '') + '">' + x + '</td>'; };
   const p = function(x){ return '<p style="margin:0 0 10pt;">' + x + '</p>'; };
   const html = '<div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;">' + p('Estimados:') + p('Por favor, su cotización de los siguientes materiales:')
     + '<table style="border-collapse:collapse;margin:0 0 12pt;"><tr>' + th('N°') + th('Código') + th('Descripción') + th('Cantidad') + th('U.M.') + '</tr>'
     + L.map(function(r, i){ return '<tr>' + td(i + 1, 'center') + td(e(r.idProducto || '')) + td(e(r.producto || '')) + td(appN(r.cantPedido, 2), 'right') + td(e(r.unidad || ''), 'center') + '</tr>'; }).join('') + '</table>'
-    + p('Indicar <b>precio unitario (sin IGV)</b>, moneda, <b>plazo de entrega</b>, validez de la oferta y condiciones de pago.') + '<p style="margin:0;">Saludos cordiales,</p></div>';
+    + p('Indicar <b>precio unitario (sin IGV)</b>, moneda, <b>plazo de entrega</b>, validez de la oferta y condiciones de pago.') + (cot ? p('Al responder, mantener el código <b>' + cot + '</b> en el asunto y adjuntar la cotización en PDF.') : '') + '<p style="margin:0;">Saludos cordiales,</p></div>';
   const abrir = function(copiado){ if(copiado) appToast('📋 Tabla copiada: en el correo pega con Ctrl+V');
-    window.location.href = 'mailto:?bcc=' + encodeURIComponent(bcc) + '&subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(copiado ? '' : T.join('\r\n')); };
+    window.location.href = 'mailto:' + COT_PARA + '?cc=' + encodeURIComponent(cc) + '&bcc=' + encodeURIComponent(bcc) + '&subject=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(copiado ? '' : T.join('\r\n')); };
   crtCopiarHtml(html, T.join('\r\n')).then(abrir, function(){ abrir(false); }); }
 async function appCotExcel(L){ let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
   const wb = new EJ.Workbook(), ws = wb.addWorksheet('Cotización', { views:[{ state:'frozen', ySplit:4, showGridLines:false }] }), hoy = new Date();
