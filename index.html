@@ -18138,7 +18138,8 @@ const APP_VISTAS = {
   frioteam:   { nombre:'Frioteam',   ico:'❄️', desc:'Inventario de Logística: stock por sede y kardex.',
     tabs:[['inventario','📦','Inventario']] },
   // Operarios de almacén (13.11.2026, Piero): validan en el celular lo que se reserva; su VB sale en el PDF de la hoja.
-  operario:   { nombre:'Operario',   ico:'🦺', desc:'Validar las reservas de stock en el almacén.',
+  operario:   { nombre:'Revisión',   ico:'🦺',   // se muestra como "Revisión", no "Operario" (25.11.2026, Piero)
+ desc:'Validar las reservas de stock en el almacén.',
     tabs:[['almval','✅','Validar'], ['almdesp','📦','Despachos']] },
   supervisor: { nombre:'Supervisor', ico:'👷', desc:'Cómo va lo que pediste: por N° de requerimiento o por proyecto.',
     // Sin Stock (29.09.2026, Piero: "el supervisor no puede ver el stock, simplemente se limita a ver sus req").
@@ -18818,7 +18819,8 @@ function appLanzador(forzar){
   const filas = vs.indexOf('gerencial') !== -1 && resto.length
     ? fila('gerencial', 0) + `<div class="lz-grupo">${fila('logistica', 1, true)}<div class="lz-subs">${resto.map(function(k, i){ return fila(k, i + 2); }).join('')}</div></div>`
     : vs.map(function(k, i){ return fila(k, i); }).join('');
-  const hoy = R && R.linea ? R.linea : (appHayDatos() ? 'Elige un módulo para empezar.' : SNAP_ESTADO && SNAP_ESTADO.error
+  const oper = !!APP.usuario && APP.usuario.tipo === 'operario';   // el operario no ve el resumen de Compras/Almacén (25.11.2026, Piero)
+  const hoy = R && R.linea && !oper ? R.linea : (appHayDatos() ? (oper ? '' : 'Elige un módulo para empezar.') : SNAP_ESTADO && SNAP_ESTADO.error
     ? 'No pude cargar los datos (' + escapeHtml(/failed to fetch|networkerror|load failed/i.test(SNAP_ESTADO.error) ? 'sin conexión con el servidor' : SNAP_ESTADO.error) + '). <button type="button" class="pz-reint" data-lzreint="1">Reintentar</button>' : 'Cargando lo importante de hoy…');
   // Ya abierta (llegaron los datos): solo se cambian los textos, sin volver a armar la pantalla (19.11.2026, Piero: "se actualiza mal,
   // se carga 2 veces"): antes se rehacía todo y la foto de fondo volvía a entrar y "Logística" se cerraba.
@@ -29831,7 +29833,7 @@ function appIngresosHtml(l){
   const uniq = function(a){ return new Set(a.map(function(x){ return x.c; })).size; };
   const hoyL = l.filter(function(x){ return x.f === hoy; }), semL = l.filter(function(x){ return x.f >= s7; });
   const dias = new Map(); l.forEach(function(x){ (dias.get(x.f) || dias.set(x.f, []).get(x.f)).push(x); });
-  const MOD = { gerencial:'Gerencial', compras:'Compras', almacen:'Almacén', super:'Supervisor', frioteam:'Frioteam', operario:'Operario' };
+  const MOD = { gerencial:'Gerencial', compras:'Compras', almacen:'Almacén', super:'Supervisor', frioteam:'Frioteam', operario:'Revisión' };
   const fila = function(x){ const cod = String(x.c || '').split('@')[0].toUpperCase();
     return `<div class="ing-r"><b class="ing-h">${e(String(x.h || '').slice(0, 5))}</b>${PD_PERSONAS[cod] ? dciFoto(cod, 'ing-av') : `<span class="ing-av dci-ini" style="background:var(--brand-mid)">${e(dciIni(x.n || x.c))}</span>`}
       <span class="ing-t"><b>${e(x.n || '—')}</b><small>${e(x.c)}</small></span><span class="ing-m"><b>${e(MOD[x.v] || x.v || '—')}</b><small>${e(x.d || '')}</small></span></div>`; };
