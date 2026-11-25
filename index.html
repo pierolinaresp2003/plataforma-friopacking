@@ -5571,6 +5571,13 @@ let PEDIDO_SIN_REQ_ROWS = [];
 // Líneas de PedidoSinReq.xlsx para Compras → Pendientes (28.09.2026): a diferencia de
 // PEDIDO_SIN_REQ_ROWS trae también los pedidos que todavía no tienen OC, y el estado/recepción de la OC.
 let PEDIDO_SIN_REQ_PEND = [];
+// PedidoSinReq a veces trae "Atendido Completo" en una línea que no recibió nada (25.11.2026, Piero: la OC 12617 sin aprobar mostraba
+// "Llegó 4,726" en el 3G1.5 directo, que no corresponde a esa OC). Si la línea no tiene recepción y otra línea de la misma OC dice su
+// estado real (Pendiente / Parcial), se toma ese.
+function psrEstadoArreglar(){ const est = new Map(), pon = function(r){ const e = String(r.estadoOrden || ''); if(r.codOrden && e && !/atendido/i.test(e)) est.set(r.codOrden, e); };
+  PEDIDO_SIN_REQ_ROWS.forEach(pon); PEDIDO_SIN_REQ_PEND.forEach(pon); try{ getReqRows().forEach(pon); }catch(err){}
+  const fix = function(r, q){ if(/atendido/i.test(r.estadoOrden || '') && !(r[q] > 0) && !r.fRecep && est.has(r.codOrden)) r.estadoOrden = est.get(r.codOrden); };
+  PEDIDO_SIN_REQ_ROWS.forEach(function(r){ fix(r, 'cantRecepcion'); }); PEDIDO_SIN_REQ_PEND.forEach(function(r){ fix(r, 'cantRecep'); }); }
 // ---------- Datos del proyecto (07.10.2026, Piero) ----------
 // La columna F de Reporte Maestro se llamaba "NombreProyecto" pero siempre trajo el CLIENTE; ahora se llama
 // "NombreCliente". Lo que la plataforma guarda como "proyecto" (py) es ese cliente. El proyecto real llega en
@@ -6929,6 +6936,7 @@ function loadFromSnapshot(snap){
     cantOrden: (r.qo!=null ? r.qo : null), cantRecep: (r.qr!=null ? r.qr : null),
     fOrden: fromIsoDay(r.fo), fCompromiso: fromIsoDay(r.fx), fRecep: fromIsoDay(r.fc),
   })) : [];
+  psrEstadoArreglar();
   GASTO_DATA = (snap.gasto && snap.gasto.rows) ? {
     fromSnapshot: true,
     filename: snap.gasto.filename,
@@ -7770,6 +7778,7 @@ function processPedidoSinReq(wb, filename){
   PEDIDO_SIN_REQ_RESP = map;
   PEDIDO_SIN_REQ_ROWS = ordenRows;
   PEDIDO_SIN_REQ_PEND = pendRows;
+  psrEstadoArreglar();
   reresolveResponsableD1(); // por si Reporte Maestro.xlsx ya se había cargado antes que este archivo (esto ya llama a render())
 
   if(n === 0 && ordenRows.length === 0){
