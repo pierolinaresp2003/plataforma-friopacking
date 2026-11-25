@@ -4132,6 +4132,7 @@ html[data-theme="dark"] .rqx-rsvb{background:rgba(45,212,191,.12);border-color:r
 .rsp-sel{display:inline-flex;align-items:center;gap:6px;border:1.5px dashed #9fb2c8;border-radius:10px;padding:0 4px 0 9px;color:var(--ink-soft);background:var(--surface-2);} .rsp-sel.si{border-style:solid;border-color:#0e8a7c;color:#0e6f64;background:#e6f4f1;}
 .rsp-sel svg{width:15px;height:15px;flex:none;} .rsp-sel select{border:0;background:transparent;font:700 12px Inter,sans-serif;color:inherit;padding:6px 2px;cursor:pointer;outline:none;max-width:150px;}
 .rsp-tag{display:inline-flex;align-items:center;gap:4px;vertical-align:middle;margin-left:6px;padding:2px 8px;border-radius:999px;font:700 11px Inter,sans-serif;background:#e6f4f1;color:#0e6f64;} .rsp-tag svg{width:12px;height:12px;}
+.rsp-tag.cam{background:#e4edfb;color:#1f4fd1;} html[data-theme="dark"] .rsp-tag.cam{background:rgba(107,156,240,.16);color:#8fb4f5;border-color:rgba(107,156,240,.45);}
 .rsp-tag.yo{background:#0e8a7c;color:#fff;} .rsp-tag.sin{background:var(--surface-2);color:var(--ink-soft);border:1px dashed #9fb2c8;}
 html[data-theme="dark"] .rsp-sel.si, html[data-theme="dark"] .rsp-tag{background:rgba(45,212,191,.14);color:#5fd3c0;border-color:rgba(45,212,191,.5);} html[data-theme="dark"] .rsp-tag.yo{background:#2dd4bf;color:#06201d;} html[data-theme="dark"] .rsp-sel select option{background:#13203a;color:#e6ecf7;} .rsvm-acc button{border:1px solid var(--border);background:var(--surface-2);border-radius:10px;padding:6px 11px;font:700 12px Inter,sans-serif;color:var(--ink);cursor:pointer;} .rsvm-acc button.lib{color:#b4231a;}
 .rsvm-f{display:grid;grid-template-columns:minmax(0,1fr) 70px 80px 190px 28px;gap:10px;align-items:center;padding:6px 0;} .rsvm-t b{display:block;font-size:13px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .rsvm-t small{font-size:11px;color:var(--ink-soft);}
@@ -4143,6 +4144,9 @@ html[data-theme="dark"] .rsp-sel.si, html[data-theme="dark"] .rsp-tag{background
 .rsvx-head{grid-template-columns:auto minmax(0,1fr);padding:14px 20px;} .rsvx-head .rsvm-hi{width:46px;height:46px;border-radius:14px;} .rsvx-head .rsvm-hi svg{width:23px;height:23px;} .rsvx-head h2{margin:0;}
 .rsvx-tabs button{padding:8px 16px;font-size:13.5px;}
 .rsvx-l{gap:8px;}
+.rsv-secc{grid-column:1 / -1;display:flex;align-items:center;gap:8px;margin:8px 2px 0;font:800 12px Inter,sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-soft);} .rsv-secc:first-child{margin-top:0;}
+.rsv-secc span{padding:1px 8px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-weight:700;letter-spacing:0;} .rsv-secc.pry{color:#0f2a80;} .rsv-secc.pry span{background:#e4edfb;border-color:#c9d8f5;color:#0f2a80;}
+html[data-theme="dark"] .rsv-secc.pry{color:#8fb4f5;} html[data-theme="dark"] .rsv-secc.pry span{background:rgba(107,156,240,.16);border-color:rgba(107,156,240,.4);color:#8fb4f5;}
 .rsvx,.valx,.valx-cab{--rc:#15803d;--rc-bg:#ebf1ec;} .rsvx.ambar,.valx.pv,.valx-cab.pv{--rc:#c27803;--rc-bg:#f5f0e6;} .rsvx.rojo,.valx.no,.valx-cab.no{--rc:#d92d20;--rc-bg:#fde8e6;} .rsvx.gris{--rc:#94a3b8;--rc-bg:var(--surface-2);}
 .rsvx{background:var(--card);border:1px solid var(--border);border-left:5px solid var(--rc);border-radius:14px;overflow:hidden;animation:pzSube .3s var(--pz-ease) both;}
 .rsvx-f{display:grid;grid-template-columns:84px minmax(0,1fr) auto 220px 22px;align-items:center;gap:14px;padding:10px 14px;min-height:70px;cursor:pointer;transition:background .15s;}
@@ -21725,7 +21729,10 @@ async function resCargar(forzar){ if(RES.cargando || (RES.ok && !forzar)) return
 function resFila(z){ const M = appMemo('resIdx' + (RQ.filas || []).length, function(){ const m = new Map(); (RQ.filas || []).forEach(function(r){ const k = r.codRequerimiento + '|' + r.idProducto, a = m.get(k); if(!a || (a.cantSalida > 0 && !(r.cantSalida > 0))) m.set(k, r); }); return m; });
   return M.get(z.req + '|' + z.producto) || null; }
 function resSede(z){ return z.sede === 'Trujillo' || z.sede === 'Ica' || z.sede === 'En camino' ? z.sede : 'Lurín'; }
-function resValida(z){ return resSede(z) === 'Lurín'; }
+// Reserva en camino (25.11.2026, Piero: "lo que sea reserva en camino no se puede asignar a nadie hasta que llegue a almacén; queda como
+// reservado sin colocar a nadie"): sigue en camino mientras lo reservado se cubra con la OC que viene; cuando llega, se valida como Lurín.
+function resEnCamino(z){ if(resSede(z) !== 'En camino') return false; const r = resFila(z), x = r ? rqFifoDe(r) : null; return !x || (x.resC || 0) > 0.001; }
+function resValida(z){ const sd = resSede(z); return sd === 'Lurín' || (sd === 'En camino' && !resEnCamino(z)); }
 // Lo que de verdad quedó separado (19.11.2026, Piero: "la observación es cuando se tiene parcial; el restante que no se tiene pasa directo a
 // Compras"): observada con menos (o rechazada: 0) solo cuenta lo que hay.
 function resQ(z){ const c = +z.cantidad || 0; return z.val_estado === 'obs' && z.val_q != null && z.val_q !== '' && isFinite(+z.val_q) ? Math.max(0, Math.min(c, +z.val_q)) : c; }   // solo lo de Lurín lo valida el personal de Lima (13.11.2026, Piero)
@@ -21873,7 +21880,14 @@ document.addEventListener('input', function(ev){ const i = ev.target; if(!i.data
 // ---- Módulo Reservas (Almacén, 13.11.2026, Piero: "un módulo donde se registren las reservas, dinámico y visual") ----
 // Las reservas son una separación de referencia: descuentan del stock mientras la salida no esté en Nisira; cuando aparece la salida
 // dejan de descontar (y se liberan solas) y el stock vuelve a basarse solo en la data real.
-const RSV_UI = { ver:'sin', sede:'', q:'', ab:new Set() };   // ver: sin (por asignar) · asig (asignados) · lib (liberadas)
+const RSV_UI = { ver:'sin', sede:'', q:'', ab:new Set() };   // ver: sin (por asignar) · asig (asignados) · cam (en camino, sin asignar) · lib (liberadas)
+function rsvmCam(g){ return g.l.every(resEnCamino); }
+// Proyectos primero y almacén después (25.11.2026, Piero: "las reservas se deben separar por las que son para proyectos y las que son para
+// almacén, para darle prioridad a los proyectos")
+function resEsPry(z){ const r = resFila(z), id = r ? String(r.idProyecto || '').trim() : ''; return !!id && !/^(SIN|ALMACEN)/i.test(id); }
+function rsvSecc(L, esPry, pinta){ const P = L.filter(esPry), A = L.filter(function(x){ return !esPry(x); }); let i = 0;
+  const parte = function(l, t, k){ return l.length ? `<div class="rsv-secc ${k}"><b>${t}</b><span>${appN(l.length)}</span></div>` + l.map(function(x){ return pinta(x, i++); }).join('') : ''; };
+  return parte(P, 'Para proyectos', 'pry') + parte(A, 'Para almacén', 'alm'); }   // todo lo del req. sigue en camino: no se asigna hasta que llegue
 async function resHistCargar(forzar){ if(RES.hCargando || (RES.hOk && !forzar)) return; RES.hCargando = true;
   try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.liberada&select=id,req,producto,descripcion,cantidad,um,sede,usuario,creado,nota,lote,val_estado,val_nombre,val_en,val_nota,val_q' + (RES.sinFoto ? '' : ',val_foto') + '&order=creado.desc&limit=300');
     if(r.ok){ RES.h = await r.json(); RES.hOk = true; } }catch(e){}
@@ -21914,6 +21928,7 @@ function rspSel(req){ const e = escapeHtml, c = rspDe(req), ops = RSP.ops.slice(
 function rspTag(req, yo){ const c = rspDe(req); if(yo && c === yo) return '';   // el operario no ve "Asignado a ti": se sobreentiende (25.11.2026, Piero)
   return c ? `<span class="rsp-tag${c === yo ? ' yo' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>${c === yo ? 'Asignado a ti' : escapeHtml(rspNom(c))}</span>` : '<span class="rsp-tag sin">Sin asignar</span>'; }
 document.addEventListener('change', async function(ev){ const s = ev.target; if(!s.dataset || !s.dataset.rspreq) return;
+  if(s.value && RES.l.filter(function(z){ return z.req === s.dataset.rspreq; }).every(resEnCamino)){ s.value = ''; return appToast('Está en camino: se asigna cuando llegue al almacén.'); }
   const req = s.dataset.rspreq, c = s.value, ant = RSP.m[req], nR = String(req).replace(/^000\d-0*/, ''), o = RSP.ops.find(function(x){ return x.correo === c; });
   const fila = { req:req, resp:c, nombre:o ? o.nombre : null, por:(APP.usuario && APP.usuario.correo) || null, actualizado:new Date().toISOString() };
   try{ const r = c ? await sbFetch('/rest/v1/fp_rsv_resp?on_conflict=req', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify(fila) })
@@ -21946,7 +21961,7 @@ function rsvmFila(g, gi, act){ const e = escapeHtml, nn = function(v){ return Nu
       <span class="rsvm-num"><small>Req.</small><b>${e(nR)}</b></span>
       <span class="rsvx-cli"><b>${e(rsvmCli(z0) || '—')}</b><small>${pry ? e(pry) + ' · ' : ''}reservó ${e(String(z0.usuario || '').split('@')[0])} · ${e(rsvmHora({ creado:g.t }))}</small></span>
       <span class="rsvx-est"><i>${g.l.length} ítem${g.l.length === 1 ? '' : 's'}</i>${act && nPv ? `<i class="pv">${nPv} por validar</i>` : ''}${act && nOk ? `<i class="ok">✓ ${nOk} VB</i>` : ''}${act && nNo ? `<i class="no">✕ ${nNo} no hay</i>` : ''}${foto ? `<i class="foto" title="Tiene foto">${RSV_CAM}</i>` : ''}</span>
-      <span class="rsvx-resp">${act ? (rspPuede() ? rspSel(g.req) : rspTag(g.req, '')) : ''}</span>
+      <span class="rsvx-resp">${act ? (rsvmCam(g) ? '<span class="rsp-tag cam">Reservado · en camino</span>' : rspPuede() ? rspSel(g.req) : rspTag(g.req, '')) : ''}</span>
       <span class="rsvx-ch">${RSV_CHEV}</span></div>
     ${ab ? `<div class="rsvx-det">
       <div class="rsvx-acc">${foto ? fotoImg(foto, 'req') : ''}<button type="button" data-rsvmreq="${e(g.req)}">Ver req.</button><button type="button" data-rsvmpdf="${e(g.req)}">PDF hoja</button>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="lib" data-rsvmlibreq="${e(g.req)}">Liberar…</button>` : ''}</div>
@@ -21954,22 +21969,22 @@ function rsvmFila(g, gi, act){ const e = escapeHtml, nn = function(v){ return Nu
         const est = act ? (pend ? ['on', sd === 'En camino' ? 'Compromete lo que llega' : 'Descuenta del stock'] : ['ok', 'Salida en Nisira ✓']) : (r && !pend ? ['ok', 'Salió en Nisira ✓'] : ['off', 'Liberada']);
         return `<div class="rsvm-f"><span class="rsvm-t"><b>${e(z.descripcion || (r && r.producto) || z.producto)}</b><small>${e(z.producto)}${z.nota ? ' · ' + e(z.nota) : ''}</small></span><span class="rsvm-q"><b>${nn(z.cantidad)}</b><small>${e(z.um || '')}</small></span>
           <span class="rsvm-s ${resSedeK(sd)}">${e(sd)}</span><span class="rsvm-e ${est[0]}">${reg && act ? '⚠ por regularizar · ' : ''}${est[1]}${act || z.val_estado === 'ok' || z.val_estado === 'obs' ? '<br>' + rsvVB(z, 1) : ''}</span>${act && rqAnalista() && rsvPuedeLiberar() ? `<button type="button" class="rsvm-x" data-rsvlib="${z.id}" title="Liberar esta reserva" aria-label="Liberar">×</button>` : '<span></span>'}</div>`; }).join('')}</div>` : ''}</div>`; }
-function rsvmLista(){ const act = RSV_UI.ver !== 'lib', G = rsvmGrupos(act ? RES.l : (RES.h || [])), L = act ? G.filter(function(g){ return (RSV_UI.ver === 'asig') === !!rspDe(g.req); }) : G;
+function rsvmLista(){ const act = RSV_UI.ver !== 'lib', G = rsvmGrupos(act ? RES.l : (RES.h || [])), L = act ? G.filter(function(g){ return RSV_UI.ver === 'cam' ? rsvmCam(g) : !rsvmCam(g) && (RSV_UI.ver === 'asig') === !!rspDe(g.req); }) : G;
   if(!L.length) return `<div class="pmf-vacio">${!act ? (RES.hOk ? 'No hay reservas liberadas con ese filtro.' : 'Cargando el historial…') : !RES.ok ? 'Cargando las reservas…'
-    : RSV_UI.q || RSV_UI.sede ? 'Nada con ese filtro.' : RSV_UI.ver === 'asig' ? 'Todavía no hay requerimientos asignados.' : '✓ Todo está asignado.'}</div>`;
-  return L.map(function(g, gi){ return rsvmFila(g, gi, act); }).join(''); }
+    : RSV_UI.q || RSV_UI.sede ? 'Nada con ese filtro.' : RSV_UI.ver === 'asig' ? 'Todavía no hay requerimientos asignados.' : RSV_UI.ver === 'cam' ? 'No hay reservas en camino.' : '✓ Todo está asignado.'}</div>`;
+  return rsvSecc(L, function(g){ return resEsPry(g.l[0]); }, function(g, gi){ return rsvmFila(g, gi, act); }); }
 function rsvmAbrir(req){ if(RSV_UI.ab.has(req)) RSV_UI.ab.delete(req); else RSV_UI.ab.add(req); const act = RSV_UI.ver !== 'lib';
   const g = rsvmGrupos(act ? RES.l : (RES.h || [])).find(function(x){ return x.req === req; }), f = document.querySelector('#rsvmL [data-rsvxab="' + CSS.escape(req) + '"]');
   if(g && f){ const t = document.createElement('div'); t.innerHTML = rsvmFila(g, -1, act); f.closest('.rsvx').replaceWith(t.firstElementChild); } }
 function appReservasHtml(){ const e = escapeHtml;
   if(!RQ.filas.length){ rqPreparar(); } if(!RSP.ok) rspCargar();
-  const G = rsvmGrupos(RES.l), nSin = G.filter(function(g){ return !rspDe(g.req); }).length;
+  const G = rsvmGrupos(RES.l), nCam = G.filter(rsvmCam).length, nSin = G.filter(function(g){ return !rsvmCam(g) && !rspDe(g.req); }).length;
   const nVal = RES.l.filter(function(z){ return resPend(resFila(z)) && (z.val_estado || 'pendiente') === 'pendiente' && resValida(z); }).length;
   const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
   const tab = function(v, t, n){ return `<button type="button" data-rsvmver="${v}" class="${RSV_UI.ver === v ? 'on' : ''}">${t}${n != null ? ` <b>${appN(n)}</b>` : ''}</button>`; };
   return `<div class="rsvm">
     <div class="rsvm-head rsvx-head"><div class="rsvm-hi">${LOCK}</div><div class="rsvm-meta"><h2>Reservas de stock</h2></div></div>
-    <div class="rsvm-bar"><div class="rsvm-seg rsvx-tabs">${tab('sin', 'Por asignar', nSin)}${tab('asig', 'Asignados', G.length - nSin)}${tab('lib', 'Liberadas', RES.hOk ? (RES.h || []).length : null)}</div>
+    <div class="rsvm-bar"><div class="rsvm-seg rsvx-tabs">${tab('sin', 'Por asignar', nSin)}${tab('asig', 'Asignados', G.length - nSin - nCam)}${tab('cam', 'En camino', nCam)}${tab('lib', 'Liberadas', RES.hOk ? (RES.h || []).length : null)}</div>
       <div class="rsvm-sedes">${[['', 'Todos'], ['Lurín', 'Lurín'], ['Trujillo', 'Trujillo'], ['Ica', 'Ica'], ['En camino', 'En camino']].map(function(o){ return `<button type="button" data-rsvmsede="${o[0]}" class="${RSV_UI.sede === o[0] ? 'on' : ''}">${o[1]}</button>`; }).join('')}</div>
       <input type="search" class="rsvm-bus" id="rsvmQ" placeholder="Buscar req., cliente, producto u operario" value="${e(RSV_UI.q)}" autocomplete="off">
       <button type="button" class="rsvm-val${nVal ? ' hay' : ''}" data-rsvmval="1" title="Validación de los operarios${nVal ? ' · ' + nVal + ' por validar' : ''}" aria-label="Abrir Validación"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>Validación</span>${nVal ? `<b>${appN(nVal)}</b>` : ''}</button></div>
@@ -22158,7 +22173,7 @@ function rsvVB(z, corto){ const e = escapeHtml, n = titleCase(String(z.val_nombr
   // Parcial: lo que falta pasó a Compras; 0 = rechazada, no estaba separado nada (19.11.2026)
   if(z.val_estado === 'obs' && z.val_q != null && z.val_q !== '' && +z.val_q === 0) return `<span class="vb obs no" title="${e(z.val_nota || '')}">✕ No hay nada ${e(n)}</span>`;
   if(z.val_estado === 'obs') return `<span class="vb obs no" title="${e(z.val_nota || '')}">✕ No hay ${z.val_q != null && z.val_q !== '' && +z.val_q !== +z.cantidad ? e(String(Math.round((+z.cantidad - +z.val_q) * 1000) / 1000)) + ' de ' + e(String(+z.cantidad)) + ' ' : ''}${e(n)}</span>`;
-  return resSede(z) === 'En camino' ? '<span class="vb cam">🚢 Por llegar</span>' : resValida(z) ? '<span class="vb pend">Por validar</span>' : ''; }
+  return resEnCamino(z) ? '<span class="vb cam">🚢 Por llegar</span>' : resValida(z) ? '<span class="vb pend">Por validar</span>' : ''; }
 // Desde qué equipo se valida (13.11.2026, Piero: "para ver si es realmente necesaria una compra de tablets")
 function rsvDisp(){ const ua = navigator.userAgent || ''; return /iPad|Tablet/.test(ua) || (/Android/.test(ua) && !/Mobile/.test(ua)) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'Tablet' : /iPhone|iPod|Android|Mobile/.test(ua) ? 'Celular' : 'PC'; }
 async function rsvValidar(ids, est, q, nota){ const u = APP.usuario || {};
@@ -22178,13 +22193,13 @@ function appValHtml(){ const e = escapeHtml;
   const base = VAL_UI.ver === 'pend' ? pend : hechas, q = crtNorm(VAL_UI.q.trim());
   const L = base.filter(function(z){ return !q || crtNorm([z.req, z.producto, z.descripcion, rsvmCli(z)].join(' ')).indexOf(q) !== -1; }), K = [...new Set(L.map(function(z){ return z.req; }))];
   const lista = !RES.ok ? '<div class="pmf-vacio">Cargando las reservas…</div>' : !K.length ? `<div class="pmf-vacio">${q ? 'Nada con esa búsqueda.' : VAL_UI.ver === 'pend' ? '✓ No hay nada por validar.' : 'Todavía no hay reservas validadas.'}</div>`
-    : K.sort(function(a, b){ return (yo && rspDe(b) === yo ? 1 : 0) - (yo && rspDe(a) === yo ? 1 : 0); }).map(function(req, gi){ const T = A.filter(function(z){ return z.req === req; }), z0 = T[0], r0 = resFila(z0);
+    : rsvSecc(K.sort(function(a, b){ return (yo && rspDe(b) === yo ? 1 : 0) - (yo && rspDe(a) === yo ? 1 : 0); }), function(req){ return resEsPry(A.find(function(z){ return z.req === req; })); }, function(req, gi){ const T = A.filter(function(z){ return z.req === req; }), z0 = T[0], r0 = resFila(z0);
       const np = T.filter(esP).length, nok = T.filter(function(z){ return z.val_estado === 'ok'; }).length, nno = T.filter(function(z){ return z.val_estado === 'obs'; }).length, pry = r0 && r0.idProyecto && !/^SIN/i.test(r0.idProyecto) ? r0.idProyecto : '';
       return `<button type="button" class="valx ${np ? 'pv' : nno ? 'no' : 'ok'}" data-valreq="${e(req)}" style="animation-delay:${Math.min(gi, 10) * 35}ms">
         <span class="valx-n"><small>Req.</small><b>${e(String(req).replace(/^000\d-0*/, ''))}</b></span>
         <span class="valx-t"><b>${e(rsvmCli(z0) || '—')}</b><small>${pry ? e(pry) + ' · ' : ''}${T.length} ítem${T.length === 1 ? '' : 's'} · ${e(rsvmHora(z0))}</small>
           <span class="valx-chips">${rspTag(req, yo)}${np ? `<i class="pv">${np} por validar</i>` : ''}${nok ? `<i class="ok">✓ ${nok} VB</i>` : ''}${nno ? `<i class="no">✕ ${nno} no hay</i>` : ''}${reqFoto(req) ? `<i class="foto" title="Tiene foto">${RSV_CAM}</i>` : ''}</span></span>
-        <span class="valx-ch">${RSV_FLECHA}</span></button>`; }).join('');
+        <span class="valx-ch">${RSV_FLECHA}</span></button>`; });
   return `<div class="val">
     <div class="val-ks"><button type="button" data-valver="pend" class="${VAL_UI.ver === 'pend' ? 'on' : ''}"><b>${appN(new Set(pend.map(function(z){ return z.req; })).size)}</b><small>req. por validar</small></button><button type="button" data-valver="ok" class="${VAL_UI.ver !== 'pend' ? 'on' : ''}"><b>${appN(new Set(hechas.map(function(z){ return z.req; })).size)}</b><small>req. validados</small></button></div>
     <input type="search" class="rsvm-bus" id="valQ" placeholder="Buscar req., cliente, código o producto" value="${e(VAL_UI.q)}" autocomplete="off">
