@@ -21681,7 +21681,17 @@ function resValida(z){ return resSede(z) === 'Lurín'; }
 function resQ(z){ const c = +z.cantidad || 0; return z.val_estado === 'obs' && z.val_q != null && z.val_q !== '' && isFinite(+z.val_q) ? Math.max(0, Math.min(c, +z.val_q)) : c; }   // solo lo de Lurín lo valida el personal de Lima (13.11.2026, Piero)
 function resSedeK(sd){ return sd === 'Lurín' ? 'L' : sd === 'Trujillo' ? 'T' : sd === 'Ica' ? 'I' : 'C'; }
 function resPend(r){ return !!r && !(r.cantSalida > 0) && !r.fSalida && r.estadoCalc !== 'Archivado' && !rqItemListo(r); }
-function resLimpiar(){ if(!rqAnalista()) return; RES.l.forEach(function(z){ const r = resFila(z); if(r && !resPend(r)) sbFetch('/rest/v1/fp_reservas?id=eq.' + z.id, { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'liberada', nota:'Liberada sola: ya salió del almacén' }) }).catch(function(){}); }); }
+// Fotos solo mientras haya reserva (25.11.2026, Piero: "solo se guardan fotos si tienen reserva, sino se borran"): al liberarse sola también
+// se borra su foto (si ninguna otra reserva activa del req. la usa) y una vez por sesión se limpian las que quedaron en reservas liberadas.
+function resLimpiar(){ if(!rqAnalista()) return; const X = RES.l.filter(function(z){ const r = resFila(z); return r && !resPend(r); });
+  Promise.all(X.map(function(z){ return sbFetch('/rest/v1/fp_reservas?id=eq.' + z.id, { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(Object.assign({ estado:'liberada', nota:'Liberada sola: ya salió del almacén' }, RES.sinFoto ? {} : { val_foto:null })) })
+    .then(function(r){ return r.ok ? z : null; }).catch(function(){ return null; }); }))
+    .then(function(L){ L = L.filter(Boolean); if(L.length) fotosBorrar(L.map(function(z){ return z.val_foto; }), L.map(function(z){ return z.id; })); });
+  fotosLimpiar(); }
+async function fotosLimpiar(){ if(fotosLimpiar.hecho || RES.sinFoto) return; fotosLimpiar.hecho = true;
+  try{ const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.liberada&val_foto=not.is.null&select=id,val_foto'); if(!r.ok) return; const L = await r.json(); if(!L.length) return;
+    const ids = L.map(function(x){ return x.id; }), u = await sbFetch('/rest/v1/fp_reservas?id=in.(' + ids.join(',') + ')', { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ val_foto:null }) });
+    if(u.ok) fotosBorrar(L.map(function(x){ return x.val_foto; }), ids); }catch(e){} }
 // Si el mismo código se repite en el req., la reserva cuenta en una sola fila (la de resFila), no en todas (13.11.2026)
 function resDeFila(r){ const S = appMemo('resSet' + (RQ.filas || []).length, function(){ return new Set(RQ.filas || []); });
   return RES.l.filter(function(z){ if(z.req !== r.codRequerimiento || z.producto !== r.idProducto) return false; const f = resFila(z); return !f || f === r || !S.has(r); }); }
@@ -21772,7 +21782,7 @@ function rsvAbrirReq(cod, solo){ const e = escapeHtml, nn = function(v){ return 
     b.disabled = true; b.textContent = 'Guardando…';
     const lote = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), nt = f.querySelector('#rsvNota').value.trim() || null;
     try{ const res = await sbFetch('/rest/v1/fp_reservas', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' },
-        body:JSON.stringify(F.map(function(x, i){ return { req:cod, producto:x.a.r.idProducto, descripcion:x.a.r.producto || '', cantidad:x.q, um:x.a.r.unidad || '', sede:HJ_ALM[x.k], nota:[x.k === 'C' ? 'llega con OC' : x.q > x.a.lb[x.k] + 0.001 ? 'por regularizar' : '', nt || ''].filter(Boolean).join(' · ') || null, lote:lote }; })) });
+        body:JSON.stringify(F.map(function(x, i){ return { req:cod, producto:x.a.r.idProducto, descripcion:x.a.r.producto || '', cantidad:x.q, um:x.a.r.unidad || '', sede:HJ_ALM[x.k], nota:[x.k === 'C' ? 'llega con OC' : x.q > x.a.lb[x.k] + 0.001 ? 'por regularizar' : '', nt || ''].filter(Boolean).join(' · ') || null, lote:lote, ...(reqFoto(cod) ? { val_foto:reqFoto(cod) } : {}) }; })) });
       if(!res.ok) throw new Error('No se pudo guardar (' + res.status + ').'); rsvCerrar(); appToast('Reservado ✔ · ' + new Set(F.map(function(x){ return x.a.r.idProducto; })).size + ' ítems'); resCargar(true);
     }catch(err){ b.disabled = false; resumen(); rsvErr(err.message); } }); }
 // Reservar varios ítems desde la lista (19.11.2026, Piero: "que deje seleccionar varios en esa línea para luego reservar todos por la cantidad
@@ -21800,7 +21810,7 @@ async function rsvSelGuardar(btn){ const r2 = function(v){ return Math.round(v *
   if(!F.length) return appToast('Indica cuánto reservar en cada fila.');
   btn.disabled = true; btn.textContent = 'Guardando…'; const lote = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   try{ const res = await sbFetch('/rest/v1/fp_reservas', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' },
-      body:JSON.stringify(F.map(function(x){ return { req:x.r.codRequerimiento, producto:x.r.idProducto, descripcion:x.r.producto || '', cantidad:x.q, um:x.r.unidad || '', sede:HJ_ALM[x.k], nota:x.reg ? 'por regularizar' : null, lote:lote }; })) });
+      body:JSON.stringify(F.map(function(x){ return { req:x.r.codRequerimiento, producto:x.r.idProducto, descripcion:x.r.producto || '', cantidad:x.q, um:x.r.unidad || '', sede:HJ_ALM[x.k], nota:x.reg ? 'por regularizar' : null, lote:lote, ...(reqFoto(x.r.codRequerimiento) ? { val_foto:reqFoto(x.r.codRequerimiento) } : {}) }; })) });
     if(!res.ok) throw new Error('No se pudo guardar (' + res.status + ').');
     const n = new Set(F.map(function(x){ return x.r; })).size, nReg = F.filter(function(x){ return x.reg; }).length;
     RSV_SEL.clear(); rsvSelBarra(); appToast('Reservado ✔ · ' + n + ' ítem' + (n === 1 ? '' : 's') + (nReg ? ' · ' + nReg + ' por regularizar' : '')); resCargar(true);
@@ -21823,7 +21833,7 @@ async function resHistCargar(forzar){ if(RES.hCargando || (RES.hOk && !forzar)) 
 const RSV_LIBERAN = ['mcondori', 'jcenteno', 'plinares', 'kalbujar'];
 function rsvPuedeLiberar(){ const c = String((APP.usuario && APP.usuario.correo) || '').toLowerCase().split('@')[0]; return RSV_LIBERAN.indexOf(c) !== -1; }
 // Al anular una reserva su foto ya no sirve (19.11.2026, Piero: "si tomé una foto y libero la reserva, esa foto ya no la necesito y no se debe
-// guardar en Supabase"): se borra el archivo y se limpia val_foto. Lo que sale en Nisira (liberación automática) conserva su foto como registro.
+// guardar en Supabase"): se borra el archivo y se limpia val_foto. Lo que sale en Nisira (liberación automática) también la borra: la foto solo se guarda mientras haya reserva (25.11.2026).
 function rsvLibCuerpo(){ return Object.assign({ estado:'liberada' }, RES.sinFoto ? {} : { val_foto:null }); }
 async function fotosBorrar(P, ids){ P = [...new Set((P || []).filter(Boolean))];
   if(ids){ const fuera = new Set(ids.map(String)); P = P.filter(function(p){ return !RES.l.some(function(y){ return y.val_foto === p && !fuera.has(String(y.id)); }); }); }   // foto compartida del req. (25.11.2026)
@@ -22204,7 +22214,7 @@ async function valFotoSubir(req, f, lab){ const Z = RES.l.filter(function(y){ re
     const up = await sbFetch('/storage/v1/object/almacen-fotos/' + p, { method:'POST', headers:{ 'Content-Type':'image/jpeg', 'x-upsert':'true' }, body:b });
     if(!up.ok) throw new Error(up.status === 400 || up.status === 404 ? 'Falta activar las fotos en Supabase (el SQL de Despachos).' : 'No se pudo subir la foto (' + up.status + ').');
     const r = await sbFetch('/rest/v1/fp_reservas?estado=eq.activa&req=eq.' + encodeURIComponent(req), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ val_foto:p }) });
-    if(!r.ok) throw new Error('La foto se subió, pero no se pudo guardar en el requerimiento (' + r.status + ').');
+    if(!r.ok){ fotosBorrar([p]); throw new Error('No se pudo guardar la foto en el requerimiento (' + r.status + ').'); }
     const viejas = [...new Set(Z.map(function(z){ return z.val_foto; }).filter(function(v){ return v && v !== p; }))];
     FOTO.url.set(p, URL.createObjectURL(b)); Z.forEach(function(z){ z.val_foto = p; }); RES.v++; appToast('Foto guardada ✔'); appRenderInicio();
     if(viejas.length) fotosBorrar(viejas);   // la foto cambiada (y las de antes por ítem) ya no se guardan
