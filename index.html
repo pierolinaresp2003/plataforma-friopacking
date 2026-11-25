@@ -4189,6 +4189,11 @@ html[data-theme="dark"] .valx-nota{background:rgba(212,161,76,.14);color:#d8ac5d
 .desp-armar{position:sticky;bottom:12px;z-index:3;display:flex;flex-direction:column;gap:8px;padding:10px;margin-top:4px;background:color-mix(in srgb,var(--bg, #eef3fb) 86%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border-radius:18px;}
 .desp-armar .val-todo{width:100%;padding:15px;font-size:16px;} .desp-armar .val-todo:disabled{background:#9aa7b8;cursor:default;}
 .desp-mas{width:100%;border:1.5px solid #15803d;background:var(--card);color:#15803d;border-radius:12px;padding:12px;font:800 14.5px Inter,sans-serif;cursor:pointer;} .desp-mas:disabled{opacity:.45;cursor:default;}
+.val-it.pal-it .desp-lib{grid-column:1 / -1;justify-self:start;border:1px solid #f1c4bf;background:#fdf1f0;color:#b4231a;border-radius:10px;padding:7px 12px;font:700 12.5px Inter,sans-serif;cursor:pointer;}
+/* En la web el detalle (de un req. o de un pallet) va centrado y no de lado a lado (25.11.2026) */
+body.app-pc .val:has(> .valx-cab){max-width:1000px;margin-left:auto;margin-right:auto;}
+.desp-libtodo{width:100%;border:1.5px solid #d92d20;background:var(--card);color:#b4231a;border-radius:12px;padding:12px;font:800 14.5px Inter,sans-serif;cursor:pointer;}
+html[data-theme="dark"] .val-it.pal-it .desp-lib{background:rgba(213,88,82,.14);border-color:rgba(213,88,82,.4);color:#f0a19c;} html[data-theme="dark"] .desp-libtodo{border-color:#db706a;color:#f0a19c;}
 .desp-deshacer{align-self:center;border:0;background:none;color:#b4231a;font:700 13.5px Inter,sans-serif;padding:10px;cursor:pointer;text-decoration:underline;}
 @media (max-width:900px){ .desp-armar{bottom:calc(env(safe-area-inset-bottom) + 84px);} }
 html[data-theme="dark"] .valx.z-norte,html[data-theme="dark"] .valx-cab.z-norte{--rc:#6aa3ef;--rc-bg:rgba(47,125,225,.16);} html[data-theme="dark"] .valx.z-centro,html[data-theme="dark"] .valx-cab.z-centro{--rc:#e9a25a;--rc-bg:rgba(224,138,30,.16);}
@@ -22352,23 +22357,53 @@ function despGrupoDet(k, l){ const e = escapeHtml, nn = function(v){ return Numb
         <span class="desp-q">${on ? `<input type="number" min="0" max="${x.q}" step="any" value="${DESP_SEL.get(id)}" data-despq="${e(id)}" inputmode="decimal" aria-label="Cantidad para el pallet">` : `<b>${nn(x.q)}</b>`}<small>${e(z.um || '')}${on ? ' de ' + nn(x.q) : ''}</small></span></div>`; }).join('')}
     <div class="desp-armar"><button type="button" class="val-todo" data-despnuevo="${e(k)}"${nSel ? '' : ' disabled'}>${nSel ? 'Armar pallet (' + nSel + ' ítem' + (nSel === 1 ? '' : 's') + ')' : 'Marca los ítems del pallet'}</button>
       ${abiertos.map(function(p){ return `<button type="button" class="desp-mas" data-despmas="${p.id}"${nSel ? '' : ' disabled'}>Agregar al pallet ${e(String(p.numero))}</button>`; }).join('')}</div>`; }
+// Liberar desde el pallet (25.11.2026, Piero: "una vez armado un pallet, Katherine y Piero tienen el poder de liberar parte o la totalidad de ese
+// pallet y eso directamente se libera, ya no estaría reservado"): la reserva baja en esa cantidad (si es toda, queda liberada) y sale del pallet.
+async function palLiberar(P, sel){ if(!palPuedeDeshacer()) return appToast('Solo Katherine o Piero pueden liberar desde un pallet.');
+  const r3 = function(v){ return Math.round(v * 1000) / 1000; }, its = (P.items || []).map(function(o){ return Object.assign({}, o); }), fotos = [], ids = [];
+  for(const x of sel){ const it = its[x.j]; if(!it) continue; const q = r3(Math.min(+x.q || 0, +it.q || 0)); if(!(q > 0)) continue;
+    const z = RES.l.find(function(y){ return String(y.id) === String(it.r); });
+    if(z){ const total = q >= +z.cantidad - 1e-9;
+      const r = await sbFetch('/rest/v1/fp_reservas?id=eq.' + encodeURIComponent(z.id), { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' },
+        body:JSON.stringify(total ? Object.assign(rsvLibCuerpo(), { nota:'Liberada desde el pallet ' + P.numero }) : { cantidad:r3(+z.cantidad - q) }) });
+      if(!r.ok) throw new Error('No se pudo liberar (' + r.status + ').'); if(total){ fotos.push(z.val_foto); ids.push(z.id); } }
+    it.q = r3(+it.q - q); }
+  const L = its.filter(function(it){ return +it.q > 0.0005; });
+  if(L.length){ const j = await palGuardar('PATCH', '?id=eq.' + P.id, { items:L, actualizado:new Date().toISOString() }); Object.assign(P, j[0] || { items:L }); }
+  else { await palGuardar('DELETE', '?id=eq.' + P.id); PAL.l = PAL.l.filter(function(x){ return x !== P; }); DESP_UI.pal = ''; }
+  fotosBorrar(fotos, ids); appToast(L.length ? 'Liberado ✔' : 'Pallet ' + P.numero + ' liberado completo ✔'); RES.hOk = false; resCargar(true); appRenderInicio(); }
+function palLiberarItem(P, j){ const it = (P.items || [])[j]; if(!it) return; const e = escapeHtml, c = +it.q || 0, um = e(it.um || ''), nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
+  const f = rsvModal(`<header><div><small>Liberar del pallet ${e(String(P.numero))}</small><h3>${e(it.desc || it.cod)}</h3><p>Req. ${e(String(it.req || '').replace(/^000\d-0*/, ''))} · Cód. ${e(it.cod || '')} · en el pallet ${e(nn(c))} ${um}</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
+    <label class="rsv-lbl">¿Cuánto liberar?<span><input type="number" id="palLibQ" min="0" max="${c}" step="any" value="${c}" class="val-in" inputmode="decimal"> ${um} <small>de ${e(nn(c))}</small></span></label>
+    <div class="val-falta">Lo que liberes deja de estar reservado y sale del pallet.</div>
+    <footer><button type="button" class="rsv-b" data-rsvx="1">Cancelar</button><button type="button" class="rsv-b ok" id="palLibOk">Liberar</button></footer>`);
+  const iq = f.querySelector('#palLibQ'), bt = f.querySelector('#palLibOk'); setTimeout(function(){ iq.focus(); iq.select(); }, 50);
+  iq.addEventListener('input', function(){ const q = +iq.value; bt.disabled = !(iq.value.trim() !== '' && isFinite(q) && q > 0 && q <= c + 1e-9); });
+  bt.addEventListener('click', async function(){ if(bt.disabled) return; bt.disabled = true; bt.textContent = 'Liberando…'; const q = Math.min(c, +iq.value);
+    try{ rsvCerrar(); await palLiberar(P, [{ j:j, q:q }]); }catch(err){ appToast(err.message || 'No se pudo liberar.'); } }); }
 // Detalle de un pallet: sus ítems y lo que se puede hacer según su estado
 function despPalDet(p){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   const est = palEstado(p), its = p.items || [], zn = despZona(p.proyecto, p.cliente), pi = p.proyecto ? pryInfo(p.proyecto) || {} : {};
-  const EST = { armando:'Armando', listo:'Listo para Rutas', salio:'Salió' };
+  const EST = { armando:'Armando', listo:'Listo para Rutas', salio:'Salió' }, libera = est !== 'salio' && palPuedeDeshacer();
   return `<div class="val-c valx-cab ${est === 'armando' ? 'pv' : est === 'listo' ? 'ok' : 'gris'}">
       <div class="valx-top"><span class="valx-n"><small>Pallet</small><b>${e(String(p.numero))}</b></span><div class="valx-cli">${e(titleCase(p.cliente || '—'))}</div></div>
       <dl class="valx-info"><div class="anc"><dt>Proyecto</dt><dd>${p.proyecto ? e(p.proyecto) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'}</dd></div><div><dt>Zona</dt><dd>${DESP_ZNOM[zn || '']}</dd></div><div><dt>Estado</dt><dd>${EST[est]}</dd></div>
         <div><dt>Armó</dt><dd>${e(valNomCorto(appNombrePorCorreo(p.usuario)) || String(p.usuario || '').split('@')[0])}</dd></div><div><dt>Fecha</dt><dd>${e(valFechaCorta(p.creado))}</dd></div></dl>
       ${est === 'armando' ? `<button type="button" class="val-todo" data-pallisto="${p.id}"${its.length ? '' : ' disabled'}>✓ Listo para Rutas</button>` : est === 'listo' ? `<button type="button" class="desp-mas" data-palarmar="${p.id}">Volver a armar</button>` : ''}</div>
     ${its.length ? its.map(function(it, j){ return `<div class="val-it pal-it"><div class="val-t"><b>${e(it.desc || it.cod)}</b><small>Req. ${e(String(it.req || '').replace(/^000\d-0*/, ''))} · Cód. ${e(it.cod || '')}</small></div>
-        <span class="desp-q"><b>${nn(it.q)}</b><small>${e(it.um || '')}</small></span>${est === 'armando' ? `<button type="button" class="rsvm-x" data-palquita="${p.id}|${j}" title="Sacar del pallet" aria-label="Sacar del pallet">×</button>` : ''}</div>`; }).join('') : '<div class="pmf-vacio">Pallet vacío.</div>'}
+        <span class="desp-q"><b>${nn(it.q)}</b><small>${e(it.um || '')}</small></span>${est === 'armando' ? `<button type="button" class="rsvm-x" data-palquita="${p.id}|${j}" title="Sacar del pallet" aria-label="Sacar del pallet">×</button>` : '<span></span>'}
+        ${libera ? `<button type="button" class="desp-lib" data-pallibit="${p.id}|${j}">Liberar reserva</button>` : ''}</div>`; }).join('') : '<div class="pmf-vacio">Pallet vacío.</div>'}
+    ${libera && its.length ? `<button type="button" class="desp-libtodo" data-pallibtodo="${p.id}">Liberar todo el pallet</button>` : ''}
     ${palPuedeDeshacer() ? `<button type="button" class="desp-deshacer" data-palborrar="${p.id}">Deshacer pallet</button>` : ''}`; }
 async function palGuardar(metodo, url, cuerpo){ const r = await sbFetch('/rest/v1/fp_pallets' + url, { method:metodo, headers:{ 'Content-Type':'application/json', Prefer:'return=representation' }, body:cuerpo ? JSON.stringify(cuerpo) : undefined });
   if(!r.ok){ if(r.status === 404 || r.status === 400) PAL.falta = true; throw new Error(r.status === 404 ? 'Falta crear la tabla de pallets en Supabase.' : 'No se pudo guardar (' + r.status + ').'); } return metodo === 'DELETE' ? [] : r.json(); }
 function despItemsSel(k){ return despPorArmar().filter(function(x){ return DESP_SEL.has(String(x.z.id)) && (!k || despClave(x.z) === k); }).map(function(x){ const z = x.z, q = Math.min(+DESP_SEL.get(String(z.id)) || 0, x.q);
   return { r:z.id, req:z.req, cod:z.producto, desc:z.descripcion || '', q:Math.round(q * 1000) / 1000, um:z.um || '' }; }).filter(function(it){ return it.q > 0; }); }
-document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-despver],[data-despsel],[data-desptodo],[data-despnuevo],[data-despmas],[data-pallisto],[data-palarmar],[data-palborrar],[data-palquita],[data-despzona],[data-despk],[data-desppal]'); if(!b) return;
+document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-despver],[data-despsel],[data-desptodo],[data-despnuevo],[data-despmas],[data-pallisto],[data-palarmar],[data-palborrar],[data-palquita],[data-despzona],[data-despk],[data-desppal],[data-pallibit],[data-pallibtodo]'); if(!b) return;
+  if(b.dataset.pallibit){ const x = b.dataset.pallibit.split('|'), P = PAL.l.find(function(y){ return String(y.id) === x[0]; }); return P && palLiberarItem(P, +x[1]); }
+  if(b.dataset.pallibtodo){ const P = PAL.l.find(function(y){ return String(y.id) === b.dataset.pallibtodo; }); if(!P) return; const n = (P.items || []).length;
+    if(!window.confirm('¿Liberar todo el pallet ' + P.numero + '? Sus ' + n + ' ítem' + (n === 1 ? '' : 's') + ' dejan de estar reservados y el pallet se borra.')) return;
+    b.disabled = true; return palLiberar(P, (P.items || []).map(function(it, j){ return { j:j, q:+it.q }; })).catch(function(err){ b.disabled = false; appToast(err.message || 'No se pudo liberar.'); }); }
   if(b.dataset.despsel && ev.target.closest('input')) return;   // escribir la cantidad no desmarca el ítem
   if(b.dataset.despk){ const k = b.dataset.despk, l = despPorArmar().filter(function(x){ return despClave(x.z) === k; });
     if(!l.some(function(x){ return DESP_SEL.has(String(x.z.id)); })) l.forEach(function(x){ DESP_SEL.set(String(x.z.id), x.q); });   // entra con todo marcado
