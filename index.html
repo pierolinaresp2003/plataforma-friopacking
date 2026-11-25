@@ -4173,9 +4173,9 @@ html[data-theme="dark"] .rsp-sel.si, html[data-theme="dark"] .rsp-tag{background
 .valx-top{display:flex;gap:14px;align-items:center;} .valx-top .valx-n{width:80px;flex:none;padding:9px 8px;}
 .valx-cli{min-width:0;font:800 18px/1.25 Inter,sans-serif;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
 .valx-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0;}
-.valx-info > div{background:var(--surface-2);border-radius:12px;padding:8px 12px;min-width:0;} .valx-info > div:last-child:nth-child(odd){grid-column:1 / -1;}
+.valx-info > div{background:var(--surface-2);border-radius:12px;padding:8px 12px;min-width:0;} .valx-info > div.anc{grid-column:1 / -1;} .valx-info > div:not(.anc):last-child:nth-child(even){grid-column:1 / -1;}
 .valx-info dt{font:700 10.5px Inter,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);}
-.valx-info dd{margin:2px 0 0;font:700 14px Inter,sans-serif;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.valx-info dd{margin:2px 0 0;font:700 13.5px/1.3 Inter,sans-serif;color:var(--ink);overflow-wrap:anywhere;}
 .valx-nota{display:inline-block;margin-top:7px;font:800 11.5px Inter,sans-serif;background:#f5f0e6;color:#9a5b00;border-radius:999px;padding:3px 10px;}
 html[data-theme="dark"] .valx-nota{background:rgba(212,161,76,.14);color:#d8ac5d;}
 .valx-sec{font:800 12px Inter,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:6px 4px -4px;}
@@ -22162,7 +22162,7 @@ function valDetalle(req, l, yo){ const e = escapeHtml, nn = function(v){ return 
       <div class="valx-top"><span class="valx-n"><small>Req.</small><b>${e(String(req).replace(/^000\d-0*/, ''))}</b></span><div class="valx-cli">${e(titleCase(rsvmCli(z0) || '—'))}</div></div>
       <dl class="valx-info">${[['Proyecto', pry || 'Sin proyecto'], ['Ítems', String(l.length)], ['Reservó', valNomCorto(appNombrePorCorreo(z0.usuario)) || titleCase(String(z0.usuario || '').split('@')[0])], ['Fecha', valFechaCorta(z0.creado)]]
         .concat(rspDe(req) && rspDe(req) === yo ? [] : [['Responsable', rspDe(req) ? rspNom(rspDe(req)) : 'Sin asignar']])
-        .map(function(x){ return `<div><dt>${x[0]}</dt><dd>${e(x[1])}</dd></div>`; }).join('')}</dl>
+        .map(function(x){ return `<div${x[0] === 'Proyecto' ? ' class="anc"' : ''}><dt>${x[0]}</dt><dd>${e(x[1])}</dd></div>`; }).join('')}</dl>
       <div class="valx-foto">${foto ? fotoImg(foto, 'req') : ''}${valCamHtml(req, foto)}</div>
       ${P.length > 1 ? `<button type="button" class="val-todo" data-valtodo="${P.map(function(z){ return z.id; }).join(',')}">✓ Todo conforme (${P.length})</button>` : !P.length ? '<div class="valx-listo">✓ Todo validado</div>' : ''}</div>
     ${P.map(item).join('')}
