@@ -4180,11 +4180,6 @@ html[data-theme="dark"] .rsvx-est i.pv,html[data-theme="dark"] .valx-chips i.pv{
 html[data-theme="dark"] .rsvx-est i.no,html[data-theme="dark"] .valx-chips i.no{background:rgba(213,88,82,.15);color:#db706a;} html[data-theme="dark"] .rsvx-est i.foto,html[data-theme="dark"] .valx-chips i.foto{background:rgba(45,212,191,.12);color:#5fd3c0;}
 /* Reservas: un bloque por requerimiento, fácil de distinguir (19.11.2026) */
 .rsvm-gl{gap:14px;}
-.desp-zona{display:flex;align-items:center;gap:10px;margin:10px 2px 0;padding:8px 14px;border-radius:12px;background:var(--surface-2);border-left:5px solid #9fb2c8;}
-.desp-zona b{font:800 14px Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);} .desp-zona small{font:600 12px Inter,sans-serif;color:var(--ink-soft);}
-.desp-zona.norte{border-left-color:#2f7de1;background:#eaf2fd;} .desp-zona.centro{border-left-color:#e08a1e;background:#fdf3e6;} .desp-zona.sur{border-left-color:#8e44ad;background:#f4ecf8;}
-.desp-zona:first-child{margin-top:0;} .rsvm-gl > .desp-zona{grid-column:1 / -1;}
-html[data-theme="dark"] .desp-zona.norte{background:rgba(47,125,225,.16);} html[data-theme="dark"] .desp-zona.centro{background:rgba(224,138,30,.16);} html[data-theme="dark"] .desp-zona.sur{background:rgba(142,68,173,.2);}
 .rsvm-g{--rc:#15803d;--rc-bg:#ebf1ec;padding:0;gap:0;overflow:hidden;border-left:5px solid var(--rc);box-shadow:0 10px 24px -20px rgba(16,24,40,.45);}
 .rsvm-g.ambar{--rc:#c27803;--rc-bg:#f5f0e6;} .rsvm-g.rojo{--rc:#d92d20;--rc-bg:#fde8e6;} .rsvm-g.gris{--rc:#94a3b8;--rc-bg:var(--surface-2);}
 .rsvm-g .rsvm-ch{background:var(--surface-2);padding:12px 16px;border-bottom:1px solid var(--border);}
@@ -20287,7 +20282,7 @@ function appRenderInicio(){
   } else if(APP.pantalla === 'daily' || APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'almreg' || APP.pantalla === 'almval' || APP.pantalla === 'almdesp' || APP.pantalla === 'almrut' || APP.pantalla === 'suppry' || APP.pantalla === 'tienda' || APP.pantalla === 'equipo'){
     if((APP.pantalla === 'supreq' || APP.pantalla === 'almseg' || APP.pantalla === 'almrsv' || APP.pantalla === 'almval' || APP.pantalla === 'almdesp' || APP.pantalla === 'suppry') && !RES.ok) resCargar();
     if(APP.pantalla === 'almrsv' && RSV_UI.ver === 'lib' && !RES.hOk) resHistCargar();
-    if(!appPonerInicio(cont, gdNavSi() + APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' && APP.pantalla !== 'almrut' && APP.pantalla !== 'almval' && APP.vista !== 'operario' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''))) return;
+    if(!appPonerInicio(cont, gdNavSi() + APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' && APP.pantalla !== 'almrut' && APP.pantalla !== 'almval' && APP.pantalla !== 'almdesp' && APP.vista !== 'operario' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''))) return;
     if(APP.pantalla === 'almrut') setTimeout(function(){ rtsIniciar(); rtpIniciar(); }, 0);   // el zoom del mapa con su tamaño real
     return;
   } else if(APP.pantalla === 'cmpeq' || APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'almrep' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog' || APP.pantalla === 'impnav' || APP.pantalla === 'almseg' || APP.pantalla === 'reportes' || GX_MODS[APP.pantalla] || GD_PANT[APP.pantalla]){
@@ -22237,7 +22232,7 @@ function valCamHtml(req, foto){ return `<label class="val-cam valx-cam${foto ? '
 // pueden ir juntos). Los pallets viven en fp_pallets (número, cliente, proyecto, ítems en JSON y estado armando/listo); cuando todas sus
 // reservas ya salieron en Nisira se ven como "Salió".
 const PAL = { l:[], ok:false, cargando:false, falta:false };
-const DESP_UI = { ver:'armar', q:'' };
+const DESP_UI = { ver:'armar', q:'', zona:'' };   // zona: NORTE · CENTRO · SUR · SIN (sin zona) · '' todas
 const DESP_SEL = new Map();   // id de la reserva → cantidad a poner en el pallet
 // Deshacer un pallet (25.11.2026, Piero: "se debe poder deshacer un pallet, pero que este poder lo tenga Katherine y Piero por el momento")
 const PAL_DESHACEN = ['kalbujar@grupofriopacking.pe', 'plinares@friopacking.pe'];
@@ -22264,20 +22259,21 @@ const DESP_ZONAS = [['NORTE', 'Norte'], ['CENTRO', 'Centro'], ['SUR', 'Sur'], ['
 function despZona(pry, cli){ if(/^(SIN|ALMACEN)/i.test(String(pry || '')) || /^(SIN PROYECTO|STOCK)/i.test(String(cli || ''))) return '';   // compra de almacén: no va a obra
   const pi = pry ? pryInfo(pry) : null, z = pi && pi.dep ? pmZona(pi.dep) : ''; if(z && z !== 'OTRAS') return z;
   const zc = cli ? rqZonaCli().get(cli) || rqZonaCli().get(appImpNombre(cli)) || '' : ''; return ['NORTE', 'CENTRO', 'SUR'].indexOf(zc) !== -1 ? zc : ''; }
-function despPorZona(L, zonaDe, pinta, cuenta){ const Z = new Map(DESP_ZONAS.map(function(x){ return [x[0], []]; })); L.forEach(function(it){ Z.get(zonaDe(it) || '').push(it); }); let gi = 0;
-  return DESP_ZONAS.filter(function(x){ return Z.get(x[0]).length; }).map(function(x){ const l = Z.get(x[0]);
-    return `<div class="desp-zona ${x[0] ? x[0].toLowerCase() : 'sin'}"><b>${x[1]}</b><small>${cuenta(l)}</small></div>` + l.map(function(it){ return pinta(it, gi++); }).join(''); }).join(''); }
+let DESP_ZN = {};   // cuántos hay por zona en la vista actual (para el filtro)
+function despPorZona(L, zonaDe, pinta){ DESP_ZN = { '':L.length, NORTE:0, CENTRO:0, SUR:0, SIN:0 };
+  const V = L.filter(function(it){ const z = zonaDe(it) || ''; DESP_ZN[z || 'SIN']++; return !DESP_UI.zona || (DESP_UI.zona === 'SIN' ? !z : z === DESP_UI.zona); });
+  return V.length ? V.map(pinta).join('') : '<div class="pmf-vacio">Nada en esa zona.</div>'; }
 function appDespHtml(){ const e = escapeHtml, nn = function(v){ return Number(v || 0).toLocaleString('es-PE', { maximumFractionDigits:2 }); };
   if(!RQ.filas.length) rqPreparar(); if(!PAL.ok) palCargar();
   const D = despPorArmar(), q = crtNorm(DESP_UI.q.trim()), nArm = PAL.l.filter(function(p){ return palEstado(p) === 'armando'; }).length, nLis = PAL.l.filter(function(p){ return palEstado(p) === 'listo'; }).length;
   const ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18M5 18v3M12 18v3M19 18v3"/><path d="M5 6h14v12H5z"/><path d="M9 6v4h6V6"/></svg>';
   const aviso = PAL.falta ? '<div class="desp-aviso">⚠ Para guardar los pallets falta crear la tabla en Supabase: corre el SQL de Despachos una vez y recarga.</div>' : '';
-  let cuerpo = '';
+  let cuerpo = ''; DESP_ZN = {};
   if(!RES.ok || !PAL.ok) cuerpo = '<div class="pmf-vacio">⏳ Cargando…</div>';
   else if(DESP_UI.ver === 'armar'){
     const L = D.filter(function(x){ return !q || crtNorm([x.z.req, x.z.producto, x.z.descripcion, despCli(x.z), despPry(x.z)].join(' ')).indexOf(q) !== -1; });
     const G = new Map(); L.forEach(function(x){ const k = despClave(x.z); if(!G.has(k)) G.set(k, []); G.get(k).push(x); });
-    cuerpo = !L.length ? `<div class="pmf-vacio">${D.length ? 'Nada con esa búsqueda.' : '✅ No hay nada validado pendiente de armar en pallets.'}</div>`
+    cuerpo = !L.length ? (D.length ? '<div class="pmf-vacio">Nada con esa búsqueda.</div>' : '')
       : despPorZona([...G.entries()], function(gx){ const z0 = gx[1][0].z, r = resFila(z0); return despZona(despPry(z0), r ? r.proyecto : despCli(z0)); }, function(gx, gi){ const k = gx[0], l = gx[1], z0 = l[0].z, pry = despPry(z0), pi = pry ? pryInfo(pry) || {} : {}, abiertos = PAL.l.filter(function(p){ return p.cliente + '|' + (p.proyecto || '') === k && palEstado(p) === 'armando'; });
         const nSel = l.filter(function(x){ return DESP_SEL.has(String(x.z.id)); }).length;
         return `<div class="rsvm-c rsvm-g desp-g" data-desgk="${e(k)}" style="animation-delay:${Math.min(gi, 10) * 40}ms"><div class="rsvm-ch"><div class="rsvm-ct"><span class="rsvm-num"><small>Ítems</small><b>${l.length}</b></span><span class="rsvm-cli"><b>${e(despCli(z0))}</b><small>${pry ? e(pry) + (pi.n ? ' · ' + e(titleCase(pi.n)) : '') : 'Sin proyecto'} · ${new Set(l.map(function(x){ return x.z.req; })).size} req.</small></span></div>
@@ -22300,17 +22296,18 @@ function appDespHtml(){ const e = escapeHtml, nn = function(v){ return Number(v 
   }
   const nSalio = PAL.l.filter(function(p){ return palEstado(p) === 'salio'; }).length;
   return `<div class="rsvm desp">
-    <div class="rsvm-head"><div class="rsvm-hi desp-hi">${ICO}</div><div class="rsvm-meta"><h2>Despachos</h2><p>Lo validado en el almacén llega aquí. Marca los ítems y arma los pallets (un cliente/proyecto por pallet, pueden ir varios req.); cuando el pallet esté completo, márcalo <b>Listo para Rutas</b>.</p></div>
-      <div class="pmx-ks rsvm-ks"><div class="pmx-k ${D.length ? 'rev' : ''}"><b>${appN(D.length)}</b><small>ítems por armar</small></div><div class="pmx-k"><b>${appN(nArm)}</b><small>pallets armando</small></div><div class="pmx-k ok"><b>${appN(nLis)}</b><small>listos para Rutas</small></div></div></div>
+    <div class="rsvm-head rsvx-head"><div class="rsvm-hi desp-hi">${ICO}</div><div class="rsvm-meta"><h2>Despachos</h2></div></div>
     ${aviso}
     <div class="rsvm-bar"><div class="rsvm-seg"><button type="button" data-despver="armar" class="${DESP_UI.ver === 'armar' ? 'on' : ''}">Por armar <b>${appN(D.length)}</b></button><button type="button" data-despver="pal" class="${DESP_UI.ver === 'pal' ? 'on' : ''}">Pallets <b>${appN(nArm + nLis)}</b></button><button type="button" data-despver="salio" class="${DESP_UI.ver === 'salio' ? 'on' : ''}">Salieron${nSalio ? ` <b>${appN(nSalio)}</b>` : ''}</button></div>
+      <div class="rsvm-sedes">${[['', 'Todas'], ['NORTE', 'Norte'], ['CENTRO', 'Centro'], ['SUR', 'Sur'], ['SIN', 'Sin zona']].map(function(o){ return `<button type="button" data-despzona="${o[0]}" class="${DESP_UI.zona === o[0] ? 'on' : ''}">${o[1]}${o[0] && DESP_ZN[o[0]] ? ' · ' + appN(DESP_ZN[o[0]]) : ''}</button>`; }).join('')}</div>
       <input type="search" class="rsvm-bus" id="despQ" placeholder="Buscar req., código, producto o cliente" value="${e(DESP_UI.q)}" autocomplete="off"></div>
     <div class="rsvm-l rsvm-gl" id="despL">${cuerpo}</div></div>`; }
 async function palGuardar(metodo, url, cuerpo){ const r = await sbFetch('/rest/v1/fp_pallets' + url, { method:metodo, headers:{ 'Content-Type':'application/json', Prefer:'return=representation' }, body:cuerpo ? JSON.stringify(cuerpo) : undefined });
   if(!r.ok){ if(r.status === 404 || r.status === 400) PAL.falta = true; throw new Error(r.status === 404 ? 'Falta crear la tabla de pallets en Supabase.' : 'No se pudo guardar (' + r.status + ').'); } return metodo === 'DELETE' ? [] : r.json(); }
 function despItemsSel(k){ return despPorArmar().filter(function(x){ return DESP_SEL.has(String(x.z.id)) && (!k || despClave(x.z) === k); }).map(function(x){ const z = x.z, q = Math.min(+DESP_SEL.get(String(z.id)) || 0, x.q);
   return { r:z.id, req:z.req, cod:z.producto, desc:z.descripcion || '', q:Math.round(q * 1000) / 1000, um:z.um || '' }; }).filter(function(it){ return it.q > 0; }); }
-document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-despver],[data-despsel],[data-desptodo],[data-despnuevo],[data-despmas],[data-pallisto],[data-palarmar],[data-palborrar],[data-palquita]'); if(!b) return;
+document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-despver],[data-despsel],[data-desptodo],[data-despnuevo],[data-despmas],[data-pallisto],[data-palarmar],[data-palborrar],[data-palquita],[data-despzona]'); if(!b) return;
+  if(b.dataset.despzona !== undefined){ DESP_UI.zona = b.dataset.despzona; return appRenderInicio(); }
   if(b.dataset.despver){ DESP_UI.ver = b.dataset.despver; return appRenderInicio(); }
   if(b.dataset.despsel){ const id = b.dataset.despsel, x = despPorArmar().find(function(y){ return String(y.z.id) === id; }); if(DESP_SEL.has(id)) DESP_SEL.delete(id); else if(x) DESP_SEL.set(id, x.q); return appRenderInicio(); }
   if(b.dataset.desptodo){ const k = b.dataset.desptodo, l = despPorArmar().filter(function(x){ return despClave(x.z) === k; }), todos = l.every(function(x){ return DESP_SEL.has(String(x.z.id)); });
