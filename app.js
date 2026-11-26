@@ -20891,7 +20891,8 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO &&
 // Tocar una fila abre su comparativa. Lo que aún no tiene OC sigue en la pestaña Pendiente.
 const APP_CR = { q:'', est:'' };
 function cotRegFilas(){ return appMemo('cotReg' + COTD.firma + '|' + getReqRows().length + '|' + (PEDIDO_SIN_REQ_ROWS || []).length, function(){
-  const OC = new Map(), c0 = function(x){ return String(x || '').trim(); };
+  const OC = new Map(), CLI = new Map(), c0 = function(x){ return String(x || '').trim(); };
+  getReqRows().forEach(function(r){ if(r.idProyecto && r.proyecto && !CLI.has(r.idProyecto)) CLI.set(r.idProyecto, r.proyecto); });
   getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(!r.codPedido || !r.idProducto || !r.codOrden || /anul/i.test(r.estadoOrden || '')) return;
     const k = c0(r.codPedido) + '|' + c0(r.idProducto); if(!OC.has(k)) OC.set(k, { oc:r.codOrden, prov:r.proveedor || '' }); });
   return COTD.sol.filter(function(s){ return s.estado !== 'anulada'; }).map(function(s){
@@ -20905,7 +20906,11 @@ function cotRegFilas(){ return appMemo('cotReg' + COTD.firma + '|' + getReqRows(
       const ex = l.filter(function(x){ return !x.alt; }), pool = ex.length ? ex : l; if(pool.length){ conP++; mejor += Math.min.apply(null, pool.map(function(x){ return x.v; })) * it.cant; } });
     const RS = cotRespuestas(s), inv = String(s.cco || '').split(/[;,]/).filter(function(x){ return /@/.test(x); }).length;
     const est = nOc && nOc === its.length ? 'oc' : nOc ? 'par' : 'sin';
-    return { s:s, its:its, nOc:nOc, provOc:provOc, ocs:[...new Set(ocs.filter(Boolean).map(function(o){ return o.oc; }))], mejor:conP ? mejor : null, conP:conP, resp:RS.n, inv:Math.max(inv, RS.inv), est:est,
+    // Qué se cotizó, en corto (v574, Piero: "no el ítem, porque puede que sean varios: un mini detalle del tipo de productos"): familia · tipos
+    const FT = new Map(); its.forEach(function(it){ let c = ''; try{ c = skuCategoria({ idProducto:it.cod, producto:it.desc }); }catch(err){} const f = String(c || 'Otros productos').split(' · ')[0], t = String(c || '').split(' · ').slice(1).join(' · '); if(!FT.has(f)) FT.set(f, new Set()); if(t) FT.get(f).add(t); });
+    const tipo = [...FT.entries()].slice(0, 2).map(function(x){ const t = [...x[1]]; return x[0] + (t.length ? ' · ' + t.slice(0, 2).join(', ') + (t.length > 2 ? '…' : '') : ''); }).join(' | ') + (FT.size > 2 ? ' y más' : '');
+    const prys0 = [...new Set(its.map(function(it){ return it.pry; }).filter(Boolean))], clis = [...new Set(prys0.map(function(y){ return appImpNombre(CLI.get(y) || '') || ''; }).filter(Boolean))];
+    return { s:s, its:its, tipo:tipo, clis:clis, nOc:nOc, provOc:provOc, ocs:[...new Set(ocs.filter(Boolean).map(function(o){ return o.oc; }))], mejor:conP ? mejor : null, conP:conP, resp:RS.n, inv:Math.max(inv, RS.inv), est:est,
       peds:[...new Set(its.map(function(it){ return it.ped; }).filter(Boolean))], prys:[...new Set(its.map(function(it){ return it.pry; }).filter(Boolean))],
       txt:polarNorm([s.cot].concat(its.map(function(it){ return it.cod + ' ' + it.desc + ' ' + it.ped + ' ' + it.pry; }), provOc, P.map(function(p){ return p.proveedor; })).join(' ')) }; })
     .sort(function(a, b){ return String(b.s.creado || '').localeCompare(String(a.s.creado || '')); }); }); }
@@ -20914,13 +20919,12 @@ function appCotRegLista(){ const e = escapeHtml, c = function(x){ return String(
   const q = polarNorm(APP_CR.q || ''), L = cotRegFilas().filter(function(x){ return (!APP_CR.est || (APP_CR.est === 'oc' ? x.est !== 'sin' : x.est === 'sin')) && (!q || q.split(' ').filter(Boolean).every(function(w){ return x.txt.indexOf(w) !== -1; })); });
   if(!L.length) return `<div class="ini-vacio">${q ? 'No hay cotizaciones con "' + e(APP_CR.q) + '".' : 'Todavía no hay cotizaciones en este estado.'}</div>`;
   const EST = { oc:['Con OC', 'ok'], par:['OC parcial', 'par'], sin:['Sin OC', 'sin'] };
-  return `<div class="creg"><div class="creg-h"><span>Cotización</span><span>Productos</span><span>Pedido</span><span class="n">Respondieron</span><span class="n">Mejor oferta</span><span>Estado</span></div>${L.map(function(x){ const s = x.s, t = EST[x.est];
+  return `<div class="creg"><div class="creg-h"><span>Cotización</span><span>Qué se cotizó</span><span class="n">Respondieron</span><span class="n">Mejor oferta</span><span>Estado</span></div>${L.map(function(x){ const s = x.s, t = EST[x.est];
     return `<button type="button" class="creg-f" data-cotreg="${e(s.cot)}" title="Ver la comparativa de ${e(s.cot)}">
       <span class="cot"><b>${e(s.cot)}</b><small>${s.creado ? e(fmtDate(new Date(s.creado))) : ''}</small></span>
-      <span class="pr"><b>${e(polarCorta(x.its[0] ? x.its[0].desc : '—', 60))}</b><small>${x.its.length > 1 ? 'y ' + appN(x.its.length - 1) + ' producto' + (x.its.length === 2 ? '' : 's') + ' más' : '1 producto'}</small></span>
-      <span>${x.peds.length ? e(x.peds.map(c).join(', ')) : '—'}<small>${e(x.prys.join(', '))}</small></span>
+      <span class="det"><b>${e(x.tipo || 'Productos')}</b><em>${appN(x.its.length)} producto${x.its.length === 1 ? '' : 's'}</em><small>${e([x.clis.join(', '), x.prys.join(', ')].filter(Boolean).join(' · ') || 'Sin proyecto')}</small></span>
       <span class="n">${appN(x.resp)} de ${appN(x.inv)}</span>
-      <span class="n">${x.mejor != null ? usd(x.mejor) : '—'}${x.mejor != null && x.conP < x.its.length ? `<small>${appN(x.conP)} de ${appN(x.its.length)}</small>` : ''}</span>
+      <span class="n">${x.mejor != null ? usd(x.mejor) : '—'}</span>
       <span><i class="creg-e ${t[1]}">${t[0]}</i>${x.ocs.length ? `<small>OC ${e(x.ocs.map(c).join(', '))}${x.provOc.length ? ' · ' + e(x.provOc.join(', ')) : ''}</small>` : ''}</span></button>`; }).join('')}</div>`; }
 function appCotRegHtml(){ const e = escapeHtml; cotCargar();
   if(!COTD.ok) return '<div class="ini-vacio">Cargando las cotizaciones…</div>';
