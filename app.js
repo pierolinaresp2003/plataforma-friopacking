@@ -1362,6 +1362,21 @@ async function appMantenerAnteriores(snapshot){
   if(sinProc && prev.proceso && prev.proceso.rows && prev.proceso.rows.length){ ['proceso', 'procesoSchemaVersion', 'filename', 'corte', 'excluded', 'totalRows', 'proyectos'].forEach(function(k){ snapshot[k] = prev[k]; }); out.push(NOM.proceso); }
   return out;
 }
+// Resumen gerencial publico (26.11.2026, Piero): en cada publicacion se deja un JSON compacto con los KPIs del
+// modulo Gerencial en la tabla fp_gerencial_pub (lectura anonima) para que el Directorio externo lo lea sin login.
+// Reusa el mismo calculo del Gerencial (gdPer/gdObjetivos/GD_PAN_G/gdVal/gdMeta); si algo falla, devuelve null y la publicacion sigue igual.
+function gerencialResumen(){
+  try{
+    if(typeof gdPer !== 'function' || typeof GD_K === 'undefined' || typeof GD_PAN_G === 'undefined') return null;
+    const P = gdPer();
+    const num = function(x){ return x == null || x === '' || isNaN(+x) ? null : +x; };
+    const ind = function(k){ const K = GD_K[k] || {}, v = gdVal(k, P.M), meta = gdMeta(k);
+      return { k:k, nombre:K.n || k, valor:num(v), meta:num(meta), fmt:K.fmt || '', mejorBajo:!!K.bajo, estado:gdEstado(v, meta, K.bajo), frente:K.fr || '', texto:(v == null ? '-' : gdFmt(k, v)) }; };
+    const objetivos = gdObjetivos(P).map(function(o){ const K = o.K || {}; return { k:o.k, nombre:K.n || o.k, titulo:o.t, valor:num(o.v), meta:num(o.meta), base:num(o.base), estado:o.est, fmt:K.fmt || '', mejorBajo:!!K.bajo, frente:K.fr || '', texto:(o.v == null ? '-' : gdFmt(o.k, o.v)) }; });
+    const paneles = GD_PAN_G.map(function(g){ return { grupo:g[0], indicadores:g[1].map(ind) }; });
+    return { generado:new Date().toISOString(), periodo:{ mes:P.M.etq, nombre:P.M.nom, anio:P.M.y, corte:isoDay(P.corte), corteTxt:fmtDate(P.corte) }, objetivos:objetivos, paneles:paneles };
+  }catch(e){ console.warn('gerencialResumen', e); return null; }
+}
 async function publishSnapshot(){
   if(!DATA){ return; }
   // Publica en Supabase (20.10.2026): solo un administrador con sesión iniciada en la app.
@@ -1394,6 +1409,9 @@ async function publishSnapshot(){
       body:JSON.stringify({ id:1, version:ver, publicado:ver, bytes:gz.length, por:(sbSesion() || {}).correo || '' }) });
     if(!pv.ok) throw new Error("se subió el archivo pero no se pudo marcar la versión (" + pv.status + "). Vuelve a darle a ☁.");
     sbCache('snap', { version:ver, buf:gz.buffer.slice(gz.byteOffset, gz.byteOffset + gz.byteLength) });
+    try{ const resumenGer = gerencialResumen();
+      if(resumenGer){ await sbFetch('/rest/v1/fp_gerencial_pub?on_conflict=id', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
+        body:JSON.stringify({ id:1, resumen:resumenGer, actualizado:new Date().toISOString() }) }); } }catch(e){ console.warn('resumen gerencial no publicado', e); }
     let nU = 0; try{ nU = await sbSincronizarUsuarios(snapshot.accesos || APP_ACCESOS_BASE); }catch(e){ console.warn('usuarios', e); }
     showPublishBanner("✅ Publicado el " + new Date().toLocaleString('es-PE', { maximumFractionDigits:2 }) + " — solo lo ven los usuarios con su clave."
       + (mantenidos.length ? " Se mantuvo lo anterior de: " + escapeHtml(mantenidos.join(', ')) + "." : "")
