@@ -5076,6 +5076,12 @@ html[data-theme="dark"] .cf-pc.mas .cf-pc-h{background:#1A2D50;color:#8DB8F0;} h
 .cot-a{display:flex;align-items:center;justify-content:center;gap:1px;width:28px;height:28px;border-radius:9px;color:var(--ink-soft);cursor:pointer;opacity:.4;transition:background .15s,opacity .15s;} .cot-a svg{width:17px;height:17px;flex:none;}
 .cot-a:hover{background:var(--surface-2);opacity:1;} .cot-a.env{opacity:.95;color:#b45309;} .cot-a.on{opacity:1;color:#0b6e63;background:#e2f3ea;} .cot-a b{font:800 9.5px Inter,sans-serif;}
 .skt-n .skt-cotc{display:block;width:max-content;margin-top:2px;font:800 9.5px Inter,sans-serif;color:#1f4fd1;background:#e3edff;border-radius:6px;padding:1px 5px;}
+/* OC sin aprobar para cotizar (26.11.2026) */
+.skt.osa .skt-g .skt-av{width:24px;height:24px;font-size:9px;} .skt.osa .skt-g b{text-transform:none;font-size:13px;}
+.osa-oc{cursor:pointer;text-decoration:underline dotted 1px;text-underline-offset:3px;} .osa-oc:hover{color:#0a1e64;} html[data-theme="dark"] .osa-oc:hover{color:#8db8f0;}
+@container (max-width:760px){ .skt.osa .skt-l::before{content:'Precio OC';} .skt.osa .skt-l b{flex:none;} }
+.skt.osa .skt-st em{white-space:nowrap;}
+@media (max-width:900px){ .ncm-izq .ncm-mod button{min-width:0;gap:5px;padding:4px 6px;font-size:12px;white-space:normal;line-height:1.1;text-align:left;} .ncm-izq .ncm-mod b{flex:none;} }
 html[data-theme="dark"] .cot-a.on{background:#16352a;color:#5fc28f;} html[data-theme="dark"] .cot-a.env{color:#d59c52;} html[data-theme="dark"] .skt-n .skt-cotc{background:#1a2d50;color:#8db8f0;}
 .cot-k{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:6px;} .cot-k > div{background:var(--surface-2);border-radius:14px;padding:12px 14px;min-width:0;}
 .cot-k small{display:block;font:700 11px Inter,sans-serif;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;} .cot-k b{display:block;font:800 20px Inter,sans-serif;color:var(--ink);margin:4px 0 2px;}
@@ -20375,7 +20381,7 @@ function appComprasHtml(){
   APP_PC.persona = ''; appPcPersonaF();
   // Filtro por persona en el mapa (18.11.2026, Piero: "esa opción de leyenda mejor sea el filtro por persona para que salga solo lo suyo"):
   // solo sus OC pendientes (en SKU sin OC, sus caras de siempre).
-  if(APP_PC.mod !== 'sku') APP_PC.persona = APP_NC.per || '';
+  if(APP_PC.mod !== 'sku' && APP_PC.mod !== 'osa') APP_PC.persona = APP_NC.per || '';   // OC sin aprobar: todo el equipo, por persona (26.11.2026)
   // Sin la barra de año, mes y cliente (18.11.2026, Piero: "borra eso también"): siempre el año en curso.
   NCM.rep = '';
   return appPendComprasHtml(false, true);
@@ -25411,6 +25417,8 @@ function appPendComprasHtml(soloLista, sinCaras){
   };
   // Pedidos sin OC como listado: una fila por SKU, el pedido más antiguo primero (05.10.2026, Piero).
   const items = filas.filter(function(r){ return r.tipo !== 'oc'; }).sort(function(a,b){ return ((a.fPedido || 0) - (b.fPedido || 0)) || String(a.codPedido).localeCompare(String(b.codPedido)); });
+  // OC sin aprobar para cotizar (26.11.2026, Piero: "la opción de cotizar oc que aun no están aprobadas… seccionadas por persona"): sus ítems, la OC más antigua primero.
+  const osa = filas.filter(function(r){ return r.tipo === 'oc' && pdEstadoOC(r) === 'Sin aprobar'; }).sort(function(a, b){ return ((a.fOrden || 0) - (b.fOrden || 0)) || String(a.codOrden).localeCompare(String(b.codOrden)); });
   // Cada SKU con lo que hace falta para cotizar (06.10.2026, Piero): PRY, quién lo pidió y la observación
   // del requerimiento. Agrupados por familia de producto (bloque de abajo).
   // Fila corta (07.10.2026, Piero: "hay demasiado texto"): producto, pedido y proyecto en una línea, la
@@ -25460,7 +25468,7 @@ function appPendComprasHtml(soloLista, sinCaras){
         <span class="skt-p">${e(r.producto || r.idProducto || '—')}</span>
         <span class="skt-q"><span>${r.cantPedido != null ? appN(r.cantPedido, 2) : '—'} <small>${e(r.unidad || '')}</small></span>${par}${r.rsv ? '<small class="skt-pc rsv">faltó en almacén</small>' : ''}</span>
         ${ult}
-        ${r.rsv ? `<span class="skt-n"><i class="skt-rsv" title="Viene de Reservas: al validar en el almacén solo había ${appN(r.rsv.hay, 2)} de ${appN(r.rsv.tot, 2)}. Falta regularizar el pedido en Nisira.">Reserva</i></span>` : `<span class="skt-n" title="Pedido ${e(c(r.codPedido))}${cots.length ? ' · cotizado en ' + e(cots.join(', ')) : ''}">${e(c(r.codPedido))}${cots.length ? `<small class="skt-cotc">${e(cots[0].replace(/^COT-\d{4}-/, 'COT-'))}</small>` : ''}</span>`}
+        ${r.rsv ? `<span class="skt-n"><i class="skt-rsv" title="Viene de Reservas: al validar en el almacén solo había ${appN(r.rsv.hay, 2)} de ${appN(r.rsv.tot, 2)}. Falta regularizar el pedido en Nisira.">Reserva</i></span>` : `<span class="skt-n" title="Pedido ${e(c(r.codPedido))}${cots.length ? ' · cotizado en ' + e(cots.join(', ')) : ''}">${e(c(r.codPedido))}${cots.length ? `<small class="skt-cotc">${e(cots[0].replace(/^COT-\d{4}-0*/, 'COT-'))}</small>` : ''}</span>`}
         <span class="skt-r" title="${r.req ? 'Requerimiento ' + e(c(r.req)) : 'Pedido directo, sin requerimiento'}">${r.req ? e(c(r.req)) : '<i>Directo</i>'}</span>
         <span class="skt-c" title="${e([cli || 'Stock / sin proyecto', pryId].filter(Boolean).join(' · '))}">${e(cli || 'Stock')}</span>
         ${r.solicitante ? `<span class="skt-s" data-clic="1" data-supinfo="${e(r.solicitante)}" title="Ver los datos de ${e(titleCase(r.solicitante))}">${e(titleCase(r.solicitante).split(' ').slice(0, 2).join(' '))}</span>` : '<span class="skt-s">—</span>'}
@@ -25479,6 +25487,32 @@ function appPendComprasHtml(soloLista, sinCaras){
       return F.map(function(x){ const uno = x.t.length === 1, rs = [].concat.apply([], x.t.map(function(g){ return g[1]; }));
         return `<section class="skt-blk" style="--fam:${appColorFamilia(x.f)}"><div class="skt-g">${ck(sel(rs), 'data-skuselg', uno ? 'Elegir toda la categoría para cotizar' : 'Elegir toda la familia para cotizar')}<i></i><b>${e(uno ? x.t[0][0] : x.f)}</b><span>${rs.length} SKU</span></div>${x.t.map(function(g){
           return uno ? g[1].map(fila).join('') : `<div class="skt-tg"><div class="skt-st">${ck(sel(g[1]), 'data-skuselt', 'Elegir este tipo para cotizar')}<b>${e(g[0].split(' · ').slice(1).join(' · '))}</b><em>${g[1].length} SKU</em></div>${g[1].map(fila).join('')}</div>`; }).join('')}</section>`; }).join(''); })()}</div>`; };
+  // OC sin aprobar (26.11.2026): un bloque por persona y, dentro, cada OC con sus ítems; se eligen para cotizar igual que los SKU sin OC. En vez de la
+  // última compra, el precio que trae la OC (y debajo la última compra anterior, para comparar).
+  const osaTabla = function(l){ const e = escapeHtml, c = function(x){ return String(x || '').replace(/^000\d-0*/, ''); }; cotCargar();
+    const fila = function(r){
+      const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', cli = /^pedido directo|^sin proyecto/i.test(r.proyecto || '') ? '' : appImpNombre(r.proyecto || '');
+      const dh = r.fOrden ? Math.max(0, busdayCount(r.fOrden, hoy) || 0) : 0, ck = cotKey(r), on = APP_PC.cot.indexOf(ck) !== -1, cots = cotDePedido(r), q = r.cantOrden != null ? r.cantOrden : r.cantPedido;
+      const pu = osaPrecio(r), uc0 = skuUltCompra(r.idProducto), uc = uc0 && uc0.oc !== r.codOrden ? uc0 : null;
+      const pre = `<span class="skt-l" title="${pu ? 'Precio en la OC ' + e(c(r.codOrden)) + ': ' + e(appSkuPrecio(pu.pu, pu.mon)) + ' c/u' : 'La OC no trae precio'}${uc ? ' · última compra: OC ' + e(c(uc.oc)) + ' del ' + e(fmtDate(uc.f)) + ' a ' + e(uc.prov) + (uc.pu != null ? ' · ' + e(appSkuPrecio(uc.pu, uc.mon)) + ' c/u' : '') : ''}"><b>${pu ? e(appSkuPrecio(pu.pu, pu.mon)) : 'Sin precio'}</b><small>${uc && uc.pu != null ? 'últ. <em>' + e(appSkuPrecio(uc.pu, uc.mon)) + '</em> · ' + e(gdCorto(uc.prov) || uc.prov || '') : 'sin compra anterior'}</small></span>`;
+      return `<button type="button" class="skt-f${on ? ' sel' : ''}" data-sku="${e(r.idProducto || '')}" data-skuped="${e(r.codPedido || '')}" data-skureq="${e(r.req || '')}" title="${e(r.producto || '')} · toca para ver su ficha">
+        <span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skusel="${e(ck)}" role="checkbox" aria-checked="${on}" title="Elegir para cotizar"></span><span class="skt-d ${dh >= 5 ? 'rojo' : dh >= 3 ? 'ambar' : 'verde'}" title="OC emitida hace ${dh} días hábiles, sin aprobar">${dh}<small>d.h.</small></span>
+        <span class="skt-p">${e(r.producto || r.idProducto || '—')}</span>
+        <span class="skt-q"><span>${q != null ? appN(q, 2) : '—'} <small>${e(r.unidad || '')}</small></span></span>
+        ${pre}
+        <span class="skt-n" title="${r.codPedido ? 'Pedido ' + e(c(r.codPedido)) : 'Sin pedido'}${cots.length ? ' · cotizado en ' + e(cots.join(', ')) : ''}">${r.codPedido ? e(c(r.codPedido)) : '—'}${cots.length ? `<small class="skt-cotc">${e(cots[0].replace(/^COT-\d{4}-0*/, 'COT-'))}</small>` : ''}</span>
+        <span class="skt-r" title="${r.req ? 'Requerimiento ' + e(c(r.req)) : 'Sin requerimiento'}">${r.req ? e(c(r.req)) : '<i>Directo</i>'}</span>
+        <span class="skt-c" title="${e([cli || 'Stock / sin proyecto', pryId].filter(Boolean).join(' · '))}">${e(cli || 'Stock')}</span>
+        ${r.solicitante ? `<span class="skt-s" data-clic="1" data-supinfo="${e(r.solicitante)}" title="Ver los datos de ${e(titleCase(r.solicitante))}">${e(titleCase(r.solicitante).split(' ').slice(0, 2).join(' '))}</span>` : '<span class="skt-s">—</span>'}
+        ${cotIcono(r)}</button>`; };
+    const sel = function(rs){ return rs.every(function(r){ return APP_PC.cot.indexOf(cotKey(r)) !== -1; }); };
+    const ck = function(on, attr, t){ return `<span class="skt-x${on ? ' on' : ''}" data-clic="1" ${attr}="1" role="checkbox" aria-checked="${on}" title="${t}"></span>`; };
+    const P = new Map(); l.forEach(function(r){ const k = r.persona || '-'; if(!P.has(k)) P.set(k, new Map()); const m = P.get(k); if(!m.has(r.codOrden)) m.set(r.codOrden, []); m.get(r.codOrden).push(r); });
+    const orden = [...P.keys()].sort(function(a, b){ const ia = APP_DAILY_COMPRAS.indexOf(a), ib = APP_DAILY_COMPRAS.indexOf(b); return (a === '-') - (b === '-') || (ia === -1) - (ib === -1) || ia - ib || a.localeCompare(b); });
+    return `<div class="skt cot sin-u osa"><div class="skt-h"><span></span><span>Espera</span><span>Producto</span><span class="hq">Cantidad</span><span class="hl">Precio OC</span><span class="hn">Pedido</span><span>Req.</span><span class="hc">Cliente</span><span>Supervisor</span><span></span><span></span></div>${orden.map(function(p){
+      const m = P.get(p), rs = [].concat.apply([], [...m.values()]), nom = p === '-' ? 'Sin asignar' : String(PD_PERSONAS[p] || p);
+      return `<section class="skt-blk" style="--fam:#1f4fd1"><div class="skt-g">${ck(sel(rs), 'data-skuselg', 'Elegir todas las OC de ' + e(nom.split(' ')[0]) + ' para cotizar')}${ncAv(p === '-' ? '' : p)}<b>${e(nom)}</b><span>${appN(m.size)} OC · ${appN(rs.length)} ítem${rs.length === 1 ? '' : 's'}</span></div>${[...m.entries()].map(function(x){ const r0 = x[1][0];
+        return `<div class="skt-tg"><div class="skt-st">${ck(sel(x[1]), 'data-skuselt', 'Elegir toda la OC para cotizar')}<b><span class="osa-oc" data-clic="1" data-oc="${e(x[0])}" title="Ver la OC">OC ${e(c(x[0]))}</span> · ${e(appImpNombre(r0.proveedor || '') || 'Sin proveedor')}</b><em>${r0.fOrden ? 'emitida ' + appDDMM(r0.fOrden) + ' · ' : ''}${appN(x[1].length)} ítem${x[1].length === 1 ? '' : 's'}</em></div>${x[1].map(fila).join('')}</div>`; }).join('')}</section>`; }).join('')}</div>`; };
   // Buscador general (05.10.2026, Piero): OC, pedido, req., código, producto, proveedor o proyecto, en
   // todos los estados a la vez. Una OC sale completa si cualquiera de sus ítems coincide.
   const q = polarNorm(APP_PC.q || ''), tope = Infinity;   // todo a la vista (05.10.2026)
@@ -25536,15 +25570,17 @@ function appPendComprasHtml(soloLista, sinCaras){
       + (l.length > tope ? `<button type="button" class="ini-link" data-pcmas="1">Ver más (${appN(l.length - tope)} restantes) ›</button>` : '');
   };
   // Para el reporte en imágenes: los mismos estados y las mismas tarjetas que se ven aquí.
-  const datos = { per:per, S:S, items:items, cardOC:cardOC, cardEnt:cardEnt, skuGrupos:skuGrupos, filaSku:filaSku, entY:entY, entM:entM, q:q, cliSel:cliSel, pasa:pasa, ocHit:ocHit, entQ:entQ, filas:filas, cliDe:cliDe };
+  const datos = { per:per, S:S, items:items, osa:osa, cardOC:cardOC, cardEnt:cardEnt, skuGrupos:skuGrupos, filaSku:filaSku, entY:entY, entM:entM, q:q, cliSel:cliSel, pasa:pasa, ocHit:ocHit, entQ:entQ, filas:filas, cliDe:cliDe };
   if(soloLista === 'datos') return datos;
   // Dos módulos (18.11.2026): OC en tránsito en el mapa por distritos (a la derecha, lo elegido) y SKU sin OC en su listado de siempre.
   const no = `<div class="ini-vacio">No hay ${sku ? 'SKU sin OC' : 'OC ni pedidos'} con "${escapeHtml(APP_PC.q)}".</div>`;
-  const lista = sku ? (q ? cliFiltro : '') + bloque('ped')
+  const osaM = APP_PC.mod === 'osa', osaBloque = function(){ const caras = ncSkuPer(osa); let l = APP_PC.skuPer ? osa.filter(function(r){ return (r.persona || '-') === APP_PC.skuPer; }) : osa; if(q) l = l.filter(pasa);
+    return `<div class="ncs-fil">${caras}</div>` + (l.length ? osaTabla(l) : `<div class="ini-vacio">${q ? 'No hay OC sin aprobar con "' + escapeHtml(APP_PC.q) + '".' : '✅ No hay OC sin aprobar.'}</div>`); };
+  const lista = osaM ? (q ? cliFiltro : '') + osaBloque() : sku ? (q ? cliFiltro : '') + bloque('ped')
     : q ? cliFiltro + (['venc', 'luego', 'ag', 'ent'].concat(APP_NC.d ? [] : ['ped']).map(function(k){ return bloque(k); }).join('') || no)
     : !(APP_NC.d || APP_NC.est) ? '' : APP_NC.est && APP_NC.est !== 'ab' ? bloque(APP_NC.est) : ['venc', 'luego', 'ag'].map(function(k){ return bloque(k, true); }).join('') || '<div class="ini-vacio">✅ Sin OC abiertas aquí.</div>';
   if(soloLista) return lista;
-  return sku ? ncSkuVista(datos, lista) : ncVista(datos, lista);
+  return sku || osaM ? ncSkuVista(datos, lista) : ncVista(datos, lista);
 }
 // ---------- Seguimiento: OC nacionales en el mapa por distritos (18.11.2026, Piero: "en seguimiento necesito que se vea todo lo nacional como
 // mapa por distritos así tal cual siguiendo la idea de módulo importaciones… sin quitar las funciones que tenemos para dar seguimiento a las OC
@@ -25596,7 +25632,7 @@ function ncUbi(prov){ const U = PROVEEDOR_UBI; if(!U || !U.n || !prov) return nu
 function ncProvUsados(){ const s = new Set(); getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(r.proveedor) s.add(gdNorm(gdCorto(r.proveedor))); }); return s.size ? s : null; }
 // Qué OC entran en la lista de la derecha (y en el Excel): las nacionales, las del distrito elegido o las que no tienen distrito. Con el buscador y
 // sin distrito elegido, todo (como antes).
-function ncAmbito(){ if(APP_PC.mod === 'sku') return null; const d = APP_NC.d;
+function ncAmbito(){ if(APP_PC.mod === 'sku' || APP_PC.mod === 'osa') return null; const d = APP_NC.d;
   if(d === 'sd') return function(oc, prov){ return !ncImp(oc) && !ncUbi(prov); };
   if(d) return function(oc, prov){ const u = !ncImp(oc) && ncUbi(prov); return !!u && u.k === d; };
   return APP_PC.q ? null : function(oc){ return !ncImp(oc); }; }
@@ -25698,8 +25734,8 @@ function ncRefrescar(){ const w = document.querySelector('.ncm'); if(!w) return;
   ['ncmMapa', 'ncmLado'].forEach(function(id){ const a = document.getElementById(id), b = t.querySelector('#' + id); if(a && b) a.innerHTML = b.innerHTML; }); ncmIniciar(); }
 // Los dos módulos: OC en tránsito (mapa) y SKU sin OC (listado aparte).
 function ncModulo(D){ const nOc = D.S.venc[3].concat(D.S.luego[3]).filter(function(o){ return !ncImp(o.oc); }).length + D.S.ag[3].filter(function(x){ return x.pend && !ncImp(x.o.oc); }).length;
-  const b = function(k, t, n){ return `<button type="button" data-pcmod="${k}" class="${(APP_PC.mod === 'sku') === (k === 'sku') ? 'on' : ''}">${t} <b>${appN(n)}</b></button>`; };
-  return `<div class="rsvm-seg ncm-mod">${b('oc', 'OC en tránsito', nOc)}${b('sku', 'SKU sin OC', D.items.length)}</div>`; }
+  const m = APP_PC.mod === 'sku' || APP_PC.mod === 'osa' ? APP_PC.mod : 'oc', b = function(k, t, n){ return `<button type="button" data-pcmod="${k}" class="${m === k ? 'on' : ''}">${t} <b>${appN(n)}</b></button>`; };
+  return `<div class="rsvm-seg ncm-mod">${b('oc', 'OC en tránsito', nOc)}${b('sku', 'SKU sin OC', D.items.length)}${b('osa', 'OC sin aprobar', new Set((D.osa || []).map(function(r){ return r.codOrden; })).size)}</div>`; }
 const NC_ICO = { pin:'<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/>', lupa:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
   web:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>', gente:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.6 14.2c2.4-.3 4.3 1.2 4.9 4.3"/>',
   res:'<rect x="3" y="5" width="12" height="15" rx="2"/><rect x="7" y="2.5" width="12" height="15" rx="2"/><circle cx="13" cy="7.6" r="2"/><path d="M9.6 13.6c.7-1.6 2-2.4 3.4-2.4s2.7.8 3.4 2.4"/>' };
@@ -25919,6 +25955,13 @@ function skuPasaCat(r, sel){ if(!sel) return true; return sel.indexOf('F|') === 
 function skuCatNombre(sel){ return String(sel || '').indexOf('F|') === 0 ? sel.slice(2) + ' (toda la familia)' : String(sel || ''); }
 // ---- Cotizar (18.11.2026, Piero: "seleccionar las familias o los ítems por separado para enviarlos a cotizar a los proveedores ideales") ----
 function skuKey(r){ return [r.codPedido || '', r.idProducto || '', r.req || '', r.cantPedido == null ? '' : r.cantPedido].join('|'); }
+// En OC sin aprobar la clave lleva la OC (26.11.2026).
+function cotKey(r){ return r.tipo === 'oc' ? 'oc|' + [r.codOrden || '', r.idProducto || '', r.req || '', r.cantOrden == null ? '' : r.cantOrden].join('|') : skuKey(r); }
+// Precio unitario del código en esa OC (monto / cantidad de sus líneas).
+function osaPrecio(r){ const M = appMemo('osaPU', function(){ const m = new Map(); polarLineasOC().forEach(function(x){ if(!x.codOrden || !x.idProducto) return;
+    const k = x.codOrden + '|' + String(x.idProducto).trim(), o = m.get(k) || m.set(k, { q:0, t:0, con:false, mon:monedaLabel(x.moneda) }).get(k), q = x.cantidadOrden != null ? x.cantidadOrden : x.cantOrden;
+    if(q != null) o.q += +q || 0; if(x.montoNativo != null && !isNaN(x.montoNativo)){ o.t += +x.montoNativo; o.con = true; } }); return m; });
+  const o = M.get(r.codOrden + '|' + String(r.idProducto || '').trim()); return o && o.con && o.q > 0 ? { pu:o.t / o.q, mon:o.mon } : null; }
 // Con quién cotizar por categoría (se puede ampliar: [categoría (expresión), [proveedores]]).
 const COT_PROV = [[/^Cables y conductores/, ['Sonepar', 'Globaltec', 'Prysmian', 'Diprosol', 'Sigelec', 'Helukabel', 'Kabelwire', 'Cominsa', 'Anixter']]];
 function ncCotBarra(){ const n = APP_PC.cot.length;
@@ -25936,7 +25979,8 @@ function ncCotPintar(){ const C = new Set(APP_PC.cot);
 function cotProvDe(nom, ruc){ const M = PROVEEDOR_MAIL || {}; if(ruc && M[ruc] && M[ruc].to) return Object.assign({ ruc:ruc }, M[ruc]);
   const k = ncK(nom).replace(/ /g, ''); if(!k) return null; let r = null;
   Object.keys(M).some(function(x){ const p = M[x]; if(p && p.to && ncK(p.nombre).replace(/ /g, '').indexOf(k) !== -1){ r = Object.assign({ ruc:x }, p); return true; } return false; }); return r; }
-function appCotItems(){ const S = new Set(APP_PC.cot); return appPendComprasHtml('datos', true).items.filter(function(r){ return S.has(skuKey(r)); }); }
+function appCotItems(){ const S = new Set(APP_PC.cot), D = appPendComprasHtml('datos', true); return D.items.filter(function(r){ return S.has(skuKey(r)); })
+  .concat((D.osa || []).filter(function(r){ return S.has(cotKey(r)); }).map(function(r){ return Object.assign({}, r, { cantPedido:r.cantOrden != null ? r.cantOrden : r.cantPedido }); })); }
 function appCotAbrir(){ const e = escapeHtml, L = appCotItems(); if(!L.length) return appToast('Elige primero los SKU que quieres cotizar.');
   const cats = [...new Set(L.map(skuCategoria))], P = new Map();
   // 1) Los proveedores de la categoría; 2) a quién se le compró antes cada SKU (Consulta y Nisira).
@@ -25961,6 +26005,7 @@ function appCotAbrir(){ const e = escapeHtml, L = appCotItems(); if(!L.length) r
     appCotCorreo(L, cats, bcc); }); }
 // Para M. Luján, con copia a Compras y al supervisor de cada requerimiento; los proveedores en copia oculta. Cada solicitud queda registrada en
 // Supabase con su código COT-AAAA-NNNN en el asunto, para guardar luego las respuestas y sus precios (25.11.2026, Piero).
+const COT_ENV = { ocup:false, f:'', cot:'', t:0 };   // el último COT registrado: uno solo por solicitud aunque se toque varias veces (26.11.2026)
 const COT_PARA = 'mlujan@grupofriopacking.pe', COT_CC = ['ccheca@friopacking.pe', 'msihuairo@friopacking.pe', 'jpomez@friopacking.pe', 'jaltamirano@friopacking.pe', 'plinares@friopacking.pe'];
 async function appCotCorreo(L, cats, bcc){ const e = escapeHtml, cod = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
   const cc = [...new Set(COT_CC.concat(L.map(function(r){ return crtCorreoSupervisor(r.solicitante || ''); })).map(function(x){ return String(x || '').trim().toLowerCase(); }).filter(function(x){ return /@/.test(x) && x !== COT_PARA; }))].join(',');
@@ -25977,15 +26022,21 @@ async function appCotCorreo(L, cats, bcc){ const e = escapeHtml, cod = function(
     + '<table style="border-collapse:collapse;margin:0 0 12pt;"><tr>' + th('N°') + th('Código') + th('Descripción') + th('Cantidad') + th('U.M.') + th('Pedido') + th('PRY') + '</tr>'
     + L.map(function(r, i){ return '<tr>' + td(i + 1, 'center') + td(e(r.idProducto || '')) + td(e(r.producto || '')) + td(appN(r.cantPedido, 2), 'right') + td(e(r.unidad || ''), 'center') + td(e(cod(r.codPedido)), 'center') + td(e(r.idProyecto || ''), 'center') + '</tr>'; }).join('') + '</table>'
     + p('Indicar <b>precio unitario (sin IGV)</b>, moneda, <b>plazo de entrega</b>, validez de la oferta y condiciones de pago.') + p('Al responder, mantener el asunto de este correo (lleva el código <b>COT</b>) y adjuntar la cotización en PDF.') + '<p style="margin:0;">Saludos cordiales,</p></div>';
+  // Un solo COT por solicitud (26.11.2026, Piero: salían 13 COT del mismo ítem): mientras se abre el correo no se registra otro y, si vuelves a
+  // tocar "Abrir correo" con los mismos ítems y proveedores, se usa el mismo código.
+  if(COT_ENV.ocup) return appToast('Abriendo el correo…');
+  const firma = L.map(cotKey).sort().join('§') + '#' + bcc;
   const copia = crtCopiarHtml(html, T.join('\r\n')).then(function(){ return true; }, function(){ return false; });   // en el clic, antes de esperar a Supabase
-  let cot = ''; try{ const r = await sbFetch('/rest/v1/rpc/fp_cot_crear', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ p:{ asunto:base, para:COT_PARA, cc:cc, cco:bcc,
-    items:L.map(function(r){ return { cod:r.idProducto || '', desc:r.producto || '', cant:+r.cantPedido || 0, um:r.unidad || '', ped:r.codPedido || '', req:r.req || '', pry:r.idProyecto || '', sol:r.solicitante || '' }; }) } }) }); if(r.ok) cot = String(await r.json() || ''); }catch(err){}
-  if(cot){ COTD.t = 0; } else appToast('No se pudo registrar la solicitud: el correo sale sin código COT.');
+  COT_ENV.ocup = true; try{
+  let cot = COT_ENV.f === firma && Date.now() - COT_ENV.t < 36e5 ? COT_ENV.cot : '';
+  if(!cot){ try{ const r = await sbFetch('/rest/v1/rpc/fp_cot_crear', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ p:{ asunto:base, para:COT_PARA, cc:cc, cco:bcc,
+    items:L.map(function(r){ return { cod:r.idProducto || '', desc:r.producto || '', cant:+r.cantPedido || 0, um:r.unidad || '', ped:r.codPedido || '', req:r.req || '', pry:r.idProyecto || '', sol:r.solicitante || '', oc:r.tipo === 'oc' ? r.codOrden || '' : '' }; }) } }) }); if(r.ok) cot = String(await r.json() || ''); }catch(err){}
+    if(cot){ Object.assign(COT_ENV, { f:firma, cot:cot, t:Date.now() }); COTD.t = 0; } else appToast('No se pudo registrar la solicitud: el correo sale sin código COT.'); }
   const copiado = await copia, asunto = (cot ? cot + ' · ' : '') + base;
   let url = 'mailto:' + COT_PARA + '?cc=' + encodeURIComponent(cc) + '&bcc=' + encodeURIComponent(bcc) + '&subject=' + encodeURIComponent(asunto);
   if(!copiado){ const b = '&body=' + encodeURIComponent(T.join('\r\n')); if(url.length + b.length <= 1900) url += b; else appToast('No se pudo copiar la tabla: vuelve a tocar "Abrir correo" o usa el Excel para cotizar.'); }
   else appToast('📋 Tabla copiada: en el correo pega con Ctrl+V');
-  window.location.href = url; }
+  window.location.href = url; } finally{ COT_ENV.ocup = false; } }
 // ---- Cotizaciones guardadas (26.11.2026, Piero: "que en el app esté vinculado el pedido a esa solicitud de cotización… y que lo del pdf
 // se lea en automático y se guarde en una base de datos para que directamente en el app salga"): cada COT guarda sus pedidos y códigos; los
 // PDF que el flujo deja en OneDrive/Cotizaciones/COT-… los lee una tarea programada de Claude y deja los precios en fp_cot_precios (y en el
@@ -25999,12 +26050,13 @@ async function cotCargar(){ if(COTD.cargando || Date.now() - COTD.t < 180000) re
   if(cambio && APP.enInicio && APP.pantalla === 'pendcompras') appRenderInicio(); }
 function cotIdx(){ if(COTD.idx) return COTD.idx; const P = new Map(), C = new Map(), k0 = function(x){ return String(x || '').trim(); };
   const de = function(cod){ let c = C.get(cod); if(!c) C.set(cod, c = { sol:[], pre:[] }); return c; };
-  COTD.sol.forEach(function(s){ (s.items || []).forEach(function(it){ const cod = k0(it.cod); if(!cod) return; const c = de(cod); if(c.sol.indexOf(s) === -1) c.sol.push(s);
-    [it.ped ? 'p|' + k0(it.ped) : '', it.req ? 'r|' + k0(it.req) : ''].forEach(function(k){ if(!k) return; k += '|' + cod; const l = P.get(k) || P.set(k, []).get(k); if(l.indexOf(s.cot) === -1) l.push(s.cot); }); }); });
+  COTD.sol.forEach(function(s){ if(s.estado === 'anulada') return; (s.items || []).forEach(function(it){ const cod = k0(it.cod); if(!cod) return; const c = de(cod); if(c.sol.indexOf(s) === -1) c.sol.push(s);
+    [it.oc ? 'o|' + k0(it.oc) : '', it.ped ? 'p|' + k0(it.ped) : '', it.req ? 'r|' + k0(it.req) : ''].forEach(function(k){ if(!k) return; k += '|' + cod; const l = P.get(k) || P.set(k, []).get(k); if(l.indexOf(s.cot) === -1) l.push(s.cot); }); }); });
   COTD.pre.forEach(function(p){ const cod = k0(p.codigo); if(cod) de(cod).pre.push(p); });
   return (COTD.idx = { P:P, C:C }); }
 // COT en que se pidió cotizar este pedido (por pedido; las primeras solicitudes, sin pedido guardado, por requerimiento)
-function cotDePedido(r){ const I = cotIdx(), cod = String(r.idProducto || '').trim(); return I.P.get('p|' + String(r.codPedido || '').trim() + '|' + cod) || (r.req ? I.P.get('r|' + String(r.req).trim() + '|' + cod) : null) || []; }
+function cotDePedido(r){ const I = cotIdx(), cod = String(r.idProducto || '').trim(), g = function(k){ return I.P.get(k + '|' + cod) || []; };
+  const l = (r.codOrden ? g('o|' + String(r.codOrden).trim()) : []).concat(r.codPedido ? g('p|' + String(r.codPedido).trim()) : []); return l.length ? [...new Set(l)] : r.req ? g('r|' + String(r.req).trim()) : []; }
 function cotUsd(p){ if(p.precio_usd != null && p.precio_usd !== '') return +p.precio_usd; if(p.precio_unit == null || p.precio_unit === '') return null;
   const TC = +p.tc || (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75; return /PEN|S\/|SOL/i.test(p.moneda || '') ? +p.precio_unit / TC : +p.precio_unit; }
 const COT_ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 17v-3M12 17v-6M16 17v-4"/></svg>';
@@ -26021,19 +26073,21 @@ function cotAnalisisAbrir(cod){ const e = escapeHtml, c0 = function(x){ return S
   const O = [...ult.values()].filter(function(p){ return cotUsd(p) > 0; }).sort(function(a, b){ return cotUsd(a) - cotUsd(b); }), V = O.map(cotUsd), best = O[0];
   const med = V.length ? (V.length % 2 ? V[(V.length - 1) / 2] : (V[V.length / 2 - 1] + V[V.length / 2]) / 2) : null;
   const plazo = function(p){ return p.plazo_txt || (p.plazo_dias != null ? p.plazo_dias + ' días' : ''); }, prov = function(p){ return gdCorto(p.proveedor || '') || p.proveedor || '—'; };
+  // Solo las solicitudes con respuesta (26.11.2026, Piero: "puedes colocar ahí solo cuando existan respuestas").
+  const nResp = function(s){ return new Set(ci.pre.filter(function(p){ return p.cot === s.cot; }).map(function(p){ return String(p.ruc || p.proveedor || '').toUpperCase(); })).size; }, solR = ci.sol.filter(function(s){ return nResp(s) > 0; });
   const kpis = `<div class="cot-k"><div><small>Última compra</small><b>${uc && uc.pu != null ? e(appSkuPrecio(uc.pu, uc.mon)) : '—'}</b><span>${uc ? e(gdCorto(uc.prov) || uc.prov || '') + ' · ' + e(fmtDate(uc.f)) : 'no se compró antes'}</span></div>
     <div class="cot-best"><small>Mejor oferta</small><b>${best ? usd2(cotUsd(best)) : '—'}</b><span>${best ? e(prov(best)) + (plazo(best) ? ' · ' + e(plazo(best)) : '') : 'aún sin respuestas leídas'}</span>${best ? pct(cotUsd(best)) : ''}</div>
     <div><small>Precio de mercado</small><b>${usd2(med)}</b><span>mediana de ${appN(O.length)} proveedor${O.length === 1 ? '' : 'es'}</span>${pct(med)}</div>
-    <div><small>Solicitudes (COT)</small><b>${appN(ci.sol.length)}</b><span>${ci.sol.length ? e(ci.sol.map(function(s){ return s.cot; }).slice(0, 3).join(', ')) : 'aún no se cotizó'}</span></div></div>`;
+    <div><small>Solicitudes (COT)</small><b>${appN(ci.sol.length)}</b><span>${solR.length ? appN(solR.length) + ' con respuesta' : ci.sol.length ? 'enviada' + (ci.sol.length === 1 ? '' : 's') + ', aún sin respuestas' : 'aún no se cotizó'}</span></div></div>`;
   const filas = ci.pre.slice().sort(function(a, b){ return String(b.fecha || '').localeCompare(String(a.fecha || '')) || (cotUsd(a) || 0) - (cotUsd(b) || 0); }).map(function(p){ const v = cotUsd(p);
     return `<tr${p === best ? ' class="cot-mejor"' : ''}><td>${p.fecha ? e(fmtDate(new Date(p.fecha + 'T00:00:00Z'))) : '—'}</td><td><b>${e(prov(p))}</b>${p.ruc ? `<small>${e(p.ruc)}</small>` : ''}</td><td>${e(p.cot || '—')}</td>
       <td class="n">${p.precio_unit != null ? e(appSkuPrecio(+p.precio_unit, /PEN|S\/|SOL/i.test(p.moneda || '') ? 'S/' : /USD|US\$|\$/i.test(p.moneda || '') ? 'US$' : (p.moneda || ''))) : '—'}${p.um ? ` <small>/ ${e(String(p.um).toLowerCase())}</small>` : ''}</td><td class="n"><b>${usd2(v)}</b>${pct(v).replace(' vs última compra', '')}</td>
       <td>${e(plazo(p) || '—')}</td><td>${e(p.cond_entrega || '—')}</td><td>${e(p.cond_pago || '—')}</td><td>${e(p.validez || '—')}</td><td>${e(p.marca || '')}${p.obs ? `<small>${e(p.obs)}</small>` : ''}</td><td class="cot-arch" title="${e(p.archivo || '')}">${e(String(p.archivo || '').split(/[\\/]/).pop() || '—')}</td></tr>`; }).join('');
-  const sols = ci.sol.map(function(s){ const its = (s.items || []).filter(function(it){ return String(it.cod || '').trim() === cod; }), inv = String(s.cco || '').split(/[;,]/).filter(function(x){ return /@/.test(x); }).length;
-    const resp = new Set(ci.pre.filter(function(p){ return p.cot === s.cot; }).map(function(p){ return String(p.ruc || p.proveedor || '').toUpperCase(); })).size;
+  const sols = solR.map(function(s){ const its = (s.items || []).filter(function(it){ return String(it.cod || '').trim() === cod; }), inv = String(s.cco || '').split(/[;,]/).filter(function(x){ return /@/.test(x); }).length;
+    const resp = nResp(s);
     return `<div class="cot-sol"><span><b>${e(s.cot)}</b> · ${e(fmtDate(new Date(s.creado)))} · ${its.map(function(it){ return (it.ped ? 'Pedido ' + e(c0(it.ped)) : it.req ? 'Req. ' + e(c0(it.req)) : '') + (it.pry ? ' · ' + e(it.pry) : ''); }).join(' / ')}</span><span>${appN(resp)} de ${appN(inv)} proveedores respondieron</span></div>`; }).join('');
   appListaAbrir('Cotizaciones · ' + e(polarCorta(desc, 60)), e(cod) + ' · precios de las respuestas de los proveedores', `<div class="cot-an">${kpis}
-    ${ci.sol.length ? `<div class="cot-sec">Solicitudes de cotización</div><div class="cot-sols">${sols}</div>` : ''}
+    ${solR.length ? `<div class="cot-sec">Solicitudes con respuesta</div><div class="cot-sols">${sols}</div>` : ''}
     <div class="cot-sec">Precios recibidos</div>${filas ? `<div class="pm-dw"><table class="pm-dt cot-t"><thead><tr><th>Fecha</th><th>Proveedor</th><th>COT</th><th class="n">Precio</th><th class="n">US$</th><th>Plazo</th><th>Entrega</th><th>Pago</th><th>Validez</th><th>Marca / obs.</th><th>Archivo</th></tr></thead><tbody>${filas}</tbody></table></div>`
       : `<div class="cot-vacio">${ci.sol.length ? 'La cotización ya se envió. Cuando los proveedores respondan, sus PDF se guardan en OneDrive → Cotizaciones → ' + e(ci.sol[0].cot) + ' y Claude los lee cada 2 horas: los precios aparecen aquí.' : 'Este código aún no se cotizó. Márcalo en SKU sin OC y usa "Cotizar".'}</div>`}</div>`);
   const oc = document.getElementById('appOC'); if(oc) oc.classList.add('ancho'); }
@@ -26079,8 +26133,8 @@ function ncSkuPer(items){ const e = escapeHtml, n = new Map(); items.forEach(fun
   const b = function(k, av, tx, c){ return `<button type="button" data-skuper="${e(k)}" class="${(APP_PC.skuPer || '') === k ? 'on' : ''}" title="${e(tx)} · ${appN(c)} SKU" aria-label="${e(tx)}">${av}</button>`; };
   return `<div class="ncs-per">${b('', '<span class="skt-av sin">👥</span>', 'Todos', items.length)}${ks.map(function(k){ return b(k, ncAv(k === '-' ? '' : k), k === '-' ? 'Sin asignar' : String(PD_PERSONAS[k] || k), n.get(k)); }).join('')}</div>`; }
 function ncSkuVista(D, lista){ const e = escapeHtml;
-  return `<div class="ncs"><div class="cmp-top ncm-bar"><div class="ncm-izq">${ncModulo(D)}<label class="pmm-q ncs-q">${ncSvg(NC_ICO.lupa)}<input type="search" id="pcBusca" placeholder="Buscar SKU, producto, pedido, req., familia o cliente" value="${e(APP_PC.q || '')}" autocomplete="off"></label>
-      ${INV_XLS_BTN.replace('pc-img-btn inv-xls', 'imx-ib').replace('data-invxls="1"', 'data-pclxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el listado para cotizar (agrupado por familia)')}</div>${NCM.rep || ''}</div>
+  return `<div class="ncs"><div class="cmp-top ncm-bar"><div class="ncm-izq">${ncModulo(D)}<label class="pmm-q ncs-q">${ncSvg(NC_ICO.lupa)}<input type="search" id="pcBusca" placeholder="${APP_PC.mod === 'osa' ? 'Buscar OC, producto, proveedor, pedido o cliente' : 'Buscar SKU, producto, pedido, req., familia o cliente'}" value="${e(APP_PC.q || '')}" autocomplete="off"></label>
+      ${APP_PC.mod === 'osa' ? '' : INV_XLS_BTN.replace('pc-img-btn inv-xls', 'imx-ib').replace('data-invxls="1"', 'data-pclxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el listado para cotizar (agrupado por familia)')}</div>${NCM.rep || ''}</div>
     <div id="pcLista">${lista}</div>${ncCotBarra()}</div>`; }
 document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-ncfoco],[data-ncd],[data-ncest],[data-nczc],[data-nczoom],[data-ncpl],[data-pcmod],[data-ncx],[data-skuper],[data-ncper]');
   if(!ev.target.closest || !ev.target.closest('.ncm .imx-plw')) document.querySelectorAll('.ncm .imx-plw.on').forEach(function(x){ if(!b || !b.dataset.ncpl) x.classList.remove('on'); });
@@ -26305,7 +26359,7 @@ function skuUltCompras(){ return appMemo('skuUltCompras', function(){ const C = 
   ((typeof GASTO_DATA !== 'undefined' && GASTO_DATA && GASTO_DATA.rows) || []).forEach(function(r){ if(!r.codigo || !r.oc) return;
     const o = oc(String(r.codigo).trim(), r.oc, function(){ return { oc:r.oc, f:new Date(Date.UTC(r.anio, (r.mes || 1) - 1, r.dia || 1)), prov:r.proveedor || '', q:0, total:0, mon:monedaLabel(r.moneda), con:false, c:true }; });
     if(r.cantidad != null) o.q += r.cantidad; if(r.montoNativo != null){ o.total += r.montoNativo; o.con = true; } });
-  try{ polarLineasOC().forEach(function(r){ if(!r.idProducto || !r.codOrden || !r.fOrden || /anul/i.test(r.estadoOrden || '')) return; const m = C.get(String(r.idProducto).trim()), y = m && m.get(r.codOrden); if(y && y.c) return;
+  try{ polarLineasOC().forEach(function(r){ if(!r.idProducto || !r.codOrden || !r.fOrden || /anul|sin aprobar/i.test(r.estadoOrden || '')) return; const m = C.get(String(r.idProducto).trim()), y = m && m.get(r.codOrden); if(y && y.c) return;
     const q = r.cantidadOrden != null ? r.cantidadOrden : r.cantOrden, o = oc(String(r.idProducto).trim(), r.codOrden, function(){ return { oc:r.codOrden, f:r.fOrden, prov:r.proveedor || '', q:0, total:0, mon:monedaLabel(r.moneda), con:false }; });
     if(q != null) o.q += q; if(r.montoNativo != null && !isNaN(r.montoNativo)){ o.total += r.montoNativo; o.con = true; } }); }catch(err){}
   const R = new Map(); C.forEach(function(m, cod){ let conP = null, sinP = null;
