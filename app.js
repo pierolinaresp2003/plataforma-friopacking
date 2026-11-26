@@ -1363,6 +1363,138 @@ async function appMantenerAnteriores(snapshot){
   if(sinProc && prev.proceso && prev.proceso.rows && prev.proceso.rows.length){ ['proceso', 'procesoSchemaVersion', 'filename', 'corte', 'excluded', 'totalRows', 'proyectos'].forEach(function(k){ snapshot[k] = prev[k]; }); out.push(NOM.proceso); }
   return out;
 }
+// Directorio de Logística (v563, 26.11.2026, Piero + Karen): el archivo gerencial/resumen.json sigue el CONTRATO-DATOS.md del Directorio
+// (listas por fila en USD: compras, embarques, despachos, desempeño por sector, materiales y stock sin movimiento) y además trae
+// "resumen" con las cifras oficiales del Gerencial. Se arma del mismo snapshot que se publica. Lo que la plataforma no tiene
+// (fletes, presupuestos, notas de crédito, documentos) va vacío o en 0 y se explica en "notas".
+function dirDataset(S, ver){
+  const TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.375;
+  const dia = function(s){ return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null; };
+  const r2 = function(x){ return Math.round((+x || 0) * 100) / 100; };
+  const dif = function(a, b){ return Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 864e5); };
+  const dh = function(a, b){ return busdayCount(new Date(a + 'T12:00:00Z'), new Date(b + 'T12:00:00Z')); };
+  const corte = dia(S.corte) || new Date().toISOString().slice(0, 10), Y = +corte.slice(0, 4), M = +corte.slice(5, 7);
+  const ini = (Y - 2) + '-01-01', enRango = function(f){ return f && f >= ini && f <= corte; };
+  const finMes = new Date(Date.UTC(Y, M, 0)).toISOString().slice(0, 10), cerrado = corte === finMes ? M : M - 1;
+  const P = S.proceso || {}, PR = P.rows || [], RQ = P.req || [], PD = P.pedidoDirecto || [];
+  const G = (S.gasto && S.gasto.rows) || [], AL = (S.almacen && S.almacen.rows) || [], EM = (S.embarques && S.embarques.rows) || [], PY = S.proyectos || {};
+  const SIN = 'STOCK';
+  // Sector: por la sede (Trujillo norte, Lima centro, Ica sur) o por el departamento del proyecto.
+  const DEP = { NORTE:['TUMBES', 'PIURA', 'LAMBAYEQUE', 'LA LIBERTAD', 'CAJAMARCA', 'AMAZONAS', 'SAN MARTIN', 'LORETO', 'ANCASH'],
+    SUR:['ICA', 'AREQUIPA', 'MOQUEGUA', 'TACNA', 'CUSCO', 'CUZCO', 'PUNO', 'AYACUCHO', 'APURIMAC', 'MADRE DE DIOS'] };
+  const sinTilde = function(t){ return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim(); };
+  const secDep = function(d){ d = sinTilde(d); if(!d) return null; return DEP.NORTE.some(function(x){ return d.indexOf(x) !== -1; }) ? 'Norte' : DEP.SUR.some(function(x){ return d.indexOf(x) !== -1; }) ? 'Sur' : 'Centro'; };
+  const secSede = function(s){ s = sinTilde(s); if(!s) return null; return /^T|TRUJ/.test(s) ? 'Norte' : /^I$|\bICA\b/.test(s) ? 'Sur' : 'Centro'; };
+  const secPry = function(id){ return (id && PY[id] && secDep(PY[id].dep)) || null; };
+  // Proveedores: el RUC es la clave; si no hay RUC, el nombre.
+  const nomRuc = new Map(); G.forEach(function(r){ if(r.rc && r.pv) nomRuc.set(gdNorm(r.pv), r.rc); }); PR.forEach(function(r){ if(r.rc && r.pv && !nomRuc.has(gdNorm(r.pv))) nomRuc.set(gdNorm(r.pv), r.rc); });
+  const PV = new Map();
+  const prov = function(nombre, ruc, og){ nombre = String(nombre || '').trim(); if(!nombre && !ruc) return null;
+    ruc = String(ruc || nomRuc.get(gdNorm(nombre)) || '').trim(); const id = ruc || 'N-' + gdNorm(nombre).replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const p = PV.get(id) || { id:id, nombres:new Map(), og:{ local:0, exterior:0 }, cred:new Map(), cats:new Map(), mes:new Map() };
+    if(nombre) p.nombres.set(nombre, (p.nombres.get(nombre) || 0) + 1); if(og) p.og[og]++; PV.set(id, p); return p; };
+  // OC → proyecto, proveedor y días del requerimiento a la OC (de Reporte Maestro y PedidoSinReq).
+  const OC = new Map();
+  PR.concat(PD).forEach(function(r){ if(!r.co) return; const o = OC.get(r.co) || { py:new Map(), pv:r.pv || '', rc:r.rc || '', cyc:[], cd:new Map(), rec:null, sinRec:false };
+    if(r.ipy) o.py.set(r.ipy, (o.py.get(r.ipy) || 0) + 1); if(!o.pv && r.pv) o.pv = r.pv; if(!o.rc && r.rc) o.rc = r.rc;
+    const fr = dia(r.fr) || dia(r.fp), fo = dia(r.fo); if(fr && fo && fo >= fr) o.cyc.push(dif(fr, fo));
+    const cd = /(\d+)\s*D[IÍ]AS/i.exec(r.cd || ''); if(cd) o.cd.set(+cd[1], (o.cd.get(+cd[1]) || 0) + 1); else if(/CONTADO|CONTRA ENTREGA/i.test(r.cd || '')) o.cd.set(0, (o.cd.get(0) || 0) + 1);
+    const fc = dia(r.fc); if(fc){ if(!o.rec || fc > o.rec) o.rec = fc; } else if(!/anul|cerrad|atendid/i.test(r.eo || '')) o.sinRec = true;
+    OC.set(r.co, o); });
+  const top = function(m){ let k = null, n = -1; m.forEach(function(v, x){ if(v > n){ n = v; k = x; } }); return k; };
+  const ocPry = function(oc){ const o = oc && OC.get(oc); return (o && top(o.py)) || null; };
+  // ---- compras (Consulta.xlsx: OC aprobadas y atendidas, en USD al tipo de cambio de la plataforma) ----
+  const CB = { 'Contado':0, 'Crédito 0-30 días':30, 'Crédito 30-60 días':60, 'Crédito 60+ días':90 };
+  const CO = new Map(), ocV = new Map(), pyAmt = new Map();
+  G.forEach(function(r){ const f = r.a + '-' + String(r.m).padStart(2, '0') + '-' + String(r.d || 1).padStart(2, '0'); if(!enRango(f)) return;
+    const og = r.og === 'importado' ? 'exterior' : 'local', p = prov(r.pv, r.rc, og); if(!p) return;
+    const amt = (r.mo || 0) / TC, cat = r.fa || 'Sin familia', py = ocPry(r.oc) || SIN;
+    p.cats.set(cat, (p.cats.get(cat) || 0) + amt); p.mes.set(f.slice(0, 7), (p.mes.get(f.slice(0, 7)) || 0) + amt);
+    if(CB[r.cb] != null) p.cred.set(CB[r.cb], (p.cred.get(CB[r.cb]) || 0) + 1);
+    if(r.oc) ocV.set(r.oc, (ocV.get(r.oc) || 0) + amt);
+    if(r.a === Y) pyAmt.set(py, (pyAmt.get(py) || 0) + amt);
+    const k = [r.a, r.m, p.id, cat, py, og].join('|'), c = CO.get(k) || { y:r.a, m:r.m, sup:p.id, cat:cat, proj:py, origin:og, amt:0, ocs:new Set() };
+    c.amt += amt; c.ocs.add(r.oc || ('L' + f + p.id)); CO.set(k, c); });
+  const compras = [...CO.values()].map(function(c){ const d = [];
+    c.ocs.forEach(function(oc){ const o = OC.get(oc); if(o && o.cyc.length) d.push(o.cyc.reduce(function(a, b){ return a + b; }, 0) / o.cyc.length); });
+    return { y:c.y, m:c.m, sup:c.sup, cat:c.cat, proj:c.proj, origin:c.origin, amt:r2(c.amt), orders:c.ocs.size, cyc:d.length ? Math.round(d.reduce(function(a, b){ return a + b; }, 0) / d.length * 10) / 10 : null }; });
+  // ---- costos: solo lo que se compra como servicio de transporte o peaje (la plataforma no tiene presupuesto por rubro) ----
+  const CS = new Map();
+  G.forEach(function(r){ const f = r.a + '-' + String(r.m).padStart(2, '0') + '-01'; if(!enRango(f)) return;
+    const t = sinTilde([r.fa, r.sf, r.pr].join(' ')), rub = /PEAJE/.test(t) ? 'Peajes' : /FLETE|TRANSPORTE DE CARGA|SERVICIO DE TRANSPORTE|TRASLADO DE/.test(t) ? 'Transporte y fletes' : null; if(!rub) return;
+    const py = ocPry(r.oc) || SIN, k = [r.a, r.m, py, rub].join('|'), c = CS.get(k) || { y:r.a, m:r.m, proj:py, rubro:rub, amt:0, bud:null }; c.amt += (r.mo || 0) / TC; CS.set(k, c); });
+  const costos = [...CS.values()].map(function(c){ c.amt = r2(c.amt); return c; });
+  // ---- embarques (Seguimiento de contenedores de Comex) ----
+  const ESTADO = function(es){ es = sinTilde(es); return /ENTREG|RECIB|ALMACEN|CERRAD|FINALIZ|LIQUID/.test(es) ? 'Recibido' : /ADUANA|ARRIB|DESADUAN|NACIONALIZ|PUERTO|DESCARG|LEVANTE/.test(es) ? 'En aduana' : /TRANSITO|NAVEG|ZARP|EMBARCADO/.test(es) ? 'En tránsito' : 'Programado'; };
+  const vistos = new Set(), embarques = [], ocG = new Map(); G.forEach(function(r){ if(r.oc && !ocG.has(r.oc)) ocG.set(r.oc, { pv:r.pv, rc:r.rc }); });
+  EM.forEach(function(e){ const ocs = e.oc || [], k = (e.rf || '') + '|' + ocs.join(','); if(vistos.has(k)) return; vistos.add(k);
+    const planned = dia(e.ea) || dia(e.et); if(!planned) return;
+    const os = ocs.map(function(c){ return OC.get(c); }).filter(Boolean);
+    const todos = ocs.length && os.length === ocs.length && os.every(function(o){ return o.rec && !o.sinRec; });
+    const actual = todos ? os.map(function(o){ return o.rec; }).sort().pop() : null;
+    const o0 = os[0] || ocs.map(function(c){ return ocG.get(c); }).filter(Boolean)[0], p = o0 ? prov(o0.pv, o0.rc, 'exterior') : prov('Proveedor sin dato', 'SIN-DATO', 'exterior');
+    embarques.push({ id:e.rf || ocs.join(' ') || ('EMB-' + embarques.length), sup:p ? p.id : null, etd:dia(e.et), planned:planned, actual:actual,
+      status:actual ? 'Recibido' : ESTADO(e.es), merch:r2(ocs.reduce(function(a, c){ return a + (ocV.get(c) || 0); }, 0)), freight:0, freightBud:0,
+      other:r2(e.sc || 0), orders:ocs.length, proj:ocs.map(ocPry).filter(Boolean)[0] || SIN }); });
+  // ---- requerimientos: despachos, desempeño por sector y materiales ----
+  const pySede = new Map();
+  RQ.forEach(function(r){ if(r.ipy && r.so){ const m = pySede.get(r.ipy) || new Map(); m.set(r.so, (m.get(r.so) || 0) + 1); pySede.set(r.ipy, m); } });
+  const secDe = function(py, so){ return secSede(so) || secPry(py) || (pySede.get(py) && secSede(top(pySede.get(py)))) || 'Centro'; };
+  const DS = new Map(), DE = new Map(), materiales = [], idsMat = new Map(), hoy = corte, lim = (function(){ const d = new Date(corte + 'T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 6); return d.toISOString().slice(0, 10); })();
+  const de = function(f, sec){ const k = f.slice(0, 7) + '|' + sec, x = DE.get(k) || { y:+f.slice(0, 4), m:+f.slice(5, 7), sector:sec, deliv:0, delivOk:0, req:0, reqOk:0, docs:0, docsOk:0, inv:0, invOk:0 }; DE.set(k, x); return x; };
+  RQ.forEach(function(r){ if(/archiv|anul/i.test(r.e || '')) return;
+    const f = dia(r.f), fs = dia(r.fs) || dia(r.fob), py = r.ipy || SIN;
+    if(fs && enRango(fs)){ const k = fs.slice(0, 7) + '|' + py, d = DS.get(k) || { y:+fs.slice(0, 4), m:+fs.slice(5, 7), proj:py, g:new Set() }; d.g.add(r.gs || r.gob || (r.n + fs)); DS.set(k, d); }
+    if(!f || !enRango(f)) return;
+    // Entregas a obra: mismo criterio que el OTIF de la plataforma (salida en ≤ 15 días hábiles y completa); lo que aún está en plazo no cuenta.
+    const dias = fs ? dh(f, fs) : null; if(fs || dh(f, hoy) > OTIF_META){ const qs = r.qs != null ? r.qs : r.qob, x = de(f, secDe(r.ipy, r.so)); x.deliv++;
+      if(dias != null && dias <= OTIF_META && qs != null && r.q != null && qs >= r.q - 1e-9) x.delivOk++; }
+    if(f >= lim && (r.co || !fs)){ let id = (r.n || 'REQ') + '-' + (r.ip || materiales.length); const n = idsMat.get(id) || 0; idsMat.set(id, n + 1); if(n) id += '-' + (n + 1);
+      const req = addBusinessDays(new Date(f + 'T12:00:00Z'), OTIF_META), rq = req ? isoDay(req) : f, p = r.pv ? prov(r.pv, '', null) : null, late = (fs || hoy) > rq;
+      materiales.push({ id:id, proj:py, material:r.pr || r.ip || '', required:rq, committed:dia(r.fx), reqId:r.n || null, reqDate:f, poId:r.co || null, poDate:dia(r.fo), sup:p ? p.id : null,
+        receipt:dia(r.fc), dispatch:fs, impact:fs ? (late ? 'Entregado tarde' : 'Entregado a tiempo') : (late ? 'Atrasado' : 'En plazo') }); } });
+  // Pedido a tiempo: requerimiento → pedido en la meta del indicador 1 (días hábiles ya calculados en Reporte Maestro).
+  const metaD1 = 1; PR.forEach(function(r){ const f = dia(r.fr); if(!f || !enRango(f) || r.d1 == null) return; const x = de(f, secDe(r.ipy, null)); x.req++; if(r.d1 <= metaD1) x.reqOk++; });
+  const despachos = [...DS.values()].map(function(d){ return { y:d.y, m:d.m, proj:d.proj, n:d.g.size }; });
+  const desempenoSector = [...DE.values()].sort(function(a, b){ return a.y - b.y || a.m - b.m || (a.sector < b.sector ? -1 : 1); });
+  // ---- stock sin movimiento (Reporte Almacén: kardex por sucursal desde Ene 2025) ----
+  const SEDES = [['l', 'lima', 'Centro'], ['t', 'trujillo', 'Norte'], ['i', 'ica', 'Sur']], hace30 = (function(){ const d = new Date(corte + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 30); return d.toISOString().slice(0, 10); })();
+  const stockSinMovimiento = [];
+  AL.forEach(function(r){ if(!(r.cu > 0)) return; const mv = r.kmv || [];
+    SEDES.forEach(function(s){ const q = r[s[0]] || 0; if(!(q > 0)) return; let ult = null, pri = null, des30 = 0;
+      mv.forEach(function(m){ if(m[2] !== s[0]) return; const f = String(m[0]).slice(0, 10); if(!pri || f < pri) pri = f; if(m[1] < 0 && (!ult || f > ult)) ult = f; if(f > hace30) des30 += m[1] || 0; });
+      const dd = dif(ult || pri || '2025-01-01', corte); if(dd < 90) return;
+      stockSinMovimiento.push({ item:(r.d || r.c) + ' (' + r.c + ')', sector:s[2], value:r2(q * r.cu), prevValue:r2(Math.max(0, q - des30) * r.cu), days:dd }); }); });
+  stockSinMovimiento.sort(function(a, b){ return b.value - a.value; });
+  // ---- proveedores y proyectos usados en las listas ----
+  const PN = S.provPais && S.provPais.n;
+  const cdRuc = new Map(); OC.forEach(function(o){ if(o.rc && o.cd.size){ const m = cdRuc.get(o.rc) || new Map(); o.cd.forEach(function(v, k){ m.set(k, (m.get(k) || 0) + v); }); cdRuc.set(o.rc, m); } });
+  const proveedores = [...PV.values()].map(function(p){ const name = top(p.nombres) || p.id, ex = p.og.exterior > p.og.local;
+    const cod = PN && (PN[gdNorm(gdCorto(name))] || PN[gdNorm(name)]), iso = cod && PM_ISO[cod];
+    const ult = [...p.mes.keys()].sort().slice(-12), base = ult.length ? ult.reduce(function(a, k){ return a + p.mes.get(k); }, 0) / ult.length : 0;
+    const cred = cdRuc.get(p.id) ? top(cdRuc.get(p.id)) : top(p.cred);
+    return { id:p.id, name:name, origin:ex ? 'exterior' : 'local', country:iso ? impPaisNom(iso) : ex ? 'Sin país' : 'Perú', creditDays:cred,
+      cats:[...p.cats.entries()].sort(function(a, b){ return b[1] - a[1]; }).map(function(x){ return x[0]; }), base:r2(base) }; });
+  const usados = new Set([SIN]); [compras, costos, embarques, despachos, materiales].forEach(function(l){ l.forEach(function(x){ if(x.proj) usados.add(x.proj); }); });
+  const proyectos = [...usados].map(function(id){ const p = PY[id] || {};
+    return { id:id, name:id === SIN ? 'Stock y compras sin proyecto' : (p.n || id), sector:id === SIN ? 'Centro' : secDe(id, null), weight:r2(pyAmt.get(id) || 0) }; });
+  const ant = desempenoSector.filter(function(x){ return x.y === Y - 1; }), tot = ant.reduce(function(a, x){ return a + x.deliv; }, 0), ok = ant.reduce(function(a, x){ return a + x.delivOk; }, 0);
+  const anios = [Y - 2, Y - 1, Y].filter(function(y){ return compras.some(function(c){ return c.y === y; }) || y === Y; });
+  return { version:Date.parse(ver) || Date.now(), generadoEn:new Date().toISOString(),
+    meta:{ currentYear:Y, years:anios, maxCut:M, defaultCut:Math.max(1, cerrado), asOf:corte },
+    categorias:[...new Set(compras.map(function(c){ return c.cat; }))].sort(),
+    proyectos:proyectos, proveedores:proveedores, compras:compras, notasCredito:[], embarques:embarques, costos:costos, despachos:despachos,
+    desempenoSector:desempenoSector, materiales:materiales, stockSinMovimiento:stockSinMovimiento,
+    objetivos:{ deliveries:{ baseline:tot ? Math.round(ok / tot * 1000) / 10 : null, target:90 } },
+    notas:[ 'Importes en USD al tipo de cambio de la plataforma (' + TC + ' soles por dólar).',
+      'Proyecto "' + SIN + '": compras y salidas que no están ligadas a un proyecto.',
+      'Sector: por la sede de salida (Trujillo = Norte, Lima = Centro, Ica = Sur) o por el departamento del proyecto.',
+      'embarques: la plataforma no tiene el flete ni su presupuesto (van en 0); "merch" es el valor de las OC y "other" el sobrecosto del seguimiento de Comex.',
+      'costos: solo servicios de transporte y peajes comprados con OC; no hay presupuesto por rubro (bud = null).',
+      'notasCredito: la plataforma no las registra (lista vacía). desempenoSector: docs e inv en 0 (sin dato).',
+      'materiales: requerimientos de los últimos 6 meses con OC o todavía sin salida; "required" = fecha del requerimiento + 15 días hábiles (meta OTIF).',
+      'stockSinMovimiento: productos con stock y sin salidas en 90 días o más, por sucursal (el KPI del Gerencial usa 180 días).' ] };
+}
 // Resumen gerencial publico (26.11.2026, Piero): en cada publicacion se deja un JSON compacto con los KPIs del
 // modulo Gerencial en la tabla fp_gerencial_pub (lectura anonima) para que el Directorio externo lo lea sin login.
 // Reusa el mismo calculo del Gerencial (gdPer/gdObjetivos/GD_PAN_G/gdVal/gdMeta); si algo falla, devuelve null y la publicacion sigue igual.
@@ -1413,10 +1545,10 @@ async function publishSnapshot(){
     try{ const resumenGer = gerencialResumen();
       if(resumenGer){ await sbFetch('/rest/v1/fp_gerencial_pub?on_conflict=id', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
         body:JSON.stringify({ id:1, resumen:resumenGer, actualizado:new Date().toISOString() }) }); } }catch(e){ console.warn('resumen gerencial no publicado', e); }
-    // v562: copia privada del resumen gerencial para el Directorio (bucket datos: solo usuarios con sesión).
-    try{ const resumenPriv = gerencialResumen();
-      if(resumenPriv){ await sbFetch('/storage/v1/object/datos/' + GERENCIAL_JSON_PATH, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-upsert':'true', 'cache-control':'no-cache' },
-        body:JSON.stringify(resumenPriv) }); } }catch(e){ console.warn('gerencial.json no publicado', e); }
+    // v562/v563: archivo privado para el Directorio de Logística (bucket datos: solo usuarios con sesión), con el formato de su CONTRATO-DATOS.md.
+    try{ const dir = dirDataset(snapshot, ver); try{ dir.resumen = gerencialResumen(); }catch(e){ dir.resumen = null; }
+      await sbFetch('/storage/v1/object/datos/' + GERENCIAL_JSON_PATH, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-upsert':'true', 'cache-control':'no-cache' },
+        body:JSON.stringify(dir) }); }catch(e){ console.warn('gerencial.json no publicado', e); }
     let nU = 0; try{ nU = await sbSincronizarUsuarios(snapshot.accesos || APP_ACCESOS_BASE); }catch(e){ console.warn('usuarios', e); }
     showPublishBanner("✅ Publicado el " + new Date().toLocaleString('es-PE', { maximumFractionDigits:2 }) + " — solo lo ven los usuarios con su clave."
       + (mantenidos.length ? " Se mantuvo lo anterior de: " + escapeHtml(mantenidos.join(', ')) + "." : "")
