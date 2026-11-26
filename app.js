@@ -859,6 +859,7 @@ function origenFor(ruc){
 }
 
 // ---------- Guardar y compartir (desde el 20.10.2026 en Supabase, privado; antes en el repo público de GitHub) ----------
+const GERENCIAL_JSON_PATH = "gerencial/resumen.json";  // v562: lo lee el Directorio de Logística con sesión
 const SNAPSHOT_GZ_PATH = "data2.json.gz";  // formato compacto por columnas (06.11.2026, ver snapCompactar)
 const SNAPSHOT_GZ_VIEJO = "data.json.gz";   // el de antes: se lee solo si todavía no se publicó el compacto
 const TOKEN_KEY = "fp_platform_gh_token";
@@ -1412,6 +1413,10 @@ async function publishSnapshot(){
     try{ const resumenGer = gerencialResumen();
       if(resumenGer){ await sbFetch('/rest/v1/fp_gerencial_pub?on_conflict=id', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
         body:JSON.stringify({ id:1, resumen:resumenGer, actualizado:new Date().toISOString() }) }); } }catch(e){ console.warn('resumen gerencial no publicado', e); }
+    // v562: copia privada del resumen gerencial para el Directorio (bucket datos: solo usuarios con sesión).
+    try{ const resumenPriv = gerencialResumen();
+      if(resumenPriv){ await sbFetch('/storage/v1/object/datos/' + GERENCIAL_JSON_PATH, { method:'POST', headers:{ 'Content-Type':'application/json', 'x-upsert':'true', 'cache-control':'no-cache' },
+        body:JSON.stringify(resumenPriv) }); } }catch(e){ console.warn('gerencial.json no publicado', e); }
     let nU = 0; try{ nU = await sbSincronizarUsuarios(snapshot.accesos || APP_ACCESOS_BASE); }catch(e){ console.warn('usuarios', e); }
     showPublishBanner("✅ Publicado el " + new Date().toLocaleString('es-PE', { maximumFractionDigits:2 }) + " — solo lo ven los usuarios con su clave."
       + (mantenidos.length ? " Se mantuvo lo anterior de: " + escapeHtml(mantenidos.join(', ')) + "." : "")
