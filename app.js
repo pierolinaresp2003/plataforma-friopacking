@@ -12992,7 +12992,7 @@ const APP_VISTAS = {
     // Sin Daily: el Daily y los reportes en imagen pasan a Gerencial (09.11.2026, Piero).
     // Sin Gasto y presupuesto; Certificados en su lugar y Equipos por origen al final (17.11.2026, Piero).
     // Importaciones pasa al módulo Comex (18.11.2026, Piero).
-    tabs:[['pendcompras','🧭','Seguimiento'], ['certificados','📄','Certificados'], ['polar'], ['cmpeq','📊','Compras por familia']] },
+    tabs:[['pendcompras','🧭','Compras'], ['cotizaciones','🧾','Cotizaciones'], ['certificados','📄','Certificados'], ['polar'], ['cmpeq','📊','Compras por familia']] },   // Cotizaciones aparte: SKU sin OC y OC sin aprobar (v572, 26.11.2026, Piero)
   // Comex (18.11.2026, Piero: "en comex debe pasar el módulo de importaciones de compras").
   comex:      { nombre:'Comex',      ico:'🚢', desc:'Importaciones: embarques en el mapa del mundo.',
     tabs:[['pendlog','🚢','Importaciones'], ['impnav','⚓','Naves'], ['polar']] },   // + Naves como en el Status de importaciones (18.11.2026)
@@ -13029,7 +13029,7 @@ function appVeGerencial(t){ return t === 'gerencia' || t === 'compras' || t === 
 function appEsLogistica(v){ return v === 'logistica' || v === 'compras' || v === 'comex' || v === 'almacen'; }
 // Pantallas propias del celular (se dibujan en #section-inicio) y su título.
 const APP_PANTALLAS = { otif:'OTIF', indicadores:'Indicadores de compradores', gasto:'Concentración de gasto', presu:'Presupuesto', gastopresu:'Gasto y presupuesto', almrep:'Almacén', almseg:'Requerimientos', almrsv:'Reservas', almreg:'Regularizaciones', almval:'Validación', almdesp:'Despachos', almrut:'Rutas', inventario:'Inventario',
-  pendcompras:'Pendientes de Compras', pendlog:'Importaciones', impnav:'Ubicación de naves', cmpeq:'Compras por familia', daily:'Daily Call In', reportes:'Reportería', gobj:'Objetivos', gabas:'Abastecimiento', ggas:'Gasto', galm:'Almacén', gser:'Nivel de servicio', gdport:'Portada', gdagen:'Agenda', gdobj:'Objetivos', gdpan:'Panorama ejecutivo', gdabas:'Abastecimiento', gdcom:'Compras', gdalm:'Almacén', gdcex:'Comercio exterior', gdmej:'Mejoras', gdacu:'Acuerdos y decisiones', supreq:'Requerimientos', suppry:'Proyectos', tienda:'Consulta de producto', equipo:'Equipo Logística' };
+  pendcompras:'Compras', cotizaciones:'Cotizaciones', pendlog:'Importaciones', impnav:'Ubicación de naves', cmpeq:'Compras por familia', daily:'Daily Call In', reportes:'Reportería', gobj:'Objetivos', gabas:'Abastecimiento', ggas:'Gasto', galm:'Almacén', gser:'Nivel de servicio', gdport:'Portada', gdagen:'Agenda', gdobj:'Objetivos', gdpan:'Panorama ejecutivo', gdabas:'Abastecimiento', gdcom:'Compras', gdalm:'Almacén', gdcex:'Comercio exterior', gdmej:'Mejoras', gdacu:'Acuerdos y decisiones', supreq:'Requerimientos', suppry:'Proyectos', tienda:'Consulta de producto', equipo:'Equipo Logística' };
 const APP = { vista:null, enInicio:false, pantalla:'inicio' };
 // Reporte gerencial en su propio link (11.11.2026, Piero: "todo esto de gerencial colócalo en otro link aparte, no dentro del
 // aplicativo, pero con un link para ir allá que tenga contraseña, como algo oculto"): ./?gerencial (o gerencial.html). Ahí solo
@@ -13212,10 +13212,10 @@ function appSelAbrir(sel){
 function appVolverAlInicioModulo(t){
   try{ appOCCerrar(); }catch(err){}
   const m = document.getElementById('kxModal'); if(m) m.classList.remove('abierto');
-  const R = { inventario:[APP_INV, { q:'', sel:'', tope:30, fam:'', kdx:'' }], tienda:[APP_TIENDA, { q:'', fam:'' }], pendcompras:[APP_PC, { q:'', fam:'', tope:20, entTope:60 }],
+  const R = { inventario:[APP_INV, { q:'', sel:'', tope:30, fam:'', kdx:'' }], tienda:[APP_TIENDA, { q:'', fam:'' }], pendcompras:[APP_PC, { q:'', fam:'', tope:20, entTope:60 }], cotizaciones:[APP_PC, { q:'', fam:'', tope:20, entTope:60 }],
     pendlog:[APP_PL, { q:'', tope:15, pais:'', foco:'' }], presu:[APP_PR, { q:'' }], gastopresu:[APP_PR, { q:'' }], supreq:[APP_SUP, { q:'' }], suppry:[APP_PM, { q:'', zona:'', rf:'' }], almseg:[APP_AS, { det:false }], equipo:[APP_GE, { cod:'' }] }[t];
   if(R) Object.assign(R[0], R[1]);
-  if(t === 'pendcompras'){ APP_NC.d = ''; APP_NC.est = ''; APP_NC.per = ''; APP_PC.skuPer = ''; }
+  if(t === 'pendcompras' || t === 'cotizaciones'){ APP_NC.d = ''; APP_NC.est = ''; APP_NC.per = ''; APP_PC.skuPer = ''; }
   if(t === 'inventario'){ kardexOrigen = null; kdxRango = null; }
   if(APP_PANTALLAS[t]) appRenderInicio();
   window.scrollTo({ top:0, behavior:'smooth' });
@@ -13942,7 +13942,7 @@ const APP_TAB_SVG = (function(){ const s = function(d){ return '<svg viewBox="0 
   return { inicio:s('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>'), supreq:s('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6M9 18h4"/>'),
     suppry:s('<path d="M3 21h18M5 21V9l7-5 7 5v12"/><path d="M9 21v-6h6v6"/>'), tienda:s('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
     inventario:s('<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'), almseg:s('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 10h6M9 14h6M9 18h4"/>'), almval:s('<path d="M20 6 9 17l-5-5"/>'), almdesp:s('<path d="M2 6h11v10H2zM13 9h4.5l3.5 3.5V16h-8"/><circle cx="6" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>'), almrut:s('<path d="M2 6h11v10H2zM13 9h4.5l3.5 3.5V16h-8"/><circle cx="6" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/>'), almreg:s('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="m10 14.5 2 2 4-4"/>'), almrsv:s('<path d="M6 3h12v18l-6-4.5L6 21z"/><path d="m9.5 9.5 2 2 3.5-3.5"/>'),
-    pendcompras:s('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'), cmpeq:s('<path d="M4 20h16"/><rect x="5.5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="5" width="3" height="12" rx="1"/><rect x="15.5" y="8" width="3" height="9" rx="1"/>'), pendlog:s('<path d="M3 17h18l-2 3H5z"/><path d="M5 17V9h14v8M9 9V5h6v4"/>'), impnav:s('<circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V21M5 12H3a9 9 0 0 0 18 0h-2M8 10h8"/>'),
+    pendcompras:s('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>'), cotizaciones:s('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>'), cmpeq:s('<path d="M4 20h16"/><rect x="5.5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="5" width="3" height="12" rx="1"/><rect x="15.5" y="8" width="3" height="9" rx="1"/>'), pendlog:s('<path d="M3 17h18l-2 3H5z"/><path d="M5 17V9h14v8M9 9V5h6v4"/>'), impnav:s('<circle cx="12" cy="5" r="2.2"/><path d="M12 7.2V21M5 12H3a9 9 0 0 0 18 0h-2M8 10h8"/>'),
     gastopresu:s('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), gasto:s('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), presu:s('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>'),
     certificados:s('<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h4"/>'), otif:s('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>'),
     indicadores:s('<path d="M4 19h16"/><path d="M7 15l4-4 3 3 5-6"/>'), daily:s('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>') }; })();
@@ -15307,12 +15307,12 @@ function almPedRegHtml(cod, st){
       g.d + ' d.h.', t ? 'a tiempo' : 'fuera de meta'); }).join('');
   return `<div class="ini-card ix">${kpis(y)}${tend}</div><div class="ini-card m-lista">${filas}</div>${L.length > tope ? `<div class="m-sec-nota">Se muestran los ${tope} más recientes de ${appN(L.length)}.</div>` : ''}`;
 }
-const APP_PANT_FN = { reportes:function(){ return appReportesHtml(); }, gobj:function(){ return appGxHtml('gobj'); }, gabas:function(){ return appGxHtml('gabas'); }, ggas:function(){ return appGxHtml('ggas'); }, galm:function(){ return appGxHtml('galm'); }, gser:function(){ return appGxHtml('gser'); }, almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appComprasHtml(); }, almseg:function(){ return appSupReqHtml(); }, almrsv:function(){ return appReservasHtml(); }, almreg:function(){ return appRegHtml(); }, almval:function(){ return appValHtml(); }, almdesp:function(){ return appDespHtml(); }, almrut:function(){ return appRutasHtml(); },
+const APP_PANT_FN = { reportes:function(){ return appReportesHtml(); }, gobj:function(){ return appGxHtml('gobj'); }, gabas:function(){ return appGxHtml('gabas'); }, ggas:function(){ return appGxHtml('ggas'); }, galm:function(){ return appGxHtml('galm'); }, gser:function(){ return appGxHtml('gser'); }, almrep:function(){ return appAlmRepHtml(); }, gastopresu:function(){ return appGastoPresuHtml(); }, gasto:function(){ return appGastoHtml(); }, presu:function(){ return appPresuHtml(); }, inventario:function(){ return appInventarioHtml(); }, pendcompras:function(){ return appComprasHtml(); }, cotizaciones:function(){ return appComprasHtml(); }, almseg:function(){ return appSupReqHtml(); }, almrsv:function(){ return appReservasHtml(); }, almreg:function(){ return appRegHtml(); }, almval:function(){ return appValHtml(); }, almdesp:function(){ return appDespHtml(); }, almrut:function(){ return appRutasHtml(); },
   cmpeq:function(){ return cqHtml(); },
   pendlog:function(){ return appPendLogHtml(); }, impnav:function(){ return appImpNavesHtml(); }, /* sin el bloque Comex · Camila Mora (17.11.2026, Piero) */ daily:function(){ return appDailyModHtml(); }, supreq:function(){ return appSupReqHtml(); }, suppry:function(){ return appSupPryHtml(); }, equipo:function(){ return appGerEquipoHtml(); }, tienda:function(){ return appTiendaHtml(); }, indicadores:function(){ return appIndicadoresHtml(); }, otif:function(){ return appOtifHtml(); } };
 function appPantallaEstado(p){
   const gx = [APP_GX, APP_RPT, APP_DCI.t, APP_DCI.lista.length];
-  const e = { cmpeq:[APP_CQ, APP_CF, ((GASTO_DATA && GASTO_DATA.rows) || []).length], reportes:[APP_RPT, APP_DCI.t, APP_DCI.lista.length], gobj:gx, gabas:gx, ggas:gx, galm:gx, gser:gx, almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INVZ.z, APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam, APP_INV.kdx, invParetoSub, RES.v], pendcompras:[APP_PC, APP_NC, appId(PROVEEDOR_UBI), APP_PL, APP_CORREO.v, APP_AG.v, APP_F.indicadores, APP_REP.sec, COTD.firma], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
+  const e = { cmpeq:[APP_CQ, APP_CF, ((GASTO_DATA && GASTO_DATA.rows) || []).length], reportes:[APP_RPT, APP_DCI.t, APP_DCI.lista.length], gobj:gx, gabas:gx, ggas:gx, galm:gx, gser:gx, almrep:[APP_AR], gastopresu:[APP_GP.sub, APP_G, APP_F.gasto, APP_PR], gasto:[APP_G, APP_F.gasto], presu:[APP_PR], inventario:[APP_INVZ.z, APP_INV.f, APP_INV.q, APP_INV.sel, APP_INV.tope, APP_INV.fam, APP_INV.kdx, invParetoSub, RES.v], pendcompras:[APP_PC, APP_NC, appId(PROVEEDOR_UBI), APP_PL, APP_CORREO.v, APP_AG.v, APP_F.indicadores, APP_REP.sec, COTD.firma], cotizaciones:[APP_PC, APP_NC, APP_PL, COTD.firma], pendlog:[APP_PL, APP_F.indicadores], almseg:[APP_AS, APP_F.indicadores, APP_AR.suc, APP_AR.sucJ],
     indicadores:[APP_F.indicadores, APP_REP.sec], otif:[APP_F.otif], tienda:[APP_TIENDA.q, APP_TIENDA.fam, APP_TIENDA.pdf ? APP_TIENDA.pdf.t : 0] }[p]
     || (GD_PANT[p] ? gx.concat([GD.mes, GD.fv, GD.fvt, GD.acu, GD.ver, GD.err, GD.provOrg, APP.usuario ? APP.usuario.nombre : '', GDF.per, GDR.l ? GDR.l.length : -1, GDR.err]) : null);
   return p + JSON.stringify(e || []) + (gerAbierto ? 1 : 0) + (APP.vista || '') + '|' + APP_VIVO_V;   // + cambios en vivo de otros usuarios (19.11.2026)
@@ -15369,7 +15369,8 @@ function appRenderInicio(){
     if(!appPonerInicio(cont, gdNavSi() + APP_PANT_FN[APP.pantalla]() + (DATA && DATA.corte && APP.pantalla !== 'daily' && APP.pantalla !== 'almrut' && APP.pantalla !== 'almval' && APP.pantalla !== 'almdesp' && APP.vista !== 'operario' ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''))) return;
     if(APP.pantalla === 'almrut') setTimeout(function(){ rtsIniciar(); rtpIniciar(); }, 0);   // el zoom del mapa con su tamaño real
     return;
-  } else if(APP.pantalla === 'cmpeq' || APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'almrep' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'pendlog' || APP.pantalla === 'impnav' || APP.pantalla === 'almseg' || APP.pantalla === 'reportes' || GX_MODS[APP.pantalla] || GD_PANT[APP.pantalla]){
+  } else if(APP.pantalla === 'cmpeq' || APP.pantalla === 'gasto' || APP.pantalla === 'presu' || APP.pantalla === 'gastopresu' || APP.pantalla === 'almrep' || APP.pantalla === 'inventario' || APP.pantalla === 'pendcompras' || APP.pantalla === 'cotizaciones' || APP.pantalla === 'pendlog' || APP.pantalla === 'impnav' || APP.pantalla === 'almseg' || APP.pantalla === 'reportes' || GX_MODS[APP.pantalla] || GD_PANT[APP.pantalla]){
+    if(APP.pantalla === 'cotizaciones'){ if(APP_PC.mod !== 'sku' && APP_PC.mod !== 'osa') APP_PC.mod = 'sku'; } else if(APP.pantalla === 'pendcompras') APP_PC.mod = 'oc';
     if(!appPonerInicio(cont, gdNavSi() + appPantallaHtml(APP.pantalla) + (DATA && DATA.corte ? `<div class="ini-datos">Datos al ${fmtDate(DATA.corte)}</div>` : ''))) return;
     if(APP.pantalla === 'inventario'){ setTimeout(appInvCompletar, 0); setTimeout(appInvKdxPintar, 0); }
     if(APP.pantalla === 'pendlog') setTimeout(impMapaIniciar, 0);   // zoom, gestos y marcas del mapa del mundo
@@ -17558,7 +17559,7 @@ function rtCargar(forzar){
   RT.prom = sbFetch('/rest/v1/fp_rutas?select=id,tipo,oc,estado,datos,por,creado,actualizado&order=creado.desc&limit=5000').then(function(r){ if(!r.ok){ RT.err = 'No se pudo leer las rutas (' + r.status + ').'; return null; } return r.json(); }).then(function(l){
     if(!l) return; RT.err = ''; RT.ok = true; const firma = JSON.stringify(l.map(function(x){ return [x.id, x.estado, x.actualizado]; }));
     if(firma === RT.firma) return; RT.firma = firma; const m = {}; l.forEach(function(x){ m[x.id] = x; }); RT.m = m; APP_VIVO_V++;
-    if(APP.enInicio && appHayDatos() && ['almrut', 'pendcompras'].indexOf(APP.pantalla) !== -1) appRenderFondo();
+    if(APP.enInicio && appHayDatos() && ['almrut', 'pendcompras', 'cotizaciones'].indexOf(APP.pantalla) !== -1) appRenderFondo();
   }).catch(function(){ RT.err = 'Sin conexión con la base de rutas.'; }).then(function(){ RT.cargando = false; RT.t = Date.now(); });
   return RT.prom; }
 async function rtGuardar(fila){ const nuevo = !RT.m[fila.id]; fila.actualizado = new Date().toISOString(); if(nuevo && !fila.por) fila.por = rtYo();
@@ -20399,7 +20400,8 @@ function ncRefrescar(){ const w = document.querySelector('.ncm'); if(!w) return;
 // Los dos módulos: OC en tránsito (mapa) y SKU sin OC (listado aparte).
 function ncModulo(D){ const nOc = D.S.venc[3].concat(D.S.luego[3]).filter(function(o){ return !ncImp(o.oc); }).length + D.S.ag[3].filter(function(x){ return x.pend && !ncImp(x.o.oc); }).length;
   const m = APP_PC.mod === 'sku' || APP_PC.mod === 'osa' ? APP_PC.mod : 'oc', b = function(k, t, n){ return `<button type="button" data-pcmod="${k}" class="${m === k ? 'on' : ''}">${t} <b>${appN(n)}</b></button>`; };
-  return `<div class="rsvm-seg ncm-mod">${b('oc', 'OC en tránsito', nOc)}${b('sku', 'SKU sin OC', D.items.length)}${b('osa', 'OC sin aprobar', new Set((D.osa || []).map(function(r){ return r.codOrden; })).size)}</div>`; }
+  if(APP.pantalla !== 'cotizaciones') return `<div class="rsvm-seg ncm-mod">${b('oc', 'OC en tránsito', nOc)}</div>`;
+  return `<div class="rsvm-seg ncm-mod">${b('sku', 'SKU sin OC', D.items.length)}${b('osa', 'OC sin aprobar', new Set((D.osa || []).map(function(r){ return r.codOrden; })).size)}</div>`; }
 const NC_ICO = { pin:'<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/>', lupa:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
   web:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>', gente:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.6 14.2c2.4-.3 4.3 1.2 4.9 4.3"/>',
   res:'<rect x="3" y="5" width="12" height="15" rx="2"/><rect x="7" y="2.5" width="12" height="15" rx="2"/><circle cx="13" cy="7.6" r="2"/><path d="M9.6 13.6c.7-1.6 2-2.4 3.4-2.4s2.7.8 3.4 2.4"/>' };
@@ -20712,7 +20714,7 @@ async function cotCargar(){ if(COTD.cargando || Date.now() - COTD.t < 180000) re
       cambio = f !== COTD.firma; COTD.firma = f; COTD.sol = sol; COTD.pre = pre; COTD.arc = arc; COTD.ok = true; COTD.idx = null; }
     if(!COTD.od){ try{ COTD.od = await sbMaestroLeer('cot_onedrive'); }catch(e){} }
   }catch(err){} finally{ COTD.t = Date.now(); COTD.cargando = false; }
-  if(cambio && APP.enInicio && APP.pantalla === 'pendcompras') appRenderInicio(); }
+  if(cambio && APP.enInicio && (APP.pantalla === 'pendcompras' || APP.pantalla === 'cotizaciones')) appRenderInicio(); }
 function cotIdx(){ if(COTD.idx) return COTD.idx; const P = new Map(), C = new Map(), k0 = function(x){ return String(x || '').trim(); };
   const de = function(cod){ let c = C.get(cod); if(!c) C.set(cod, c = { sol:[], pre:[] }); return c; };
   COTD.sol.forEach(function(s){ if(s.estado === 'anulada') return; (s.items || []).forEach(function(it){ const cod = k0(it.cod); if(!cod) return; const c = de(cod); if(c.sol.indexOf(s) === -1) c.sol.push(s);
@@ -21949,7 +21951,7 @@ function appAgCargar(forzar){
     if(!l) return; const firma = JSON.stringify(l.map(function(x){ return [x.oc, x.agencia, x.persona, x.recogen, x.fecha, x.factura, x.guia]; }).sort());
     if(firma === APP_AG.firma) return;
     const m = {}; l.forEach(function(x){ m[x.oc] = x; }); APP_AG.m = m; APP_AG.firma = firma; APP_AG.v++; APP_VIVO_V++; appAgAplicar();
-    if(APP.enInicio && appHayDatos() && ['pendcompras', 'almreg'].indexOf(APP.pantalla) !== -1) appRenderFondo();
+    if(APP.enInicio && appHayDatos() && ['pendcompras', 'cotizaciones', 'almreg'].indexOf(APP.pantalla) !== -1) appRenderFondo();
   }).catch(function(){}).then(function(){ APP_AG.cargando = false; APP_AG.t = Date.now(); });
   return APP_AG.prom;
 }
@@ -25448,7 +25450,7 @@ function appInicioLogistica(v){
   return `<div class="ini-stats">
       ${verC ? `<button type="button" data-pantalla="pendcompras"><b>${n(pd.ocs)}</b><span>OC por llegar</span></button>
       <button type="button" data-pantalla="pendcompras" class="rojo"><b>${n(pd.venc)}</b><span>OC vencidas</span></button>
-      <button type="button" data-pantalla="pendcompras"><b>${n(pd.peds)}</b><span>Pedidos sin OC</span></button>` : ''}
+      <button type="button" data-pantalla="cotizaciones"><b>${n(pd.peds)}</b><span>Pedidos sin OC</span></button>` : ''}
       ${verA ? `<button type="button" data-pantalla="inventario" class="ambar"><b>${n(rep.length)}</b><span>Por reponer</span></button>` : ''}
     </div>
     ${verA ? `<div class="ini-card"><div class="ini-card-tit">📦 Buscar un producto</div>
