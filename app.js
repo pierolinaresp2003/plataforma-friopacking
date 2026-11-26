@@ -13778,15 +13778,15 @@ function appBienvenida(correoFijo){
     <div class="bv-tarjeta bv-otp-card" id="bvOtpPanel" hidden>
       <button type="button" class="bv-otp-volver" id="bvOtpVolver">‹ Volver</button>
       <h3 class="bv-otp-h">Entra con tu correo</h3>
-      <p class="bv-otp-txt">Pon tu correo <b>@friopacking.pe</b> o <b>@grupofriopacking.pe</b>, te enviamos un código de 6 dígitos y entras a la vista Supervisor.</p>
+      <p class="bv-otp-txt">Pon tu correo <b>@friopacking.pe</b> o <b>@grupofriopacking.pe</b>, te enviamos un enlace y con él entras a la vista Supervisor.</p>
       <label class="bv-lbl" for="bvOtpCorreo">Correo corporativo</label>
       <input type="email" id="bvOtpCorreo" class="bv-inp" placeholder="usuario@friopacking.pe" inputmode="email" autocapitalize="off" autocomplete="email" enterkeyhint="go">
-      <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpPedir">Enviarme el código</button>
+      <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpPedir">Enviarme el enlace</button>
       <div id="bvOtpCod" hidden>
-        <label class="bv-lbl" for="bvOtpInp">Código del correo</label>
+        <div hidden><label class="bv-lbl" for="bvOtpInp">Código del correo</label>
         <input type="text" id="bvOtpInp" class="bv-inp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6 dígitos" enterkeyhint="go">
-        <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpEntrar">Entrar</button>
-        <button type="button" class="bv-otro" id="bvOtpReenviar">Reenviar código</button>
+        <button type="button" class="bv-entrar bv-otp-btn" id="bvOtpEntrar">Entrar</button></div>
+        <button type="button" class="bv-otro" id="bvOtpReenviar">Reenviar enlace</button>
       </div>
       <p class="bv-err" id="bvOtpErr" hidden></p>
     </div>`}
@@ -13839,7 +13839,7 @@ function appBienvenida(correoFijo){
       errO = document.getElementById('bvOtpErr'), txt = panel.querySelector('.bv-otp-txt');
     const eo = function(t){ errO.textContent = t || ''; errO.hidden = !t; };
     const reset = function(){ codW.hidden = true; pedir.hidden = false; pedir.disabled = false; pedir.classList.remove('cargando');
-      inp.value = ''; eo(''); if(txt) txt.innerHTML = 'Pon tu correo <b>@friopacking.pe</b> o <b>@grupofriopacking.pe</b>, te enviamos un código de 6 dígitos y entras a la vista Supervisor.'; };
+      inp.value = ''; eo(''); if(txt) txt.innerHTML = 'Pon tu correo <b>@friopacking.pe</b> o <b>@grupofriopacking.pe</b>, te enviamos un enlace y con él entras a la vista Supervisor.'; };
     abrir.onclick = function(){ reset(); bienv.classList.add('bv-otp-on'); correoO.value = correo.value.trim(); setTimeout(function(){ correoO.focus(); }, 30); };
     volver.onclick = function(){ bienv.classList.remove('bv-otp-on'); };
     const correoOk = function(){ const c = correoO.value.trim().toLowerCase();
@@ -13847,12 +13847,12 @@ function appBienvenida(correoFijo){
       if(!sbCorreoEmpresa(c)){ eo('Solo correos @friopacking.pe o @grupofriopacking.pe.'); return null; } return c; };
     const pedirCod = async function(bt){ const c = correoOk(); if(!c) return; bt.disabled = true; bt.classList.add('cargando'); eo('');
       try{ await sbOtpPedir(c); codW.hidden = false; pedir.hidden = true; eo(''); setTimeout(function(){ inp.focus(); }, 30);
-        if(txt) txt.innerHTML = 'Te enviamos un código de 6 dígitos a <b>' + escapeHtml(c) + '</b>. Escríbelo aquí abajo.'; }
-      catch(er){ eo(er.status === 429 || /rate limit/i.test(er.message || '') ? 'Se pidieron muchos códigos seguidos. Espera unos minutos y vuelve a intentar.' : (er.message && er.message !== 'Failed to fetch' ? er.message : 'No hay conexión. Inténtalo de nuevo.')); }
+        if(txt) txt.innerHTML = 'Te enviamos un enlace a <b>' + escapeHtml(c) + '</b>. Abre ese correo y toca «Sign in»: la plataforma se abre y entras solo.'; }
+      catch(er){ eo(er.status === 429 || /rate limit/i.test(er.message || '') ? 'Se pidieron muchos enlaces seguidos. Espera unos minutos y vuelve a intentar.' : (er.message && er.message !== 'Failed to fetch' ? er.message : 'No hay conexión. Inténtalo de nuevo.')); }
       finally{ bt.disabled = false; bt.classList.remove('cargando'); } };
     pedir.onclick = function(){ pedirCod(pedir); };
     reenviar.onclick = function(){ pedirCod(pedir); };
-    correoO.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); if(!codW.hidden) entrar.click(); else pedir.click(); } });
+    correoO.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); if(codW.hidden) pedir.click(); } });
     entrar.onclick = async function(){ const c = correoOk(); if(!c) return; const cod = inp.value.trim();
       if(!/^\d{4,8}$/.test(cod)){ eo('Escribe el código de 6 dígitos del correo.'); return; }
       entrar.disabled = true; entrar.classList.add('cargando'); eo('');
@@ -20219,6 +20219,7 @@ function appPendComprasHtml(soloLista, sinCaras){
     // Por familia y tipo (18.11.2026, Piero: "segmenta bien por productos"): cada familia es un grupo del desplegable, con "toda la familia" y sus tipos.
     const famDe = skuCategoria, famN = {}, famF = {}; if(k === 'ped') l.forEach(function(r){ const c = famDe(r), f = skuFamilia(c); famN[c] = (famN[c] || 0) + 1; famF[f] = (famF[f] || 0) + 1; });
     if(k === 'ped' && APP_PC.fam && !(APP_PC.fam.indexOf('F|') === 0 ? famF[APP_PC.fam.slice(2)] : famN[APP_PC.fam])) APP_PC.fam = '';
+    if(k === 'ped') APP_PC.fam = '';   // sin el desplegable de categorías (v575, 26.11.2026, Piero: "quita esto"); la búsqueda ya filtra por familia
     // El elegido dice también la familia (cerrado, el desplegable solo muestra el texto de esa opción).
     const opF = function(v, t, tSel){ const on = v === (APP_PC.fam || ''); return `<option value="${escapeHtml(v)}"${on ? ' selected' : ''}>${escapeHtml(on && tSel ? tSel : t)}</option>`; };
     const famChips = k === 'ped' && l.length ? `<label class="ncs-fam"><select class="ini-select" id="pcFam" aria-label="Categoría">${opF('', 'Todas las categorías · ' + l.length)}${Object.keys(famF).sort(function(a, b){ return (a === 'Otros productos') - (b === 'Otros productos') || a.localeCompare(b); }).map(function(f){
@@ -20226,12 +20227,12 @@ function appPendComprasHtml(soloLista, sinCaras){
       return `<optgroup label="${escapeHtml(f)}">${tipos.length > 1 ? opF('F|' + f, 'Toda la familia · ' + famF[f], f + ' (toda la familia) · ' + famF[f]) : ''}${tipos.map(function(c){ return opF(c, c.split(' · ').slice(1).join(' · ') + ' · ' + famN[c], c + ' · ' + famN[c]); }).join('')}</optgroup>`; }).join('')}</select></label>` : '';
     // SKU sin OC (18.11.2026, Piero: "quita lo que dice pedidos sin OC, el más antiguo primero…"): solo las caras, la familia y la tabla.
     if(k === 'ped' && sku){ const lf = APP_PC.fam ? l.filter(function(r){ return skuPasaCat(r, APP_PC.fam); }) : l;
-      return `<div class="ncs-fil">${ncSkuPer(items)}${famChips}</div>` + (lf.length ? (skuVistaCarolina() ? skuTablaCarolina(lf) : skuTabla(lf)) : `<div class="ini-vacio">${q ? 'No hay SKU sin OC con "' + escapeHtml(APP_PC.q) + '".' : '✅ No hay SKU sin OC.'}</div>`); }
+      return `<div class="ncs-fil">${ncSkuPer(items)}</div>` + (lf.length ? (skuVistaCarolina() ? skuTablaCarolina(lf) : skuTabla(lf)) : `<div class="ini-vacio">${q ? 'No hay SKU sin OC con "' + escapeHtml(APP_PC.q) + '".' : '✅ No hay SKU sin OC.'}</div>`); }
     const nPed = k === 'ped' ? new Set(l.map(function(r){ return r.codPedido; })).size : 0, nIt = l.length;
     if(k === 'ped' && APP_PC.fam) l = l.filter(function(r){ return skuPasaCat(r, APP_PC.fam); });
     if((q || omitir) && !l.length) return '';
     return `<div class="m-pl-tit"><span>${x[0]} ${x[1]}</span><b>${k === 'ped' ? (q ? l.length + (l.length === 1 ? ' ítem' : ' ítems') : nPed + (nPed === 1 ? ' pedido · ' : ' pedidos · ') + nIt + (nIt === 1 ? ' ítem' : ' ítems')) : l.length}</b></div><div class="m-sec-nota">${x[4]}</div>`
-      + famChips + (!l.length ? '<div class="ini-vacio">✅ Nada en este estado.</div>' : k === 'ped' ? skuTabla(l.slice(0, tope))
+      + (!l.length ? '<div class="ini-vacio">✅ Nada en este estado.</div>' : k === 'ped' ? skuTabla(l.slice(0, tope))
         : '<div class="oc2-grid">' + l.slice(0, tope).map(function(o, i){ return cardOC(o, i, k); }).join('') + '</div>')
       + (l.length > tope ? `<button type="button" class="ini-link" data-pcmas="1">Ver más (${appN(l.length - tope)} restantes) ›</button>` : '');
   };
@@ -20855,15 +20856,10 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO &&
     const hoy = Date.parse(isoDay(new Date()) + 'T00:00:00Z'); P.forEach(function(pv){ const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(pv.val || ''); if(!m) return; const d = Math.round((Date.UTC(+m[3], +m[2] - 1, +m[1]) - hoy) / 864e5);
       if(d >= 0 && d <= 3) L.push(`La oferta de <b>${e(pv.nom)}</b> vence ${d === 0 ? 'hoy' : d === 1 ? 'mañana' : 'en ' + d + ' días'}.`); });
   }catch(err){ console.warn('cot avisos', err); }
-  // Análisis del precio de cada producto (v570): última compra, precio esperado hoy, mercado nacional e importado, y dónde queda la mejor oferta.
-  const pa = function(f){ const it = f.it, uc = f.uc, ofs = f.cel.filter(function(c){ return c && !c.alt; }).map(function(c){ return c.v; }), A = cotPrecioRef(it.cod, ofs);
-    // v571 (Piero: "en simple, sin tanto texto: la última compra y siempre el precio esperado; si no hay compra anterior, el precio de mercado"; sin importado)
-    const deMer = A.esp == null, esp = deMer ? A.of.v : A.esp, b = f.best && !f.best.alt ? f.best.v : null;
-    const ver = b != null && esp && (!deMer || ofs.length > 1) ? `La mejor oferta está <b>${Math.abs((b - esp) / esp * 100).toFixed(1)} % ${b <= esp ? 'por debajo' : 'por encima'}</b> del precio esperado.` : '';
-    return `<div class="cot2-pa"><div class="pa-g">
-      <div><small>Última compra</small><b>${f.ucU ? usd(f.ucU) : '—'}</b><span>${uc ? e(gdCorto(uc.prov) || uc.prov || '') + ' · ' + e(fmtDate(uc.f)) : 'No se compró antes'}</span></div>
-      <div class="esp"><small>Precio esperado hoy</small><b>${esp != null ? usd(esp) : '—'}</b><span>${esp == null ? 'Sin datos' : deMer ? 'según las ofertas de hoy' : 'según tus compras'}</span></div></div>
-      <p class="pa-v">${ver ? '<span>' + ver + '</span>' : ''}<button type="button" class="ocv-it-c pa-hist" data-sku="${e(it.cod)}">Ver historial ›</button></p></div>`; };
+  // Precio esperado hoy como columna antes de la última compra (v575, 26.11.2026, Piero: "esto no puede salir mejor como columna? antes de
+  // última compra… y que abajo solo salga la tarjeta de detalle de proveedor"): según tus compras; si nunca se compró, según las ofertas de hoy.
+  const espDe = function(f){ const ofs = f.cel.filter(function(c){ return c && !c.alt; }).map(function(c){ return c.v; }), A = cotPrecioRef(f.it.cod, ofs), deMer = A.esp == null;
+    return { v:deMer ? (A.of && A.of.v) : A.esp, deMer:deMer }; };
   // Detalle de un producto: lo que ofrece cada proveedor, en tarjetas
   const det = function(f, i){ const it = f.it;
     const cards = P.map(function(pv, j){ const c = f.cel[j]; if(!c) return ''; const p = c.p, q = +p.cantidad, W = c.ver;
@@ -20872,18 +20868,19 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO &&
       return `<div class="cot2-o${c === f.best ? ' mejor' : ''}"><div class="h"><b>${e(pv.nom)}</b><span>${usd(c.v)}</span></div>
         <div class="st ${W.k}">${W.k === 'ok' ? '✓ Es lo que pediste' : W.k === 'rev' ? 'Revisar' : 'No es lo mismo'}${W.k !== 'ok' ? `<small>${e(W.why)}</small>` : ''}</div>
         <p>${e(p.descripcion || 'No detalló el producto')}</p>${li.length ? `<ul>${li.map(function(x){ return '<li>' + e(x) + '</li>'; }).join('')}</ul>` : ''}${cotPdfA(p.archivo, 'Ver cotización')}</div>`; }).join('');
-    return `<tr class="cot-det" data-cotdetrow="${i}" hidden><td colspan="${2 + P.length}">${pa(f)}<div class="cot2-of">${cards}</div></td></tr>`; };
+    return `<tr class="cot-det" data-cotdetrow="${i}" hidden><td colspan="${3 + P.length}"><div class="cot2-of">${cards}</div></td></tr>`; };
   const th = P.map(function(pv){ return `<th class="c"><span>${e(pv.nom)}</span>${cotPdfA(pv.arc, 'PDF')}</th>`; }).join('');
-  const filas = F.map(function(f, i){ const it = f.it;
+  const filas = F.map(function(f, i){ const it = f.it, E = espDe(f);
     return `<tr><td><button type="button" class="cot2-p" data-cotdet="${i}"><b>${e(polarCorta(it.desc, 55))}</b><small>${appN(it.cant)} ${e(um(it))}</small></button></td>
-      <td class="c ult">${f.uc ? `<button type="button" class="cot-cel cot2-ult" data-cotdet="${i}" title="${e((f.uc.prov || '') + ' · ' + fmtDate(f.uc.f) + ' · toca para ver el análisis del precio')}">${f.ucU ? usd(f.ucU) : 'Sin precio'}${f.uc.prov ? `<small>${e(gdCorto(f.uc.prov) || f.uc.prov)}</small>` : ''}<small>${e(fmtDate(f.uc.f))}</small></button>` : '—'}</td>
+      <td class="c esp">${E.v != null ? usd(E.v) + `<small>${E.deMer ? 'según ofertas de hoy' : 'según tus compras'}</small>` : '—'}</td>
+      <td class="c ult">${f.uc ? `<button type="button" class="cot-cel cot2-ult ocv-it-c" data-sku="${e(it.cod)}" title="${e((f.uc.prov || '') + ' · ' + fmtDate(f.uc.f) + ' · toca para ver el historial de compras')}">${f.ucU ? usd(f.ucU) : 'Sin precio'}${f.uc.prov ? `<small>${e(gdCorto(f.uc.prov) || f.uc.prov)}</small>` : ''}<small>${e(fmtDate(f.uc.f))}</small></button>` : '—'}</td>
       ${f.cel.map(function(c){ if(!c) return '<td class="c vac">—</td>'; const q = +c.p.cantidad;
         const tag = c.alt ? '<i class="cot2-tag alt">alternativa</i>' : c.ver.k === 'rev' ? '<i class="cot2-tag">revisar</i>' : q > 0 && f.it.cant && q < f.it.cant ? '<i class="cot2-tag">parcial</i>' : '';
         const dif = c === f.best && !c.alt && f.ucU ? (c.v - f.ucU) / f.ucU * 100 : null;   // la mejor oferta frente a la última compra (v567)
         return `<td class="c${c === f.best && !c.alt ? ' mejor' : ''}"><button type="button" class="cot-cel" data-cotdet="${i}">${usd(c.v)}${dif != null && Math.abs(dif) >= 0.05 ? `<i class="cot2-dif ${dif < 0 ? 'dn' : 'up'}">${dif < 0 ? '▼' : '▲'} ${Math.abs(dif).toFixed(1)} % vs última</i>` : ''}${tag}</button></td>`; }).join('')}</tr>` + det(f, i); }).join('');
-  const pie = `<tfoot><tr><td>Total</td><td></td>${P.map(function(pv){ return `<td class="c">${usd(pv.tot)}${pv.n < its.length ? `<small>${appN(pv.n)} de ${appN(its.length)}</small>` : ''}</td>`; }).join('')}</tr></tfoot>`;
+  const pie = `<tfoot><tr><td>Total</td><td></td><td></td>${P.map(function(pv){ return `<td class="c">${usd(pv.tot)}${pv.n < its.length ? `<small>${appN(pv.n)} de ${appN(its.length)}</small>` : ''}</td>`; }).join('')}</tr></tfoot>`;
   appListaAbrir('Cotización · ' + e(s.cot), appN(its.length) + ' productos' + (s.creado ? ' · enviada el ' + e(fmtDate(new Date(s.creado))) : ''), `<div class="cot-an">${kpis}
-    ${P.length ? `<div class="pm-dw"><table class="pm-dt cot-cmp cot2-t"><thead><tr><th>Producto</th><th class="c">Última compra</th>${th}</tr></thead><tbody>${filas}</tbody>${pie}</table></div>`
+    ${P.length ? `<div class="pm-dw"><table class="pm-dt cot-cmp cot2-t"><thead><tr><th>Producto</th><th class="c">Precio esperado</th><th class="c">Última compra</th>${th}</tr></thead><tbody>${filas}</tbody>${pie}</table></div>`
       : `<div class="cot-vacio">Aún no llega ningún precio para esta solicitud. Cuando los proveedores manden su cotización, aquí sale la comparativa.</div>`}</div>`);   // sin "Quién respondió" (v571, Piero: "quita esto"); arriba queda cuántos respondieron
   const oc = document.getElementById('appOC'); if(oc) oc.classList.add('ancho'); }
 // Registro de cotizaciones (v573, 26.11.2026, Piero: "un módulo para consultar estas cotizaciones… que tenga el registro"): cada solicitud COT
@@ -20914,18 +20911,21 @@ function cotRegFilas(){ return appMemo('cotReg' + COTD.firma + '|' + getReqRows(
       peds:[...new Set(its.map(function(it){ return it.ped; }).filter(Boolean))], prys:[...new Set(its.map(function(it){ return it.pry; }).filter(Boolean))],
       txt:polarNorm([s.cot].concat(its.map(function(it){ return it.cod + ' ' + it.desc + ' ' + it.ped + ' ' + it.pry; }), provOc, P.map(function(p){ return p.proveedor; })).join(' ')) }; })
     .sort(function(a, b){ return String(b.s.creado || '').localeCompare(String(a.s.creado || '')); }); }); }
+// Tarjetas como las de las OC (v575, 26.11.2026, Piero: "no es llamativo, parece un borrador… hazlo siguiendo la idea del app en diseño"):
+// franja de color por estado, cuántos respondieron en grande, la COT, qué se cotizó, cliente y PRY, la mejor oferta y la OC si ya la tiene.
 function appCotRegLista(){ const e = escapeHtml, c = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
-  const usd = function(v){ return 'US$ ' + v.toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 }); };
+  const usd = function(v){ return 'US$ ' + v.toLocaleString('es-PE', { maximumFractionDigits:0 }); };
   const q = polarNorm(APP_CR.q || ''), L = cotRegFilas().filter(function(x){ return (!APP_CR.est || (APP_CR.est === 'oc' ? x.est !== 'sin' : x.est === 'sin')) && (!q || q.split(' ').filter(Boolean).every(function(w){ return x.txt.indexOf(w) !== -1; })); });
   if(!L.length) return `<div class="ini-vacio">${q ? 'No hay cotizaciones con "' + e(APP_CR.q) + '".' : 'Todavía no hay cotizaciones en este estado.'}</div>`;
-  const EST = { oc:['Con OC', 'ok'], par:['OC parcial', 'par'], sin:['Sin OC', 'sin'] };
-  return `<div class="creg"><div class="creg-h"><span>Cotización</span><span>Qué se cotizó</span><span class="n">Respondieron</span><span class="n">Mejor oferta</span><span>Estado</span></div>${L.map(function(x){ const s = x.s, t = EST[x.est];
-    return `<button type="button" class="creg-f" data-cotreg="${e(s.cot)}" title="Ver la comparativa de ${e(s.cot)}">
-      <span class="cot"><b>${e(s.cot)}</b><small>${s.creado ? e(fmtDate(new Date(s.creado))) : ''}</small></span>
-      <span class="det"><b>${e(x.tipo || 'Productos')}</b><em>${appN(x.its.length)} producto${x.its.length === 1 ? '' : 's'}</em><small>${e([x.clis.join(', '), x.prys.join(', ')].filter(Boolean).join(' · ') || 'Sin proyecto')}</small></span>
-      <span class="n">${appN(x.resp)} de ${appN(x.inv)}</span>
-      <span class="n">${x.mejor != null ? usd(x.mejor) : '—'}</span>
-      <span><i class="creg-e ${t[1]}">${t[0]}</i>${x.ocs.length ? `<small>OC ${e(x.ocs.map(c).join(', '))}${x.provOc.length ? ' · ' + e(x.provOc.join(', ')) : ''}</small>` : ''}</span></button>`; }).join('')}</div>`; }
+  return `<div class="oc2-grid cotc-grid">${L.map(function(x){ const s = x.s;
+    const est = x.est === 'oc' ? ['Con OC', 'ok'] : x.est === 'par' ? ['OC parcial', 'prox'] : x.mejor != null ? ['Con ofertas', 'cam'] : ['Esperando respuestas', 'neu'];
+    return `<div class="oc2 cotc t-${est[1]}" data-clic="1" data-cotreg="${e(s.cot)}" title="Ver la comparativa de ${e(s.cot)}">
+      <div class="oc2-h"><span class="oc2-big"><b>${appN(x.resp)}</b><small>de ${appN(x.inv)} resp.</small></span>
+        <span class="oc2-t"><span class="oc2-l1"><span class="oc2-cods">${e(s.cot)}</span><em class="oc2-est">${est[0]}</em></span>
+          <b class="oc2-prov" title="${e(x.tipo)}">${e(x.tipo || 'Productos')}</b>
+          <small class="oc2-cli">${e([x.clis.join(', '), x.prys.join(', ')].filter(Boolean).join(' · ') || 'Sin proyecto')}</small></span>
+        <span class="oc2-q cotc-m"><b>${x.mejor != null ? usd(x.mejor) : '—'}</b><small>${x.mejor != null ? 'mejor oferta' : 'sin precios aún'}</small></span></div>
+      <div class="oc2-pie"><span>📅 ${s.creado ? e(fmtDate(new Date(s.creado))) : '—'}</span><span>${appN(x.its.length)} producto${x.its.length === 1 ? '' : 's'}</span>${x.ocs.length ? `<span class="ok">OC ${e(x.ocs.map(c).join(', '))}${x.provOc.length ? ' · ' + e(x.provOc.join(', ')) : ''}</span>` : ''}</div></div>`; }).join('')}</div>`; }
 function appCotRegHtml(){ const e = escapeHtml; cotCargar();
   if(!COTD.ok) return '<div class="ini-vacio">Cargando las cotizaciones…</div>';
   const T = cotRegFilas(), n = { '':T.length, sin:T.filter(function(x){ return x.est === 'sin'; }).length, oc:T.filter(function(x){ return x.est !== 'sin'; }).length };
