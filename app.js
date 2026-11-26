@@ -19717,6 +19717,8 @@ function appPanelMostrar(html){
     const b = e.target.closest('button'); if(!b) return;
     if(b.dataset.occerrar){ if(el._pila && el._pila.length){ el.innerHTML = el._pila.pop(); appOCRestaura(el); return appTareasPintar(); } return appOCCerrar(); }
     if(b.dataset.cottab) return cotAnalisisAbrir(b.dataset.cotcod, b.dataset.cottab);   // pestañas Comparativa / Por producto (26.11.2026)
+    if(b.dataset.cotdet !== undefined){ const t = b.closest('table.cot-cmp'), r = t && t.querySelector('tr[data-cotdetrow="' + b.dataset.cotdet + '"]'); if(r){ r.hidden = !r.hidden; t.querySelectorAll('.cot-cel[data-cotdet="' + b.dataset.cotdet + '"]').forEach(function(x){ x.classList.toggle('on', !r.hidden); }); } return; }   // qué ofrece cada proveedor (26.11.2026)
+    if(b.dataset.cotdetall !== undefined){ const rs = [...el.querySelectorAll('tr[data-cotdetrow]')], abrir = rs.some(function(r){ return r.hidden; }); rs.forEach(function(r){ r.hidden = !abrir; }); el.querySelectorAll('.cot-cel').forEach(function(x){ x.classList.toggle('on', abrir); }); b.textContent = abrir ? 'Ocultar el detalle' : 'Ver qué ofrece cada proveedor'; return; }
     if(b.dataset.taragregar !== undefined || b.dataset.tarest || b.dataset.tarcom || b.dataset.tarborrar) return appTareaAccion(b, el);
     if(b.dataset.gdf) return b.dataset.gdf.indexOf('ir|') === 0 ? (appOCCerrar(), appInicio(b.dataset.gdf.slice(3))) : gdFormAccion(b, el);
     if(b.dataset.oc){ (el._pila = el._pila || []).push(el.innerHTML); return appOCAbrir(b.dataset.oc, true); }
@@ -20575,21 +20577,45 @@ function cotSolDe(cod){ cod = String(cod || '').trim(); const ci = cotIdx().C.ge
 function cotTabsHtml(cod, on){ const e = escapeHtml;
   return `<div class="cot-tabs" role="tablist"><button type="button" role="tab" class="${on === 'comp' ? 'on' : ''}" data-cottab="comp" data-cotcod="${e(cod)}">Comparativa del pedido</button><button type="button" role="tab" class="${on === 'prod' ? 'on' : ''}" data-cottab="prod" data-cotcod="${e(cod)}">Por producto</button></div>`; }
 function cotEsAlt(p){ return /alternativ/i.test(String(p.obs || '') + ' ' + String(p.marca || '')); }
+// ¿Ofrece exactamente lo pedido? (26.11.2026, Piero: "cómo sé si los proveedores ofrecen exactamente lo que necesito"): se lee el calibre
+// (conductores × sección en mm² o AWG; G = con tierra, × = sin tierra) de lo pedido y de lo que ofrece cada proveedor, y si es apantallado.
+function cotSpec(t){ t = String(t || '').toUpperCase().replace(/MM²/g, 'MM2').replace(/(\d),(\d)/g, '$1.$2');
+  const re = /(\d{1,2})\s*([GX×])\s*(\d+(?:\.\d+)?)(?!\.?\d)(?!\s*[X×]\s*\d)\s*(MM2|MM)?/g; let m, b = null;
+  while((m = re.exec(t))){ const x = { n:+m[1], g:m[2] === 'G', s:+m[3], mm:!!m[4] }; if(!b || (x.mm && !b.mm)) b = x; }
+  const aw = /(?:(\d+)\s*[X×]\s*)?(\d+)\s*[X×]\s*(\d+)\s*AWG/.exec(t);
+  if(b && b.mm) return { n:b.n, g:b.g, s:b.s, u:'mm2' };
+  if(aw) return { n:+aw[2], g:false, s:+aw[3], u:'awg' };
+  if(b) return { n:b.n, g:b.g, s:b.s, u:'mm2' };
+  const d = /(\d{1,2})\s*([GX×])\s*0\.(\d)\.(\d)/.exec(t);   // "7G 0.1.5MM" se lee como 7G 1.5 mm²
+  return d ? { n:+d[1], g:d[2] === 'G', s:+(d[3] + '.' + d[4]), u:'mm2', duda:true } : null; }
+function cotSpecTxt(x){ return x ? x.n + (x.g ? 'G ' : '×') + String(x.s) + (x.u === 'awg' ? ' AWG' : ' mm²') : ''; }
+function cotBlind(t){ return /APANTALL|PANTALLA|SHIELD|\bCY\b|LIYCY|YSLCY|\bOS\b|\bSTP\b|\bFTP\b/i.test(String(t || '')); }
+function cotVerif(desc, p){ const R = cotSpec(desc), O = cotSpec(p.descripcion), alt = cotEsAlt(p), A = { k:'alt', t:'Alternativa', why:p.obs || 'El proveedor lo marcó como alternativa' };
+  if(!String(p.descripcion || '').trim()) return alt ? A : { k:'rev', t:'Revisar', why:'El proveedor no detalló qué producto ofrece' };
+  if(R && O){
+    if(R.u !== O.u || R.n !== O.n || Math.abs(R.s - O.s) > 1e-6) return { k:'dif', t:'Distinto a lo pedido', why:'Pediste ' + cotSpecTxt(R) + '; ofrece ' + cotSpecTxt(O) };
+    if(alt) return A;
+    if(R.g !== O.g) return { k:'rev', t:'Revisar', why:'Mismo calibre, pero ' + (R.g ? 'pediste con tierra (G) y ofrece sin tierra (×)' : 'pediste sin tierra (×) y ofrece con tierra (G)') };
+    if(cotBlind(desc) && !cotBlind(p.descripcion)) return { k:'rev', t:'Revisar', why:'Pediste apantallado y su descripción no lo indica' };
+    return { k:'ok', t:'Mismo producto', why:cotSpecTxt(O) + (cotBlind(p.descripcion) ? ' · apantallado' : '') }; }
+  if(alt) return A;
+  return { k:'rev', t:'Revisar', why:!R ? 'No se pudo leer el calibre de lo pedido: compáralo a mano' : 'No se pudo leer el calibre de lo que ofrece: compáralo a mano' }; }
 function cotComparativaAbrir(s, cod){ const e = escapeHtml, c0 = function(x){ return String(x || '').replace(/^000\d-0*/, ''); }, TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75;
   const usd = function(v){ return v == null || isNaN(v) ? '—' : 'US$ ' + v.toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 }); };
   const pct = function(v, ref){ if(v == null || !ref) return ''; const d = (v - ref) / ref * 100; return `<em class="cot-v ${d > 0.5 ? 'up' : d < -0.5 ? 'dn' : ''}">${d > 0.5 ? '▲ ' : d < -0.5 ? '▼ ' : ''}${Math.abs(d).toFixed(1)}%</em>`; };
   const its = []; (s.items || []).forEach(function(it){ const k = String(it.cod || '').trim(); if(k && !its.some(function(x){ return x.cod === k; })) its.push({ cod:k, desc:it.desc || k, cant:+it.cant || 0, um:it.um || '', ped:it.ped || '', pry:it.pry || '' }); });
+  const nomIt = function(it){ const R = cotSpec(it.desc); return R ? 'el ' + cotSpecTxt(R) : polarCorta(it.desc, 30); };
   // Última oferta de cada proveedor por código, solo de esta COT
   const provK = function(p){ return String(p.ruc || p.proveedor || '').toUpperCase(); }, PV = new Map(), C = new Map();
   COTD.pre.forEach(function(p){ if(p.cot !== s.cot) return; const cd = String(p.codigo || '').trim(), v = cotUsd(p); if(!cd || v == null || !(v > 0)) return; const k = provK(p);
     if(!PV.has(k)) PV.set(k, { k:k, nom:gdCorto(p.proveedor || '') || p.proveedor || '—', val:'', pago:'' }); const pv = PV.get(k);
     if(p.validez && !pv.val) pv.val = p.validez; if(p.cond_pago && !pv.pago) pv.pago = p.cond_pago;
     const kk = cd + '|' + k, o = C.get(kk); if(!o || String(p.fecha || '') >= String(o.fecha || '')) C.set(kk, p); });
-  const P = [...PV.values()];
-  P.forEach(function(pv){ pv.n = 0; pv.tot = 0; pv.gana = 0; pv.alt = []; its.forEach(function(it){ const p = C.get(it.cod + '|' + pv.k); if(p){ pv.n++; pv.tot += cotUsd(p) * (it.cant || 0); if(cotEsAlt(p)) pv.alt.push(it.desc); } }); });
+  const P = [...PV.values()], noEs = function(k){ return k === 'alt' || k === 'dif'; };
+  P.forEach(function(pv){ pv.n = 0; pv.tot = 0; pv.gana = 0; pv.alt = []; its.forEach(function(it){ const p = C.get(it.cod + '|' + pv.k); if(p){ pv.n++; pv.tot += cotUsd(p) * (it.cant || 0); if(noEs(cotVerif(it.desc, p).k)) pv.alt.push(it); } }); });
   P.sort(function(a, b){ return b.n - a.n || a.tot - b.tot; });
   const F = its.map(function(it){ const uc = skuUltCompra(it.cod), ucU = uc && uc.pu != null ? (uc.mon === 'S/' ? uc.pu / TC : +uc.pu) : null;
-    const cel = P.map(function(pv){ const p = C.get(it.cod + '|' + pv.k); return p ? { p:p, v:cotUsd(p), alt:cotEsAlt(p), pv:pv } : null; });
+    const cel = P.map(function(pv){ const p = C.get(it.cod + '|' + pv.k); if(!p) return null; const ver = cotVerif(it.desc, p); return { p:p, v:cotUsd(p), ver:ver, alt:noEs(ver.k), pv:pv }; });
     const ex = cel.filter(function(c){ return c && !c.alt; }), pool = ex.length ? ex : cel.filter(Boolean);
     const best = pool.length ? pool.reduce(function(m, c){ return c.v < m.v ? c : m; }) : null; if(best) best.pv.gana++;
     return { it:it, uc:uc, ucU:ucU, cel:cel, best:best }; });
@@ -20602,31 +20628,45 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, c0 = function(x){ re
   const kpis = `<div class="cot-k"><div><small>Productos</small><b>${appN(its.length)}</b><span>${[peds.length ? 'Pedido ' + peds.map(e).join(', ') : '', prys.map(e).join(', ')].filter(Boolean).join(' · ') || e(s.cot)}</span></div>
     <div><small>Respondieron</small><b>${appN(RS.n)} de ${appN(Math.max(inv, RS.inv))}</b><span>${appN(P.length)} con precio</span></div>
     <div class="cot-best"><small>Mejor combinación</small><b>${cub.length ? usd(combo) : '—'}</b><span>${cub.length ? 'a cada uno lo más barato · ' + appN(cub.length) + ' de ' + appN(its.length) + ' ítems' : 'aún sin precios'}</span>${comp.length && ultC ? pct(comboC, ultC).replace('</em>', ' vs última compra</em>') : ''}</div>
-    <div><small>Un solo proveedor</small><b>${top1 ? usd(top1.tot) : '—'}</b><span>${top1 ? e(top1.nom) + ' · ' + appN(top1.n) + ' de ' + appN(its.length) + ' ítems' + (top1.alt.length ? ' · incluye ' + appN(top1.alt.length) + ' alternativa' + (top1.alt.length === 1 ? '' : 's') : '') : 'aún sin precios'}</span></div></div>`;
+    <div><small>Un solo proveedor</small><b>${top1 ? usd(top1.tot) : '—'}</b><span>${top1 ? e(top1.nom) + ' · ' + appN(top1.n) + ' de ' + appN(its.length) + ' ítems' + (top1.alt.length ? ' · ' + appN(top1.alt.length) + ' no ' + (top1.alt.length === 1 ? 'es' : 'son') + ' el mismo producto' : '') : 'aún sin precios'}</span></div></div>`;
   // Lectura rápida, en palabras
+  const V = []; F.forEach(function(f){ f.cel.forEach(function(c){ if(c) V.push(c); }); });
+  const nk = function(k){ return V.filter(function(c){ return c.ver.k === k; }).length; }, nNo = nk('alt') + nk('dif');
   const L = []; try{
-    const g = P.slice().sort(function(a, b){ return b.gana - a.gana; })[0]; if(g && g.gana) L.push(`<b>${e(g.nom)}</b> es el más barato en ${appN(g.gana)} de ${appN(its.length)} productos.`);
+    if(V.length) L.push(`De ${appN(V.length)} precios, <b>${appN(nk('ok'))} son el mismo producto</b> que pediste` + (nk('rev') ? `, ${appN(nk('rev'))} para revisar` : '') + (nNo ? `, <b>${appN(nNo)} no ${nNo === 1 ? 'es' : 'son'} lo mismo</b> (alternativa o calibre distinto)` : '') + ' · toca un precio para ver qué ofrece exactamente.');
+    const noL = []; F.forEach(function(f){ f.cel.forEach(function(c){ if(c && c.alt){ const O = cotSpec(c.p.descripcion); noL.push(`${e(c.pv.nom)} en ${e(nomIt(f.it))} (ofrece ${e(O ? cotSpecTxt(O) : (c.p.obs || 'otro producto'))})`); } }); });
+    if(noL.length) L.push('No son lo mismo: ' + noL.join(' · ') + '.');
+    const g = P.slice().sort(function(a, b){ return b.gana - a.gana; })[0]; if(g && g.gana) L.push(`<b>${e(g.nom)}</b> es el más barato en ${appN(g.gana)} de ${appN(its.length)} productos, contando solo el mismo producto pedido.`);
     if(top1 && !top1.alt.length && top1.n === its.length && cub.length === its.length && top1.tot - combo > 0.5) L.push(`Combinando proveedores se ahorra <b>${usd(top1.tot - combo)}</b> frente a darle todo a ${e(top1.nom)}.`);
-    if(top1 && top1.alt.length) L.push(`<b>${e(top1.nom)}</b> cotiza todo por ${usd(top1.tot)}, pero incluye ${top1.alt.length === 1 ? 'una alternativa' : appN(top1.alt.length) + ' alternativas'} (${top1.alt.map(function(x){ return e(polarCorta(x, 34)); }).join(', ')}): no es el mismo producto pedido.`);
-    const sinP = F.filter(function(f){ return !f.best; }); if(sinP.length) L.push('Sin precio todavía: ' + sinP.map(function(f){ return e(polarCorta(f.it.desc, 40)); }).join(', '));
-    F.filter(function(f){ return f.best && f.best.alt; }).forEach(function(f){ L.push(`${e(polarCorta(f.it.desc, 40))}: solo hay <b>alternativa</b> (${e(f.best.pv.nom)}); confirmar con el supervisor.`); });
-    F.forEach(function(f){ if(!f.best) return; const q = +f.best.p.cantidad; if(q > 0 && f.it.cant && q < f.it.cant) L.push(`${e(f.best.pv.nom)} ofrece solo ${appN(q)} de ${appN(f.it.cant)} ${e(String(f.it.um || '').toLowerCase())} en ${e(polarCorta(f.it.desc, 40))}`); });
+    if(top1 && top1.alt.length) L.push(`<b>${e(top1.nom)}</b> cotiza todo por ${usd(top1.tot)}, pero ${top1.alt.length === 1 ? 'uno no es' : appN(top1.alt.length) + ' no son'} el mismo producto (${top1.alt.map(function(it){ return e(nomIt(it)); }).join(', ')}).`);
+    const sinP = F.filter(function(f){ return !f.best; }); if(sinP.length) L.push('Sin precio todavía: ' + sinP.map(function(f){ return e(nomIt(f.it)); }).join(', '));
+    F.filter(function(f){ return f.best && f.best.alt; }).forEach(function(f){ L.push(`${e(nomIt(f.it))}: solo hay <b>alternativa</b> (${e(f.best.pv.nom)}); confirmar con el supervisor.`); });
+    F.forEach(function(f){ if(!f.best) return; const q = +f.best.p.cantidad; if(q > 0 && f.it.cant && q < f.it.cant) L.push(`${e(f.best.pv.nom)} ofrece solo ${appN(q)} de ${appN(f.it.cant)} ${e(String(f.it.um || '').toLowerCase())} en ${e(nomIt(f.it))}`); });
     const hoy = Date.parse(isoDay(new Date()) + 'T00:00:00Z'); P.forEach(function(pv){ const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(pv.val || ''); if(!m) return; const d = Math.round((Date.UTC(+m[3], +m[2] - 1, +m[1]) - hoy) / 864e5);
       if(d >= 0 && d <= 3) L.push(`La oferta de <b>${e(pv.nom)}</b> vence ${d === 0 ? 'hoy' : d === 1 ? 'mañana' : 'en ' + d + ' días'} (${e(m[1] + '/' + m[2])}).`); });
   }catch(err){ console.warn('cot lectura', err); }
   const th = P.map(function(pv){ return `<th class="n">${e(pv.nom)}${pv.pago || pv.val ? `<small>${e([pv.pago, pv.val].filter(Boolean).join(' · '))}</small>` : ''}</th>`; }).join('');
-  const filas = F.map(function(f){ const it = f.it;
+  // Detalle bajo cada producto: lo que se pidió frente a lo que ofrece cada proveedor
+  const det = function(f, i){ const it = f.it, R = cotSpec(it.desc);
+    const rows = P.map(function(pv, j){ const c = f.cel[j];
+      if(!c) return `<tr><td class="v na">No cotizó</td><td><b>${e(pv.nom)}</b></td><td class="o"><span class="cot-na">No cotizó este producto</span></td></tr>`;
+      const p = c.p, q = +p.cantidad, W = c.ver, ic = W.k === 'ok' ? '✓' : W.k === 'rev' ? '?' : '≠';
+      return `<tr><td class="v ${W.k}">${ic} ${e(W.t)}<small>${e(W.why)}</small></td><td><b>${e(pv.nom)}</b><small>${usd(c.v)} por ${e(String(p.um || it.um || 'unidad').toLowerCase())}</small></td>
+        <td class="o">${e(p.descripcion || 'Sin descripción del producto')}<small>${[p.marca ? 'Marca ' + p.marca : '', q > 0 ? appN(q) + ' ' + String(it.um || '').toLowerCase() + (it.cant && q < it.cant ? ' de ' + appN(it.cant) + ' pedidos' : '') : '', p.plazo_txt || '', p.obs || ''].filter(Boolean).map(e).join(' · ')}</small></td></tr>`; }).join('');
+    return `<tr class="cot-det" data-cotdetrow="${i}" hidden><td colspan="${3 + P.length}"><div class="cot-dq"><b>Pediste:</b> ${e(it.desc)} · ${e(it.cod)} · ${appN(it.cant)} ${e(String(it.um || '').toLowerCase())}${R ? ` · <span class="cot-spec">${e(cotSpecTxt(R))}${cotBlind(it.desc) ? ' · apantallado' : ''}</span>` : ''}${R && R.duda ? `<small>La descripción del pedido no es clara («${e(it.desc)}»): se compara como ${e(cotSpecTxt(R))}.</small>` : ''}</div><table class="cot-dt"><tbody>${rows}</tbody></table></td></tr>`; };
+  const filas = F.map(function(f, i){ const it = f.it;
     return `<tr><td><button type="button" class="cot-pbtn" data-cottab="prod" data-cotcod="${e(it.cod)}" title="Ver el detalle de este producto">${e(polarCorta(it.desc, 60))}</button><small>${e(it.cod)}</small></td>
       <td class="n">${appN(it.cant)} <small>${e(String(it.um || '').toLowerCase())}</small></td><td class="n">${f.ucU ? usd(f.ucU) : '—'}${f.uc ? `<small>${e(gdCorto(f.uc.prov) || f.uc.prov || '')}</small>` : ''}</td>
-      ${f.cel.map(function(c){ if(!c) return '<td class="vac">—</td>'; const p = c.p, q = +p.cantidad;
-        return `<td class="c${c === f.best ? ' mejor' : ''}"><b>${usd(c.v)}</b>${c.alt ? `<span class="cot-alt" title="${e(p.obs || 'Producto alternativo')}">alt.</span>` : ''}${pct(c.v, f.ucU)}<small>${[q > 0 && it.cant && q < it.cant ? 'solo ' + appN(q) + ' ' + String(it.um || '').toLowerCase() : '', p.plazo_txt || (p.plazo_dias != null ? p.plazo_dias + ' días' : '')].filter(Boolean).map(e).join(' · ')}</small></td>`; }).join('')}</tr>`; }).join('');
+      ${f.cel.map(function(c){ if(!c) return '<td class="vac">—</td>'; const p = c.p, q = +p.cantidad, W = c.ver;
+        const ic = W.k === 'ok' ? `<i class="cot-ok" title="${e('Mismo producto · ' + W.why)}">✓</i>` : W.k === 'rev' ? `<i class="cot-rev" title="${e('Revisar · ' + W.why)}">?</i>` : `<span class="cot-alt" title="${e(W.t + ' · ' + W.why)}">alt.</span>`;
+        return `<td class="c${c === f.best ? ' mejor' : ''}"><button type="button" class="cot-cel" data-cotdet="${i}" title="Ver qué ofrece exactamente"><b>${usd(c.v)}</b>${ic}${pct(c.v, f.ucU)}<small>${[q > 0 && it.cant && q < it.cant ? 'solo ' + appN(q) + ' ' + String(it.um || '').toLowerCase() : '', p.plazo_txt || (p.plazo_dias != null ? p.plazo_dias + ' días' : '')].filter(Boolean).map(e).join(' · ')}</small></button></td>`; }).join('')}</tr>` + det(f, i); }).join('');
   const pie = P.length ? `<tfoot><tr><td>Total del pedido</td><td></td><td class="n">${ultT ? usd(ultT) + (conUc.length < its.length ? `<small>${appN(conUc.length)} con compra previa</small>` : '') : ''}</td>${P.map(function(pv){ return `<td class="c">${usd(pv.tot)}<small>${appN(pv.n)} de ${appN(its.length)} ítems${pv.alt.length ? ' · ' + appN(pv.alt.length) + ' alt.' : ''}</small></td>`; }).join('')}</tr></tfoot>` : '';
   const chips = RS.L.filter(function(r){ return r.est; }).map(function(r){ const t = COT_EST[r.est] || COT_EST.otro; return `<span class="${t[1]}" title="${e([r.mail, r.nota].filter(Boolean).join(' · '))}">${e(r.nom)} <i>${t[0]}</i></span>`; }).join('');
   const sin = RS.L.filter(function(r){ return r.inv && !r.est; }).map(function(r){ return r.nom; });
   appListaAbrir('Cotización · ' + e(s.cot), appN(its.length) + ' productos · comparativa de proveedores' + (s.creado ? ' · enviada el ' + e(fmtDate(new Date(s.creado))) : ''), `<div class="cot-an">${cotTabsHtml(cod, 'comp')}${kpis}
     ${L.length ? `<div class="cot-sec">Lectura rápida</div><div class="cot-lect">${L.map(function(x){ return '<span>' + x + '</span>'; }).join('')}</div>` : ''}
-    <div class="cot-sec">Precio por producto y proveedor</div>${P.length ? `<div class="pm-dw"><table class="pm-dt cot-t cot-cmp"><thead><tr><th>Producto</th><th class="n">Cant.</th><th class="n">Últ. compra</th>${th}</tr></thead><tbody>${filas}</tbody>${pie}</table></div>
-      <p class="cot-nota">US$ por unidad, sin IGV · en verde, el más barato de cada producto (entre los que cotizan el mismo producto) · «alt.» = ofrece un producto alternativo · el total es precio × cantidad pedida · toca un producto para ver su detalle.</p>`
+    <div class="cot-sec cot-secb">Precio por producto y proveedor${P.length ? '<button type="button" class="cot-tg" data-cotdetall="1">Ver qué ofrece cada proveedor</button>' : ''}</div>${P.length ? `<div class="pm-dw"><table class="pm-dt cot-t cot-cmp"><thead><tr><th>Producto</th><th class="n">Cant.</th><th class="n">Últ. compra</th>${th}</tr></thead><tbody>${filas}</tbody>${pie}</table></div>
+      <p class="cot-nota">US$ por unidad, sin IGV · <b>✓</b> = es el mismo producto pedido (mismo calibre y apantallado) · <b>?</b> = revisar · «alt.» = alternativa o calibre distinto · en verde, el más barato del mismo producto · el total es precio × cantidad pedida · toca un precio para ver qué ofrece exactamente; toca un producto para su detalle.</p>`
       : `<div class="cot-vacio">Aún no llega ningún precio para esta solicitud. Cuando los proveedores manden su cotización, Claude la lee y aquí sale la comparativa.</div>`}
     <div class="cot-sec">Quién respondió</div><div class="cot-sols"><div class="cot-sol"><span><b>${e(s.cot)}</b>${s.creado ? ' · ' + e(fmtDate(new Date(s.creado))) : ''}</span><span>${appN(RS.n)} de ${appN(Math.max(inv, RS.inv))} proveedores respondieron</span><div class="cot-pv">${chips}</div>${sin.length ? `<small class="cot-sin">Sin respuesta: ${e(sin.join(', '))}</small>` : ''}</div></div></div>`);
   const oc = document.getElementById('appOC'); if(oc) oc.classList.add('ancho'); }
@@ -20639,7 +20679,7 @@ function cotAnalisisAbrir(cod, tab){ const e = escapeHtml, c0 = function(x){ ret
   const pct = function(v){ if(v == null || !ucUsd) return ''; const d = (v - ucUsd) / ucUsd * 100; return `<em class="cot-v ${d > 0.5 ? 'up' : d < -0.5 ? 'dn' : ''}">${d > 0.5 ? '▲ ' : d < -0.5 ? '▼ ' : ''}${Math.abs(d).toFixed(1)}% vs última compra</em>`; };
   // La última oferta de cada proveedor: mejor oferta y precio de mercado (mediana) a la fecha
   const ult = new Map(); ci.pre.forEach(function(p){ const k = String(p.ruc || p.proveedor || '').toUpperCase(), o = ult.get(k); if(!o || String(p.fecha || '') > String(o.fecha || '')) ult.set(k, p); });
-  const O = [...ult.values()].filter(function(p){ return cotUsd(p) > 0; }).sort(function(a, b){ return cotUsd(a) - cotUsd(b); }), V = O.map(cotUsd), best = O[0];
+  const O = [...ult.values()].filter(function(p){ return cotUsd(p) > 0; }).sort(function(a, b){ return cotUsd(a) - cotUsd(b); }), V = O.map(cotUsd), best = O.find(function(p){ const k = cotVerif(it0.desc || '', p).k; return k !== 'alt' && k !== 'dif'; }) || O[0];   // la mejor oferta es del mismo producto pedido
   const med = V.length ? (V.length % 2 ? V[(V.length - 1) / 2] : (V[V.length / 2 - 1] + V[V.length / 2]) / 2) : null;
   const plazo = function(p){ return p.plazo_txt || (p.plazo_dias != null ? p.plazo_dias + ' días' : ''); }, prov = function(p){ return gdCorto(p.proveedor || '') || p.proveedor || '—'; };
   // Solo las solicitudes con respuesta (26.11.2026, Piero: "puedes colocar ahí solo cuando existan respuestas").
@@ -20651,7 +20691,7 @@ function cotAnalisisAbrir(cod, tab){ const e = escapeHtml, c0 = function(x){ ret
   const filas = ci.pre.slice().sort(function(a, b){ return String(b.fecha || '').localeCompare(String(a.fecha || '')) || (cotUsd(a) || 0) - (cotUsd(b) || 0); }).map(function(p){ const v = cotUsd(p);
     return `<tr${p === best ? ' class="cot-mejor"' : ''}><td>${p.fecha ? e(fmtDate(new Date(p.fecha + 'T00:00:00Z'))) : '—'}</td><td><b>${e(prov(p))}</b>${p.ruc ? `<small>${e(p.ruc)}</small>` : ''}</td><td>${e(p.cot || '—')}</td>
       <td class="n">${p.precio_unit != null ? e(appSkuPrecio(+p.precio_unit, /PEN|S\/|SOL/i.test(p.moneda || '') ? 'S/' : /USD|US\$|\$/i.test(p.moneda || '') ? 'US$' : (p.moneda || ''))) : '—'}${p.um ? ` <small>/ ${e(String(p.um).toLowerCase())}</small>` : ''}</td><td class="n"><b>${usd2(v)}</b>${pct(v).replace(' vs última compra', '')}</td>
-      <td>${e(plazo(p) || '—')}</td><td>${e(p.cond_entrega || '—')}</td><td>${e(p.cond_pago || '—')}</td><td>${e(p.validez || '—')}</td><td>${e(p.marca || '')}${p.obs ? `<small>${e(p.obs)}</small>` : ''}</td><td class="cot-arch" title="${e(p.archivo || '')}">${e(String(p.archivo || '').split(/[\\/]/).pop() || '—')}</td></tr>`; }).join('');
+      <td>${e(plazo(p) || '—')}</td><td>${e(p.cond_entrega || '—')}</td><td>${e(p.cond_pago || '—')}</td><td>${e(p.validez || '—')}</td><td>${(function(){ const W = cotVerif(it0.desc || '', p); return `<span class="cot-vk ${W.k}" title="${e(W.why)}">${W.k === 'ok' ? '✓' : W.k === 'rev' ? '?' : '≠'} ${e(W.t)}</span>`; })()}${p.descripcion ? `<small>${e(p.descripcion)}</small>` : ''}${p.marca ? `<small>Marca: ${e(p.marca)}</small>` : ''}${p.obs ? `<small>${e(p.obs)}</small>` : ''}</td><td class="cot-arch" title="${e(p.archivo || '')}">${e(String(p.archivo || '').split(/[\\/]/).pop() || '—')}</td></tr>`; }).join('');
   const sols = solR.map(function(s){ const its = (s.items || []).filter(function(it){ return String(it.cod || '').trim() === cod; }), inv = String(s.cco || '').split(/[;,]/).filter(function(x){ return /@/.test(x); }).length;
     const RS = cotRespuestas(s), resp = RS.n, sin = RS.L.filter(function(r){ return r.inv && !r.est; }).map(function(r){ return r.nom; });
     const pv = RS.L.filter(function(r){ return r.est; }).map(function(r){ const t = COT_EST[r.est] || COT_EST.otro; return `<span class="${t[1]}" title="${e([r.mail, r.nota].filter(Boolean).join(' · '))}">${e(r.nom)} <i>${t[0]}</i></span>`; }).join('');
@@ -20659,7 +20699,7 @@ function cotAnalisisAbrir(cod, tab){ const e = escapeHtml, c0 = function(x){ ret
       <div class="cot-pv">${pv}</div>${sin.length ? `<small class="cot-sin">Sin respuesta: ${e(sin.join(', '))}</small>` : ''}</div>`; }).join('');
   appListaAbrir('Cotizaciones · ' + e(polarCorta(desc, 60)), e(cod) + ' · precios de las respuestas de los proveedores', `<div class="cot-an">${sc ? cotTabsHtml(cod, 'prod') : ''}${kpis}
     ${solR.length ? `<div class="cot-sec">Solicitudes con respuesta</div><div class="cot-sols">${sols}</div>` : ''}
-    <div class="cot-sec">Precios recibidos</div>${filas ? `<div class="pm-dw"><table class="pm-dt cot-t"><thead><tr><th>Fecha</th><th>Proveedor</th><th>COT</th><th class="n">Precio</th><th class="n">US$</th><th>Plazo</th><th>Entrega</th><th>Pago</th><th>Validez</th><th>Marca / obs.</th><th>Archivo</th></tr></thead><tbody>${filas}</tbody></table></div>`
+    <div class="cot-sec">Precios recibidos</div>${filas ? `<div class="pm-dw"><table class="pm-dt cot-t"><thead><tr><th>Fecha</th><th>Proveedor</th><th>COT</th><th class="n">Precio</th><th class="n">US$</th><th>Plazo</th><th>Entrega</th><th>Pago</th><th>Validez</th><th>Qué ofrece</th><th>Archivo</th></tr></thead><tbody>${filas}</tbody></table></div>`
       : `<div class="cot-vacio">${solR.length ? 'Aún no llega ningún precio: arriba ves qué respondió cada proveedor. Cuando manden su cotización, Claude la lee y los precios aparecen aquí.' : ci.sol.length ? 'La cotización ya se envió. Cuando los proveedores respondan, sus PDF se guardan en OneDrive → Cotizaciones → ' + e(ci.sol[0].cot) + ' y Claude los lee cada 2 horas: los precios aparecen aquí.' : 'Este código aún no se cotizó. Márcalo en SKU sin OC y usa "Cotizar".'}</div>`}</div>`);
   const oc = document.getElementById('appOC'); if(oc) oc.classList.add('ancho'); }
 async function appCotExcel(L){ let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
