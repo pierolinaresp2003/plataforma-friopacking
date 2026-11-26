@@ -20830,14 +20830,14 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO &&
   const pie = `<tfoot><tr><td>Total</td>${P.map(function(pv){ return `<td class="c">${usd(pv.tot)}${pv.n < its.length ? `<small>${appN(pv.n)} de ${appN(its.length)}</small>` : ''}</td>`; }).join('')}</tr></tfoot>`;
   const chips = RS.L.filter(function(r){ return r.est; }).map(function(r){ const t = COT_EST[r.est] || COT_EST.otro; return `<span class="${t[1]}" title="${e([r.mail, r.nota].filter(Boolean).join(' · '))}">${e(r.nom)} <i>${t[0]}</i></span>`; }).join('');
   const sin = RS.L.filter(function(r){ return r.inv && !r.est; }).map(function(r){ return r.nom; });
-  appListaAbrir('Cotización · ' + e(s.cot), appN(its.length) + ' productos' + (s.creado ? ' · enviada el ' + e(fmtDate(new Date(s.creado))) : ''), `<div class="cot-an">${cotTabsHtml(cod, 'comp')}${kpis}
+  appListaAbrir('Cotización · ' + e(s.cot), appN(its.length) + ' productos' + (s.creado ? ' · enviada el ' + e(fmtDate(new Date(s.creado))) : ''), `<div class="cot-an">${kpis}
     ${L.length ? `<ul class="cot2-av">${L.slice(0, 4).map(function(x){ return '<li>' + x + '</li>'; }).join('')}</ul>` : ''}
     ${P.length ? `<div class="pm-dw"><table class="pm-dt cot-cmp cot2-t"><thead><tr><th>Producto</th>${th}</tr></thead><tbody>${filas}</tbody>${pie}</table></div>`
       : `<div class="cot-vacio">Aún no llega ningún precio para esta solicitud. Cuando los proveedores manden su cotización, aquí sale la comparativa.</div>`}
     <div class="cot-sec">Quién respondió</div><div class="cot-sols"><div class="cot-sol"><div class="cot-pv">${chips}</div>${sin.length ? `<small class="cot-sin">Sin respuesta: ${e(sin.join(', '))}</small>` : ''}</div></div></div>`);
   const oc = document.getElementById('appOC'); if(oc) oc.classList.add('ancho'); }
 function cotAnalisisAbrir(cod, tab){ const e = escapeHtml, c0 = function(x){ return String(x || '').replace(/^000\d-0*/, ''); }; cod = String(cod || '').trim();
-  const sc = cotSolDe(cod); if(tab !== 'prod' && sc) return cotComparativaAbrir(sc, cod);
+  const sc = cotSolDe(cod); if(sc) return cotComparativaAbrir(sc, cod);   // sin pestaña "Por producto" (v565, 26.11.2026, Piero: "no entiendo el por producto, quítalo"); esta vista queda solo para códigos sin solicitud COT
   const ci = cotIdx().C.get(cod) || { sol:[], pre:[] }, uc = skuUltCompra(cod), TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75;
   const it0 = ci.sol.map(function(s){ return (s.items || []).find(function(it){ return String(it.cod || '').trim() === cod; }); }).find(Boolean) || {};
   const desc = it0.desc || (ci.pre.find(function(p){ return p.descripcion; }) || {}).descripcion || cod;
@@ -20863,7 +20863,7 @@ function cotAnalisisAbrir(cod, tab){ const e = escapeHtml, c0 = function(x){ ret
     const pv = RS.L.filter(function(r){ return r.est; }).map(function(r){ const t = COT_EST[r.est] || COT_EST.otro; return `<span class="${t[1]}" title="${e([r.mail, r.nota].filter(Boolean).join(' · '))}">${e(r.nom)} <i>${t[0]}</i></span>`; }).join('');
     return `<div class="cot-sol"><span><b>${e(s.cot)}</b> · ${e(fmtDate(new Date(s.creado)))} · ${its.map(function(it){ return (it.ped ? 'Pedido ' + e(c0(it.ped)) : it.req ? 'Req. ' + e(c0(it.req)) : '') + (it.pry ? ' · ' + e(it.pry) : ''); }).join(' / ')}</span><span>${appN(resp)} de ${appN(Math.max(inv, RS.inv))} proveedores respondieron</span>
       <div class="cot-pv">${pv}</div>${sin.length ? `<small class="cot-sin">Sin respuesta: ${e(sin.join(', '))}</small>` : ''}</div>`; }).join('');
-  appListaAbrir('Cotizaciones · ' + e(polarCorta(desc, 60)), e(cod) + ' · precios de las respuestas de los proveedores', `<div class="cot-an">${sc ? cotTabsHtml(cod, 'prod') : ''}${kpis}
+  appListaAbrir('Cotizaciones · ' + e(polarCorta(desc, 60)), e(cod) + ' · precios de las respuestas de los proveedores', `<div class="cot-an">${kpis}
     ${solR.length ? `<div class="cot-sec">Solicitudes con respuesta</div><div class="cot-sols">${sols}</div>` : ''}
     <div class="cot-sec">Precios recibidos</div>${filas ? `<div class="pm-dw"><table class="pm-dt cot-t"><thead><tr><th>Fecha</th><th>Proveedor</th><th>COT</th><th class="n">Precio</th><th class="n">US$</th><th>Plazo</th><th>Entrega</th><th>Pago</th><th>Validez</th><th>Qué ofrece</th><th>Archivo</th></tr></thead><tbody>${filas}</tbody></table></div>`
       : `<div class="cot-vacio">${solR.length ? 'Aún no llega ningún precio: arriba ves qué respondió cada proveedor. Cuando manden su cotización, Claude la lee y los precios aparecen aquí.' : ci.sol.length ? 'La cotización ya se envió. Cuando los proveedores respondan, sus PDF se guardan en OneDrive → Cotizaciones → ' + e(ci.sol[0].cot) + ' y Claude los lee cada 2 horas: los precios aparecen aquí.' : 'Este código aún no se cotizó. Márcalo en SKU sin OC y usa "Cotizar".'}</div>`}</div>`);
