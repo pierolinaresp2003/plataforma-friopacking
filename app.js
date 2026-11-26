@@ -13522,6 +13522,7 @@ function appLanzador(forzar){
   const fecha0 = new Date().toLocaleDateString('es-PE', { weekday:'long', day:'numeric', month:'long' }), fecha = fecha0.charAt(0).toUpperCase() + fecha0.slice(1);
   const sal = appSaludo().split(', '), correo = APP.usuario && APP.usuario.correo ? APP.usuario.correo : '', R = pzResumenYa();
   const fila = function(k, i, grupo){ const v = APP_VISTAS[k] || { nombre:'Logística' };
+    if(k === 'gerencial') return '<a class="pz-mod pz-gerencial" href="https://directorio-logistica.vercel.app/" target="_blank" rel="noopener" style="--i:' + i + ';text-decoration:none;color:inherit"><span class="pz-ic">' + (ico[k] || '') + '</span><span class="pz-tx"><b>' + escapeHtml(v.nombre) + '</b><span>' + escapeHtml(ext[k] || 'Resumen de todo Logistica') + '</span></span><span class="pz-go">' + go + '</span></a>';
     return `<button type="button" class="pz-mod pz-${k}" ${grupo ? 'data-lzgrupo="1"' : `data-lzv="${k}"`} style="--i:${i}"><span class="pz-ic">${ico[k] || ''}</span><span class="pz-tx"><b>${escapeHtml(v.nombre)}</b><span>${escapeHtml(ext[k] || v.desc || 'Compras, Comex y Almacén')}</span></span>
       <span class="pz-go">${go}</span></button>`; };
   // Gerencia (15.10.2026, Piero): primero Gerencial y abajo "Logística", que abre Compras, Comex y Almacén (18.11.2026).
