@@ -20836,7 +20836,7 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO &&
   const th = P.map(function(pv){ return `<th class="c"><span>${e(pv.nom)}</span>${cotPdfA(pv.arc, 'PDF')}</th>`; }).join('');
   const filas = F.map(function(f, i){ const it = f.it;
     return `<tr><td><button type="button" class="cot2-p" data-cotdet="${i}"><b>${e(polarCorta(it.desc, 55))}</b><small>${appN(it.cant)} ${e(um(it))}</small></button></td>
-      <td class="c ult"${f.uc ? ` title="${e((f.uc.prov || '') + ' · ' + fmtDate(f.uc.f))}"` : ''}>${f.ucU ? usd(f.ucU) : '—'}${f.uc && f.uc.prov ? `<small>${e(gdCorto(f.uc.prov) || f.uc.prov)}</small>` : ''}</td>
+      <td class="c ult">${f.uc ? `<button type="button" class="ocv-it-c cot2-ult" data-sku="${e(it.cod)}" title="${e((f.uc.prov || '') + ' · ' + fmtDate(f.uc.f) + ' · toca para ver el historial de compras')}">${f.ucU ? usd(f.ucU) : 'Sin precio'}${f.uc.prov ? `<small>${e(gdCorto(f.uc.prov) || f.uc.prov)}</small>` : ''}</button>` : '—'}</td>
       ${f.cel.map(function(c){ if(!c) return '<td class="c vac">—</td>'; const q = +c.p.cantidad;
         const tag = c.alt ? '<i class="cot2-tag alt">alternativa</i>' : c.ver.k === 'rev' ? '<i class="cot2-tag">revisar</i>' : q > 0 && f.it.cant && q < f.it.cant ? '<i class="cot2-tag">parcial</i>' : '';
         const dif = c === f.best && !c.alt && f.ucU ? (c.v - f.ucU) / f.ucU * 100 : null;   // la mejor oferta frente a la última compra (v567)
