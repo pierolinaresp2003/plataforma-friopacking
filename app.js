@@ -20786,6 +20786,34 @@ function cotPdfA(arc, txt){ const u = cotPdfUrl(arc); return u ? `<a class="cot-
 // Comparativa simple (v564, 26.11.2026, Piero: "tiene demasiados detalles y números en pequeño… hazlo simple y que solo se pueda ver el
 // detalle al hacer click"): arriba 2 cifras y pocos avisos; en la tabla solo el precio (verde = el más barato del mismo producto); al tocar
 // un producto o un precio se abre lo que ofrece cada proveedor, con su PDF.
+// ¿A cuánto debería estar el precio hoy? (v570, 26.11.2026, Piero: "a quién se le compró, cuándo, y un análisis de cómo debería estar el
+// precio ahora en base al precio de mercado, análisis global y nacional"). Todo sale de Consulta.xlsx y de las ofertas de la COT:
+//  · Última compra y las anteriores del mismo código (proveedor, fecha, precio en US$).
+//  · Precio esperado hoy: la última compra llevada a hoy con la variación anual de precios de su familia (mediana de lo que cambió el precio
+//    entre compras seguidas de un mismo código, en la misma moneda, en los últimos 3 años; hacen falta 5 casos o más).
+//  · Mercado nacional: lo que ofrecen hoy los proveedores (mismo producto) y lo pagado en compras nacionales (OC 0001) en 12 meses.
+//  · Importado: lo pagado en importaciones (OC 0002) del mismo código en 2 años, precio de la OC sin flete ni aduana.
+function cotPrecioRef(cod, ofertas){ cod = String(cod || '').trim();
+  const TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.375, TE = (TIPO_CAMBIO && (TIPO_CAMBIO['€'] || TIPO_CAMBIO.EUR)) || 3.9;
+  const aUsd = function(v, mon){ const m = String(mon || ''); return /S\//.test(m) ? v / TC : /€|EUR/i.test(m) ? v * TE / TC : v; };
+  const med = function(l){ if(!l.length) return null; const s = l.slice().sort(function(a, b){ return a - b; }), k = s.length >> 1; return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; };
+  const R = (GASTO_DATA && GASTO_DATA.rows) || [], hoy = Date.now(), dia = 864e5, fe = function(r){ return Date.UTC(r.anio, (r.mes || 1) - 1, r.dia || 1); };
+  const M = new Map(); let fam = '';
+  R.forEach(function(r){ if(String(r.codigo || '').trim() !== cod || !r.oc || !(r.cantidad > 0) || !(r.montoNativo > 0)) return; if(r.familia && !fam) fam = r.familia;
+    const o = M.get(r.oc) || { oc:r.oc, f:fe(r), prov:r.proveedor || '', mon:r.moneda, q:0, m:0, imp:r.origen === 'importado' }; o.q += r.cantidad; o.m += r.montoNativo; M.set(r.oc, o); });
+  const C = [...M.values()].map(function(o){ o.pu = aUsd(o.m / o.q, o.mon); return o; }).sort(function(a, b){ return b.f - a.f; });
+  const nac = C.filter(function(o){ return !o.imp && hoy - o.f <= 365 * dia; }).map(function(o){ return o.pu; });
+  const imp = C.filter(function(o){ return o.imp && hoy - o.f <= 730 * dia; }).map(function(o){ return o.pu; });
+  fam = fam || FAMILIA_BY_PRODUCTO[cod] || '';
+  // Variación anual de precios de la familia
+  let tasa = null, n = 0; try{ if(fam){ const L = [], d3 = hoy - 3 * 365 * dia;
+    gdPrecioBase().forEach(function(l){ if(!l.length || (l[0].r.familia || '') !== fam) return;
+      for(let i = 1; i < l.length; i++){ const a = l[i - 1], b = l[i]; if(a.mn !== b.mn || a.oc === b.oc) continue; const tb = Date.parse(b.k + 'T00:00:00Z'), ta = Date.parse(a.k + 'T00:00:00Z');
+        const y = (tb - ta) / (365 * dia), q = b.pu / a.pu; if(tb < d3 || y < 0.25 || !(q > 0.2 && q < 5)) continue; L.push(Math.pow(q, 1 / y) - 1); } });
+    n = L.length; if(n >= 5) tasa = Math.max(-0.3, Math.min(0.5, med(L))); } }catch(err){}
+  // Precio esperado hoy: las últimas compras (hasta 3, de los últimos 3 años) llevadas a hoy con esa variación; la mediana, para que una compra rara no mande.
+  const rec = C.filter(function(o){ return hoy - o.f <= 3 * 365 * dia; }).slice(0, 3), esp = med(rec.map(function(o){ return o.pu * Math.pow(1 + (tasa || 0), Math.max(0, (hoy - o.f) / (365 * dia))); }));
+  return { C:C, fam:fam, tasa:tasa, n:n, esp:esp, nEsp:rec.length, nac:{ v:med(nac), n:nac.length }, imp:{ v:med(imp), n:imp.length }, of:{ v:med(ofertas || []), n:(ofertas || []).length } }; }
 function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75;
   const usd = function(v){ return v == null || isNaN(v) ? '—' : 'US$ ' + v.toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 }); };
   const its = []; (s.items || []).forEach(function(it){ const k = String(it.cod || '').trim(); if(k && !its.some(function(x){ return x.cod === k; })) its.push({ cod:k, desc:it.desc || k, cant:+it.cant || 0, um:it.um || '' }); });
@@ -20824,6 +20852,21 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO &&
     const hoy = Date.parse(isoDay(new Date()) + 'T00:00:00Z'); P.forEach(function(pv){ const m = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(pv.val || ''); if(!m) return; const d = Math.round((Date.UTC(+m[3], +m[2] - 1, +m[1]) - hoy) / 864e5);
       if(d >= 0 && d <= 3) L.push(`La oferta de <b>${e(pv.nom)}</b> vence ${d === 0 ? 'hoy' : d === 1 ? 'mañana' : 'en ' + d + ' días'}.`); });
   }catch(err){ console.warn('cot avisos', err); }
+  // Análisis del precio de cada producto (v570): última compra, precio esperado hoy, mercado nacional e importado, y dónde queda la mejor oferta.
+  const pa = function(f){ const it = f.it, uc = f.uc, ofs = f.cel.filter(function(c){ return c && !c.alt; }).map(function(c){ return c.v; }), A = cotPrecioRef(it.cod, ofs);
+    const ultT = uc && uc.f ? Date.UTC(uc.f.getUTCFullYear(), uc.f.getUTCMonth(), uc.f.getUTCDate()) : null, anos = ultT ? Math.max(0, (Date.now() - ultT) / (365 * 864e5)) : 0;
+    const esp = A.esp;
+    const hace = ultT ? (anos >= 1 ? appN(anos, 1) + ' años' : Math.max(1, Math.round(anos * 12)) + (Math.round(anos * 12) === 1 ? ' mes' : ' meses')) : '';
+    const famT = A.fam ? titleCase(A.fam) : 'su familia';
+    const prev = A.C.filter(function(o){ return !uc || o.oc !== uc.oc; }).slice(0, 3).map(function(o){ return e(fmtDate(new Date(o.f))) + ' · ' + e(gdCorto(o.prov) || o.prov || '') + ' · ' + usd(o.pu) + (o.imp ? ' (importado)' : ''); });
+    const tj = [
+      `<div><small>Última compra</small><b>${f.ucU ? usd(f.ucU) : '—'}</b><span>${uc ? e(gdCorto(uc.prov) || uc.prov || 'Sin proveedor') + ' · ' + e(fmtDate(uc.f)) + (hace ? ' (hace ' + hace + ')' : '') + (uc.oc ? ' · OC ' + e(String(uc.oc).replace(/^000\d-0*/, '')) : '') : 'No se compró antes'}</span></div>`,
+      `<div class="esp"><small>Precio esperado hoy</small><b>${esp != null ? usd(esp) : '—'}</b><span>${esp != null ? 'según ' + (A.nEsp === 1 ? 'la última compra' : 'las últimas ' + A.nEsp + ' compras') + ' llevadas a hoy' + (A.tasa != null ? ' · ' + e(famT) + ' ' + (A.tasa >= 0 ? 'sube' : 'baja') + ' ' + Math.abs(A.tasa * 100).toFixed(1) + ' % al año' : ' (sin ajuste: pocos datos de ' + e(famT) + ')') : 'Sin compras de este código en los últimos 3 años'}</span></div>`,
+      `<div><small>Mercado nacional</small><b>${A.of.v != null ? usd(A.of.v) : A.nac.v != null ? usd(A.nac.v) : '—'}</b><span>${[A.of.n ? (A.of.n === 1 ? '1 oferta de hoy' : 'mediana de ' + A.of.n + ' ofertas de hoy') : '', A.nac.n ? 'compras nacionales en 12 meses: ' + usd(A.nac.v) + ' (' + A.nac.n + (A.nac.n === 1 ? ' compra)' : ' compras)') : 'sin compras nacionales en 12 meses'].filter(Boolean).join(' · ')}</span></div>`,
+      `<div><small>Importado</small><b>${A.imp.v != null ? usd(A.imp.v) : '—'}</b><span>${A.imp.n ? (A.imp.n === 1 ? '1 importación' : 'mediana de ' + A.imp.n + ' importaciones') + ' en 2 años · precio de la OC, sin flete ni aduana' : 'Sin importaciones de este código en 2 años'}</span></div>`];
+    const ref = esp != null ? esp : A.of.v, b = f.best && !f.best.alt ? f.best.v : null;
+    const ver = b != null && ref ? `La mejor oferta (${usd(b)}, ${e(f.best.pv.nom)}) está <b>${Math.abs((b - ref) / ref * 100).toFixed(1)} % ${b <= ref ? 'por debajo' : 'por encima'}</b> ${esp != null ? 'del precio esperado hoy' : 'de la mediana de las ofertas'}.` : '';
+    return `<div class="cot2-pa"><div class="pa-h"><b>¿A cuánto debería estar?</b><button type="button" class="ocv-it-c pa-hist" data-sku="${e(it.cod)}">Ver historial completo ›</button></div><div class="pa-g">${tj.join('')}</div>${ver ? `<p class="pa-v">${ver}</p>` : ''}${prev.length ? `<p class="pa-p"><b>Compras anteriores:</b> ${prev.join(' · ')}</p>` : ''}</div>`; };
   // Detalle de un producto: lo que ofrece cada proveedor, en tarjetas
   const det = function(f, i){ const it = f.it;
     const cards = P.map(function(pv, j){ const c = f.cel[j]; if(!c) return ''; const p = c.p, q = +p.cantidad, W = c.ver;
@@ -20832,11 +20875,11 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO &&
       return `<div class="cot2-o${c === f.best ? ' mejor' : ''}"><div class="h"><b>${e(pv.nom)}</b><span>${usd(c.v)}</span></div>
         <div class="st ${W.k}">${W.k === 'ok' ? '✓ Es lo que pediste' : W.k === 'rev' ? 'Revisar' : 'No es lo mismo'}${W.k !== 'ok' ? `<small>${e(W.why)}</small>` : ''}</div>
         <p>${e(p.descripcion || 'No detalló el producto')}</p>${li.length ? `<ul>${li.map(function(x){ return '<li>' + e(x) + '</li>'; }).join('')}</ul>` : ''}${cotPdfA(p.archivo, 'Ver cotización')}</div>`; }).join('');
-    return `<tr class="cot-det" data-cotdetrow="${i}" hidden><td colspan="${2 + P.length}"><div class="cot2-dq"><b>Pediste:</b> ${e(it.desc)} · ${appN(it.cant)} ${e(um(it))}${f.ucU ? ` · última compra ${usd(f.ucU)}${f.uc && f.uc.prov ? ' a ' + e(gdCorto(f.uc.prov) || f.uc.prov) : ''}` : ''}</div><div class="cot2-of">${cards}</div></td></tr>`; };
+    return `<tr class="cot-det" data-cotdetrow="${i}" hidden><td colspan="${2 + P.length}"><div class="cot2-dq"><b>Pediste:</b> ${e(it.desc)} · ${appN(it.cant)} ${e(um(it))}</div>${pa(f)}<div class="cot2-of">${cards}</div></td></tr>`; };
   const th = P.map(function(pv){ return `<th class="c"><span>${e(pv.nom)}</span>${cotPdfA(pv.arc, 'PDF')}</th>`; }).join('');
   const filas = F.map(function(f, i){ const it = f.it;
     return `<tr><td><button type="button" class="cot2-p" data-cotdet="${i}"><b>${e(polarCorta(it.desc, 55))}</b><small>${appN(it.cant)} ${e(um(it))}</small></button></td>
-      <td class="c ult">${f.uc ? `<button type="button" class="ocv-it-c cot2-ult" data-sku="${e(it.cod)}" title="${e((f.uc.prov || '') + ' · ' + fmtDate(f.uc.f) + ' · toca para ver el historial de compras')}">${f.ucU ? usd(f.ucU) : 'Sin precio'}${f.uc.prov ? `<small>${e(gdCorto(f.uc.prov) || f.uc.prov)}</small>` : ''}</button>` : '—'}</td>
+      <td class="c ult">${f.uc ? `<button type="button" class="cot-cel cot2-ult" data-cotdet="${i}" title="${e((f.uc.prov || '') + ' · ' + fmtDate(f.uc.f) + ' · toca para ver el análisis del precio')}">${f.ucU ? usd(f.ucU) : 'Sin precio'}${f.uc.prov ? `<small>${e(gdCorto(f.uc.prov) || f.uc.prov)}</small>` : ''}<small>${e(fmtDate(f.uc.f))}</small></button>` : '—'}</td>
       ${f.cel.map(function(c){ if(!c) return '<td class="c vac">—</td>'; const q = +c.p.cantidad;
         const tag = c.alt ? '<i class="cot2-tag alt">alternativa</i>' : c.ver.k === 'rev' ? '<i class="cot2-tag">revisar</i>' : q > 0 && f.it.cant && q < f.it.cant ? '<i class="cot2-tag">parcial</i>' : '';
         const dif = c === f.best && !c.alt && f.ucU ? (c.v - f.ucU) / f.ucU * 100 : null;   // la mejor oferta frente a la última compra (v567)
