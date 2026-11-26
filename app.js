@@ -13006,9 +13006,9 @@ const APP_VISTAS = {
     tabs:[['inventario','📦','Inventario'], ['almseg','🧭','Requerimientos'], ['almrsv','🔒','Reservas'], ['almdesp','📦','Despachos'], ['almreg','🔁','Regularizaciones'], ['polar']] },   // Inventario primero y sin Rutas (25.11.2026, Piero)   // Reservas (13.11.2026, Piero)   // sin OTIF; Seguimiento = requerimientos como en Supervisor (12.11.2026, Piero)
   // Supervisor (13.10.2026, Piero): trazabilidad de requerimientos y consulta de stock por producto. Reemplaza a la vista
   // de antes que entraba directo a Leo (Leo sigue en la burbuja).
-  super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos y consulta de stock por producto.',
+  super:      { nombre:'Supervisor', ico:'👷', desc:'Estado de los requerimientos, stock por producto y certificados.',
     // Inventario (stock por sede y kardex) se suma al Supervisor (09.11.2026, Piero).
-    tabs:[['suppry','🏗️','Proyectos'], ['supreq','📋','Requerimientos'], ['polar'], ['pendlog','🚢','Importaciones'], ['inventario','📦','Inventario']] },   // + Importaciones (19.11.2026, Piero: "el supervisor también debe tener la vista de importaciones")   // Producto se quitó de Supervisor (12.11.2026, Piero)   // + Proyectos (11.11.2026, Piero)   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
+    tabs:[['suppry','🏗️','Proyectos'], ['supreq','📋','Requerimientos'], ['polar'], ['pendlog','🚢','Importaciones'], ['inventario','📦','Inventario'], ['certificados','📄','Certificados']] },   // + Certificados, solo para ver (v576, 26.11.2026, Piero: "añade el módulo certificados en vista supervisor")   // + Importaciones (19.11.2026, Piero: "el supervisor también debe tener la vista de importaciones")   // Producto se quitó de Supervisor (12.11.2026, Piero)   // + Proyectos (11.11.2026, Piero)   // Certificados se quitó de Supervisor por ahora (07.11.2026, Piero; estaba desde el 05.11.2026)
   // Gerencial (15.10.2026, Piero: "kalegria, mlujan y apl no deben tener Compras ni Almacén sino un módulo gerencial con
   // el resumen de todo Logística, con las fotos, para ver en un pantallazo lo que hace cada uno y darle seguimiento").
   gerencial:  { nombre:'Gerencial',  ico:'📈', desc:'Resumen de todo Logística: qué hace cada uno en Compras, Comex y Almacén.',
@@ -13648,7 +13648,7 @@ function appLanzador(forzar){
       appNavAtras = true; try{ if(v !== APP.vista) appElegirVista(v); else appInicio(); } finally{ appNavAtras = false; }
       APP_NAV.push({ lz:1 });
       setTimeout(function(){ el.classList.remove('abierto', 'fuera', 'pz-ya'); b.classList.remove('pulsado'); el._yendo = false; }, 180); }); }
-  const ext = { gerencial:'Resumen de todo Logística: cada persona, sus números y su Daily', compras:'Seguimiento de OC, certificados y equipos por origen', comex:'Importaciones: embarques en el mapa del mundo', almacen:'Requerimientos, reservas, regularizaciones e inventario', operario:'Validar las reservas de stock', super:'Trazabilidad de requerimientos y consulta de stock por producto', frioteam:'Stock por sede y kardex' };
+  const ext = { gerencial:'Resumen de todo Logística: cada persona, sus números y su Daily', compras:'Seguimiento de OC, certificados y equipos por origen', comex:'Importaciones: embarques en el mapa del mundo', almacen:'Requerimientos, reservas, regularizaciones e inventario', operario:'Validar las reservas de stock', super:'Trazabilidad de requerimientos, stock por producto y certificados', frioteam:'Stock por sede y kardex' };
   // Portada nueva (11.11.2026, Piero: "todo más simple y que vaya al grano"): saludo, una línea con lo importante de hoy y cada
   // módulo con sus 2 números clave a la derecha. Blanca, sin emojis y con íconos de línea.
   const sv = function(d){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`; };
@@ -27391,7 +27391,6 @@ function polarMovimientosAlmacen(p, tipo){
     ${top.slice(0, 8).map(function(y){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(y.r.descripcion, 60))}</div><div class="q">${polarNum(Math.round(y.q * 100) / 100)} ${escapeHtml(y.r.unidad || '')} · ${y.n} mov. ${polarBtn('inv', y.r.codigo, 'kardex')}</div></div>`; }).join('')}`;
 }
 function polarCertificados(){
-  if(crtSoloVer()) return '<p>Los certificados no están disponibles en la vista Supervisor por ahora.</p>';   // 07.11.2026
   if(!CRT.listo || !CRT.filas || !CRT.filas.length) return `<p>Los certificados se leen de Drive al abrir el módulo. Ábrelo una vez y vuelve a preguntarme.</p><div class="asis-acc">${polarBtn('ir', 'certificados', 'Abrir Certificados')}</div>`;
   const falta = CRT.filas.filter(function(f){ return !(crtTiene(f, 'cert') && crtTiene(f, 'ficha')); });
   const pp = new Map(); falta.forEach(function(f){ pp.set(f.idPry, (pp.get(f.idPry) || 0) + 1); });
