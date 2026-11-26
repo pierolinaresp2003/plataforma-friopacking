@@ -5090,6 +5090,9 @@ html[data-theme="dark"] .cot-a.on{background:#16352a;color:#5fc28f;} html[data-t
 html[data-theme="dark"] .cot-v.up{background:#3b1d1c;color:#da6e65;} html[data-theme="dark"] .cot-v.dn{background:#16352a;color:#5fc28f;}
 .cot-sec{font:800 11.5px Inter,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:16px 0 6px;}
 .cot-sols{display:flex;flex-direction:column;gap:6px;} .cot-sol{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface-2);border-radius:12px;padding:9px 12px;font-size:12.5px;color:var(--ink-soft);} .cot-sol b{color:var(--ink);}
+.cot-pv{display:flex;flex-wrap:wrap;gap:6px;width:100%;} .cot-pv:empty{display:none;} .cot-pv span{font:700 11.5px Inter,sans-serif;border-radius:99px;padding:3px 10px;background:var(--card);color:var(--ink);} .cot-pv i{font-style:normal;font-weight:800;margin-left:2px;}
+.cot-pv .ok i{color:#1b7f4a;} .cot-pv .pr i{color:#b45309;} .cot-pv .no i{color:#b42318;} .cot-pv .ot i{color:var(--ink-soft);} .cot-sin{display:block;width:100%;font-size:11.5px;color:var(--ink-soft);}
+html[data-theme="dark"] .cot-pv .ok i{color:#5fc28f;} html[data-theme="dark"] .cot-pv .pr i{color:#d59c52;} html[data-theme="dark"] .cot-pv .no i{color:#da6e65;}
 .cot-vacio{background:var(--surface-2);border-radius:14px;padding:14px 16px;font-size:13px;color:var(--ink-soft);line-height:1.45;}
 .cot-t td small{display:block;font-size:11px;color:var(--ink-soft);} .cot-t td .cot-v{margin-top:2px;} .cot-t tr.cot-mejor td{background:color-mix(in srgb,#1b7f4a 8%,var(--card));} .cot-arch{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--ink-soft);}
 </style>
@@ -26041,11 +26044,11 @@ async function appCotCorreo(L, cats, bcc){ const e = escapeHtml, cod = function(
 // se lea en automático y se guarde en una base de datos para que directamente en el app salga"): cada COT guarda sus pedidos y códigos; los
 // PDF que el flujo deja en OneDrive/Cotizaciones/COT-… los lee una tarea programada de Claude y deja los precios en fp_cot_precios (y en el
 // Excel BD Cotizaciones). En SKU sin OC, el pedido muestra su COT y el ícono de la derecha abre el análisis de precios del código.
-const COTD = { sol:[], pre:[], ok:false, t:0, cargando:false, idx:null, firma:'' };
+const COTD = { sol:[], pre:[], arc:[], ok:false, t:0, cargando:false, idx:null, firma:'' };
 async function cotCargar(){ if(COTD.cargando || Date.now() - COTD.t < 180000) return; COTD.cargando = true; let cambio = false;
-  try{ const a = await sbFetch('/rest/v1/fp_cotizaciones?select=cot,creado,cco,items,estado&order=creado.desc&limit=1000'), b = await sbFetch('/rest/v1/fp_cot_precios?select=*&order=fecha.desc.nullslast&limit=10000');
-    if(a.ok && b.ok){ const sol = await a.json(), pre = await b.json(), f = JSON.stringify([sol.length, pre.length, sol[0] && sol[0].cot, pre.reduce(function(m, p){ return Math.max(m, p.id || 0); }, 0)]);
-      cambio = f !== COTD.firma; COTD.firma = f; COTD.sol = sol; COTD.pre = pre; COTD.ok = true; COTD.idx = null; }
+  try{ const a = await sbFetch('/rest/v1/fp_cotizaciones?select=cot,creado,cco,items,estado&order=creado.desc&limit=1000'), b = await sbFetch('/rest/v1/fp_cot_precios?select=*&order=fecha.desc.nullslast&limit=10000'), c = await sbFetch('/rest/v1/fp_cot_archivos?select=archivo,cot,proveedor,correo,recibido,estado,nota&limit=10000');
+    if(a.ok && b.ok){ const sol = await a.json(), pre = await b.json(), arc = c.ok ? await c.json() : [], f = JSON.stringify([sol.length, pre.length, arc.length, sol[0] && sol[0].cot, pre.reduce(function(m, p){ return Math.max(m, p.id || 0); }, 0)]);
+      cambio = f !== COTD.firma; COTD.firma = f; COTD.sol = sol; COTD.pre = pre; COTD.arc = arc; COTD.ok = true; COTD.idx = null; }
   }catch(err){} finally{ COTD.t = Date.now(); COTD.cargando = false; }
   if(cambio && APP.enInicio && APP.pantalla === 'pendcompras') appRenderInicio(); }
 function cotIdx(){ if(COTD.idx) return COTD.idx; const P = new Map(), C = new Map(), k0 = function(x){ return String(x || '').trim(); };
@@ -26059,6 +26062,21 @@ function cotDePedido(r){ const I = cotIdx(), cod = String(r.idProducto || '').tr
   const l = (r.codOrden ? g('o|' + String(r.codOrden).trim()) : []).concat(r.codPedido ? g('p|' + String(r.codPedido).trim()) : []); return l.length ? [...new Set(l)] : r.req ? g('r|' + String(r.req).trim()) : []; }
 function cotUsd(p){ if(p.precio_usd != null && p.precio_usd !== '') return +p.precio_usd; if(p.precio_unit == null || p.precio_unit === '') return null;
   const TC = +p.tc || (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75; return /PEN|S\/|SOL/i.test(p.moneda || '') ? +p.precio_unit / TC : +p.precio_unit; }
+// Qué respondió cada proveedor de una COT (26.11.2026, Piero: "las respuestas que guarda son correos… no tienen la cotización"): con precio,
+// Cotizó; si no, lo último que dijo (sin stock, no cotiza, en proceso); el resto, sin respuesta. Se une por el dominio del correo.
+const COT_EST = { cotizo:['Cotizó', 'ok'], en_proceso:['En proceso', 'pr'], sin_stock:['Sin stock', 'no'], no_cotiza:['No cotiza', 'no'], otro:['Respondió', 'ot'] };
+function cotRespuestas(s){ const gen = /^(gmail|hotmail|outlook|yahoo|live|icloud)\./i, mail = function(x){ const m = String(x || '').match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/); return m ? m[0].toLowerCase() : ''; };
+  const R = new Map(), de = function(m, nom){ const d = m.split('@')[1] || '', k = m ? (gen.test(d) ? m : d) : 'n|' + String(nom || '').toUpperCase(); let r = R.get(k);
+    if(!r) R.set(k, r = { mail:m, nom:'', est:'', nota:'', f:'', pre:false, inv:false }); if(nom && !r.nom) r.nom = nom; return r; };
+  String(s.cco || '').split(/[;,]/).map(mail).filter(Boolean).forEach(function(m){ de(m).inv = true; });
+  (COTD.arc || []).forEach(function(a){ if(a.cot !== s.cot) return; const r = de(mail(a.correo) || mail(a.archivo), a.proveedor), f = String(a.recibido || ''); if(f >= r.f){ r.f = f; r.est = a.estado || 'otro'; r.nota = a.nota || ''; } });
+  COTD.pre.forEach(function(p){ if(p.cot === s.cot) de(mail(p.correo) || mail(p.archivo), p.proveedor).pre = true; });
+  const M = PROVEEDOR_MAIL || {}, nomDe = function(r){ if(r.nom) return gdCorto(r.nom) || r.nom; if(!r.mail) return '—'; const d = r.mail.split('@')[1]; let n = '';
+    Object.keys(M).some(function(x){ const p = M[x], ms = [p.to].concat(p.cc || []).map(function(y){ return String(y || '').trim().toLowerCase(); });
+      if(ms.indexOf(r.mail) !== -1 || (!gen.test(d) && ms.some(function(y){ return y.split('@')[1] === d; }))){ n = p.nombre || ''; return true; } return false; });
+    return n ? gdCorto(n) || n : titleCase(d.split('.')[0]); };
+  const L = [...R.values()].map(function(r){ return { nom:nomDe(r), mail:r.mail, est:r.pre ? 'cotizo' : r.est, nota:r.nota, inv:r.inv }; });
+  return { L:L, inv:L.filter(function(r){ return r.inv; }).length, n:L.filter(function(r){ return r.est; }).length }; }
 const COT_ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 17v-3M12 17v-6M16 17v-4"/></svg>';
 function cotIcono(r){ const e = escapeHtml, ci = cotIdx().C.get(String(r.idProducto || '').trim()), nP = ci ? new Set(ci.pre.map(function(p){ return String(p.ruc || p.proveedor || '').toUpperCase(); })).size : 0, nS = ci ? ci.sol.length : 0;
   return `<span class="skt-a cot-a${nP ? ' on' : nS ? ' env' : ''}" data-clic="1" data-skucot="${e(r.idProducto || '')}" title="${nP ? appN(nP) + ' proveedor' + (nP === 1 ? '' : 'es') + ' con precio' : nS ? 'Cotización enviada, aún sin respuestas leídas' : 'Sin cotizaciones'} · ver el análisis de cotizaciones">${COT_ICO}${nP ? `<b>${nP}</b>` : ''}</span>`; }
@@ -26074,9 +26092,9 @@ function cotAnalisisAbrir(cod){ const e = escapeHtml, c0 = function(x){ return S
   const med = V.length ? (V.length % 2 ? V[(V.length - 1) / 2] : (V[V.length / 2 - 1] + V[V.length / 2]) / 2) : null;
   const plazo = function(p){ return p.plazo_txt || (p.plazo_dias != null ? p.plazo_dias + ' días' : ''); }, prov = function(p){ return gdCorto(p.proveedor || '') || p.proveedor || '—'; };
   // Solo las solicitudes con respuesta (26.11.2026, Piero: "puedes colocar ahí solo cuando existan respuestas").
-  const nResp = function(s){ return new Set(ci.pre.filter(function(p){ return p.cot === s.cot; }).map(function(p){ return String(p.ruc || p.proveedor || '').toUpperCase(); })).size; }, solR = ci.sol.filter(function(s){ return nResp(s) > 0; });
+  const nResp = function(s){ return cotRespuestas(s).n; }, solR = ci.sol.filter(function(s){ return nResp(s) > 0; });
   const kpis = `<div class="cot-k"><div><small>Última compra</small><b>${uc && uc.pu != null ? e(appSkuPrecio(uc.pu, uc.mon)) : '—'}</b><span>${uc ? e(gdCorto(uc.prov) || uc.prov || '') + ' · ' + e(fmtDate(uc.f)) : 'no se compró antes'}</span></div>
-    <div class="cot-best"><small>Mejor oferta</small><b>${best ? usd2(cotUsd(best)) : '—'}</b><span>${best ? e(prov(best)) + (plazo(best) ? ' · ' + e(plazo(best)) : '') : 'aún sin respuestas leídas'}</span>${best ? pct(cotUsd(best)) : ''}</div>
+    <div class="cot-best"><small>Mejor oferta</small><b>${best ? usd2(cotUsd(best)) : '—'}</b><span>${best ? e(prov(best)) + (plazo(best) ? ' · ' + e(plazo(best)) : '') : 'aún sin precios'}</span>${best ? pct(cotUsd(best)) : ''}</div>
     <div><small>Precio de mercado</small><b>${usd2(med)}</b><span>mediana de ${appN(O.length)} proveedor${O.length === 1 ? '' : 'es'}</span>${pct(med)}</div>
     <div><small>Solicitudes (COT)</small><b>${appN(ci.sol.length)}</b><span>${solR.length ? appN(solR.length) + ' con respuesta' : ci.sol.length ? 'enviada' + (ci.sol.length === 1 ? '' : 's') + ', aún sin respuestas' : 'aún no se cotizó'}</span></div></div>`;
   const filas = ci.pre.slice().sort(function(a, b){ return String(b.fecha || '').localeCompare(String(a.fecha || '')) || (cotUsd(a) || 0) - (cotUsd(b) || 0); }).map(function(p){ const v = cotUsd(p);
@@ -26084,12 +26102,14 @@ function cotAnalisisAbrir(cod){ const e = escapeHtml, c0 = function(x){ return S
       <td class="n">${p.precio_unit != null ? e(appSkuPrecio(+p.precio_unit, /PEN|S\/|SOL/i.test(p.moneda || '') ? 'S/' : /USD|US\$|\$/i.test(p.moneda || '') ? 'US$' : (p.moneda || ''))) : '—'}${p.um ? ` <small>/ ${e(String(p.um).toLowerCase())}</small>` : ''}</td><td class="n"><b>${usd2(v)}</b>${pct(v).replace(' vs última compra', '')}</td>
       <td>${e(plazo(p) || '—')}</td><td>${e(p.cond_entrega || '—')}</td><td>${e(p.cond_pago || '—')}</td><td>${e(p.validez || '—')}</td><td>${e(p.marca || '')}${p.obs ? `<small>${e(p.obs)}</small>` : ''}</td><td class="cot-arch" title="${e(p.archivo || '')}">${e(String(p.archivo || '').split(/[\\/]/).pop() || '—')}</td></tr>`; }).join('');
   const sols = solR.map(function(s){ const its = (s.items || []).filter(function(it){ return String(it.cod || '').trim() === cod; }), inv = String(s.cco || '').split(/[;,]/).filter(function(x){ return /@/.test(x); }).length;
-    const resp = nResp(s);
-    return `<div class="cot-sol"><span><b>${e(s.cot)}</b> · ${e(fmtDate(new Date(s.creado)))} · ${its.map(function(it){ return (it.ped ? 'Pedido ' + e(c0(it.ped)) : it.req ? 'Req. ' + e(c0(it.req)) : '') + (it.pry ? ' · ' + e(it.pry) : ''); }).join(' / ')}</span><span>${appN(resp)} de ${appN(inv)} proveedores respondieron</span></div>`; }).join('');
+    const RS = cotRespuestas(s), resp = RS.n, sin = RS.L.filter(function(r){ return r.inv && !r.est; }).map(function(r){ return r.nom; });
+    const pv = RS.L.filter(function(r){ return r.est; }).map(function(r){ const t = COT_EST[r.est] || COT_EST.otro; return `<span class="${t[1]}" title="${e([r.mail, r.nota].filter(Boolean).join(' · '))}">${e(r.nom)} <i>${t[0]}</i></span>`; }).join('');
+    return `<div class="cot-sol"><span><b>${e(s.cot)}</b> · ${e(fmtDate(new Date(s.creado)))} · ${its.map(function(it){ return (it.ped ? 'Pedido ' + e(c0(it.ped)) : it.req ? 'Req. ' + e(c0(it.req)) : '') + (it.pry ? ' · ' + e(it.pry) : ''); }).join(' / ')}</span><span>${appN(resp)} de ${appN(Math.max(inv, RS.inv))} proveedores respondieron</span>
+      <div class="cot-pv">${pv}</div>${sin.length ? `<small class="cot-sin">Sin respuesta: ${e(sin.join(', '))}</small>` : ''}</div>`; }).join('');
   appListaAbrir('Cotizaciones · ' + e(polarCorta(desc, 60)), e(cod) + ' · precios de las respuestas de los proveedores', `<div class="cot-an">${kpis}
     ${solR.length ? `<div class="cot-sec">Solicitudes con respuesta</div><div class="cot-sols">${sols}</div>` : ''}
     <div class="cot-sec">Precios recibidos</div>${filas ? `<div class="pm-dw"><table class="pm-dt cot-t"><thead><tr><th>Fecha</th><th>Proveedor</th><th>COT</th><th class="n">Precio</th><th class="n">US$</th><th>Plazo</th><th>Entrega</th><th>Pago</th><th>Validez</th><th>Marca / obs.</th><th>Archivo</th></tr></thead><tbody>${filas}</tbody></table></div>`
-      : `<div class="cot-vacio">${ci.sol.length ? 'La cotización ya se envió. Cuando los proveedores respondan, sus PDF se guardan en OneDrive → Cotizaciones → ' + e(ci.sol[0].cot) + ' y Claude los lee cada 2 horas: los precios aparecen aquí.' : 'Este código aún no se cotizó. Márcalo en SKU sin OC y usa "Cotizar".'}</div>`}</div>`);
+      : `<div class="cot-vacio">${solR.length ? 'Aún no llega ningún precio: arriba ves qué respondió cada proveedor. Cuando manden su cotización, Claude la lee y los precios aparecen aquí.' : ci.sol.length ? 'La cotización ya se envió. Cuando los proveedores respondan, sus PDF se guardan en OneDrive → Cotizaciones → ' + e(ci.sol[0].cot) + ' y Claude los lee cada 2 horas: los precios aparecen aquí.' : 'Este código aún no se cotizó. Márcalo en SKU sin OC y usa "Cotizar".'}</div>`}</div>`);
   const oc = document.getElementById('appOC'); if(oc) oc.classList.add('ancho'); }
 async function appCotExcel(L){ let EJ; try{ EJ = await appCargarExcelJs(); }catch(err){ appToast('No se pudo preparar el Excel: revisa tu conexión.'); return; }
   const wb = new EJ.Workbook(), ws = wb.addWorksheet('Cotización', { views:[{ state:'frozen', ySplit:4, showGridLines:false }] }), hoy = new Date();
