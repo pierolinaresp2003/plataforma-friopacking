@@ -19950,6 +19950,11 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
     return `<i class="ctb-av" style="background:${COL[h % COL.length]}">${e(ini)}</i>`; };
   const L = l.slice().sort(function(a, b){ return ((b.fPedido || 0) - (a.fPedido || 0)) || String(b.codPedido || '').localeCompare(String(a.codPedido || '')); });
   const todos = L.length && L.every(function(r){ return APP_PC.cot.indexOf(skuKey(r)) !== -1; });
+  // OC abiertas de cada código (v566, Piero: "en tránsito… al hacer click salga el detalle de la OC"): la más reciente primero.
+  const ocT = appMemo('ctbOcTr' + getProcesoRows().length + '|' + (PEDIDO_SIN_REQ_ROWS || []).length, function(){ const M = new Map();
+    polarLineasOC().forEach(function(x){ if(!x.idProducto || !pdOcAbierta(x) || /anul|sin aprobar/i.test(x.estadoOrden || '')) return; const k = String(x.idProducto).trim(), l = M.get(k) || [];
+      if(!l.some(function(y){ return y.oc === x.codOrden; })) l.push({ oc:x.codOrden, f:x.fOrden }); M.set(k, l); });
+    M.forEach(function(l){ l.sort(function(a, b){ return (b.f || 0) - (a.f || 0); }); }); return M; });
   const fila = function(r){ const ck = skuKey(r), on = APP_PC.cot.indexOf(ck) !== -1, cots = cotDePedido(r);
     const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', cli = /^pedido directo|^sin proyecto/i.test(r.proyecto || '') ? '' : String(r.proyecto || '');
     const tr = (appSkuStock(r.idProducto) || {}).transito || 0, est = r.rsv ? 'Por regularizar' : (r.estadoPedido || 'Pendiente');
@@ -19962,7 +19967,9 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
       <td class="desc"><button type="button" class="ctb-desc" ${sku} title="Ver la ficha del SKU">${e(r.producto || '—')}</button></td>
       <td class="n">${r.cantPedido != null ? appN(r.cantPedido, 2) : '—'}</td><td>${e(r.unidad || '')}</td>
       <td>${r.req ? e(r.req) : 'Directo'}</td><td>${fch(r.fReq)}</td>
-      <td class="c">${tr > 0 ? `<i class="ctb-si" title="${appN(tr, 2)} ${e(r.unidad || '')} en tránsito">Sí</i>` : '—'}</td>
+      <td class="c">${(function(){ const os = ocT.get(String(r.idProducto || '').trim()) || [], c0 = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
+        if(os.length) return `<button type="button" class="ctb-si" data-oc="${e(os[0].oc)}" title="${e('En tránsito: OC ' + os.map(function(o){ return c0(o.oc); }).join(', ') + (tr > 0 ? ' · ' + appN(tr, 2) + ' ' + (r.unidad || '') + ' en tránsito' : '') + ' · toca para ver la OC')}">Sí${os.length > 1 ? ' · ' + os.length : ''}</button>`;
+        return tr > 0 ? `<i class="ctb-si" title="${appN(tr, 2)} ${e(r.unidad || '')} en tránsito">Sí</i>` : '—'; })()}</td>
       <td><i class="ctb-est">${e(est)}</i></td>
       <td class="cz">${cotIcono(r)}${cots.length ? `<small>${e(cots[0].replace(/^COT-\d{4}-0*/, 'COT-'))}</small>` : ''}</td></tr>`; };
   return `<div class="skt cot ctb-w"><div class="skt-blk ctb-blk"><div class="ctb-scroll"><table class="ctb"><thead><tr>
@@ -19970,7 +19977,7 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
     <th>N° pedido</th><th>Fecha pedido</th><th>Resp. pedido</th><th>Responsable / solicitante</th><th>ID proyecto</th><th>Proyecto</th><th>Código</th><th>Descripción producto</th>
     <th class="n">Cant.</th><th>Unidad</th><th>Requerimiento</th><th>Fecha req.</th><th class="c">En tránsito</th><th>Estado</th><th class="cz">Cotiz.</th></tr></thead>
     <tbody>${L.map(fila).join('')}</tbody></table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(L.length)}</div></div></div>`; }
-function skuVistaCarolina(){ const yo = String((APP.usuario || {}).correo || '').split('@')[0].toUpperCase(); return APP_PC.skuPer === 'CCHECA' || (!APP_PC.skuPer && yo === 'CCHECA'); }
+function skuVistaCarolina(){ const yo = String((APP.usuario || {}).correo || '').split('@')[0].toUpperCase(); const L = ['CCHECA', 'MSIHUAIRO']; return L.indexOf(APP_PC.skuPer) !== -1 || (!APP_PC.skuPer && L.indexOf(yo) !== -1); }   // Carolina y Melissa (v566)
 function appPendComprasHtml(soloLista, sinCaras){
   appCorreoCargar(false); appAgCargar(false); rtCargar(false);
   const hoy = new Date(), c = appIndCorte(), finSem = isoWeekStart(c); finSem.setUTCDate(finSem.getUTCDate() + 6);
