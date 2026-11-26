@@ -4,11 +4,11 @@
 // GitHub (Guardar y compartir) y a Google no pasa por aquí.
 // v5 (20.10.2026): los datos ya no están en este sitio sino en Supabase (privado); al activarse se borra la copia
 // vieja que guardaba data.json.gz.
-const CACHE = 'friopacking-v8';   // v8 (11.11.2026): nueva publicación para destrabar GitHub Pages (deploy de v334 en cola) y renovar la copia guardada
+const CACHE = 'friopacking-v9';   // v9 (26.11.2026): el código de la app pasó a app.js   // v8 (11.11.2026): nueva publicación para destrabar GitHub Pages (deploy de v334 en cola) y renovar la copia guardada
 self.addEventListener('install', function(e){
   self.skipWaiting();
   // La primera vez se guarda la página misma, para que abra aunque luego no haya señal.
-  e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']); }).catch(function(){}));
+  e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(['./', 'index.html', 'app.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']); }).catch(function(){}));
 });
 self.addEventListener('activate', function(e){
   e.waitUntil(caches.keys().then(function(ks){ return Promise.all(ks.filter(function(k){ return k !== CACHE; }).map(function(k){ return caches.delete(k); })); }).then(function(){ return self.clients.claim(); }));
