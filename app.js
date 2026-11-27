@@ -20512,7 +20512,6 @@ function ncVista(D, lista){ if(APP_NC.vista === 'lista' || APP_NC.vista === 'opd
   const con = APP_NC.d || APP_NC.est || APP_PC.q || APP_NC.foco;
   return `<div class="imx ncm${con ? ' con' : ''}${APP_NC.d ? ' cond' : ''}"><div class="imx-mw"><div class="cmp-top ncm-bar"><div class="ncm-izq">${ncModulo(D)}${copVisSeg()}<label class="pmm-q">${ncSvg(NC_ICO.lupa)}<input type="search" id="pcBusca" placeholder="Buscar OC, proveedor o distrito" value="${e(APP_PC.q || '')}" autocomplete="off"></label>
       ${ncPerFiltro(I)}
-      <button type="button" class="imx-ib" data-pcres="1" title="Resumen del comprador en imágenes: reporte de compras, aviso de entrega y pedidos sin OC" aria-label="Resumen del comprador en imágenes">${ncSvg(NC_ICO.res)}</button>
 </div>${NCM.rep || ''}</div>
     <div class="imx-mapa" id="ncmMapa">${ncMapaHtml(I)}</div>
     <div class="imx-zoom">${Z('in', 'Acercar', '<path d="M12 5v14M5 12h14"/>')}${Z('out', 'Alejar', '<path d="M5 12h14"/>')}${Z('lima', 'Ver Lima Metropolitana', 'Lima')}${Z('pe', 'Ver todo el Perú', 'Perú')}</div>
