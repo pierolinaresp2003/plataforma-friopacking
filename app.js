@@ -21053,7 +21053,7 @@ function ncSkuVista(D, lista){ const e = escapeHtml;
 // el app… En Compras coloca 2 vistas, la del mapa y otra más normal por líneas para que se vea el status de la compra… incluye las funciones…
 // para cotizar sigue el formato que tenemos, eso no cambia". Sale del documento de Melissa (Lógica de las operaciones de Compras, 27.11.2026):
 // correo de la OC al proveedor en sus 4 modalidades (sin el WhatsApp: Piero, "esa opción no la repliques"), OC urgente desde el PDF de Nisira, solicitud de pago a
-// Tesorería y el flujo de la OPD (solicitud, recepción, envío al proveedor y pago), con REG. y fecha de entrega corregida por OC.
+// Tesorería y el flujo de la OPD (solicitud, recepción, envío al proveedor y pago), con fecha de entrega corregida por OC (sin la columna REG.: v581, Piero "quita la columna de regularización").
 // El correo se arma aquí con vista previa editable, se copia con formato y se abre en Outlook (pegar con Ctrl+V); los adjuntos (PDF de la OC,
 // cartilla SSOMA, factura, OPD) se ponen en Outlook. La OPD, sus PDF y el seguimiento por OC quedan en Supabase (fp_opd, fp_oc_meta, bucket compras).
 const COP_MAIL = {
@@ -21406,10 +21406,9 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
       <td class="c">${ncAv(o.persona)}</td>
       <td class="ent${fm ? ' man' : ''}"><span>${copF(fe)}</span><small>${e(dias)}</small>${ent ? '' : `<button type="button" class="cop-fe" data-copfeb="${e(oc)}" title="${fm ? 'Fecha corregida (Maestro: ' + copF(o.f) + ') · toca para cambiar' : 'Corregir la fecha de entrega (el proveedor la movió)'}">✏</button>`}</td>
       <td class="n">${appN(o.n || 0)}</td><td class="c">${appCorreoBtn(oc)}</td>
-      <td class="c"><label class="cop-reg" title="Regularización: material ya entregado en obra"><input type="checkbox" data-copreg="${e(oc)}"${me.reg ? ' checked' : ''}><span>REG.</span></label></td>
       <td class="acc"><button type="button" class="cop-a" data-copmail="${e(oc)}" title="Correo de la OC al proveedor (4 modalidades)">✉</button><button type="button" class="cop-a" data-coppago="${e(oc)}" title="Solicitud de pago a Tesorería">💰</button>${ent ? '' : appAgBtn(oc) + appRecBtn(oc)}</td></tr>`; };
   return `<div class="cop-chs">${q ? `<span class="cop-q">“${e(q)}”: ${appN(L.length)} OC</span>` : ''}${ch('ab', 'Abiertas')}${ch('sa', 'Sin aprobar')}${ch('venc', 'Vencidas')}${ch('cam', 'En camino')}${ch('ag', 'Por agencia')}${ch('ent', 'Entregadas')}</div>`
-    + (L.length ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th>Estado</th><th>OC</th><th>Emitida</th><th>Proveedor</th><th>Cliente / PRY</th><th class="c">Comprador</th><th>Entrega</th><th class="n">Ítems</th><th class="c">Correo</th><th class="c">REG.</th><th class="c">Acciones</th></tr></thead><tbody>${L.map(fila).join('')}</tbody></table></div><small class="imx-nota">OC nacionales · ✉ correo al proveedor · 💰 solicitud de pago · camión: agencia · caja: recojo del Almacén · toca el N° para ver la OC.</small>`
+    + (L.length ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th>Estado</th><th>OC</th><th>Emitida</th><th>Proveedor</th><th>Cliente / PRY</th><th class="c">Comprador</th><th>Entrega</th><th class="n">Ítems</th><th class="c">Correo</th><th class="c">Acciones</th></tr></thead><tbody>${L.map(fila).join('')}</tbody></table></div><small class="imx-nota">OC nacionales · ✉ correo al proveedor · 💰 solicitud de pago · camión: agencia · caja: recojo del Almacén · toca el N° para ver la OC.</small>`
       : `<div class="ini-vacio">${q ? 'No hay OC con "' + e(q) + '".' : '✅ Nada en este estado.'}</div>`); }
 function copVisSeg(){ const v = APP_NC.vista || 'mapa', b = function(k, t, extra){ return `<button type="button" data-copvis="${k}" class="${v === k ? 'on' : ''}">${t}${extra || ''}</button>`; };
   return `<div class="rsvm-seg cop-vis">${b('mapa', '🗺 Mapa')}${b('lista', '☰ Lista')}${b('opd', '📄 OPD', ' <b>' + appN(copOpdAbiertas().length) + '</b>')}</div>`; }
