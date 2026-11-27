@@ -9683,14 +9683,19 @@ function closeDrilldown(){
 // contenido del archivo (huella), no por su nombre.
 // ============================================================================
 // --------------------------------------------------------------------------
-// Conexión con Drive. Pega acá la URL de la aplicación web de Apps Script
-// (termina en /exec) y la misma clave que pusiste en el script. Con esto
-// vacío, el módulo sigue funcionando pero los archivos no salen del navegador.
+// Certificados en OneDrive (v577, 27.11.2026, Piero: "que todo se guarde en OneDrive, ya no en Drive… en carpetas PRY-cliente / los req"):
+// el índice vive en Supabase (fp_certificados) y los PDF en OneDrive › Certificados / PRY — CLIENTE / REQ. Lo que se sube desde aquí entra
+// al bucket 'certificados' de Supabase (se ve al instante) y Claude lo deja en su carpeta de OneDrive cuando revisa las respuestas de los
+// proveedores. El nombre CRT_DRIVE se queda para no tocar el resto del módulo.
 // --------------------------------------------------------------------------
-const CRT_DRIVE = {
-  url: 'https://script.google.com/macros/s/AKfycbyeK-tV0ZzBPLopDZuOQEXq2zmeWfn9XXpMx9b6aVwA2jHYspp8tQWJA-9BAuBVA-B8/exec',   // nueva implementación (18.11.2026): la anterior ya no existía
-  clave: 'friopacking-2026',
-};
+const CRT_DRIVE = { url:'supabase' };
+function crtCorreoYo(){ const s = sbSesion(); return (s && s.correo) || ''; }
+function crtArchivoSeguro(n){ return String(n || 'archivo.pdf').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.\- ]+/g, '_').replace(/\s+/g, ' ').trim().slice(-120) || 'archivo.pdf'; }
+// Enlaces firmados (7 días) para lo que todavía está en el bucket y no en OneDrive.
+async function crtFirmar(paths){ const M = {}; paths = [...new Set(paths.filter(Boolean))]; if(!paths.length) return M;
+  try{ const r = await sbFetch('/storage/v1/object/sign/certificados', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ expiresIn:60 * 60 * 24 * 7, paths:paths }) });
+    if(r.ok) (await r.json()).forEach(function(x){ if(x && x.signedURL && x.path) M[x.path] = SB_URL + '/storage/v1' + x.signedURL; }); }catch(e){}
+  return M; }
 
 const CRT = {
   filas: [], proyectos: [], pry: '', cli: '', q: '', filtro: 'todos',
@@ -9702,48 +9707,33 @@ const CRT = {
   cargados: new Set(),   // proyectos ya consultados uno por uno (respaldo del script viejo)
 };
 
-/** Convierte el archivo a base64 para mandarlo en el JSON. */
-function crtBase64(file){
-  return new Promise(function(res, rej){
-    const r = new FileReader();
-    r.onload = function(){ res(String(r.result).split(',')[1]); };
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-}
-
-/** Manda el archivo al Apps Script, que lo guarda en Drive y crea las carpetas. */
+/** Sube el archivo al bucket y lo deja registrado para los productos marcados (Claude lo pasa luego a OneDrive). */
 async function crtGuardarEnDrive(file, tipo, destinos){
-  if(!CRT_DRIVE.url) return { ok:false, sinConexion:true };
-  const payload = {
-    clave: CRT_DRIVE.clave,
-    tipo: tipo,
-    archivo: { nombre:file.name, mime:file.type || 'application/pdf', datos: await crtBase64(file) },
-    destinos: destinos.map(function(f){
-      return { nroPry:f.idPry, nomPry:f.nomPry, req:f.req, codigo:f.codigo, producto:f.producto, oc:f.oc };
-    }),
-  };
-  // Sin encabezados propios: así el navegador no dispara el preflight que
-  // Apps Script no sabe responder.
-  // Si el Apps Script no contesta JSON (por ejemplo, se borró su implementación y Google devuelve una página de error), antes se cortaba
-  // todo en silencio y la pantalla no cambiaba (18.11.2026, Piero: "subí 2 fichas técnicas y no se actualiza"). Ahora vuelve con el error.
+  if(!sbSesion()) return { ok:false, error:'entra con tu usuario para subir' };
+  const ruta = 'entrada/' + Date.now() + ' ' + crtArchivoSeguro(file.name);
   try{
-    const r = await fetch(CRT_DRIVE.url, { method:'POST', body: JSON.stringify(payload) });
-    const t = await r.text(); try{ return JSON.parse(t); }catch(e){ return { ok:false, error:'el enlace de Drive (Apps Script) no responde: hay que volver a publicarlo' }; }
-  }catch(err){ return { ok:false, error:'no hay conexión con Drive' }; }
+    const up = await sbFetch('/storage/v1/object/certificados/' + ruta.split('/').map(encodeURIComponent).join('/'), { method:'POST', headers:{ 'Content-Type':file.type || 'application/pdf', 'x-upsert':'false' }, body:file });
+    if(!up.ok){ const j = await up.json().catch(function(){ return {}; }); return { ok:false, error:j.message || j.error || ('error ' + up.status) }; }
+    let huella = null; try{ huella = await crtHuella(file); }catch(e){}
+    const por = crtCorreoYo();
+    const filas = destinos.map(function(f){ return { tipo:tipo, pry:f.idPry || null, nom_pry:f.nomPry || null, req:f.req || '', codigo:f.codigo || '', oc:f.oc || null, producto:f.producto || null, proveedor:f.proveedor || null, storage:ruta, nombre:file.name, huella:huella, estado:'entrada', origen:'plataforma', por:por }; });
+    const r = await sbFetch('/rest/v1/fp_certificados', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(filas) });
+    if(!r.ok){ const j = await r.json().catch(function(){ return {}; }); return { ok:false, error:j.message || ('error ' + r.status) }; }
+    const F = await crtFirmar([ruta]);
+    if(F[ruta]){ if(!CRT.idsPorUrl) CRT.idsPorUrl = new Map(); }
+    return { ok:true, url:F[ruta] || '', nombre:file.name, ruta:'OneDrive › Certificados (queda en su carpeta en la próxima revisión)' };
+  }catch(err){ return { ok:false, error:(err && err.message) || 'error de red' }; }
 }
 
-// Eliminar un certificado o ficha técnica (19.11.2026, Piero: "que salga la opción para eliminar el certificado o ficha técnica"): el Apps Script
-// lo manda a la papelera de Drive (se puede recuperar 30 días) y solo si quien lo pide tiene sesión en la plataforma.
+// Eliminar (19.11.2026; v577): se marca como quitado en Supabase en todos los productos que lo usaban y, en la próxima revisión,
+// Claude mueve el PDF a la carpeta _to_delete de OneDrive (no se borra de verdad).
 async function crtBorrarDeDrive(url){
-  if(!CRT_DRIVE.url) return { ok:false, error:'sin conexión a Drive' };
-  let token = ''; try{ token = await sbToken(); }catch(err){}
-  try{
-    const r = await fetch(CRT_DRIVE.url, { method:'POST', body: JSON.stringify({ clave:CRT_DRIVE.clave, accion:'borrar', url:url, token:token || '' }) });
-    const t = await r.text(); let d; try{ d = JSON.parse(t); }catch(e){ return { ok:false, error:'El Apps Script no está actualizado: pégalo y vuelve a desplegarlo como Nueva versión.' }; }
-    if(d && !d.ok && /sin destinos|sin archivo/.test(d.error || '')) return { ok:false, error:'El Apps Script no está actualizado: pégalo y vuelve a desplegarlo como Nueva versión.' };
-    return d;
-  }catch(err){ return { ok:false, error:'no hay conexión con Drive' }; }
+  const ids = (CRT.idsPorUrl && CRT.idsPorUrl.get(url)) || [];
+  if(!ids.length) return { ok:false, error:'no se encontró en el registro: toca ↻ y vuelve a intentar' };
+  try{ const por = crtCorreoYo();
+    const r = await sbFetch('/rest/v1/fp_certificados?id=in.(' + ids.join(',') + ')', { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ estado:'borrado', nota:'quitado desde la plataforma' + (por ? ' por ' + por : ''), actualizado:new Date().toISOString() }) });
+    if(!r.ok){ const j = await r.json().catch(function(){ return {}; }); return { ok:false, error:j.message || ('error ' + r.status) }; }
+    return { ok:true }; }catch(err){ return { ok:false, error:(err && err.message) || 'error de red' }; }
 }
 function crtQuitarDoc(url){
   CRT.filas.forEach(function(f){ ['cert', 'ficha'].forEach(function(t){ const c = crtLista(t), L = f[c]; if(!L || !L.some(function(d){ return d.url === url; })) return;
@@ -9755,7 +9745,7 @@ function crtQuitarDoc(url){
 document.addEventListener('click', async function(ev){ const b = ev.target.closest && ev.target.closest('[data-crtborrar]'); if(!b) return; ev.preventDefault(); ev.stopPropagation();
   if(crtSoloVer()) return; const nom = b.dataset.nom || 'este archivo', url = b.dataset.crtborrar;
   const n = CRT.filas.filter(function(f){ return crtDocs(f, b.dataset.tipo).some(function(d){ return d.url === url; }); }).length;
-  if(!window.confirm('¿Eliminar "' + nom + '"?' + (n > 1 ? '\nEstá cargado en ' + n + ' productos: se quita de todos.' : '') + '\nSe va a la papelera de Drive (se puede recuperar 30 días).')) return;
+  if(!window.confirm('¿Eliminar "' + nom + '"?' + (n > 1 ? '\nEstá cargado en ' + n + ' productos: se quita de todos.' : '') + '\nSe quita de la plataforma; el PDF pasa a la carpeta _to_delete de OneDrive (se puede recuperar).')) return;
   b.disabled = true; crtCerrarMenus(); appToast('Eliminando…');
   const r = await crtBorrarDeDrive(url);
   if(!r || !r.ok){ b.disabled = false; appToast('No se pudo eliminar: ' + ((r && r.error) || 'error de red') + '.'); return; }
@@ -9805,7 +9795,7 @@ function crtVaciarDocs(){
 // abrir el módulo, mientras se mira la lista, y entrar a un proyecto ya no espera nada. Lo que contestó
 // la última vez queda guardado en este navegador y se pinta al instante mientras llega la respuesta
 // nueva. Es solo un atajo: Drive sigue siendo la verdad y se vuelve a consultar en cada apertura.
-const CRT_CACHE = 'fp_crt_drive';
+const CRT_CACHE = 'fp_crt_od';   // v577: la copia de Drive ya no sirve
 function crtCacheLeer(){
   try{ const c = JSON.parse(localStorage.getItem(CRT_CACHE) || 'null'); return (c && c.docs) ? c : null; }
   catch(err){ return null; }
@@ -9846,10 +9836,17 @@ function crtCheckPedido(k, texto){
 }
 
 async function crtPreguntarDrive(pry){
-  const u = CRT_DRIVE.url + '?clave=' + encodeURIComponent(CRT_DRIVE.clave) + '&pry=' + encodeURIComponent(pry);
-  const r = await fetch(u);
-  const d = await r.json();
-  return (d && d.ok && d.docs) ? d.docs : null;
+  if(!sbSesion()) return null;
+  let q = '/rest/v1/fp_certificados?select=id,tipo,pry,req,codigo,archivo,storage,url,nombre&estado=in.(ok,entrada)&order=id&limit=50000';
+  if(pry && pry !== '*') q += '&pry=eq.' + encodeURIComponent(pry);
+  const r = await sbFetch(q); if(!r.ok) return null;
+  const L = await r.json(), F = await crtFirmar(L.filter(function(d){ return !d.url && d.storage; }).map(function(d){ return d.storage; }));
+  if(!CRT.idsPorUrl) CRT.idsPorUrl = new Map();
+  const docs = [];
+  L.forEach(function(d){ const u = d.url || F[d.storage] || ''; if(!u) return;
+    const ids = CRT.idsPorUrl.get(u) || []; if(ids.indexOf(d.id) === -1) ids.push(d.id); CRT.idsPorUrl.set(u, ids);
+    docs.push({ pry:d.pry, req:d.req, codigo:d.codigo || null, tipo:d.tipo, url:u, nombre:d.nombre || String(d.archivo || '').split('/').pop() }); });
+  return docs;
 }
 
 async function crtLeerDeDrive(){
@@ -10159,11 +10156,12 @@ function crtCorreoProducto(clave, soloEste){
 }
 /** Id corto y fijo por proyecto y proveedor: el mismo correo vuelto a generar usa la misma referencia. */
 function crtSolId(pry, clave){ let h = 2166136261; const s = String(pry) + '|' + String(clave); for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(36).toUpperCase().padStart(6, '0').slice(-6); }
-/** Le pasa al Apps Script lo pedido en el correo (N°, OC, Req., Código, Producto) para archivar solo la respuesta. */
+/** Guarda lo pedido en el correo (N°, OC, Req., Código, Producto) para que Claude archive la respuesta en su carpeta (v577: en Supabase). */
 function crtRegistrarSolicitud(id, f0, lineas){
-  if(!CRT_DRIVE.url) return;
+  if(!sbSesion()) return;
   const items = lineas.map(function(y, i){ return { n:i + 1, oc:y.oc === 'sin OC' ? '' : String(y.oc || ''), req:y.x.req || '', codigo:y.x.codigo || '', producto:String(y.x.producto || '').slice(0, 90) }; });
-  try{ fetch(CRT_DRIVE.url, { method:'POST', keepalive:true, body:JSON.stringify({ clave:CRT_DRIVE.clave, accion:'solicitud', id:id, pry:f0.idPry, nomPry:f0.nomPry || '', items:items }) }).catch(function(){}); }catch(err){}
+  sbFetch('/rest/v1/fp_cert_solicitudes?on_conflict=id', { method:'POST', keepalive:true, headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' },
+    body:JSON.stringify([{ id:id, pry:f0.idPry, nom_pry:f0.nomPry || '', items:items, por:crtCorreoYo(), actualizado:new Date().toISOString() }]) }).catch(function(){});
 }
 function crtCorreoRico(g){
   const d = g.correo;
@@ -10485,18 +10483,18 @@ async function crtRecibirArchivo(file, lote){
     reg.enDrive = true;   // para el resumen de arriba: este archivo sí quedó guardado
   }
   const enDrive = res && res.ok
-    ? ' Guardado en Drive: <b>' + escapeHtml(res.ruta) + '</b>.' +
+    ? ' Guardado: <b>' + escapeHtml(res.ruta) + '</b>.' +
       (res.reusado ? ' (ya estaba ahí, no se guardó otra copia)' : '')
-    : (res && res.sinConexion ? ' <i>Todavía sin conexión a Drive: queda solo en pantalla.</i>'
-                              : ' <b>No se pudo guardar en Drive:</b> ' + escapeHtml((res && res.error) || 'error de red') + '.');
+    : (res && res.sinConexion ? ' <i>Sin sesión: queda solo en pantalla.</i>'
+                              : ' <b>No se pudo guardar:</b> ' + escapeHtml((res && res.error) || 'error de red') + '.');
 
   const repetido = yaEstaba.length
     ? ' <b>Es el mismo documento</b> que ya estaba en ' + escapeHtml(yaEstaba.slice(0,4).join(', ')) +
       (yaEstaba.length > 4 ? ' y ' + (yaEstaba.length-4) + ' más' : '') + ': no se guarda otra copia.'
     : '';
 
-  if(!lote && !(res && res.ok)) appToast('No se guardó en Drive: ' + ((res && res.error) || 'sin conexión') + '.');
-  if(lote) return { ok:!!(res && res.ok), nombre:reg.nombre, error:res && !res.ok ? (res.sinConexion ? 'sin conexión a Drive' : (res.error || 'error de red')) : '', tocados:tocados };
+  if(!lote && !(res && res.ok)) appToast('No se guardó: ' + ((res && res.error) || 'sin conexión') + '.');
+  if(lote) return { ok:!!(res && res.ok), nombre:reg.nombre, error:res && !res.ok ? (res.sinConexion ? 'sin conexión' : (res.error || 'error de red')) : '', tocados:tocados };
   if(tocados.length > 1){
     CRT.sel.clear();
     crtMensaje('<b>' + escapeHtml(reg.nombre) + '</b> quedó como ' + crtNombreDoc(tipo) + ' de ' +
@@ -10547,8 +10545,8 @@ function crtDibujarResumen(){
     (function(){
       const sinDrive = [...CRT.subidas.values()].filter(x => !x.enDrive).length;
       return sinDrive
-        ? `<span style="margin-left:auto;font-weight:700;color:var(--red);">⚠ ${sinDrive} ${sinDrive===1?'archivo quedó':'archivos quedaron'} solo en este navegador: no llegaron a Drive</span>`
-        : `<span style="margin-left:auto;font-weight:700;color:var(--green);">✔ Guardado en Drive automáticamente</span>`;
+        ? `<span style="margin-left:auto;font-weight:700;color:var(--red);">⚠ ${sinDrive} ${sinDrive===1?'archivo quedó':'archivos quedaron'} solo en este navegador: no llegaron a OneDrive</span>`
+        : `<span style="margin-left:auto;font-weight:700;color:var(--green);">✔ Guardado automáticamente</span>`;
     })();
 }
 function crtDibujar(){ if(CRT._tc) return crtDibujar0(); CRT._tc = new Map(); try{ crtDibujar0(); } finally{ CRT._tc = null; } }
@@ -10578,7 +10576,7 @@ function crtVistaProyectos(cont){
     const pc = function(n, d){ return d ? Math.round(n / d * 100) : 0; };
     const barra = function(t, n, d){ const v = pc(n, d); return `<div class="crt-pb"><span>${t}</span><i><em class="${v >= 90 ? 'ok' : v >= 60 ? 'med' : 'baja'}" style="width:${v}%"></em></i><b>${v}%</b></div>`; };
     cont.innerHTML = `<div class="pmx-head crt-head"><div class="pmx-dona">${pmDona(pc(nC, tot), 120, 10, 'con certificado')}<span class="pmx-dona-n"><b>${appN(nC)}</b> de ${appN(tot)} productos</span></div>
-        <div class="pmx-meta"><h2>Certificados y fichas técnicas</h2><p>${CRT.leyendo ? '⟳ consultando Drive…' : appN(prys.size) + ' proyecto' + (prys.size === 1 ? '' : 's') + ' · ' + appN(tot) + ' productos · toca un proyecto para subir sus archivos'}</p></div><div></div>
+        <div class="pmx-meta"><h2>Certificados y fichas técnicas</h2><p>${CRT.leyendo ? '⟳ consultando…' : appN(prys.size) + ' proyecto' + (prys.size === 1 ? '' : 's') + ' · ' + appN(tot) + ' productos · toca un proyecto para subir sus archivos'}</p></div><div></div>
         <div class="pmx-ks"><div class="pmx-k ${tot - nC ? 'rev' : ''}"><b>${appN(tot - nC)}</b><small>sin certificado</small></div><div class="pmx-k ok"><b>${pc(nF, tot)}%</b><small>con ficha técnica</small></div><div class="pmx-k ${tot - nF ? 'oc' : ''}"><b>${appN(tot - nF)}</b><small>sin ficha técnica</small></div></div></div>
       <div class="crt-grid crt-lista">${[...prys.entries()].sort(function(a, b){ return b[1].filas.length - a[1].filas.length; }).map(function(e){ const id = e[0], pr = e[1], l = pr.filas;
         const c = l.filter(function(f){ return crtTiene(f, 'cert'); }).length, fi = l.filter(function(f){ return crtTiene(f, 'ficha'); }).length;
@@ -10628,8 +10626,9 @@ const CT2_ICO = { del:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 // la vista previa de Drive dentro de una ventana de la app y la descarga directa.
 function crtDriveId(u){ const m = String(u || '').match(/\/d\/([-\w]{15,})/) || String(u || '').match(/[?&]id=([-\w]{15,})/); return m ? m[1] : ''; }
 function crtDescargaUrl(u){ const id = crtDriveId(u); return id ? 'https://drive.google.com/uc?export=download&id=' + id : u; }
-function crtVer(url, nombre){ const e = escapeHtml, id = crtDriveId(url), src = id ? 'https://drive.google.com/file/d/' + id + '/preview' : url, nom = nombre || 'Documento';
-  const f = rsvModal(`<header><div><small>Vista previa</small><h3>${e(nom)}</h3></div><span class="crt-vis-acc"><a class="ct2-btn sec" href="${e(crtDescargaUrl(url))}" target="_blank" rel="noopener">${CT2_ICO.dl}Descargar</a><a class="ct2-btn sec" href="${e(url)}" target="_blank" rel="noopener">${CT2_ICO.ext}Abrir en Drive</a><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></span></header>
+function crtVer(url, nombre){ if(/sharepoint\.com/i.test(String(url || ''))){ window.open(url, '_blank', 'noopener'); return; }   // OneDrive (v577)
+  const e = escapeHtml, id = crtDriveId(url), src = id ? 'https://drive.google.com/file/d/' + id + '/preview' : url, nom = nombre || 'Documento';
+  const f = rsvModal(`<header><div><small>Vista previa</small><h3>${e(nom)}</h3></div><span class="crt-vis-acc"><a class="ct2-btn sec" href="${e(crtDescargaUrl(url))}" target="_blank" rel="noopener">${CT2_ICO.dl}Descargar</a><a class="ct2-btn sec" href="${e(url)}" target="_blank" rel="noopener">${CT2_ICO.ext}Abrir</a><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></span></header>
     <iframe src="${e(src)}" title="${e(nom)}" allow="autoplay"></iframe>`); f.classList.add('crt-visor'); }
 function ct2Pct(n, d){ return d ? Math.round(n / d * 100) : 0; }
 // Agrupado por PROVEEDOR para la lista de Certificados (20.11.2026, Piero: "agrupados por proveedores sin perder la trazabilidad... la oc, el responsable, el requerimiento, la fecha").
@@ -10661,7 +10660,7 @@ function ct2VistaProyectos(cont){
   document.getElementById('crtConteo').textContent = appN(prys.size) + (prys.size === 1 ? ' proyecto' : ' proyectos');
   const tot = base.length, nC = base.filter(function(f){ return crtTiene(f, 'cert'); }).length, nF = base.filter(function(f){ return crtTiene(f, 'ficha'); }).length;
   const hero = `<section class="ct2-hero"><div class="ct2-dona">${pmDona(ct2Pct(nC, tot), 112, 10, 'certificado')}</div>
-      <div class="ct2-t"><small>Certificados y fichas técnicas</small><h2>${e(CRT.cli || 'Todos los clientes')}</h2><p>${CRT.leyendo ? '⟳ Consultando Drive…' : appN(prys.size) + ' proyectos · ' + appN(tot) + ' productos'}</p></div>
+      <div class="ct2-t"><small>Certificados y fichas técnicas</small><h2>${e(CRT.cli || 'Todos los clientes')}</h2><p>${CRT.leyendo ? '⟳ Consultando…' : appN(prys.size) + ' proyectos · ' + appN(tot) + ' productos'}</p></div>
       <div class="ct2-ks"><div class="ct2-k"><b>${appN(nC)}</b><small>con certificado</small></div><div class="ct2-k mal"><b>${appN(tot - nC)}</b><small>falta certificado</small></div><div class="ct2-k prox"><b>${appN(tot - nF)}</b><small>falta ficha</small></div></div></section>`;
   if(!prys.size){ cont.innerHTML = hero + '<div class="pmf-vacio">Ningún proyecto con ese filtro.</div>'; return; }
   const L = [...prys.entries()].sort(function(a, b){ return b[1].filas.length - a[1].filas.length; });
@@ -10732,7 +10731,7 @@ function ct2VistaProyecto(cont){
   const hero = `<button type="button" class="ct2-volver" id="crtVolver">‹ Proyectos</button>
     <section class="ct2-hero"><div class="ct2-dona">${pmDona(ct2Pct(nC, delPry.length), 112, 10, 'certificado')}</div>
       <div class="ct2-t"><small>${crtMarca(CRT.pry)}</small><h2>${e(cli && cli !== '—' ? cli : crtNombrePry(CRT.pry))}</h2><p>${e(pryNombre(CRT.pry) || crtNombrePry(CRT.pry))}</p>
-        <div class="ct2-acc">${ley ? '<span class="ct2-lee">⟳ Consultando Drive…</span>' : `<button type="button" class="ct2-btn sec" id="crtRecargar" title="Volver a leer de Drive lo que ya está subido">${CT2_ICO.drive}Actualizar desde Drive</button>`}
+        <div class="ct2-acc">${ley ? '<span class="ct2-lee">⟳ Consultando…</span>' : `<button type="button" class="ct2-btn sec" id="crtRecargar" title="Volver a leer lo que ya está subido">${CT2_ICO.drive}Actualizar</button>`}
           ${conCorreo.length ? `<button type="button" class="ct2-btn sec" data-ct2ped="1">${CT2_ICO.mail}Pedir a proveedores <em>${appN(conCorreo.length)}</em></button>` : ''}</div></div>
       <div class="ct2-ks"><div class="ct2-k"><b>${appN(delPry.length)}</b><small>productos</small></div><div class="ct2-k mal"><b>${appN(delPry.length - nC)}</b><small>falta certificado</small></div><div class="ct2-k prox"><b>${appN(delPry.length - nF)}</b><small>falta ficha</small></div>${(function(){ const v = delPry.filter(function(f){ const p = crtPlazo(f); return p && p.vencido; }).length; return v ? `<div class="ct2-k mal"><b>${appN(v)}</b><small>vencidos (+${CRT_PLAZO_DH} d.h.)</small></div>` : ''; })()}</div></section>`;
   const panelPed = pend.length && CRT.pedAbierto ? `<div class="ct2-ped"><div class="ct2-ped-h"><b>Un correo por proveedor con todo lo que falta</b><button type="button" class="ct2-x" data-ct2ped="1" aria-label="Cerrar">${CT2_ICO.x}</button></div>
@@ -10846,8 +10845,8 @@ function crtVistaProyecto(cont){
         <div class="nom">${escapeHtml(crtNombrePry(CRT.pry))}</div></div>
       <div class="der">
         ${(CRT.leyendo || CRT.leyendoPry)
-          ? `<div class="crt-mini"><div class="t crt-drive-estado">⟳ consultando Drive…</div></div>`
-          : `<div class="crt-mini"><button type="button" class="crt-drive-btn" id="crtRecargar" title="Volver a preguntarle a Drive qué documentos tiene este proyecto">↻ Actualizar desde Drive</button></div>`}
+          ? `<div class="crt-mini"><div class="t crt-drive-estado">⟳ consultando…</div></div>`
+          : `<div class="crt-mini"><button type="button" class="crt-drive-btn" id="crtRecargar" title="Volver a consultar qué documentos tiene este proyecto">↻ Actualizar</button></div>`}
         <div class="crt-mini"><div class="v">${reqs.size}</div><div class="t">Requerim.</div></div>
         <div class="crt-mini"><div class="v">${delPry.length}</div><div class="t">Productos</div></div>
         <div class="crt-mini"><div class="v ok">${conCert}</div><div class="t">Con certificado</div></div>
@@ -10857,7 +10856,7 @@ function crtVistaProyecto(cont){
 
   // Un correo por proveedor con todo lo que le falta en ESTE proyecto (23.09.2026, pedido de Piero).
   const cargandoDrive = (CRT.leyendo || CRT.leyendoPry)
-    ? `<div class="note warn crt-cargando">⟳ <b>Consultando Drive…</b> todavía no se sabe qué documentos tiene este proyecto: lo que abajo aparece en rojo puede estar ya subido.</div>`
+    ? `<div class="note warn crt-cargando">⟳ <b>Consultando…</b> todavía no se sabe qué documentos tiene este proyecto: lo que abajo aparece en rojo puede estar ya subido.</div>`
     : '';
 
   const pend = crtPendientesPorProveedor();
@@ -12834,7 +12833,7 @@ async function crtRecibirVarios(fs, pend){
     (mal.length ? ' <b>No se guardaron en Drive:</b> ' + mal.map(function(r){ return escapeHtml(r.nombre) + ' (' + escapeHtml(r.error) + ')'; }).join(', ') + '.' : '');
   if(tocados.length > 1){ CRT.sel.clear(); crtMensaje(html); } else { crtMensaje(''); if(tocados[0]) tocados[0].nota = { html:html }; }
   crtDibujar();
-  if(mal.length) appToast('No se guardó en Drive: ' + mal[0].error + '.');
+  if(mal.length) appToast('No se guardó: ' + mal[0].error + '.');
 }
 document.getElementById('crtSubirCert').addEventListener('click', ()=> crtPedirArchivo([...CRT.sel], 'cert'));
 document.getElementById('crtSubirFicha').addEventListener('click', ()=> crtPedirArchivo([...CRT.sel], 'ficha'));
@@ -27391,7 +27390,7 @@ function polarMovimientosAlmacen(p, tipo){
     ${top.slice(0, 8).map(function(y){ return `<div class="asis-item"><div class="d">${escapeHtml(polarCorta(y.r.descripcion, 60))}</div><div class="q">${polarNum(Math.round(y.q * 100) / 100)} ${escapeHtml(y.r.unidad || '')} · ${y.n} mov. ${polarBtn('inv', y.r.codigo, 'kardex')}</div></div>`; }).join('')}`;
 }
 function polarCertificados(){
-  if(!CRT.listo || !CRT.filas || !CRT.filas.length) return `<p>Los certificados se leen de Drive al abrir el módulo. Ábrelo una vez y vuelve a preguntarme.</p><div class="asis-acc">${polarBtn('ir', 'certificados', 'Abrir Certificados')}</div>`;
+  if(!CRT.listo || !CRT.filas || !CRT.filas.length) return `<p>Los certificados se leen al abrir el módulo. Ábrelo una vez y vuelve a preguntarme.</p><div class="asis-acc">${polarBtn('ir', 'certificados', 'Abrir Certificados')}</div>`;
   const falta = CRT.filas.filter(function(f){ return !(crtTiene(f, 'cert') && crtTiene(f, 'ficha')); });
   const pp = new Map(); falta.forEach(function(f){ pp.set(f.idPry, (pp.get(f.idPry) || 0) + 1); });
   return `<div class="cab">📄 Certificados por pedir</div><p><b>${falta.length}</b> productos sin certificado o ficha técnica, en ${pp.size} proyectos.</p>
