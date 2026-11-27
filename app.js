@@ -21211,7 +21211,7 @@ async function copSsomaPintar(){ const t = document.getElementById('copSsomaT'),
 function copUsr(){ return String(copYo() || '').split('@')[0].toUpperCase(); }
 // Cualquiera del equipo puede subir la firma de otro (v601, Piero: "¿no puedo yo subir la firma de los demás?"): se elige la persona y se sube su imagen.
 // El .eml siempre lleva la firma de quien está usando la app.
-const COP_FIRMA_P = ['PLINARES', 'CCHECA', 'MSIHUAIRO', 'JALTAMIRANO', 'JPOMEZ', 'MLUJAN', 'JCENTENO', 'KALBUJAR', 'MCONDORI'];
+const COP_FIRMA_P = ['PLINARES', 'CCHECA', 'MSIHUAIRO', 'JALTAMIRANO', 'JPOMEZ', 'MLUJAN'];   // solo quienes envían OC (v602, Piero: sin Javier, Mary ni Kathy)
 async function copFirma(u){ u = u || copUsr(); if(!u) return null; APP_COP.firmas = APP_COP.firmas || {}; if(u in APP_COP.firmas) return APP_COP.firmas[u];
   try{ const r = await sbFetch('/storage/v1/object/compras/firmas/' + encodeURIComponent(u)); APP_COP.firmas[u] = r.ok ? { b:await r.arrayBuffer(), t:(r.headers.get('content-type') || 'image/png').split(';')[0] } : null; return APP_COP.firmas[u]; }catch(err){ return null; } }
 function copFirmaSel(){ const s = document.getElementById('copFirmaP'); return (s && s.value) || copUsr(); }
