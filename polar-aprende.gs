@@ -38,6 +38,11 @@
  * Más adelante) en la pestaña "Correos OC": OC, enviado (SI / NO), fecha y hora, quién lo marcó y su correo. La plataforma lo lee
  * con doGet?accion=correos y lo ve todo el equipo.
  *
+ * Desde el 27.11.2026 (v10): también marca SOLO las OC cuyo correo salió de verdad. Un flujo de Power Automate (gratis) anota en la
+ * pestaña "Enviados Outlook" cada correo con "Orden de Compra N°" en el asunto (Fecha, De, Para, Asunto); al leer los correos,
+ * se saca el N° de OC del asunto y la OC queda con ✓ (en la app pasa sola a «En camino»). Si alguien quitó el ✓ a mano DESPUÉS
+ * de ese correo, manda lo manual. Una vez: elige la función  instalarOutlook  y pulsa Ejecutar (crea la pestaña con sus títulos).
+ *
  * ACTUALIZAR (si ya estaba instalado): pega este archivo encima del anterior → Guardar →
  *   Implementar → Administrar implementaciones → ✏️ editar → Versión: Nueva versión → Implementar.
  *   Así la URL /exec sigue siendo la misma y no hay que tocar el index.html.
@@ -329,10 +334,41 @@ function correoGuardar(d) {
     return salida({ ok: true });
   } finally { lock.releaseLock(); }
 }
+// v10: correos de OC que anota Power Automate (lo que salió de verdad por Outlook).
+const HOJA_OUT = 'Enviados Outlook';
+const COLS_OUT = ['Fecha', 'De', 'Para', 'Asunto'];
+function hojaOutlook() {
+  const libro = SpreadsheetApp.getActiveSpreadsheet();
+  let h = libro.getSheetByName(HOJA_OUT);
+  if (!h) {
+    h = libro.insertSheet(HOJA_OUT);
+    h.appendRow(COLS_OUT);
+    h.setFrozenRows(1);
+    h.getRange(1, 1, 1, COLS_OUT.length).setFontWeight('bold').setBackground('#0a1e64').setFontColor('#ffffff');
+    h.setColumnWidth(1, 170); h.setColumnWidth(2, 230); h.setColumnWidth(3, 260); h.setColumnWidth(4, 620);
+  }
+  return h;
+}
+/** Ejecútala una vez desde el editor: crea la pestaña "Enviados Outlook" con sus títulos (Power Automate la necesita para elegirla). */
+function instalarOutlook() { hojaOutlook(); Logger.log('Listo: pestaña "' + HOJA_OUT + '" creada.'); }
 function correosLeer() {
-  const h = hojaCorreos(), n = h.getLastRow(), out = {};
+  const h = hojaCorreos(), n = h.getLastRow(), out = {}, man = {};
   if (n >= 2) h.getRange(2, 1, n - 1, 4).getDisplayValues().forEach(function (f) {
-    if (f[0] && f[1] === 'SI') { const t = String(f[2] || ''); out[f[0]] = { f: t.length >= 10 ? t.slice(8, 10) + '/' + t.slice(5, 7) : t, u: f[3] }; }
+    if (!f[0]) return;
+    const t = String(f[2] || ''); man[f[0]] = { si: f[1] === 'SI', t: t };
+    if (f[1] === 'SI') out[f[0]] = { f: t.length >= 10 ? t.slice(8, 10) + '/' + t.slice(5, 7) : t, u: f[3] };
   });
+  const o = hojaOutlook(), m = o.getLastRow();
+  if (m >= 2) o.getRange(2, 1, m - 1, 4).getValues().forEach(function (f) {
+    const mm = String(f[3] || '').match(/000\d-\d{7}/); if (!mm) return;
+    const oc = mm[0], d = f[0] instanceof Date ? f[0] : new Date(String(f[0] || ''));
+    const t = isNaN(d.getTime()) ? '' : Utilities.formatDate(d, 'America/Lima', 'yyyy-MM-dd HH:mm');
+    const x = man[oc];
+    if (x && !x.si && x.t > t) return;              // le quitaron el ✓ a mano después de ese correo
+    if (out[oc] && !out[oc].o) return;              // ya estaba marcado a mano: se queda como está
+    const de = String(f[1] || '').split('@')[0].toLowerCase();
+    if (!out[oc] || t > (out[oc].t || '')) out[oc] = { f: t ? t.slice(8, 10) + '/' + t.slice(5, 7) : '', u: 'Outlook · ' + de, o: 'outlook', t: t };
+  });
+  Object.keys(out).forEach(function (k) { delete out[k].t; });
   return salida({ ok: true, correos: out });
 }
