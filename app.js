@@ -20906,7 +20906,8 @@ function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO &&
         <p>${e(p.descripcion || 'No detalló el producto')}</p>${li.length ? `<ul>${li.map(function(x){ return '<li>' + e(x) + '</li>'; }).join('')}</ul>` : ''}${cotPdfA(p.archivo, 'Ver cotización')}</div>`; }).map(function(h){ return h.indexOf('<td') === 0 ? h : '<td class="cot2-dc">' + h + '</td>'; }).join('');
     // Cada tarjeta debajo de su proveedor (v579, 27.11.2026, Piero: "que cada tarjeta esté debajo del proveedor donde corresponda… para que se entienda mejor").
     return `<tr class="cot-det" data-cotdetrow="${i}" hidden><td colspan="3" class="cot2-dl"><small>Lo que ofrece cada proveedor ↓</small></td>${cards}</tr>`; };
-  const th = P.map(function(pv){ return `<th class="c"><span>${e(pv.nom)}</span>${cotPdfA(pv.arc, 'PDF')}</th>`; }).join('');
+  // Columnas de proveedor del mismo ancho (v580, Piero: "que tengan el mismo tamaño")
+  const th = P.map(function(pv){ return `<th class="c" style="width:${(62 / Math.max(1, P.length)).toFixed(2)}%"><span>${e(pv.nom)}</span>${cotPdfA(pv.arc, 'PDF')}</th>`; }).join('');
   const filas = F.map(function(f, i){ const it = f.it, E = espDe(f);
     return `<tr><td><button type="button" class="cot2-p" data-cotdet="${i}"><b>${e(polarCorta(it.desc, 55))}</b><small>${appN(it.cant)} ${e(um(it))}</small></button></td>
       <td class="c esp">${E.v != null ? usd(E.v) + `<small>${E.deMer ? 'según ofertas de hoy' : 'según tus compras'}</small>` : '—'}</td>
