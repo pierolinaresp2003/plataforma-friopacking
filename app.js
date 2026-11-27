@@ -17565,7 +17565,7 @@ function rtCargar(forzar){
 async function rtGuardar(fila){ const nuevo = !RT.m[fila.id]; fila.actualizado = new Date().toISOString(); if(nuevo && !fila.por) fila.por = rtYo();
   const r = await sbFetch('/rest/v1/fp_rutas?on_conflict=id', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify([fila]) });
   if(!r.ok) throw sbError(await r.json().catch(function(){ return {}; }), r.status);
-  RT.m[fila.id] = Object.assign({ creado:fila.actualizado }, RT.m[fila.id] || {}, fila); RT.firma = ''; }
+  RT.m[fila.id] = Object.assign({ creado:fila.actualizado }, RT.m[fila.id] || {}, fila); RT.firma = ''; RT_IDX = null; }
 // ---- Salidas: viajes armados con las guías de salida ----
 function rtViajes(){ const R = almMovRows(), mx = (ALMACEN_DATA && ALMACEN_DATA.almMov && ALMACEN_DATA.almMov.max) || '';
   return appMemo('rtViajes' + R.length + '|' + mx, function(){
@@ -17618,7 +17618,10 @@ function rtIngresos(){ const R = almMovRows(); return appMemo('rtIng' + R.length
 function rtRecIng(x){ const l = rtIngresos().get(x.oc), d = String(x.creado || '').slice(0, 10); return l ? l.filter(function(i){ return i[0] >= d; }).sort()[0] || null : null; }
 function rtRecEst(x){ return x.estado === 'anul' ? 'anul' : rtRecIng(x) ? 'ing' : x.estado; }
 function rtRecojos(){ return Object.keys(RT.m).map(function(k){ return RT.m[k]; }).filter(function(x){ return x.tipo === 'recojo'; }).map(function(x){ return Object.assign({}, x, { k:rtRecEst(x), d:x.datos || {} }); }); }
-function rtRecDeOc(oc){ let b = null; Object.keys(RT.m).forEach(function(k){ const x = RT.m[k]; if(x.tipo === 'recojo' && x.oc === oc && x.estado !== 'anul' && (!b || String(x.creado) > String(b.creado))) b = x; }); return b; }
+// Con índice (v587, 27.11.2026, Piero: "se laguea el app en compras"): antes recorría todos los registros por cada tarjeta y fila.
+var RT_IDX = null, RT_IDX_M = null;
+function rtRecDeOc(oc){ if(!RT_IDX || RT_IDX_M !== RT.m){ const I = new Map(); Object.keys(RT.m).forEach(function(k){ const x = RT.m[k]; if(x.tipo !== 'recojo' || x.estado === 'anul') return; const b = I.get(x.oc); if(!b || String(x.creado) > String(b.creado)) I.set(x.oc, x); }); RT_IDX = I; RT_IDX_M = RT.m; }
+  return RT_IDX.get(oc) || null; }
 function rtRecFila(x){ const e = escapeHtml, d = x.d, S = RT_REST[x.k], its = d.items || [], ing = x.k === 'ing' ? rtRecIng(x) : null, id = e(x.id);
   const acc = x.k === 'pend' ? `<button type="button" class="rt-bt ok" data-rtval="${id}">${RT_ICO.check}Validar</button><button type="button" class="rt-bt" data-rtobs="${id}">Observar</button><button type="button" class="rt-bt pri" data-rtprog="${id}">Programar</button>`
     : x.k === 'obs' ? `<button type="button" class="rt-bt ok" data-rtval="${id}">${RT_ICO.check}Validar</button><button type="button" class="rt-bt" data-rtedit="${id}">Ver pedido</button>`
@@ -19948,8 +19951,9 @@ function appOCPresuMapa(){ return appMemo('ocpresu', function(){
 // [familia, regla por la descripción, regla por la familia de Nisira] — gana la primera que calza.
 const SKU_FAM_CC = [
   ['Cables y material eléctrico', /^(TUBO LED|CONECTOR (JACK|RJ)|ACOPLE GUARDA|(PANELES LATERALES|ZOCALO|CANTONERAS?)\b.*CHAPA DE ACERO|PLACA DE MONTAJE|SELLADOR AIS[A-Z]*LANTE ELE)/],
+  ['Paneles, puertas y ventanas', /PUERTA RAPIDA|^(CERRADERO|JUNTA DE ESTANQUEIDAD)/],   // v587: lo de Jaime, José y Manuel
   ['EPP, uniformes y seguridad', /^(CASCO|GUANTE|LENTE|GAFA|OREJERA|TAPON (AUDITIVO|DE OIDO)|BARBIQUEJO|ARNES|LINEA DE VIDA|BOTA|BOTIN|ZAPATO|CHALECO|CAMISA|POLO|PANTALON|CASACA|CHOMPA|OVEROL|MAMELUCO|UNIFORME|MASCARILLA|RESPIRADOR|CORTAVIENTO|GORRO|CAPUCHA|BLOQUEADOR|EXTINTOR|BOTIQUIN|CAMILLA|INMOVILIZADOR|COLLARIN CERVICAL|CORREA CON CLIP|BARRA RETRACTIL|CONO\b|CINTA DE SEGURIDAD|MALLA DE SEGURIDAD|SENAL|LETRERO|CACHACO|LAVAOJOS|DUCHA (DE EMERGENCIA|LAVAOJOS)|KIT (DE EMERGENCIA|ANTIDERRAME)|BANDEJA ANTIDERRAME|PEDESTAL)/, /UNIFORME|PROTECCION PERSONAL|EMERGENCIA|SENAL DE SEGURIDAD/],
-  ['Lonas, toldos y cortinas', /^(LONA|TOLDO|CORTINA(?! DE AIRE)|LAMA|PUERTA DE LONA)\b/, /^(LONA|CORTINA)$/],
+  ['Lonas, toldos y cortinas', /^(LONA|TOLDO|MANTA|CORTINA(?! DE AIRE)|LAMA|PUERTA DE LONA)\b/, /^(LONA|CORTINA)$/],
   ['Paneles, puertas y ventanas', /^(PANEL(?! (LED|DE CONTROL|HMI|SOLAR|ELECTRICO))|PUERTA(?! DE (GABINETE|TABLERO))|PORTON|VENTANA|CERROJO|CERRADURA|BISAGRA|MANIJA|JALADOR|PICAPORTE|CIERRAPUERTA|BARRA ANTIPANICO|ABRIGO|SELLO (DE )?ANDEN|RAMPA|NIVELADOR|BUMPER|CENTRALITA|CUMBRERA|COBERTURA|T940|CANALETA (FLUVIAL|PLUVIAL|PREPINTADA)|FLASHING|ZOCALO|CONTRAZOCALO|TAPAJUNTA|CANTONERA|CANAL OMEGA|PERFIL.*PANEL|ANGULO SANITARIO|PERFIL SANITARIO)/, /^(PUERTA|VENTANA|PANEL|PART\. DE PUERTA|INSTALACION DE PANEL Y PUERTA|COBERTURA Y ACCESORIO|PART\. DE NIVELADOR|PART\. DE SELLO HERMETICO)$/],
   ['Válvulas', /^(VALV|VLV\b|ELECTROVALVULA|LLAVE (DE )?(PASO|BOLA|ESFERICA|COMPUERTA|GLOBO)|ELEM(ENTO)?\.? TE|CUERPO VALV|NUCLEO DE VALVULA|ORIFICIO|MALLA \d+ MY|FILTRO (TIPO )?(Y|CANASTA)\b|VISOR|ACTUADOR|PURGADOR|GRIFO)/, /VALVULA/],
   ['Cables y material eléctrico', /^(CABLE(?! (DE ACERO|ACERADO))|C ?\/|CONDUCTOR|TOXFREE|AFUMEX|N2XOH|NHX|THW|TABLERO|GABINETE|STD\d|INTERRUPTOR|TERMOMAGNETICO|DIFERENCIAL|CONTACTOR|GUARDAMOTOR|RELE|FUSIBLE|BORNE|TERMINAL (DE )?(COBRE|OJO|PIN|PUNTA|COMPRESION)|TOMACORRIENTE|ENCHUFE|CLAVIJA|BANDEJA(?! DE PINTURA| ANTIDERRAME)|ESCALERILLA|CANALETA|TUBO (CONDUIT|EMT|IMC|FLEXIBLE|PVC[ -]?SAP)|CONDUIT|CONDULET|CAJA (DE PASE|OCTOGONAL|RECTANGULAR|ELECTRICA|SUPERFICIAL|METALICA)|LUMINARIA|REFLECTOR|LAMPARA|FOCO|VARIADOR|ARRANCADOR|UPS|ESTABILIZADOR|TRANSFORMADOR|PLC|MODULO|HMI|PANTALLA (INDUSTRIAL|HMI)|VARILLA (DE )?COBRE|POZO A TIERRA|CEMENTO CONDUCTIVO|MATIX|DADO|PULSADOR|SELECTOR|LUZ PILOTO|RIEL (DIN|UNISTRUT)|CANAL UNISTRUT)/, /ELECTRIC|TABLERO|FABRICACION|ACTIVO/],
@@ -19980,34 +19984,40 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
     polarLineasOC().forEach(function(x){ if(!x.idProducto || !pdOcAbierta(x) || /anul|sin aprobar/i.test(x.estadoOrden || '')) return; const k = String(x.idProducto).trim(), l = M.get(k) || [];
       if(!l.some(function(y){ return y.oc === x.codOrden; })) l.push({ oc:x.codOrden, f:x.fOrden }); M.set(k, l); });
     M.forEach(function(l){ l.sort(function(a, b){ return (b.f || 0) - (a.f || 0); }); }); return M; });
+  // Orden de columnas de Piero (v587, 27.11.2026): Fecha pedido, Pedido, ID proyecto, Cliente, Responsable, Código, Descripción, Cantidad, Unidad,
+  // Fecha requerimiento, Requerimiento, En tránsito. Con una persona elegida no van "Resp. pedido" ni "Estado" (Piero: "cuando se filtra por persona eso no va").
+  const todosP = !APP_PC.skuPer;
   const fila = function(r){ const ck = skuKey(r), on = APP_PC.cot.indexOf(ck) !== -1, cots = cotDePedido(r);
     const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', cli = /^pedido directo|^sin proyecto/i.test(r.proyecto || '') ? '' : String(r.proyecto || '');
     const tr = (appSkuStock(r.idProducto) || {}).transito || 0, est = r.rsv ? 'Por regularizar' : (r.estadoPedido || 'Pendiente');
     const sku = `data-sku="${e(r.idProducto || '')}" data-skuped="${e(r.codPedido || '')}" data-skureq="${e(r.req || '')}"`;
     return `<tr class="skt-f${on ? ' sel' : ''}"><td class="ck"><span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skusel="${e(ck)}" role="checkbox" aria-checked="${on}" title="Elegir para cotizar"></span></td>
-      <td class="b">${r.rsv ? 'Reserva' : e(r.codPedido || '—')}</td><td>${fch(r.fPedido)}</td><td>${e(PD_PERSONAS[r.persona] || r.persona || '—')}</td>
-      <td>${r.solicitante ? `<span class="ctb-sol" data-clic="1" data-supinfo="${e(r.solicitante)}" title="Ver los datos de ${e(titleCase(r.solicitante))}">${av(r.solicitante)}<span>${e(r.solicitante)}</span></span>` : '—'}</td>
+      <td class="nw">${fch(r.fPedido)}</td><td class="b">${r.rsv ? 'Reserva' : e(r.codPedido || '—')}</td>${todosP ? `<td class="nw">${e(PD_PERSONAS[r.persona] || r.persona || '—')}</td>` : ''}
       <td class="pry">${e(pryId || '—')}</td><td class="pyn"><span>${e(cli)}</span></td>
+      <td>${r.solicitante ? `<span class="ctb-sol" data-clic="1" data-supinfo="${e(r.solicitante)}" title="Ver los datos de ${e(titleCase(r.solicitante))}">${av(r.solicitante)}<span>${e(r.solicitante)}</span></span>` : '—'}</td>
       <td><button type="button" class="ctb-cod" ${sku} title="Ver la ficha del SKU">${e(r.idProducto || '—')}</button></td>
       <td class="desc"><button type="button" class="ctb-desc" ${sku} title="Ver la ficha del SKU">${e(r.producto || '—')}</button></td>
       <td class="n">${r.cantPedido != null ? appN(r.cantPedido, 2) : '—'}</td><td>${e(r.unidad || '')}</td>
-      <td>${r.req ? e(r.req) : 'Directo'}</td><td>${fch(r.fReq)}</td>
+      <td class="nw">${fch(r.fReq)}</td><td class="nw">${r.req ? e(r.req) : 'Directo'}</td>
       <td class="c">${(function(){ const os = ocT.get(String(r.idProducto || '').trim()) || [], c0 = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
         if(os.length) return `<button type="button" class="ctb-si" data-oc="${e(os[0].oc)}" title="${e('En tránsito: OC ' + os.map(function(o){ return c0(o.oc); }).join(', ') + (tr > 0 ? ' · ' + appN(tr, 2) + ' ' + (r.unidad || '') + ' en tránsito' : '') + ' · toca para ver la OC')}">Sí${os.length > 1 ? ' · ' + os.length : ''}</button>`;
         return tr > 0 ? `<i class="ctb-si" title="${appN(tr, 2)} ${e(r.unidad || '')} en tránsito">Sí</i>` : '—'; })()}</td>
-      <td><i class="ctb-est">${e(est)}</i></td>
+      ${todosP ? `<td><i class="ctb-est">${e(est)}</i></td>` : ''}
       <td class="cz">${cotIcono(r)}${cots.length ? `<small>${e(cots[0].replace(/^COT-\d{4}-0*/, 'COT-'))}</small>` : ''}</td></tr>`; };
   return `<div class="skt cot ctb-w"><div class="skt-blk ctb-blk"><div class="ctb-scroll"><table class="ctb"><thead><tr>
     <th class="ck"><span class="skt-x${todos ? ' on' : ''}" data-clic="1" data-skuselg="1" role="checkbox" aria-checked="${todos}" title="Elegir todos para cotizar"></span></th>
-    <th>N° pedido</th><th>Fecha pedido</th><th>Resp. pedido</th><th>Responsable / solicitante</th><th>ID proyecto</th><th>Proyecto</th><th>Código</th><th>Descripción producto</th>
-    <th class="n">Cant.</th><th>Unidad</th><th>Requerimiento</th><th>Fecha req.</th><th class="c">En tránsito</th><th>Estado</th><th class="cz">Cotiz.</th></tr></thead>
+    <th>Fecha pedido</th><th>Pedido</th>${todosP ? '<th>Resp. pedido</th>' : ''}<th>ID proyecto</th><th>Cliente</th><th>Responsable</th><th>Código</th><th>Descripción</th>
+    <th class="n">Cantidad</th><th>Unidad</th><th>Fecha requerimiento</th><th>Requerimiento</th><th class="c">En tránsito</th>${todosP ? '<th>Estado</th>' : ''}<th class="cz">Cotiz.</th></tr></thead>
     ${(function(){   // un bloque por familia general (v578): la familia con el pedido más reciente primero; dentro, el más reciente primero
       const G = new Map(); L.forEach(function(r){ const f = skuFamCC(r); if(!G.has(f)) G.set(f, []); G.get(f).push(r); });
       return [...G.entries()].sort(function(a, b){ return (a[0] === 'Otros productos') - (b[0] === 'Otros productos'); }).map(function(g){ const on = g[1].every(function(r){ return APP_PC.cot.indexOf(skuKey(r)) !== -1; });
         return `<tbody class="skt-blk ctb-g" style="--fam:${appColorFamilia(g[0])}"><tr class="ctb-gh"><td class="ck"><span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skuselg="1" role="checkbox" aria-checked="${on}" title="Elegir toda la familia para cotizar"></span></td>
-          <td colspan="15"><div class="ctb-ghd"><i></i><b>${e(g[0])}</b><span>${appN(g[1].length)} SKU</span></div></td></tr>${g[1].map(fila).join('')}</tbody>`; }).join(''); })()}</table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(L.length)}</div></div></div>`; }
-function skuVistaCarolina(){ const yo = String((APP.usuario || {}).correo || '').split('@')[0].toUpperCase(); const L = ['CCHECA', 'MSIHUAIRO']; return L.indexOf(APP_PC.skuPer) !== -1 || (!APP_PC.skuPer && L.indexOf(yo) !== -1); }   // Carolina y Melissa (v566)
+          <td colspan="${todosP ? 15 : 13}"><div class="ctb-ghd"><i></i><b>${e(g[0])}</b><span>${appN(g[1].length)} SKU</span></div></td></tr>${g[1].map(fila).join('')}</tbody>`; }).join(''); })()}</table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(L.length)}</div></div></div>`; }
+function skuVistaCarolina(){ const yo = String((APP.usuario || {}).correo || '').split('@')[0].toUpperCase(); const L = ['CCHECA', 'MSIHUAIRO', 'JALTAMIRANO', 'JPOMEZ', 'MLUJAN']; return L.indexOf(APP_PC.skuPer) !== -1 || (!APP_PC.skuPer && L.indexOf(yo) !== -1); }   // Carolina y Melissa (v566); Jaime, José y Manuel (v587)
 function appPendComprasHtml(soloLista, sinCaras){
+  // Memoria de los datos (v587, 27.11.2026, Piero: "se laguea el app en compras"): misma llave que la pantalla + los recojos.
+  if(soloLista === 'datos' && !appPendComprasHtml.en){ appCorreoCargar(false); appAgCargar(false); rtCargar(false);
+    return appMemo('pcDatos:' + (sinCaras ? 1 : 0) + appPantallaEstado('pendcompras') + '|' + appId(RT.m) + RT.firma, function(){ appPendComprasHtml.en = true; try{ return appPendComprasHtml('datos', sinCaras); } finally{ appPendComprasHtml.en = false; } }); }
   appCorreoCargar(false); appAgCargar(false); rtCargar(false);
   const hoy = new Date(), c = appIndCorte(), finSem = isoWeekStart(c); finSem.setUTCDate(finSem.getUTCDate() + 6);
   const todas = pdFilas();
@@ -20075,7 +20085,7 @@ function appPendComprasHtml(soloLista, sinCaras){
     }
     return appOcCard({ cls:S[k][2], tono:tono, big:big, est:EST[k], flag:flag, codLbl:'OC',
       cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', appImpNombre(o.prov)], b:['Cliente', prysTxt(o) || 'Stock / sin proyecto'],
-      via:via, chips:['📅 ' + fecha, '📦 ' + o.n + ' ítem' + (o.n === 1 ? '' : 's'), imp && !tr ? '🌎 Importación' : ''], quien:nom(o.persona), correo:o.oc, agOc:o.oc, rcOc:imp ? '' : o.oc, op:o.oc });   // recojo solo en OC nacionales (17.11.2026)
+      via:via, chips:['📅 ' + fecha, '📦 ' + o.n + ' ítem' + (o.n === 1 ? '' : 's'), imp && !tr ? '🌎 Importación' : ''], quien:nom(o.persona), correo:o.oc, agOc:o.oc, rcOc:imp ? '' : o.oc });   // recojo solo en OC nacionales (17.11.2026)
   };
   // OC enviada por agencia (17.11.2026): Emitida → Aprobada → Agencia → Regularizada, con los documentos que subió Almacén.
   const cardAg = function(x, i){ const o = x.o, a = APP_AG.m[o.oc] || {}, e2 = appDDMM, fa = a.fecha ? fromIsoDay(String(a.fecha).slice(0, 10)) : null, regu = !x.pend;
@@ -20084,7 +20094,7 @@ function appPendComprasHtml(soloLista, sinCaras){
     return appOcCard({ cls:'ag', tono:tono, big:regu ? ['✓', 'regularizada'] : dias != null ? [dias, dias === 1 ? 'día desde el envío' : 'días desde el envío'] : ['—', 'sin fecha'], est:'Por agencia', flag:'', codLbl:'OC',
       cods:[[o.oc.replace(/^000\d-0*/, ''), 'data-oc="' + escapeHtml(o.oc) + '"']], a:['Proveedor', appImpNombre(o.prov)], b:['Cliente', prys || 'Stock / sin proyecto'],
       via:{ n:[['Emitida', o.fo ? e2(o.fo) : ''], ['Aprobada', o.fb ? e2(o.fb) : ''], ['Agencia', fa ? e2(fa) : ''], ['Regularizada', regu && o.fr ? e2(o.fr) : '']], p:regu ? 3 : 2, ico:regu ? OC2_ICO.check : OC2_ICO.camion },
-      chips:[(a.factura ? '✅' : '⬜') + ' Factura', (a.guia ? '✅' : '⬜') + ' Guía firmada', '📦 ' + o.n + ' ítem' + (o.n === 1 ? '' : 's')], quien:nom(o.persona), agOc:o.oc, op:o.oc }); };
+      chips:[(a.factura ? '✅' : '⬜') + ' Factura', (a.guia ? '✅' : '⬜') + ' Guía firmada', '📦 ' + o.n + ' ítem' + (o.n === 1 ? '' : 's')], quien:nom(o.persona), agOc:o.oc }); };
   // En "Pedidos sin OC" el número es la cantidad de SKU del listado, no de pedidos (06.10.2026, Piero).
   const cardEnt = function(o, i){
     const flag = o.fin && !o.fr ? '<em class="ok">✔ Finalizada</em>' : o.atraso == null ? '' : o.atraso > 0 ? '<em class="mal">' + o.atraso + ' d.h. tarde</em>' : '<em class="ok">A tiempo</em>';
@@ -20099,7 +20109,7 @@ function appPendComprasHtml(soloLista, sinCaras){
       cods:cods, a:['Proveedor', appImpNombre(o.prov)],
       b:['Cliente', (cl.length ? polarCorta(cl.slice(0, 2).join(' · '), 34) + (cl.length > 2 ? ' +' + (cl.length - 2) : '') : 'Stock / sin proyecto') + (ids.length ? ' · ' + ids[0] + (ids.length > 1 ? ' +' + (ids.length - 1) : '') : '')],
       via:{ n:[['Emitida', o.fo ? e2(o.fo) : ''], ['Aprobada', o.fb ? e2(o.fb) : ''], ['Pactada', o.fx ? e2(o.fx) : ''], [o.fr ? 'Llegó' : 'Cerrada', e2(o.f) + (o.f && o.f.getUTCFullYear() !== c.getUTCFullYear() ? '/' + String(o.f.getUTCFullYear()).slice(2) : '')]], p:3, ico:cerr ? OC2_ICO.candado : OC2_ICO.check },
-      chips:[its, prTxt], quien:nom(o.persona), agOc:o.oc, op:o.oc });
+      chips:[its, prTxt], quien:nom(o.persona), agOc:o.oc });
   };
   const entFiltros = function(){
     const op = function(v, t, sel){ return `<option value="${v}"${String(v) === String(sel) ? ' selected' : ''}>${t}</option>`; };
@@ -20392,7 +20402,7 @@ function ncFicha(x, D){ const e = escapeHtml, o = x.o || {}, est = NC_EST[x.st] 
   const cuando = x.st === 'ent' || x.st === 'agr' ? 'Ya llegó' + (o.f ? ' el ' + fmtDate(o.f) : '') : dias === null ? 'Sin fecha de compromiso' : dias < 0 ? 'Debió llegar hace ' + dd(-dias) : dias === 0 ? 'Llega hoy' : 'Llega en ' + dd(dias);
   const prov = appImpNombre(x.prov) || x.prov || '—', ocC = x.oc.replace(/^000\d-0*/, ''), per = x.per ? String(PD_PERSONAS[x.per] || x.per) : '';
   const dato = function(k, v){ return v ? `<div><small>${k}</small><b title="${e(v)}">${e(v)}</b></div>` : ''; };
-  const iO = ['venc', 'luego'].indexOf(x.st) !== -1 ? D.cardOC(o, 0, x.st) : x.st === 'ent' && D.cardEnt ? D.cardEnt(o, 0) : '';
+  const iO = ['venc', 'luego'].indexOf(x.st) !== -1 ? D.cardOC(o, 0, x.st) : '';
   const L = x.u ? NCM.I.filter(function(y){ return y.u && y.u.k === x.u.k && ncEnEst(y, 'ab'); }).length : 0;
   return `<div class="imx-pan imx-fi ncm-fi" style="--fc:${col}"><header><i class="imx-fic">${ncSvg('<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>')}</i><div><h3>OC ${e(ocC)}</h3><span>${e(prov)}</span></div><button type="button" class="pmm-x" data-ncx="1" aria-label="Cerrar">×</button></header>
     <div class="imx-fi-est"><b>${e(est[0])}</b><span>${e(cuando)}</span></div>
@@ -21391,11 +21401,6 @@ function copEstDe(x){ const o = x.o; if(x.st === 'ent') return o.anul ? ['anu', 
 const COP_ESTN = { venc:['Vencida', '#d43c3c'], sa:['Sin aprobar', '#d4891a'], par:['Llegó parcial', '#0e7490'], cam:['En camino', '#2f6fd6'], ag:['Por agencia', '#8a5cd1'], agr:['Agencia regularizada', '#b9a3e3'], ent:['Entregada', '#1e8a4f'], cer:['Cerrada', '#64748b'], anu:['Anulada', '#98a2b3'] };
 function copEstPop(){ const c = APP_COP.estCnt || {}, f = APP_COP.estF || '';
   return `<span class="rqx-skf-pop"><button type="button" class="${f ? '' : 'sel'}" data-copestv=""><i></i>Todos<b>${appN(APP_COP.estTot || 0)}</b></button>${Object.keys(COP_ESTN).filter(function(k){ return c[k]; }).map(function(k){ return `<button type="button" class="${f === k ? 'sel' : ''}" data-copestv="${k}"><i style="background:${COP_ESTN[k][1]}"></i>${COP_ESTN[k][0]}<b>${appN(c[k])}</b></button>`; }).join('')}</span>`; }
-// ✉ y 💰 en las tarjetas de OC (v586, 27.11.2026, Piero: "cuando algo está entregado ya no salen las opciones de correo o pago tesorería… cuando algo está en camino tampoco").
-function copCardBtns(oc){ const e = escapeHtml, s = function(p){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`; };
-  return `<button type="button" class="oc2-ag oc2-op" data-copmail="${e(oc)}" title="Correo de la OC al proveedor" aria-label="Correo al proveedor">${s('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>')}</button><button type="button" class="oc2-ag oc2-op" data-coppago="${e(oc)}" title="Solicitud de pago a Tesorería" aria-label="Solicitud de pago">${s('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>')}</button>`; }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('.oc2-op'); if(!b) return; ev.preventDefault(); ev.stopPropagation();
-  const oc = b.dataset.copmail || b.dataset.coppago, i = copOcInfo(oc); if(!i) return appToast('No encuentro la OC ' + oc + ' en el Reporte Maestro.'); return b.dataset.copmail ? copMailAbrir(i) : copPagoAbrir(i); }, true);
 document.addEventListener('click', function(ev){ if(!(ev.target.closest && ev.target.closest('.cop-estf'))) document.querySelectorAll('.cop-estf .rqx-skf-pop').forEach(function(x){ x.remove(); }); });
 function copEnFiltro(x, k){ const s = copEstDe(x)[0]; return k === 'ab' ? x.st === 'venc' || x.st === 'luego' || x.st === 'ag' : k === 'sa' ? s === 'sa' : k === 'venc' ? x.st === 'venc' && s !== 'sa' : k === 'cam' ? x.st === 'luego' && s !== 'sa' : k === 'ag' ? x.st === 'ag' || x.st === 'agr' : k === 'ent' ? x.st === 'ent' : true; }
 function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k = APP_COP.est || 'ab', c0 = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
@@ -21407,13 +21412,14 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   // Entregadas: todas, no solo las del mes (v586, 27.11.2026, Piero: "¿por qué sale entregada hasta esa fecha? y no todo"); la más reciente primero.
   let L = q ? I : I.filter(function(x){ return x.st !== 'agr' && x.st !== 'ent'; }).concat((D.entAll || []).filter(function(o){ return !ncImp(o.oc); }).map(function(o){ return { st:'ent', oc:o.oc, prov:o.prov, per:o.persona || '', o:o }; }));
   const ord = { venc:0, sa:1, par:2, cam:3, ag:4, agr:5, ent:6, cer:7, anu:8 };
-  L = L.slice().sort(function(a, b){ const sa = copEstDe(a)[0], sb = copEstDe(b)[0], fin = function(s){ return s === 'ent' || s === 'cer' || s === 'anu'; };
+  L.forEach(function(x){ x.s = copEstDe(x); });
+  L = L.slice().sort(function(a, b){ const sa = a.s[0], sb = b.s[0], fin = function(s){ return s === 'ent' || s === 'cer' || s === 'anu'; };
     return (fin(sa) - fin(sb)) || (fin(sa) ? (b.o.f || 0) - (a.o.f || 0) : (ord[sa] - ord[sb]) || (sa === 'venc' ? (b.o.d || 0) - (a.o.d || 0) : (a.o.f || 9e15) - (b.o.f || 9e15))); });
   // Filtro en la columna Estado (v586, 27.11.2026, Piero: "añade un filtro en la columna de estado con el ícono ese para filtrar los estados").
-  const cnt = {}; L.forEach(function(x){ const s = copEstDe(x)[0]; cnt[s] = (cnt[s] || 0) + 1; }); APP_COP.estCnt = cnt; APP_COP.estTot = L.length;
-  const fk = APP_COP.estF && cnt[APP_COP.estF] ? APP_COP.estF : ''; if(fk) L = L.filter(function(x){ return copEstDe(x)[0] === fk; });
-  const tope = APP_COP.tope || 300, total = L.length; L = L.slice(0, tope);
-  const fila = function(x){ const o = x.o, s = copEstDe(x), oc = o.oc, me = APP_COP.meta[oc] || {}, p = pry.get(oc), ent = x.st === 'ent';
+  const cnt = {}; L.forEach(function(x){ const s = x.s[0]; cnt[s] = (cnt[s] || 0) + 1; }); APP_COP.estCnt = cnt; APP_COP.estTot = L.length;
+  const fk = APP_COP.estF && cnt[APP_COP.estF] ? APP_COP.estF : ''; if(fk) L = L.filter(function(x){ return x.s[0] === fk; });
+  const tope = APP_COP.tope || 150, total = L.length; L = L.slice(0, tope);
+  const fila = function(x){ const o = x.o, s = x.s, oc = o.oc, me = APP_COP.meta[oc] || {}, p = pry.get(oc), ent = x.st === 'ent';
     const cli = ent ? [...(o.clis || [])].slice(0, 2).join(' · ') : [...(o.prys || [])].map(appImpNombre).slice(0, 2).join(' · ');
     const fm = me.fent_manual ? new Date(me.fent_manual + 'T12:00:00Z') : null, fe = ent ? o.f : fm || o.f;
     const dias = ent ? (o.anul ? 'anulada' : o.atraso != null ? (o.atraso > 0 ? o.atraso + ' d.h. tarde' : 'a tiempo') : '') : !fe ? 'sin fecha' : fm ? 'corregida' : o.d > 0 ? o.d + ' d.h. de atraso' : o.d === 0 ? 'vence hoy' : 'faltan ' + (-o.d) + ' d.h.';
@@ -21423,7 +21429,7 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
       <td class="c">${ncAv(o.persona)}</td>
       <td class="ent${fm ? ' man' : ''}"><span>${copF(fe)}</span><small>${e(dias)}</small>${ent ? '' : `<button type="button" class="cop-fe" data-copfeb="${e(oc)}" title="${fm ? 'Fecha corregida (Maestro: ' + copF(o.f) + ') · toca para cambiar' : 'Corregir la fecha de entrega (el proveedor la movió)'}">✏</button>`}</td>
       <td class="n">${appN(o.n || 0)}</td><td class="c">${appCorreoBtn(oc)}</td>
-      <td class="acc"><button type="button" class="cop-a" data-copmail="${e(oc)}" title="Correo de la OC al proveedor (4 modalidades)">✉</button><button type="button" class="cop-a" data-coppago="${e(oc)}" title="Solicitud de pago a Tesorería">💰</button>${ent ? '' : appAgBtn(oc) + appRecBtn(oc)}</td></tr>`; };
+      <td class="acc">${['cam', 'ent', 'cer', 'anu'].indexOf(s[0]) !== -1 ? '' : `<button type="button" class="cop-a" data-copmail="${e(oc)}" title="Correo de la OC al proveedor (4 modalidades)">✉</button><button type="button" class="cop-a" data-coppago="${e(oc)}" title="Solicitud de pago a Tesorería">💰</button>`}${ent ? '' : appAgBtn(oc) + appRecBtn(oc)}</td></tr>`; };
   return (q ? `<div class="cop-chs"><span class="cop-q">“${e(q)}”: ${appN(L.length)} OC</span></div>` : '')
     + (L.length ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th><span class="rqx-skf-w cop-estf"><button type="button" class="rqx-skf-b${fk ? ' on' : ''}" data-copestf="1" title="Filtrar por estado">${fk ? e(COP_ESTN[fk][0]) : 'Estado'} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span></th><th>OC</th><th>Emitida</th><th>Proveedor</th><th>Cliente / PRY</th><th class="c">Comprador</th><th>Entrega</th><th class="n">Ítems</th><th class="c">Correo</th><th class="c">Acciones</th></tr></thead><tbody>${L.map(fila).join('')}</tbody></table></div>${total > tope ? `<button type="button" class="ini-link" data-copmas="1">Ver más (${appN(total - tope)} restantes) ›</button>` : ''}`
       : `<div class="ini-vacio">${q ? 'No hay OC con "' + e(q) + '".' : '✅ Nada en este estado.'}</div>`); }
@@ -21438,8 +21444,8 @@ document.addEventListener('click', function(ev){ const b = ev.target.closest && 
   if(!b) return; const d = b.dataset;
   if(d.copvis){ APP_NC.vista = d.copvis; try{ localStorage.setItem('fp-cop-vista', d.copvis); }catch(err){} APP_NC.d = ''; APP_NC.foco = ''; if(d.copvis !== 'mapa') APP_NC.est = ''; return appRenderInicio(); }
   if(d.copest){ APP_COP.est = d.copest; return copRefrescar(); }
-  if(d.copmas){ APP_COP.tope = (APP_COP.tope || 300) + 300; return copRefrescar(); }
-  if(d.copestv !== undefined){ APP_COP.estF = d.copestv; APP_COP.tope = 300; return copRefrescar(); }
+  if(d.copmas){ APP_COP.tope = (APP_COP.tope || 150) + 300; return copRefrescar(); }
+  if(d.copestv !== undefined){ APP_COP.estF = d.copestv; APP_COP.tope = 150; return copRefrescar(); }
   if(d.copestf){ const w = b.closest('.rqx-skf-w'), pp = w.querySelector('.rqx-skf-pop'); if(pp){ pp.remove(); return; } w.insertAdjacentHTML('beforeend', copEstPop());
     const r = b.getBoundingClientRect(), p = w.querySelector('.rqx-skf-pop'); p.style.position = 'fixed'; p.style.top = (r.bottom + 6) + 'px'; p.style.left = r.left + 'px'; p.style.right = 'auto'; return; }
   if(d.copopdf){ APP_COP.opdEst = d.copopdf; return copRefrescar(); }
@@ -22587,7 +22593,7 @@ function appOcCard(t){ const e = escapeHtml, ag = t.agOc ? APP_AG.m[t.agOc] : nu
     <div class="oc2-h"><span class="oc2-big"><b>${e(String(t.big[0]))}</b><small>${e(t.big[1] || '')}</small></span>
       <span class="oc2-t"><span class="oc2-l1"><span class="oc2-cods"><small>${t.codLbl}</small>${t.cods.slice(0, t.cods.length > 4 ? 3 : 4).map(function(c){ return `<button type="button" ${c[1]}>${e(c[0])}</button>`; }).join('<i>·</i>')}${t.cods.length > 4 ? `<i>·</i><button type="button" class="oc2-mas" data-oc2mas="1" title="${e(t.cods.map(function(c){ return c[0]; }).join(' · '))}">+${t.cods.length - 3}</button><span class="oc2-resto" hidden>${t.cods.slice(3).map(function(c){ return `<i>·</i><button type="button" ${c[1]}>${e(c[0])}</button>`; }).join('')}</span>` : ''}</span><em class="oc2-est">${t.est}</em>${t.flag || ''}${ag && t.est !== 'Por agencia' ? '<em class="ag">Por agencia</em>' : ''}</span>
         <b class="oc2-prov" title="${e(t.a[1] || '')}">${e(t.a[1] || '—')}</b><small class="oc2-cli">${e(t.b[1] || '—')}</small></span>
-      <span class="oc2-q">${appQuienAv(t.quien)}<small>${e(t.quien || '')}</small>${t.correo || t.agOc || t.rcOc ? `<span class="oc2-acc">${t.correo ? appCorreoBtn(t.correo) : ''}${t.agOc ? appAgBtn(t.agOc) : ''}${t.rcOc ? appRecBtn(t.rcOc) : ''}</span>` : ''}${t.op && !ncImp(t.op) ? `<span class="oc2-acc">${copCardBtns(t.op)}</span>` : ''}</span></div>
+      <span class="oc2-q">${appQuienAv(t.quien)}<small>${e(t.quien || '')}</small>${t.correo || t.agOc || t.rcOc ? `<span class="oc2-acc">${t.correo ? appCorreoBtn(t.correo) : ''}${t.agOc ? appAgBtn(t.agOc) : ''}${t.rcOc ? appRecBtn(t.rcOc) : ''}</span>` : ''}</span></div>
     ${t.via ? appOcViaje(t.via) : ''}
     ${(t.chips || []).filter(Boolean).length || ag || rc ? `<div class="oc2-pie">${ag ? `<span class="ag">${OC2_ICO.camion}${e(appAgTxt(ag))}</span>` : ''}${rc}${(t.chips || []).filter(Boolean).map(function(c){ return `<span>${c}</span>`; }).join('')}</div>` : ''}
   </div>`; }
