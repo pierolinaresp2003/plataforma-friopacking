@@ -19758,11 +19758,19 @@ function appOCHtml(d){
   const clis = [...new Set(d.items.map(function(i){ const y = i.r.proyecto || ''; return /^pedido directo|^sin proyecto/i.test(y) || !y ? 'Stock / sin proyecto' : appImpNombre(y); }))];
   const dato = function(k, v, cls){ return v ? `<div class="ocx2-d${cls ? ' ' + cls : ''}"><small>${k}</small><b>${v}</b></div>` : ''; };
   const pago = d.cond || ocCondDe(cod), ag = APP_AG.m[cod];
+  // Quién pidió y para qué PRY / cliente (v598, 27.11.2026, Piero: "si tiene req debe salir el responsable en columna ahí mismo a la derecha y el pry-cliente").
+  const AVC = ['#b54708', '#4338ca', '#b42318', '#0e7490', '#7c3aed', '#047857', '#be185d'];
+  const av = function(n){ const p = n.split(/\s+/), ini = (p[0].charAt(0) + (p[1] ? p[1].charAt(0) : '')).toUpperCase(); let h = 0; for(let k = 0; k < n.length; k++) h = (h * 31 + n.charCodeAt(k)) >>> 0; return `<i class="ctb-av" style="background:${AVC[h % AVC.length]}">${e(ini)}</i>`; };
+  const quien = function(r){ const n = String(r.codRequerimiento ? (r.responsable || r.responsableReq || '') : '').trim(), pry = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '';
+    const cli = /^pedido directo|^sin proyecto/i.test(r.proyecto || '') ? '' : appImpNombre(r.proyecto || '');
+    if(!n && !pry && !cli) return '<div class="ocx2-it-r"></div>';
+    return `<div class="ocx2-it-r">${n ? `<span class="ocx2-it-rq" title="Responsable del requerimiento">${av(n)}<b>${e(titleCase(n))}</b></span>` : ''}${pry || cli ? `<small title="${e([pry, cli].filter(Boolean).join(' · '))}">${pry ? `<em>${e(pry)}</em>` : ''}${pry && cli ? ' · ' : ''}${e(polarCorta(cli, 40))}</small>` : ''}</div>`; };
   const it = function(i){ const r = i.r, um = e(r.unidad || ''), abierta = i.abierta && !fin, q = abierta ? i.x : i.q, pc = i.q ? Math.min(100, Math.round(q / i.q * 100)) : 100;
     const st = !abierta ? ['ok', 'Llegó'] : i.x > 0 ? ['cam', 'En parte'] : atraso > 0 ? ['mal', 'Falta'] : ['neu', 'Falta'];
     return `<div class="ocx2-it st-${st[0]}">
       <div class="ocx2-it-t"><b>${rqTxt(r.producto || r.idProducto)}</b><span>${r.idProducto ? `<button type="button" class="ocv-it-c" data-sku="${e(r.idProducto)}" title="Ver la ficha del producto">${e(r.idProducto)}</button>` : ''}${r.codRequerimiento ? `<button type="button" class="ocv-req" data-ocreq="${e(r.codRequerimiento)}">Req. ${e(r.codRequerimiento.replace(/^000\d-0*/, ''))}</button>` : '<small>Directo</small>'}</span>
         ${r.obs ? `<small class="ocx2-it-o" title="Observación del req.">${e(r.obs)}</small>` : ''}</div>
+      ${quien(r)}
       <div class="ocx2-it-q"><span><b>${polarNum(q)}</b><small>/ ${polarNum(i.q)} ${um}</small></span><i><em style="width:${pc}%"></em></i></div>
       <em class="ocx2-it-st">${st[1]}${i.fRec && !abierta ? ' · ' + e(dm(i.fRec)) : ''}</em>
       ${!polarSinPrecios() && r.precioUnit != null ? `<div class="ocx2-it-p"><b>${e(r.moneda ? r.moneda + ' ' : '')}${Number(r.precioUnit).toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 })}</b><small>c/u</small></div>` : '<div class="ocx2-it-p"></div>'}
@@ -21493,6 +21501,11 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   // Monto de cada OC (sin IGV, en su moneda) y Comprador solo cuando se ve a todos (v590, 27.11.2026, Piero: "no coloques al comprador cuando se está filtrando su cara").
   const monto = appMemo('copMonto', function(){ const m = new Map(); polarLineasOC().forEach(function(r){ if(!r.codOrden) return; const x = m.get(r.codOrden) || m.set(r.codOrden, { v:0, m:copMon(r.moneda) }).get(r.codOrden); x.v += +r.montoNativo || 0; }); return m; });
   const conComp = !APP_NC.per;
+  // Responsable del requerimiento de cada OC (v598, Piero: "el responsable también debe salir ahí como columna").
+  const resp = appMemo('copResp', function(){ const m = new Map(); polarLineasOC().forEach(function(r){ const n = String(r.codRequerimiento ? (r.responsableReq || r.responsable || '') : '').trim(); if(!r.codOrden || !n) return;
+    const l = m.get(r.codOrden) || m.set(r.codOrden, []).get(r.codOrden); if(l.indexOf(n) === -1) l.push(n); }); return m; });
+  const AVC = ['#b54708', '#4338ca', '#b42318', '#0e7490', '#7c3aed', '#047857', '#be185d'];
+  const avR = function(n){ const p = n.split(/\s+/), ini = (p[0].charAt(0) + (p[1] ? p[1].charAt(0) : '')).toUpperCase(); let h = 0; for(let k = 0; k < n.length; k++) h = (h * 31 + n.charCodeAt(k)) >>> 0; return `<i class="ctb-av" style="background:${AVC[h % AVC.length]}">${e(ini)}</i>`; };
   const fila = function(x){ const o = x.o, s = x.s, oc = o.oc, me = APP_COP.meta[oc] || {}, p = pry.get(oc), ent = x.st === 'ent';
     const cli = ent ? [...(o.clis || [])].slice(0, 2).join(' · ') : [...(o.prys || [])].map(appImpNombre).slice(0, 2).join(' · ');
     const fm = me.fent_manual ? new Date(me.fent_manual + 'T12:00:00Z') : null, fe = ent ? o.f : fm || o.f;
@@ -21503,12 +21516,13 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
     return `<tr class="cop-f k-${s[0]}"><td>${chip}</td>
       <td class="b"><button type="button" class="cop-oc" data-oc="${e(oc)}" title="Ver la OC ${e(oc)}">${e(c0(oc))}</button></td>
       <td class="prov" title="${e(o.prov || '')}">${e(appImpNombre(o.prov || '—'))}</td><td class="cli">${e(polarCorta(cli || 'Stock / sin proyecto', 46))}${p ? `<small>${e(p[0])}</small>` : ''}</td>
+      <td class="rsp">${(function(){ const l = resp.get(oc) || []; return l.length ? `<span title="${e(l.map(titleCase).join(' · '))}">${avR(l[0])}<b>${e(titleCase(l[0]))}</b>${l.length > 1 ? `<small>+${l.length - 1}</small>` : ''}</span>` : '<small>—</small>'; })()}</td>
       ${conComp ? `<td class="c">${ncAv(o.persona)}</td>` : ''}<td class="fch">${copF(o.fo)}</td><td class="fch${s[0] === 'sa' ? ' pend' : ''}">${apr}</td>
       <td class="ent${fm ? ' man' : ''}"><span>${copF(fe)}</span><small>${e(dias)}</small>${ent ? '' : `<button type="button" class="cop-fe" data-copfeb="${e(oc)}" title="${fm ? 'Fecha corregida (Maestro: ' + copF(o.f) + ') · toca para cambiar' : 'Corregir la fecha de entrega (el proveedor la movió)'}">✏</button>`}</td>
       <td class="n">${mt ? copMonto(mt.v, mt.m) : '—'}</td><td class="n">${appN(o.n || 0)}</td>
       <td class="acc"><span class="cop-acc">${copAcc(oc, s[0])}</span></td></tr>`; };
   return (q ? `<div class="cop-chs"><span class="cop-q">“${e(q)}”: ${appN(L.length)} OC</span></div>` : '')
-    + (L.length || fk ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th><span class="rqx-skf-w cop-estf"><button type="button" class="rqx-skf-b${fk ? ' on' : ''}" data-copestf="1" title="Filtrar por estado">Estado${fk ? ' · ' + (nk - fk) + ' de ' + nk : ''} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span></th><th>OC</th><th>Proveedor</th><th>Cliente / PRY</th>${conComp ? '<th class="c">Comprador</th>' : ''}<th>Emitida</th><th>Aprobada</th><th>Entrega</th><th class="n">Monto s/IGV</th><th class="n">Ítems</th><th class="c">Acciones</th></tr></thead><tbody>${L.length ? L.map(fila).join('') : `<tr><td colspan="${conComp ? 11 : 10}" class="cop-vac">Marca al menos un estado en el filtro.</td></tr>`}</tbody></table></div>${total > tope ? `<button type="button" class="ini-link" data-copmas="1">Ver más (${appN(total - tope)} restantes) ›</button>` : ''}`
+    + (L.length || fk ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th><span class="rqx-skf-w cop-estf"><button type="button" class="rqx-skf-b${fk ? ' on' : ''}" data-copestf="1" title="Filtrar por estado">Estado${fk ? ' · ' + (nk - fk) + ' de ' + nk : ''} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span></th><th>OC</th><th>Proveedor</th><th>Cliente / PRY</th><th>Responsable</th>${conComp ? '<th class="c">Comprador</th>' : ''}<th>Emitida</th><th>Aprobada</th><th>Entrega</th><th class="n">Monto s/IGV</th><th class="n">Ítems</th><th class="c">Acciones</th></tr></thead><tbody>${L.length ? L.map(fila).join('') : `<tr><td colspan="${conComp ? 12 : 11}" class="cop-vac">Marca al menos un estado en el filtro.</td></tr>`}</tbody></table></div>${total > tope ? `<button type="button" class="ini-link" data-copmas="1">Ver más (${appN(total - tope)} restantes) ›</button>` : ''}`
       : `<div class="ini-vacio">${q ? 'No hay OC con "' + e(q) + '".' : '✅ Nada en este estado.'}${(APP_COP.estOff || []).length ? ' <button type="button" class="ini-link" data-copestv="">Quitar el filtro de estado</button>' : ''}</div>`); }
 function copVisSeg(){ const v = APP_NC.vista || 'mapa', b = function(k, t, extra){ return `<button type="button" data-copvis="${k}" class="${v === k ? 'on' : ''}">${t}${extra || ''}</button>`; };
   return `<div class="rsvm-seg cop-vis">${b('mapa', '🗺 Mapa')}${b('lista', '☰ Lista')}${b('opd', '📄 OPD', ' <b>' + appN(copOpdAbiertas().length) + '</b>')}</div>`; }
