@@ -21496,8 +21496,10 @@ function copOpdInfo(o){ return { oc:o.numero, prov:o.prov || '', ruc:o.ruc || ''
 function copEstDe(x){ const o = x.o; if(x.st === 'ent') return o.anul ? ['anu', 'Anulada'] : ['ent', 'Entregada'];   // cerrada (OC finalizada) = entregada (v593, Piero)
   if(o.est === 'Sin aprobar') return ['sa', 'Sin aprobar']; if(x.st === 'ag') return ['ag', 'Por agencia']; if(x.st === 'agr') return ['agr', 'Agencia regularizada'];
   const rc = rtRecDeOc(o.oc), rk = rc ? rtRecEst(rc) : ''; if(rk && rk !== 'ing' && rk !== 'anul') return ['prc', rk === 'rec' ? 'Recogido' : 'Por recoger'];   // v593: recojo por Friopacking
-  if(o.est === 'Llegó parcial') return ['par', 'Llegó parcial']; return x.st === 'venc' ? ['venc', 'Vencida'] : ['cam', 'En camino']; }
-const COP_ESTN = { venc:['Vencida', '#d43c3c'], sa:['Sin aprobar', '#d4891a'], par:['Llegó parcial', '#0e7490'], cam:['En camino', '#2f6fd6'], ag:['Por agencia', '#8a5cd1'], agr:['Agencia regularizada', '#b9a3e3'], prc:['Por recoger', '#0e8a7c'], ent:['Entregada', '#1e8a4f'], cer:['Cerrada', '#64748b'], anu:['Anulada', '#98a2b3'] };
+  if(o.est === 'Llegó parcial') return ['par', 'Llegó parcial'];
+  // Aprobada pero sin el correo al proveedor: «Pendiente correo»; «En camino» recién con el ✓ correo enviado (v604, Piero).
+  return x.st === 'venc' ? ['venc', 'Vencida'] : APP_CORREO.m[o.oc] ? ['cam', 'En camino'] : ['pco', 'Pendiente correo']; }
+const COP_ESTN = { venc:['Vencida', '#d43c3c'], sa:['Sin aprobar', '#d4891a'], pco:['Pendiente correo', '#db2777'], par:['Llegó parcial', '#0e7490'], cam:['En camino', '#2f6fd6'], ag:['Por agencia', '#8a5cd1'], agr:['Agencia regularizada', '#b9a3e3'], prc:['Por recoger', '#0e8a7c'], ent:['Entregada', '#1e8a4f'], cer:['Cerrada', '#64748b'], anu:['Anulada', '#98a2b3'] };
 function copEstPop(){ const c = APP_COP.estCnt || {}, off = APP_COP.estOff || [], K = Object.keys(COP_ESTN).filter(function(k){ return c[k]; }), todos = !K.some(function(k){ return off.indexOf(k) !== -1; });
   const ck = function(on){ return `<span class="cop-ckb${on ? ' on' : ''}"></span>`; };
   return `<span class="rqx-skf-pop cop-estpop"><button type="button" data-copestv="">${ck(todos)}Todos</button>${K.map(function(k){ const on = off.indexOf(k) === -1;
@@ -21523,7 +21525,7 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   // estado (vencidas, sin aprobar, en camino, por agencia y al final las entregadas); el estado va en la primera columna.
   // Entregadas: todas, no solo las del mes (v586, 27.11.2026, Piero: "¿por qué sale entregada hasta esa fecha? y no todo"); la más reciente primero.
   let L = q ? I : I.filter(function(x){ return x.st !== 'agr' && x.st !== 'ent'; }).concat((D.entAll || []).filter(function(o){ return !ncImp(o.oc); }).map(function(o){ return { st:'ent', oc:o.oc, prov:o.prov, per:o.persona || '', o:o }; }));
-  const ord = { venc:0, sa:1, par:2, cam:3, prc:4, ag:5, agr:6, ent:7, cer:7, anu:8 };
+  const ord = { venc:0, sa:1, pco:2, par:3, cam:4, prc:5, ag:6, agr:7, ent:8, cer:8, anu:9 };
   L.forEach(function(x){ x.s = copEstDe(x); });
   L = L.slice().sort(function(a, b){ const sa = a.s[0], sb = b.s[0], fin = function(s){ return s === 'ent' || s === 'cer' || s === 'anu'; };
     return (ord[sa] - ord[sb]) || (fin(sa) ? (b.o.f || 0) - (a.o.f || 0) : sa === 'venc' ? (b.o.d || 0) - (a.o.d || 0) : (a.o.f || 9e15) - (b.o.f || 9e15)); });
@@ -21560,7 +21562,7 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   // Formato de Pendientes (v599, 27.11.2026, Piero: "separa bien las tablas… dale el formato similar a Pendientes"): un bloque por estado con su franja de color.
   const nCol = conComp ? 12 : 11, G = [];
   L.forEach(function(x){ const k = x.s[0] === 'cer' ? 'ent' : x.s[0], g = G[G.length - 1]; if(g && g.k === k) g.l.push(x); else G.push({ k:k, l:[x] }); });
-  const GN = { venc:'Vencidas', sa:'Sin aprobar', par:'Llegó parcial', cam:'En camino', prc:'Por recoger', ag:'Por agencia', agr:'Agencia regularizada', ent:'Entregadas', anu:'Anuladas' };
+  const GN = { venc:'Vencidas', sa:'Sin aprobar', pco:'Pendiente correo', par:'Llegó parcial', cam:'En camino', prc:'Por recoger', ag:'Por agencia', agr:'Agencia regularizada', ent:'Entregadas', anu:'Anuladas' };
   const th = `<thead><tr><th><span class="rqx-skf-w cop-estf"><button type="button" class="rqx-skf-b${fk ? ' on' : ''}" data-copestf="1" title="Filtrar por estado">Estado${fk ? ' · ' + (nk - fk) + ' de ' + nk : ''} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span></th>
     <th>OC</th><th>Proveedor</th><th>Cliente / PRY</th><th>Responsable</th>${conComp ? '<th class="c">Comprador</th>' : ''}<th>Emitida</th><th>Aprobada</th><th>Entrega</th><th class="n">Monto s/IGV</th><th class="n">Ítems</th><th class="c">Acciones</th></tr></thead>`;
   const cuerpo = G.length ? G.map(function(g){ return `<tbody class="skt-blk ctb-g" style="--fam:${(COP_ESTN[g.k] || ['', '#64748b'])[1]}"><tr class="ctb-gh"><td colspan="${nCol}"><div class="ctb-ghd"><i></i><b>${GN[g.k] || g.k}</b><span>${appN(cnt[g.k] + (g.k === 'ent' ? cnt.cer || 0 : 0) || g.l.length)} OC</span></div></td></tr>${g.l.map(fila).join('')}</tbody>`; }).join('')
