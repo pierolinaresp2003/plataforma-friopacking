@@ -1227,7 +1227,7 @@ function buildSnapshot(){
         mn: r.moneda, mo: r.montoNativo==null?null:Math.round(r.montoNativo*100)/100, cd: r.condiciones,
         // 29.09.2026: proveedor, cantidades y unidad para el panel de "en tránsito" del Análisis de Inventario.
         pv: r.proveedor || '', qo: r.cantidadOrden, qr: r.cantRecepcion, um: r.unidad || '', eo: r.estadoOrden || '',
-        et: isoDay(r.etd), fer: isoDay(r.fEntregaRef), fe: isoDay(r.fEntregaReal),
+        et: isoDay(r.etd), fer: isoDay(r.fEntregaRef), fe: isoDay(r.fEntregaReal), pu: r.precioUnit == null ? undefined : r.precioUnit,   // v592
       })),
       // Compras → Pendientes (28.09.2026): solo las líneas de PedidoSinReq que siguen abiertas.
       pendDirecto: PEDIDO_SIN_REQ_PEND.filter(r => pdOcAbierta(r) || pdPedidoAbierto(r)).map(r => ({
@@ -1714,6 +1714,7 @@ function loadFromSnapshot(snap){
     d1: null, d2: r.d2, d3: r.d3, d4: (origenForDocumento(r.co) === 'importado' ? null : r.d4), d6: null,
     d4cumple: r.d4c, d4raw: r.d4, esRegularizacion: false,
     responsableD1: r.rp || 'JCENTENO', moneda: r.mn || null, montoNativo: (r.mo!=null ? r.mo : null), condiciones: r.cd || "",
+    precioUnit: (r.pu != null ? r.pu : (r.mo != null && r.qo > 0 ? Math.round(r.mo / r.qo * 10000) / 10000 : null)),   // pedido directo con precio (v592)
     etd: fromIsoDay(r.et), fEntregaRef: fromIsoDay(r.fer), fEntregaReal: fromIsoDay(r.fe), esPedidoDirecto: true,
   })) : [];
   PEDIDO_SIN_REQ_PEND = (snap.proceso && snap.proceso.pendDirecto) ? snap.proceso.pendDirecto.map(r => ({
@@ -2547,6 +2548,7 @@ function processPedidoSinReq(wb, filename){
       moneda: col.moneda!==-1 ? (r[col.moneda]||"").toString().trim() : null,
       montoNativo: (col.cantidadOrden!==-1 && col.precioUnitario!==-1 && r[col.cantidadOrden]!=null && r[col.precioUnitario]!=null && !isNaN(Number(r[col.cantidadOrden])) && !isNaN(Number(r[col.precioUnitario])))
         ? Number(r[col.cantidadOrden]) * Number(r[col.precioUnitario]) : null,
+      precioUnit: (col.precioUnitario!==-1 && r[col.precioUnitario]!=null && r[col.precioUnitario]!=='' && !isNaN(Number(r[col.precioUnitario]))) ? Number(r[col.precioUnitario]) : null,   // pedido directo con precio (v592)
       cantidadOrden: (col.cantidadOrden!==-1 && r[col.cantidadOrden]!=null && !isNaN(Number(r[col.cantidadOrden])))
         ? Number(r[col.cantidadOrden]) : null,
       // Lo ya recibido de esta OC: sin esto el panel de "en tránsito" daría por en camino OC que
@@ -19987,11 +19989,14 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
   // Orden de columnas de Piero (v587-588, 27.11.2026): Pedido, Fecha pedido, ID proyecto, Cliente, Responsable, Código, Descripción, Cantidad, Unidad,
   // Requerimiento, Fecha requerimiento, En tránsito. Con una persona elegida no van "Resp. pedido" ni "Estado" (Piero: "cuando se filtra por persona eso no va").
   const todosP = !APP_PC.skuPer;
-  const fila = function(r){ const ck = skuKey(r), on = APP_PC.cot.indexOf(ck) !== -1, cots = cotDePedido(r);
+  // Los cables de Piero siguen en subgrupos por tipo (v592, 27.11.2026, Piero: "mis cables que se sigan dividiendo en subgrupos"), cada uno con su casilla.
+  const yo = String((APP.usuario || {}).correo || '').split('@')[0].toUpperCase(), subCab = APP_PC.skuPer === 'PLINARES' || (!APP_PC.skuPer && yo === 'PLINARES');
+  const subDe = function(r){ return skuCategoria(r).split(' · ').slice(1).join(' · ') || 'Otros'; }, enCot = function(r){ return APP_PC.cot.indexOf(skuKey(r)) !== -1; };
+  const fila = function(r, sid){ const ck = skuKey(r), on = APP_PC.cot.indexOf(ck) !== -1, cots = cotDePedido(r);
     const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', cli = /^pedido directo|^sin proyecto/i.test(r.proyecto || '') ? '' : String(r.proyecto || '');
     const tr = (appSkuStock(r.idProducto) || {}).transito || 0, est = r.rsv ? 'Por regularizar' : (r.estadoPedido || 'Pendiente');
     const sku = `data-sku="${e(r.idProducto || '')}" data-skuped="${e(r.codPedido || '')}" data-skureq="${e(r.req || '')}"`;
-    return `<tr class="skt-f${on ? ' sel' : ''}"><td class="ck"><span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skusel="${e(ck)}" role="checkbox" aria-checked="${on}" title="Elegir para cotizar"></span></td>
+    return `<tr class="skt-f${on ? ' sel' : ''}"${sid ? ` data-sub="${sid}"` : ''}><td class="ck"><span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skusel="${e(ck)}" role="checkbox" aria-checked="${on}" title="Elegir para cotizar"></span></td>
       <td class="b">${r.rsv ? 'Reserva' : e(r.codPedido || '—')}</td><td class="nw">${fch(r.fPedido)}</td>${todosP ? `<td class="nw">${e(PD_PERSONAS[r.persona] || r.persona || '—')}</td>` : ''}
       <td class="pry">${e(pryId || '—')}</td><td class="pyn"><span>${e(cli)}</span></td>
       <td>${r.solicitante ? `<span class="ctb-sol" data-clic="1" data-supinfo="${e(r.solicitante)}" title="Ver los datos de ${e(titleCase(r.solicitante))}">${av(r.solicitante)}<span>${e(r.solicitante)}</span></span>` : '—'}</td>
@@ -20012,7 +20017,12 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
       const G = new Map(); L.forEach(function(r){ const f = skuFamCC(r); if(!G.has(f)) G.set(f, []); G.get(f).push(r); });
       return [...G.entries()].sort(function(a, b){ return (a[0] === 'Otros productos') - (b[0] === 'Otros productos'); }).map(function(g){ const on = g[1].every(function(r){ return APP_PC.cot.indexOf(skuKey(r)) !== -1; });
         return `<tbody class="skt-blk ctb-g" style="--fam:${appColorFamilia(g[0])}"><tr class="ctb-gh"><td class="ck"><span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skuselg="1" role="checkbox" aria-checked="${on}" title="Elegir toda la familia para cotizar"></span></td>
-          <td colspan="${todosP ? 15 : 13}"><div class="ctb-ghd"><i></i><b>${e(g[0])}</b><span>${appN(g[1].length)} SKU</span></div></td></tr>${g[1].map(fila).join('')}</tbody>`; }).join(''); })()}</table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(L.length)}</div></div></div>`; }
+          <td colspan="${todosP ? 15 : 13}"><div class="ctb-ghd"><i></i><b>${e(g[0])}</b><span>${appN(g[1].length)} SKU</span></div></td></tr>${(function(){
+            const S = new Map(); if(subCab && g[0] === 'Cables y material eléctrico') g[1].forEach(function(r){ const t = subDe(r); if(!S.has(t)) S.set(t, []); S.get(t).push(r); });
+            if(S.size < 2) return g[1].map(function(r){ return fila(r); }).join('');
+            return [...S.entries()].sort(function(a, b){ return (/^Otr/.test(a[0]) - /^Otr/.test(b[0])) || b[1].length - a[1].length || a[0].localeCompare(b[0]); }).map(function(s, j){ const sid = 'cs' + j, on = s[1].every(enCot);
+              return `<tr class="ctb-sh"><td class="ck"><span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skuselsub="${sid}" role="checkbox" aria-checked="${on}" title="Elegir todo ${e(s[0])} para cotizar"></span></td><td colspan="${todosP ? 15 : 13}"><div class="ctb-shd"><b>${e(s[0])}</b><span>${appN(s[1].length)} SKU</span></div></td></tr>`
+                + s[1].map(function(r){ return fila(r, sid); }).join(''); }).join(''); })()}</tbody>`; }).join(''); })()}</table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(L.length)}</div></div></div>`; }
 function skuVistaCarolina(){ const yo = String((APP.usuario || {}).correo || '').split('@')[0].toUpperCase(); const L = ['CCHECA', 'MSIHUAIRO', 'JALTAMIRANO', 'JPOMEZ', 'MLUJAN', 'PLINARES']; return L.indexOf(APP_PC.skuPer) !== -1 || (!APP_PC.skuPer && L.indexOf(yo) !== -1); }   // Carolina y Melissa (v566); Jaime, José y Manuel (v587); Piero (v589)
 function appPendComprasHtml(soloLista, sinCaras){
   // Memoria de los datos (v587, 27.11.2026, Piero: "se laguea el app en compras"): misma llave que la pantalla + los recojos.
@@ -20679,6 +20689,7 @@ function ncCotToggle(ks, on){ const C = APP_PC.cot;
 function ncCotPintar(){ const C = new Set(APP_PC.cot);
   document.querySelectorAll('.skt [data-skusel]').forEach(function(x){ const on = C.has(x.dataset.skusel); x.classList.toggle('on', on); x.setAttribute('aria-checked', on); x.closest('.skt-f').classList.toggle('sel', on); });
   document.querySelectorAll('.skt-tg').forEach(function(b){ const g = b.querySelector('[data-skuselt]'), ks = [...b.querySelectorAll('[data-skusel]')]; if(g){ const on = ks.length && ks.every(function(x){ return C.has(x.dataset.skusel); }); g.classList.toggle('on', on); g.setAttribute('aria-checked', on); } });
+  document.querySelectorAll('[data-skuselsub]').forEach(function(g){ const ks = [...g.closest('table').querySelectorAll('tr[data-sub="' + g.dataset.skuselsub + '"] [data-skusel]')], on = ks.length && ks.every(function(x){ return C.has(x.dataset.skusel); }); g.classList.toggle('on', on); g.setAttribute('aria-checked', on); });
   document.querySelectorAll('.skt-blk').forEach(function(b){ const g = b.querySelector('[data-skuselg]'), ks = [...b.querySelectorAll('[data-skusel]')]; if(g){ const on = ks.length && ks.every(function(x){ return C.has(x.dataset.skusel); }); g.classList.toggle('on', on); g.setAttribute('aria-checked', on); } });
   const bar = document.getElementById('ncsCot'); if(bar){ bar.hidden = !C.size; const n = document.getElementById('ncsCotN'); if(n) n.textContent = appN(C.size); } }
 // Correo del proveedor en DB Proveedores por su nombre (Sonepar, Prysmian…) o por su RUC.
@@ -26097,6 +26108,7 @@ function appClickInicio(e){
   if(b.dataset.crest !== undefined){ APP_CR.est = b.dataset.crest; return appRenderInicio(); }
   if(b.dataset.skusel !== undefined){ e.stopPropagation(); return ncCotToggle([b.dataset.skusel]); }   // elegir para cotizar (18.11.2026)
   if(b.dataset.skuselt !== undefined){ e.stopPropagation(); const ks = [...b.closest('.skt-tg').querySelectorAll('[data-skusel]')].map(function(x){ return x.dataset.skusel; }); return ncCotToggle(ks, !ks.every(function(k){ return APP_PC.cot.indexOf(k) !== -1; })); }   // un tipo dentro de la familia
+  if(b.dataset.skuselsub !== undefined){ e.stopPropagation(); const ks = [...b.closest('table').querySelectorAll('tr[data-sub="' + b.dataset.skuselsub + '"] [data-skusel]')].map(function(x){ return x.dataset.skusel; }); return ncCotToggle(ks, !ks.every(function(k){ return APP_PC.cot.indexOf(k) !== -1; })); }   // un subgrupo de cables (v592)
   if(b.dataset.skuselg !== undefined){ e.stopPropagation(); const ks = [...b.closest('.skt-blk').querySelectorAll('[data-skusel]')].map(function(x){ return x.dataset.skusel; }); return ncCotToggle(ks, !ks.every(function(k){ return APP_PC.cot.indexOf(k) !== -1; })); }
   if(b.dataset.cotlimpiar){ APP_PC.cot = []; return ncCotPintar(); }
   if(b.dataset.cotabrir) return appCotAbrir();
