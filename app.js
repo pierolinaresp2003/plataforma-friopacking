@@ -19984,21 +19984,21 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
     polarLineasOC().forEach(function(x){ if(!x.idProducto || !pdOcAbierta(x) || /anul|sin aprobar/i.test(x.estadoOrden || '')) return; const k = String(x.idProducto).trim(), l = M.get(k) || [];
       if(!l.some(function(y){ return y.oc === x.codOrden; })) l.push({ oc:x.codOrden, f:x.fOrden }); M.set(k, l); });
     M.forEach(function(l){ l.sort(function(a, b){ return (b.f || 0) - (a.f || 0); }); }); return M; });
-  // Orden de columnas de Piero (v587, 27.11.2026): Fecha pedido, Pedido, ID proyecto, Cliente, Responsable, Código, Descripción, Cantidad, Unidad,
-  // Fecha requerimiento, Requerimiento, En tránsito. Con una persona elegida no van "Resp. pedido" ni "Estado" (Piero: "cuando se filtra por persona eso no va").
+  // Orden de columnas de Piero (v587-588, 27.11.2026): Pedido, Fecha pedido, ID proyecto, Cliente, Responsable, Código, Descripción, Cantidad, Unidad,
+  // Requerimiento, Fecha requerimiento, En tránsito. Con una persona elegida no van "Resp. pedido" ni "Estado" (Piero: "cuando se filtra por persona eso no va").
   const todosP = !APP_PC.skuPer;
   const fila = function(r){ const ck = skuKey(r), on = APP_PC.cot.indexOf(ck) !== -1, cots = cotDePedido(r);
     const pryId = r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) ? r.idProyecto : '', cli = /^pedido directo|^sin proyecto/i.test(r.proyecto || '') ? '' : String(r.proyecto || '');
     const tr = (appSkuStock(r.idProducto) || {}).transito || 0, est = r.rsv ? 'Por regularizar' : (r.estadoPedido || 'Pendiente');
     const sku = `data-sku="${e(r.idProducto || '')}" data-skuped="${e(r.codPedido || '')}" data-skureq="${e(r.req || '')}"`;
     return `<tr class="skt-f${on ? ' sel' : ''}"><td class="ck"><span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skusel="${e(ck)}" role="checkbox" aria-checked="${on}" title="Elegir para cotizar"></span></td>
-      <td class="nw">${fch(r.fPedido)}</td><td class="b">${r.rsv ? 'Reserva' : e(r.codPedido || '—')}</td>${todosP ? `<td class="nw">${e(PD_PERSONAS[r.persona] || r.persona || '—')}</td>` : ''}
+      <td class="b">${r.rsv ? 'Reserva' : e(r.codPedido || '—')}</td><td class="nw">${fch(r.fPedido)}</td>${todosP ? `<td class="nw">${e(PD_PERSONAS[r.persona] || r.persona || '—')}</td>` : ''}
       <td class="pry">${e(pryId || '—')}</td><td class="pyn"><span>${e(cli)}</span></td>
       <td>${r.solicitante ? `<span class="ctb-sol" data-clic="1" data-supinfo="${e(r.solicitante)}" title="Ver los datos de ${e(titleCase(r.solicitante))}">${av(r.solicitante)}<span>${e(r.solicitante)}</span></span>` : '—'}</td>
       <td><button type="button" class="ctb-cod" ${sku} title="Ver la ficha del SKU">${e(r.idProducto || '—')}</button></td>
       <td class="desc"><button type="button" class="ctb-desc" ${sku} title="Ver la ficha del SKU">${e(r.producto || '—')}</button></td>
       <td class="n">${r.cantPedido != null ? appN(r.cantPedido, 2) : '—'}</td><td>${e(r.unidad || '')}</td>
-      <td class="nw">${fch(r.fReq)}</td><td class="nw">${r.req ? e(r.req) : 'Directo'}</td>
+      <td class="nw">${r.req ? e(r.req) : 'Directo'}</td><td class="nw">${fch(r.fReq)}</td>
       <td class="c">${(function(){ const os = ocT.get(String(r.idProducto || '').trim()) || [], c0 = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
         if(os.length) return `<button type="button" class="ctb-si" data-oc="${e(os[0].oc)}" title="${e('En tránsito: OC ' + os.map(function(o){ return c0(o.oc); }).join(', ') + (tr > 0 ? ' · ' + appN(tr, 2) + ' ' + (r.unidad || '') + ' en tránsito' : '') + ' · toca para ver la OC')}">Sí${os.length > 1 ? ' · ' + os.length : ''}</button>`;
         return tr > 0 ? `<i class="ctb-si" title="${appN(tr, 2)} ${e(r.unidad || '')} en tránsito">Sí</i>` : '—'; })()}</td>
@@ -20006,8 +20006,8 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
       <td class="cz">${cotIcono(r)}${cots.length ? `<small>${e(cots[0].replace(/^COT-\d{4}-0*/, 'COT-'))}</small>` : ''}</td></tr>`; };
   return `<div class="skt cot ctb-w"><div class="skt-blk ctb-blk"><div class="ctb-scroll"><table class="ctb"><thead><tr>
     <th class="ck"><span class="skt-x${todos ? ' on' : ''}" data-clic="1" data-skuselg="1" role="checkbox" aria-checked="${todos}" title="Elegir todos para cotizar"></span></th>
-    <th>Fecha pedido</th><th>Pedido</th>${todosP ? '<th>Resp. pedido</th>' : ''}<th>ID proyecto</th><th>Cliente</th><th>Responsable</th><th>Código</th><th>Descripción</th>
-    <th class="n">Cantidad</th><th>Unidad</th><th>Fecha requerimiento</th><th>Requerimiento</th><th class="c">En tránsito</th>${todosP ? '<th>Estado</th>' : ''}<th class="cz">Cotiz.</th></tr></thead>
+    <th>Pedido</th><th>Fecha pedido</th>${todosP ? '<th>Resp. pedido</th>' : ''}<th>ID proyecto</th><th>Cliente</th><th>Responsable</th><th>Código</th><th>Descripción</th>
+    <th class="n">Cantidad</th><th>Unidad</th><th>Requerimiento</th><th>Fecha requerimiento</th><th class="c">En tránsito</th>${todosP ? '<th>Estado</th>' : ''}<th class="cz">Cotiz.</th></tr></thead>
     ${(function(){   // un bloque por familia general (v578): la familia con el pedido más reciente primero; dentro, el más reciente primero
       const G = new Map(); L.forEach(function(r){ const f = skuFamCC(r); if(!G.has(f)) G.set(f, []); G.get(f).push(r); });
       return [...G.entries()].sort(function(a, b){ return (a[0] === 'Otros productos') - (b[0] === 'Otros productos'); }).map(function(g){ const on = g[1].every(function(r){ return APP_PC.cot.indexOf(skuKey(r)) !== -1; });
