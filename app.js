@@ -21185,7 +21185,7 @@ function copMailAbrir(info, x){ x = x || {}; const e = escapeHtml, tipo = x.tipo
       <div class="cop-dest">${[0, 1, 2].map(function(i){ const d = APP_COP.m.dest[i]; return `<label class="rsv-lbl">Destinatario ${i + 1}<input data-copdn="${i}" list="copSupL" value="${e(d.n || '')}" placeholder="Nombre" autocomplete="off"></label><label class="rsv-lbl">DNI<input data-copdd="${i}" value="${e(d.dni || '')}" inputmode="numeric" placeholder="DNI"></label>`; }).join('')}</div>
       <datalist id="copSupL">${sups.map(function(n){ return `<option value="${e(n)}">`; }).join('')}</datalist></div>
     <div class="cop-ssoma" id="copSsoma"${mod === 'lurin' && tipo === 'oc' ? '' : ' hidden'}><span id="copSsomaT">📎 Cartilla SSOMA: revisando…</span><span class="cop-ssb"><button type="button" class="rsv-b" data-copssoma="1" id="copSsomaD" hidden>Bajar</button><label class="rsv-b"><span id="copSsomaB">Subir cartilla</span><input type="file" accept="application/pdf" id="copSsomaF" hidden></label></span></div>
-    ${tipo === 'oc' ? `<div class="cop-ssoma"><span id="copFirmaT">✍ Tu firma: revisando…</span><span class="cop-ssb"><label class="rsv-b"><span id="copFirmaB">Subir firma</span><input type="file" accept="image/png,image/jpeg" id="copFirmaF" hidden></label></span></div>` : ''}
+    ${tipo === 'oc' ? `<div class="cop-ssoma"><span id="copFirmaT">✍ Tu firma: revisando…</span><span class="cop-ssb"><select id="copFirmaP" class="ini-select" title="De quién es la firma">${(function(){ const yo = copUsr(), L = COP_FIRMA_P.indexOf(yo) === -1 && yo ? [yo].concat(COP_FIRMA_P) : COP_FIRMA_P; return L.map(function(k){ return `<option value="${e(k)}"${k === yo ? ' selected' : ''}>${e(String(PD_PERSONAS[k] || k).split(' ').slice(0, 2).join(' '))}${k === yo ? ' (tú)' : ''}</option>`; }).join(''); })()}</select><label class="rsv-b"><span id="copFirmaB">Subir firma</span><input type="file" accept="image/png,image/jpeg" id="copFirmaF" hidden></label></span></div>` : ''}
     <div class="cop-rec" id="copRec"${mod === 'recojo' ? '' : ' hidden'}>${/^000\d-/.test(info.oc) ? `<button type="button" class="rsv-b" data-ocrec="${e(info.oc)}">🚚 Llenar ficha de recojo para Almacén</button>` : ''}</div>
     <div class="cop-ff"><label class="rsv-lbl">Para<input id="copTo" value="${e(to)}" placeholder="correo del proveedor"></label><label class="rsv-lbl">CC<input id="copCcI" value="${e(copCc(info, mod, tipo))}"></label></div>
     <label class="rsv-lbl">Asunto<input id="copAs" value="${e(copAsunto(info, tipo))}"></label>
@@ -21209,15 +21209,21 @@ async function copSsomaPintar(){ const t = document.getElementById('copSsomaT'),
 // Firma de cada usuario para el correo .eml (v600, Piero: "agrega la firma para PLINARES"): una imagen guardada en Supabase (compras/firmas/USUARIO).
 // En «Abrir correo» no va: Outlook pone sola la firma en los correos nuevos.
 function copUsr(){ return String(copYo() || '').split('@')[0].toUpperCase(); }
-async function copFirma(){ const u = copUsr(); if(!u) return null; if(APP_COP.firmaU === u) return APP_COP.firmaB;
-  try{ const r = await sbFetch('/storage/v1/object/compras/firmas/' + encodeURIComponent(u)); APP_COP.firmaU = u; APP_COP.firmaB = r.ok ? { b:await r.arrayBuffer(), t:(r.headers.get('content-type') || 'image/png').split(';')[0] } : null; return APP_COP.firmaB; }catch(err){ return null; } }
-async function copFirmaPintar(){ const t = document.getElementById('copFirmaT'), b = document.getElementById('copFirmaB'); if(!t) return; const x = await copFirma();
-  t.textContent = x ? '✍ Tu firma va al final del correo .eml.' : '✍ Sube tu firma (imagen) para que vaya en el correo .eml.'; if(b) b.textContent = x ? 'Cambiar' : 'Subir firma'; }
-document.addEventListener('change', async function(ev){ const i = ev.target; if(!i || i.id !== 'copFirmaF' || !i.files || !i.files[0]) return; const f = i.files[0], u = copUsr();
+// Cualquiera del equipo puede subir la firma de otro (v601, Piero: "¿no puedo yo subir la firma de los demás?"): se elige la persona y se sube su imagen.
+// El .eml siempre lleva la firma de quien está usando la app.
+const COP_FIRMA_P = ['PLINARES', 'CCHECA', 'MSIHUAIRO', 'JALTAMIRANO', 'JPOMEZ', 'MLUJAN', 'JCENTENO', 'KALBUJAR', 'MCONDORI'];
+async function copFirma(u){ u = u || copUsr(); if(!u) return null; APP_COP.firmas = APP_COP.firmas || {}; if(u in APP_COP.firmas) return APP_COP.firmas[u];
+  try{ const r = await sbFetch('/storage/v1/object/compras/firmas/' + encodeURIComponent(u)); APP_COP.firmas[u] = r.ok ? { b:await r.arrayBuffer(), t:(r.headers.get('content-type') || 'image/png').split(';')[0] } : null; return APP_COP.firmas[u]; }catch(err){ return null; } }
+function copFirmaSel(){ const s = document.getElementById('copFirmaP'); return (s && s.value) || copUsr(); }
+async function copFirmaPintar(){ const t = document.getElementById('copFirmaT'), b = document.getElementById('copFirmaB'); if(!t) return; const u = copFirmaSel(), yo = u === copUsr(), x = await copFirma(u);
+  const nom = String(PD_PERSONAS[u] || u).split(' ')[0];
+  t.textContent = x ? (yo ? '✍ Tu firma va al final del correo .eml.' : '✍ ' + nom + ' ya tiene su firma.') : (yo ? '✍ Sube tu firma (imagen) para que vaya en el correo .eml.' : '✍ ' + nom + ' todavía no tiene firma.'); if(b) b.textContent = x ? 'Cambiar' : 'Subir firma'; }
+document.addEventListener('change', async function(ev){ const i = ev.target; if(i && i.id === 'copFirmaP') return copFirmaPintar();
+  if(!i || i.id !== 'copFirmaF' || !i.files || !i.files[0]) return; const f = i.files[0], u = copFirmaSel();
   if(!/^image\/(png|jpe?g|gif)$/i.test(f.type)) return appToast('La firma tiene que ser una imagen (PNG o JPG).'); if(!u) return appToast('Entra con tu usuario.');
   try{ const r = await sbFetch('/storage/v1/object/compras/firmas/' + encodeURIComponent(u), { method:'POST', headers:{ 'Content-Type':f.type, 'x-upsert':'true' }, body:f });
     if(!r.ok){ const j = await r.json().catch(function(){ return {}; }); throw new Error(j.message || j.error || ('error ' + r.status)); }
-    APP_COP.firmaU = u; APP_COP.firmaB = { b:await f.arrayBuffer(), t:f.type }; appToast('✅ Firma guardada.'); copFirmaPintar(); }
+    APP_COP.firmas = APP_COP.firmas || {}; APP_COP.firmas[u] = { b:await f.arrayBuffer(), t:f.type }; appToast('✅ Firma de ' + String(PD_PERSONAS[u] || u).split(' ')[0] + ' guardada.'); copFirmaPintar(); }
   catch(err){ appToast('No se pudo subir la firma: ' + (err.message || err)); } i.value = ''; });
 function copB64(buf){ const u = buf instanceof Uint8Array ? buf : new Uint8Array(buf); let s = ''; for(let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
 function copB64L(b){ return b.replace(/.{1,76}/g, '$&\r\n'); }
