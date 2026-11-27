@@ -21211,27 +21211,32 @@ async function copAbrirCorreo(to, cc, asunto, html){ const tmp = document.create
   if(!copiado){ const b = '&body=' + encodeURIComponent(texto); if(url.length + b.length <= 1900) url += b; else appToast('No se pudo copiar el correo: usa el botón Copiar y pega en Outlook.'); }
   else appToast('📋 Correo copiado: en Outlook pega con Ctrl+V');
   window.location.href = url; return copiado; }
+// Abrir el correo NO lo marca como enviado (v597, 27.11.2026, Piero: "¿qué pasa si le doy al botón pero no envío el correo?"): después de abrirlo
+// la ventana pregunta «¿Ya lo enviaste?» y solo con «Sí, ya lo envié» se marca ✓, la OPD pasa a Enviada, la OC queda «Por agencia» o se abre la ficha de recojo.
+function copMailRec(m){ return (m.dest || []).filter(function(p){ return p && (p.n || p.dni); }).map(function(p){ return { nombre:String(p.n || '').trim().replace(/\s+/g, ' '), dni:String(p.dni || '').replace(/[\s.-]/g, '').toUpperCase() }; }); }
+function copMailFalta(m){ if(!(m.tipo === 'oc' && m.mod === 'agencia')) return ''; const rec = copMailRec(m);
+  if(!m.agencia) return 'Escribe la agencia.'; if(!rec.length) return 'Pon al menos un destinatario con su DNI.';
+  const mal = rec.find(function(p){ return !p.nombre || !/^(\d{8}|[0-9A-Z]{9,12})$/.test(p.dni); }); return mal ? (mal.nombre ? 'Revisa el DNI de ' + mal.nombre + '.' : 'Falta el nombre de quien tiene DNI ' + mal.dni + '.') : ''; }
 async function copMailEnviar(){ const m = APP_COP.m; if(!m) return; const to = document.getElementById('copTo').value.trim(), cc = document.getElementById('copCcI').value, as = document.getElementById('copAs').value, html = document.getElementById('copPrev').innerHTML;
   if(!/@/.test(to)) return appToast('Escribe el correo del proveedor en «Para».');
-  // Envío por agencia (v593, Piero: "una vez que se manda así… que se marque como «enviado por agencia» en el estado"): se registra con la agencia y quienes recogen.
-  const esOc = m.tipo === 'oc' && /^000\d-\d{7}$/.test(m.info.oc), rec = (m.dest || []).filter(function(p){ return p && (p.n || p.dni); }).map(function(p){ return { nombre:String(p.n || '').trim().replace(/\s+/g, ' '), dni:String(p.dni || '').replace(/[\s.-]/g, '').toUpperCase() }; });
-  if(esOc && m.mod === 'agencia'){ if(!m.agencia) return appToast('Escribe la agencia.'); if(!rec.length) return appToast('Pon al menos un destinatario con su DNI.');
-    const mal = rec.find(function(p){ return !p.nombre || !/^(\d{8}|[0-9A-Z]{9,12})$/.test(p.dni); }); if(mal) return appToast(mal.nombre ? 'Revisa el DNI de ' + mal.nombre + '.' : 'Falta el nombre de quien tiene DNI ' + mal.dni + '.'); }
+  const falta = copMailFalta(m); if(falta) return appToast(falta);
   let eml = false;
   if(m.tipo === 'oc' && m.mod === 'lurin'){ const sb = await copSsoma();
     if(sb){ copEmlBajar(to, cc, as, html, [{ n:'CARTILLA_SSOMA_FRIOPACKING.pdf', b:sb }], ('OC ' + String(m.info.oc).replace(/^000\d-0*/, '') + ' ' + (appImpNombre(m.info.prov) || '')).replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.eml'); eml = true;
       appToast('📨 Se bajó el correo con la cartilla SSOMA adjunta: ábrelo y sale en Outlook listo para enviar.'); }
     else appToast('No encuentro la cartilla SSOMA (súbela en esta ventana): el correo se abre sin ella.'); }
-  if(!eml) await copAbrirCorreo(to, cc, as, html); m.enviado = true;
-  if(esOc && m.mod === 'agencia'){ const oc = m.info.oc, fila = { oc:oc, agencia:m.agencia, persona:rec.map(function(p){ return p.nombre; }).join(', '), recogen:rec, fecha:new Date().toLocaleDateString('en-CA', { timeZone:'America/Lima' }), por:(APP.usuario && (APP.usuario.nombre || APP.usuario.correo)) || null, actualizado:new Date().toISOString() };
+  if(!eml) await copAbrirCorreo(to, cc, as, html);
+  const pie = document.getElementById('copPie'); if(pie) pie.innerHTML = `<span class="cop-ok">${eml ? '📨 Abre el .eml que se bajó (ya lleva la cartilla SSOMA), adjunta el PDF de la OC y envíalo.' : '✉ Correo abierto en Outlook: pega con Ctrl+V y envíalo.'} <b>¿Ya lo enviaste?</b></span><button type="button" class="rsv-b" data-rsvx="1">Todavía no</button><button type="button" class="rsv-b ok" data-copconf="1">✓ Sí, ya lo envié</button>`; }
+async function copMailConfirmar(){ const m = APP_COP.m; if(!m) return; const falta = copMailFalta(m); if(falta) return appToast(falta);
+  const esOc = m.tipo === 'oc' && /^000\d-\d{7}$/.test(m.info.oc), oc = m.info.oc; m.enviado = true;
+  if(m.tipo === 'opd' && m.opdId){ const o = APP_COP.opd.find(function(y){ return y.id === m.opdId; }); if(o && COP_OPD_EST.indexOf(o.estado) < 3) copOpdGuardar(m.opdId, { estado:'Enviada', f_envio:o.f_envio || copHoy() }); }
+  else if(esOc && !APP_CORREO.m[oc]) appCorreoToggle({ dataset:{ correo:oc } });   // ✓ correo enviado (lo ve todo el equipo)
+  if(esOc && m.mod === 'agencia'){ const rec = copMailRec(m), fila = { oc:oc, agencia:m.agencia, persona:rec.map(function(p){ return p.nombre; }).join(', '), recogen:rec, fecha:new Date().toLocaleDateString('en-CA', { timeZone:'America/Lima' }), por:(APP.usuario && (APP.usuario.nombre || APP.usuario.correo)) || null, actualizado:new Date().toISOString() };
     try{ const r = await sbFetch('/rest/v1/fp_oc_agencia?on_conflict=oc', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify([fila]) });
       if(!r.ok) throw sbError(await r.json().catch(function(){ return {}; }), r.status); APP_AG.m[oc] = Object.assign({}, APP_AG.m[oc] || {}, fila); APP_AG.v++; appAgAplicar(); }
-    catch(err){ appToast('El correo se abrió, pero no se pudo marcar «Por agencia»: ' + ((err && err.message) || err)); } }
-  if(m.tipo === 'opd' && m.opdId){ const o = APP_COP.opd.find(function(y){ return y.id === m.opdId; }); if(o && COP_OPD_EST.indexOf(o.estado) < 3) copOpdGuardar(m.opdId, { estado:'Enviada', f_envio:o.f_envio || copHoy() }); }
-  else if(/^000\d-\d{7}$/.test(m.info.oc) && typeof appCorreoToggle === 'function' && !APP_CORREO.m[m.info.oc]) appCorreoToggle({ dataset:{ correo:m.info.oc } });   // ✓ correo enviado (lo ve todo el equipo)
-  // Recojo por Friopacking: se abre la ficha de recojo para Almacén; al guardarla la OC queda «Por recoger».
-  if(esOc && m.mod === 'recojo' && !rtRecDeOc(m.info.oc)){ appToast('✅ Correo abierto en Outlook · llena la ficha de recojo para Almacén'); rtRecAbrir(m.info.oc, ''); return; }
-  const pie = document.getElementById('copPie'); if(pie) pie.innerHTML = `<span class="cop-ok">✅ ${eml ? 'Correo bajado (.eml) con la cartilla SSOMA: ábrelo y adjunta también el PDF de la OC' : 'Correo abierto en Outlook'}${m.tipo === 'opd' ? ' · OPD marcada como Enviada' : esOc && m.mod === 'agencia' && APP_AG.m[m.info.oc] ? ' · OC marcada «Por agencia»' : ' · OC marcada con ✓ correo enviado'}</span><button type="button" class="rsv-b" data-rsvx="1">Listo</button>`;
+    catch(err){ appToast('No se pudo marcar «Por agencia»: ' + ((err && err.message) || err)); } }
+  if(esOc && m.mod === 'recojo' && !rtRecDeOc(oc)){ appToast('✅ Correo marcado como enviado · ahora la ficha de recojo para Almacén'); rtRecAbrir(oc, ''); return; }
+  const pie = document.getElementById('copPie'); if(pie) pie.innerHTML = `<span class="cop-ok">✅ ${m.tipo === 'opd' ? 'OPD marcada como Enviada' : esOc && m.mod === 'agencia' && APP_AG.m[oc] ? 'OC marcada «Por agencia» y con ✓ correo enviado' : 'OC marcada con ✓ correo enviado'}</span><button type="button" class="rsv-b" data-rsvx="1">Listo</button>`;
   if(esOc) copRefrescar(); }
 // ---- Lectura de PDF (OC de Nisira, OPD, cotización, factura) con pdf.js en el mismo navegador ----
 async function copPdf(file){ try{ const T = await tdPdfTexto(file); return { lineas:T.lineas, texto:T.lineas.join('\n') }; }catch(err){ appToast('No pude leer el PDF: ' + (err.message || err)); return null; } }
@@ -21512,11 +21517,12 @@ function copVista(D){ const e = escapeHtml, I = ncItems(D); copCargar(false);
   return `<div class="cop"><div class="cmp-top ncm-bar"><div class="ncm-izq">${ncModulo(D)}${copVisSeg()}<label class="pmm-q">${ncSvg(NC_ICO.lupa)}<input type="search" id="pcBusca" placeholder="${APP_NC.vista === 'opd' ? 'Buscar OPD, proveedor, proyecto o responsable' : 'Buscar OC, proveedor, producto o cliente'}" value="${e(APP_PC.q || '')}" autocomplete="off"></label>
       ${APP_NC.vista === 'lista' ? ncPerFiltro(I) : ''}<span class="cop-ico">${APP_NC.vista === 'lista' ? INV_XLS_BTN.replace('pc-img-btn inv-xls', 'imx-ib').replace('data-invxls="1"', 'data-pclxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar el status general en Excel') : ''}${copOps(true)}</span></div></div>
     <div id="copTabla">${APP_NC.vista === 'opd' ? copOpdHtml() : copListaHtml(D)}</div></div>`; }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-copvis],[data-copmarca],[data-copmas],[data-copestf],[data-copestv],[data-copest],[data-copopdf],[data-copmail],[data-coppago],[data-copurg],[data-copurgok],[data-copmod],[data-copcopiar],[data-copenviar],[data-coppagoenv],[data-copopdnueva],[data-copopdsave],[data-copopdrec],[data-coprecsave],[data-copopdenv],[data-copopdpago],[data-copdoc],[data-copfeb]');
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-copvis],[data-copmarca],[data-copconf],[data-copmas],[data-copestf],[data-copestv],[data-copest],[data-copopdf],[data-copmail],[data-coppago],[data-copurg],[data-copurgok],[data-copmod],[data-copcopiar],[data-copenviar],[data-coppagoenv],[data-copopdnueva],[data-copopdsave],[data-copopdrec],[data-coprecsave],[data-copopdenv],[data-copopdpago],[data-copdoc],[data-copfeb]');
   if(!b) return; const d = b.dataset;
   if(d.copvis){ APP_NC.vista = d.copvis; try{ localStorage.setItem('fp-cop-vista', d.copvis); }catch(err){} APP_NC.d = ''; APP_NC.foco = ''; if(d.copvis !== 'mapa') APP_NC.est = ''; return appRenderInicio(); }
   if(d.copest){ APP_COP.est = d.copest; return copRefrescar(); }
-  if(d.copmarca){ appCorreoToggle({ dataset:{ correo:d.copmarca } }); b.textContent = APP_CORREO.m[d.copmarca] ? 'Quitar ✓ enviado' : '✓ Ya se envió'; copRefrescar(); return; }
+  if(d.copmarca){ if(!APP_CORREO.m[d.copmarca]) return copMailConfirmar(); appCorreoToggle({ dataset:{ correo:d.copmarca } }); b.textContent = '✓ Ya se envió'; copRefrescar(); return; }
+  if(d.copconf) return copMailConfirmar();
   if(d.copmas){ APP_COP.tope = (APP_COP.tope || 150) + 300; return copRefrescar(); }
   if(d.copestv !== undefined){ const k = d.copestv, c = APP_COP.estCnt || {}, K = Object.keys(c); let off = (APP_COP.estOff || []).filter(function(x){ return c[x]; });
     if(!k) off = off.length ? [] : K.slice(); else if(off.indexOf(k) !== -1) off = off.filter(function(x){ return x !== k; }); else off = off.concat([k]);   // "Todos" marca o desmarca todo (v593)
