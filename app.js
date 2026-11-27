@@ -21459,10 +21459,10 @@ function copEstPopAbrir(){ const b = document.querySelector('#copTabla [data-cop
   w.insertAdjacentHTML('beforeend', copEstPop()); const r = b.getBoundingClientRect(), p = w.querySelector('.rqx-skf-pop'); p.style.position = 'fixed'; p.style.top = (r.bottom + 6) + 'px'; p.style.left = r.left + 'px'; p.style.right = 'auto'; p.style.animation = 'none'; }
 document.addEventListener('click', function(ev){ if(!(ev.target.closest && ev.target.closest('.cop-estf'))) document.querySelectorAll('.cop-estf .rqx-skf-pop').forEach(function(x){ x.remove(); }); });
 // Acciones de la OC en la Lista (v590, 27.11.2026, Piero: "déjalas en simple… que cumplan con todo sin repetirse"): una sola fila de íconos iguales.
-// ✉ correo al proveedor (en verde si ya se envió; ya no va la columna "Correo" aparte) · 💰 pago a Tesorería. En camino y entregadas: sin íconos.
+// ✉ correo al proveedor (en verde si ya se envió; ya no va la columna "Correo" aparte) · 💰 pago a Tesorería. Entregadas y anuladas: sin íconos.
 // Agencia y recojo ya no van como íconos (v593, Piero: "solo quedaría como ícono el mensaje y el pago"): salen del correo según su modalidad
 // (Envío por agencia → «Por agencia»; Recojo por Friopacking → ficha de recojo y «Por recoger»), y se ven o editan tocando el estado.
-function copAcc(oc, s){ const e = escapeHtml, fin = ['ent', 'cer', 'anu'].indexOf(s) !== -1, sinMail = fin || s === 'cam', c = APP_CORREO.m[oc];
+function copAcc(oc, s){ const e = escapeHtml, fin = ['ent', 'cer', 'anu'].indexOf(s) !== -1, sinMail = fin, c = APP_CORREO.m[oc];   // en camino también lleva ✉ y 💰 (v596, Piero: "las en camino deben tener la opción de enviar por correo… y la solicitud de pago")
   const ic = function(p){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`; };
   return (sinMail ? '' : `<button type="button" class="oc2-ag${c ? ' cop-env' : ''}" data-copmail="${e(oc)}" title="${c ? 'Correo enviado' + (c.f ? ' el ' + e(c.f) : '') + (c.u ? ' · ' + e(c.u) : '') + ' · toca para volver a abrirlo' : 'Correo de la OC al proveedor'}" aria-label="Correo al proveedor">${ic('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>')}</button>`
     + `<button type="button" class="oc2-ag" data-coppago="${e(oc)}" title="Solicitud de pago a Tesorería" aria-label="Solicitud de pago">${ic('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>')}</button>`)
