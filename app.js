@@ -20429,7 +20429,7 @@ function ncRefrescar(){ const w = document.querySelector('.ncm'); if(!w) return;
 // Los dos módulos: OC en tránsito (mapa) y SKU sin OC (listado aparte).
 function ncModulo(D){ const nOc = D.S.venc[3].concat(D.S.luego[3]).filter(function(o){ return !ncImp(o.oc); }).length + D.S.ag[3].filter(function(x){ return x.pend && !ncImp(x.o.oc); }).length;
   const m = APP_PC.mod === 'sku' || APP_PC.mod === 'osa' ? APP_PC.mod : 'oc', b = function(k, t, n){ return `<button type="button" data-pcmod="${k}" class="${m === k ? 'on' : ''}">${t} <b>${appN(n)}</b></button>`; };
-  if(APP.pantalla !== 'pendiente') return `<div class="rsvm-seg ncm-mod">${b('oc', 'OC en tránsito', nOc)}</div>`;
+  if(APP.pantalla !== 'pendiente') return '';   // sin el botón "OC en tránsito" en Compras (v582, 27.11.2026, Piero: "quita esto")
   return `<div class="rsvm-seg ncm-mod">${b('sku', 'SKU sin OC', D.items.length)}${b('osa', 'OC sin aprobar', new Set((D.osa || []).map(function(r){ return r.codOrden; })).size)}</div>`; }
 const NC_ICO = { pin:'<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.3"/>', lupa:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
   web:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>', gente:'<circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.6 14.2c2.4-.3 4.3 1.2 4.9 4.3"/>',
