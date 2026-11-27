@@ -21393,7 +21393,9 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   const pry = appMemo('copPryOc', function(){ const m = new Map(); polarLineasOC().forEach(function(r){ if(r.codOrden && r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) && !m.has(r.codOrden)) m.set(r.codOrden, [r.idProyecto, r.proyecto || '']); }); return m; });
   const n = function(x){ return I.filter(function(y){ return copEnFiltro(y, x); }).length; };
   const ch = function(x, t){ return `<button type="button" class="cop-ch k-${x}${k === x && !q ? ' on' : ''}" data-copest="${x}">${t} <b>${appN(n(x))}</b></button>`; };
-  let L = q ? I : I.filter(function(x){ return copEnFiltro(x, k); });
+  // Sin los botones de estado (v583, 27.11.2026, Piero: "quita eso, esas tarjetas así no sirven"): todas las OC en una sola lista, ordenadas por
+  // estado (vencidas, sin aprobar, en camino, por agencia y al final las entregadas); el estado va en la primera columna.
+  let L = q ? I : I.filter(function(x){ return x.st !== 'agr'; });
   const ord = { venc:0, sa:1, par:2, cam:3, ag:4, agr:5, ent:6, cer:7, anu:8 };
   L = L.slice().sort(function(a, b){ const sa = copEstDe(a)[0], sb = copEstDe(b)[0]; return (ord[sa] - ord[sb]) || (sa === 'venc' ? (b.o.d || 0) - (a.o.d || 0) : sa === 'ent' || sa === 'cer' ? (b.o.f || 0) - (a.o.f || 0) : (a.o.f || 9e15) - (b.o.f || 9e15)); });
   const fila = function(x){ const o = x.o, s = copEstDe(x), oc = o.oc, me = APP_COP.meta[oc] || {}, p = pry.get(oc), ent = x.st === 'ent';
@@ -21407,7 +21409,7 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
       <td class="ent${fm ? ' man' : ''}"><span>${copF(fe)}</span><small>${e(dias)}</small>${ent ? '' : `<button type="button" class="cop-fe" data-copfeb="${e(oc)}" title="${fm ? 'Fecha corregida (Maestro: ' + copF(o.f) + ') · toca para cambiar' : 'Corregir la fecha de entrega (el proveedor la movió)'}">✏</button>`}</td>
       <td class="n">${appN(o.n || 0)}</td><td class="c">${appCorreoBtn(oc)}</td>
       <td class="acc"><button type="button" class="cop-a" data-copmail="${e(oc)}" title="Correo de la OC al proveedor (4 modalidades)">✉</button><button type="button" class="cop-a" data-coppago="${e(oc)}" title="Solicitud de pago a Tesorería">💰</button>${ent ? '' : appAgBtn(oc) + appRecBtn(oc)}</td></tr>`; };
-  return `<div class="cop-chs">${q ? `<span class="cop-q">“${e(q)}”: ${appN(L.length)} OC</span>` : ''}${ch('ab', 'Abiertas')}${ch('sa', 'Sin aprobar')}${ch('venc', 'Vencidas')}${ch('cam', 'En camino')}${ch('ag', 'Por agencia')}${ch('ent', 'Entregadas')}</div>`
+  return (q ? `<div class="cop-chs"><span class="cop-q">“${e(q)}”: ${appN(L.length)} OC</span></div>` : '')
     + (L.length ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th>Estado</th><th>OC</th><th>Emitida</th><th>Proveedor</th><th>Cliente / PRY</th><th class="c">Comprador</th><th>Entrega</th><th class="n">Ítems</th><th class="c">Correo</th><th class="c">Acciones</th></tr></thead><tbody>${L.map(fila).join('')}</tbody></table></div><small class="imx-nota">OC nacionales · ✉ correo al proveedor · 💰 solicitud de pago · camión: agencia · caja: recojo del Almacén · toca el N° para ver la OC.</small>`
       : `<div class="ini-vacio">${q ? 'No hay OC con "' + e(q) + '".' : '✅ Nada en este estado.'}</div>`); }
 function copVisSeg(){ const v = APP_NC.vista || 'mapa', b = function(k, t, extra){ return `<button type="button" data-copvis="${k}" class="${v === k ? 'on' : ''}">${t}${extra || ''}</button>`; };
