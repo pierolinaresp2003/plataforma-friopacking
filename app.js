@@ -21163,7 +21163,7 @@ function copMailAbrir(info, x){ x = x || {}; const e = escapeHtml, tipo = x.tipo
     ${to ? '' : '<p class="rsv-err">El proveedor no tiene correo en DB Proveedores: escríbelo en «Para».</p>'}
     <div class="cop-prev" id="copPrev" contenteditable="true">${copCuerpo(info, APP_COP.m)}</div>
     <p class="rsv-nota" id="copAdj">Adjunta en Outlook ${copAdjTxt(tipo, mod)}.</p>
-    <footer id="copPie"><button type="button" class="rsv-b" data-copcopiar="1">📋 Copiar</button><button type="button" class="rsv-b ok" data-copenviar="1">✉ Abrir correo</button></footer>`);
+    <footer id="copPie">${tipo === 'oc' && /^000\d-\d{7}$/.test(info.oc) ? `<button type="button" class="rsv-b" data-copmarca="${e(info.oc)}">${APP_CORREO.m[info.oc] ? 'Quitar ✓ enviado' : '✓ Ya se envió'}</button>` : ''}<button type="button" class="rsv-b" data-copcopiar="1">📋 Copiar</button><button type="button" class="rsv-b ok" data-copenviar="1">✉ Abrir correo</button></footer>`);
   if(f) f.classList.add('cop-modal'); }
 function copMailRehacer(){ const m = APP_COP.m; if(!m) return; const p = document.getElementById('copPrev'); if(p) p.innerHTML = copCuerpo(m.info, m);
   const cc = document.getElementById('copCcI'); if(cc) cc.value = copCc(m.info, m.mod, m.tipo); const a = document.getElementById('copAdj'); if(a) a.textContent = 'Adjunta en Outlook ' + copAdjTxt(m.tipo, m.mod) + '.';
@@ -21402,6 +21402,14 @@ const COP_ESTN = { venc:['Vencida', '#d43c3c'], sa:['Sin aprobar', '#d4891a'], p
 function copEstPop(){ const c = APP_COP.estCnt || {}, f = APP_COP.estF || '';
   return `<span class="rqx-skf-pop"><button type="button" class="${f ? '' : 'sel'}" data-copestv=""><i></i>Todos<b>${appN(APP_COP.estTot || 0)}</b></button>${Object.keys(COP_ESTN).filter(function(k){ return c[k]; }).map(function(k){ return `<button type="button" class="${f === k ? 'sel' : ''}" data-copestv="${k}"><i style="background:${COP_ESTN[k][1]}"></i>${COP_ESTN[k][0]}<b>${appN(c[k])}</b></button>`; }).join('')}</span>`; }
 document.addEventListener('click', function(ev){ if(!(ev.target.closest && ev.target.closest('.cop-estf'))) document.querySelectorAll('.cop-estf .rqx-skf-pop').forEach(function(x){ x.remove(); }); });
+// Acciones de la OC en la Lista (v590, 27.11.2026, Piero: "déjalas en simple… que cumplan con todo sin repetirse"): una sola fila de íconos iguales.
+// ✉ correo al proveedor (en verde si ya se envió; ya no va la columna "Correo" aparte) · 💰 pago a Tesorería · 🚚 agencia · 🛒 recojo del Almacén.
+// En camino y entregadas: sin ✉ ni 💰; entregadas, cerradas y anuladas: sin agencia ni recojo.
+function copAcc(oc, s){ const e = escapeHtml, fin = ['ent', 'cer', 'anu'].indexOf(s) !== -1, sinMail = fin || s === 'cam', c = APP_CORREO.m[oc];
+  const ic = function(p){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`; };
+  return (sinMail ? '' : `<button type="button" class="oc2-ag${c ? ' cop-env' : ''}" data-copmail="${e(oc)}" title="${c ? 'Correo enviado' + (c.f ? ' el ' + e(c.f) : '') + (c.u ? ' · ' + e(c.u) : '') + ' · toca para volver a abrirlo' : 'Correo de la OC al proveedor'}" aria-label="Correo al proveedor">${ic('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>')}</button>`
+    + `<button type="button" class="oc2-ag" data-coppago="${e(oc)}" title="Solicitud de pago a Tesorería" aria-label="Solicitud de pago">${ic('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>')}</button>`)
+    + (fin ? '' : appAgBtn(oc) + appRecBtn(oc)); }
 function copEnFiltro(x, k){ const s = copEstDe(x)[0]; return k === 'ab' ? x.st === 'venc' || x.st === 'luego' || x.st === 'ag' : k === 'sa' ? s === 'sa' : k === 'venc' ? x.st === 'venc' && s !== 'sa' : k === 'cam' ? x.st === 'luego' && s !== 'sa' : k === 'ag' ? x.st === 'ag' || x.st === 'agr' : k === 'ent' ? x.st === 'ent' : true; }
 function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k = APP_COP.est || 'ab', c0 = function(x){ return String(x || '').replace(/^000\d-0*/, ''); };
   const pry = appMemo('copPryOc', function(){ const m = new Map(); polarLineasOC().forEach(function(r){ if(r.codOrden && r.idProyecto && !/^SIN PROYECTO/i.test(r.idProyecto) && !m.has(r.codOrden)) m.set(r.codOrden, [r.idProyecto, r.proyecto || '']); }); return m; });
@@ -21419,19 +21427,23 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   const cnt = {}; L.forEach(function(x){ const s = x.s[0]; cnt[s] = (cnt[s] || 0) + 1; }); APP_COP.estCnt = cnt; APP_COP.estTot = L.length;
   const fk = APP_COP.estF && cnt[APP_COP.estF] ? APP_COP.estF : ''; if(fk) L = L.filter(function(x){ return x.s[0] === fk; });
   const tope = APP_COP.tope || 150, total = L.length; L = L.slice(0, tope);
+  // Monto de cada OC (sin IGV, en su moneda) y Comprador solo cuando se ve a todos (v590, 27.11.2026, Piero: "no coloques al comprador cuando se está filtrando su cara").
+  const monto = appMemo('copMonto', function(){ const m = new Map(); polarLineasOC().forEach(function(r){ if(!r.codOrden) return; const x = m.get(r.codOrden) || m.set(r.codOrden, { v:0, m:copMon(r.moneda) }).get(r.codOrden); x.v += +r.montoNativo || 0; }); return m; });
+  const conComp = !APP_NC.per;
   const fila = function(x){ const o = x.o, s = x.s, oc = o.oc, me = APP_COP.meta[oc] || {}, p = pry.get(oc), ent = x.st === 'ent';
     const cli = ent ? [...(o.clis || [])].slice(0, 2).join(' · ') : [...(o.prys || [])].map(appImpNombre).slice(0, 2).join(' · ');
     const fm = me.fent_manual ? new Date(me.fent_manual + 'T12:00:00Z') : null, fe = ent ? o.f : fm || o.f;
     const dias = ent ? (o.anul ? 'anulada' : o.atraso != null ? (o.atraso > 0 ? o.atraso + ' d.h. tarde' : 'a tiempo') : '') : !fe ? 'sin fecha' : fm ? 'corregida' : o.d > 0 ? o.d + ' d.h. de atraso' : o.d === 0 ? 'vence hoy' : 'faltan ' + (-o.d) + ' d.h.';
+    const mt = monto.get(oc), apr = o.fb ? copF(o.fb) : s[0] === 'sa' ? 'Pendiente' : '—';
     return `<tr class="cop-f k-${s[0]}"><td><i class="cop-est k-${s[0]}">${s[1]}</i></td>
-      <td class="b"><button type="button" class="cop-oc" data-oc="${e(oc)}" title="Ver la OC ${e(oc)}">${e(c0(oc))}</button></td><td class="fch">${copF(o.fo)}</td>
+      <td class="b"><button type="button" class="cop-oc" data-oc="${e(oc)}" title="Ver la OC ${e(oc)}">${e(c0(oc))}</button></td>
       <td class="prov" title="${e(o.prov || '')}">${e(appImpNombre(o.prov || '—'))}</td><td class="cli">${e(polarCorta(cli || 'Stock / sin proyecto', 46))}${p ? `<small>${e(p[0])}</small>` : ''}</td>
-      <td class="c">${ncAv(o.persona)}</td>
+      ${conComp ? `<td class="c">${ncAv(o.persona)}</td>` : ''}<td class="fch">${copF(o.fo)}</td><td class="fch${s[0] === 'sa' ? ' pend' : ''}">${apr}</td>
       <td class="ent${fm ? ' man' : ''}"><span>${copF(fe)}</span><small>${e(dias)}</small>${ent ? '' : `<button type="button" class="cop-fe" data-copfeb="${e(oc)}" title="${fm ? 'Fecha corregida (Maestro: ' + copF(o.f) + ') · toca para cambiar' : 'Corregir la fecha de entrega (el proveedor la movió)'}">✏</button>`}</td>
-      <td class="n">${appN(o.n || 0)}</td><td class="c">${appCorreoBtn(oc)}</td>
-      <td class="acc">${['cam', 'ent', 'cer', 'anu'].indexOf(s[0]) !== -1 ? '' : `<button type="button" class="cop-a" data-copmail="${e(oc)}" title="Correo de la OC al proveedor (4 modalidades)">✉</button><button type="button" class="cop-a" data-coppago="${e(oc)}" title="Solicitud de pago a Tesorería">💰</button>`}${ent ? '' : appAgBtn(oc) + appRecBtn(oc)}</td></tr>`; };
+      <td class="n">${mt ? copMonto(mt.v, mt.m) : '—'}</td><td class="n">${appN(o.n || 0)}</td>
+      <td class="acc"><span class="cop-acc">${copAcc(oc, s[0])}</span></td></tr>`; };
   return (q ? `<div class="cop-chs"><span class="cop-q">“${e(q)}”: ${appN(L.length)} OC</span></div>` : '')
-    + (L.length ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th><span class="rqx-skf-w cop-estf"><button type="button" class="rqx-skf-b${fk ? ' on' : ''}" data-copestf="1" title="Filtrar por estado">${fk ? e(COP_ESTN[fk][0]) : 'Estado'} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span></th><th>OC</th><th>Emitida</th><th>Proveedor</th><th>Cliente / PRY</th><th class="c">Comprador</th><th>Entrega</th><th class="n">Ítems</th><th class="c">Correo</th><th class="c">Acciones</th></tr></thead><tbody>${L.map(fila).join('')}</tbody></table></div>${total > tope ? `<button type="button" class="ini-link" data-copmas="1">Ver más (${appN(total - tope)} restantes) ›</button>` : ''}`
+    + (L.length ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th><span class="rqx-skf-w cop-estf"><button type="button" class="rqx-skf-b${fk ? ' on' : ''}" data-copestf="1" title="Filtrar por estado">${fk ? e(COP_ESTN[fk][0]) : 'Estado'} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span></th><th>OC</th><th>Proveedor</th><th>Cliente / PRY</th>${conComp ? '<th class="c">Comprador</th>' : ''}<th>Emitida</th><th>Aprobada</th><th>Entrega</th><th class="n">Monto s/IGV</th><th class="n">Ítems</th><th class="c">Acciones</th></tr></thead><tbody>${L.map(fila).join('')}</tbody></table></div>${total > tope ? `<button type="button" class="ini-link" data-copmas="1">Ver más (${appN(total - tope)} restantes) ›</button>` : ''}`
       : `<div class="ini-vacio">${q ? 'No hay OC con "' + e(q) + '".' : '✅ Nada en este estado.'}</div>`); }
 function copVisSeg(){ const v = APP_NC.vista || 'mapa', b = function(k, t, extra){ return `<button type="button" data-copvis="${k}" class="${v === k ? 'on' : ''}">${t}${extra || ''}</button>`; };
   return `<div class="rsvm-seg cop-vis">${b('mapa', '🗺 Mapa')}${b('lista', '☰ Lista')}${b('opd', '📄 OPD', ' <b>' + appN(copOpdAbiertas().length) + '</b>')}</div>`; }
@@ -21440,10 +21452,11 @@ function copVista(D){ const e = escapeHtml, I = ncItems(D); copCargar(false);
   return `<div class="cop"><div class="cmp-top ncm-bar"><div class="ncm-izq">${ncModulo(D)}${copVisSeg()}<label class="pmm-q">${ncSvg(NC_ICO.lupa)}<input type="search" id="pcBusca" placeholder="${APP_NC.vista === 'opd' ? 'Buscar OPD, proveedor, proyecto o responsable' : 'Buscar OC, proveedor, producto o cliente'}" value="${e(APP_PC.q || '')}" autocomplete="off"></label>
       ${APP_NC.vista === 'lista' ? ncPerFiltro(I) : ''}<span class="cop-ico">${APP_NC.vista === 'lista' ? INV_XLS_BTN.replace('pc-img-btn inv-xls', 'imx-ib').replace('data-invxls="1"', 'data-pclxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar el status general en Excel') : ''}${copOps(true)}</span></div></div>
     <div id="copTabla">${APP_NC.vista === 'opd' ? copOpdHtml() : copListaHtml(D)}</div></div>`; }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-copvis],[data-copmas],[data-copestf],[data-copestv],[data-copest],[data-copopdf],[data-copmail],[data-coppago],[data-copurg],[data-copurgok],[data-copmod],[data-copcopiar],[data-copenviar],[data-coppagoenv],[data-copopdnueva],[data-copopdsave],[data-copopdrec],[data-coprecsave],[data-copopdenv],[data-copopdpago],[data-copdoc],[data-copfeb]');
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-copvis],[data-copmarca],[data-copmas],[data-copestf],[data-copestv],[data-copest],[data-copopdf],[data-copmail],[data-coppago],[data-copurg],[data-copurgok],[data-copmod],[data-copcopiar],[data-copenviar],[data-coppagoenv],[data-copopdnueva],[data-copopdsave],[data-copopdrec],[data-coprecsave],[data-copopdenv],[data-copopdpago],[data-copdoc],[data-copfeb]');
   if(!b) return; const d = b.dataset;
   if(d.copvis){ APP_NC.vista = d.copvis; try{ localStorage.setItem('fp-cop-vista', d.copvis); }catch(err){} APP_NC.d = ''; APP_NC.foco = ''; if(d.copvis !== 'mapa') APP_NC.est = ''; return appRenderInicio(); }
   if(d.copest){ APP_COP.est = d.copest; return copRefrescar(); }
+  if(d.copmarca){ appCorreoToggle({ dataset:{ correo:d.copmarca } }); b.textContent = APP_CORREO.m[d.copmarca] ? 'Quitar ✓ enviado' : '✓ Ya se envió'; copRefrescar(); return; }
   if(d.copmas){ APP_COP.tope = (APP_COP.tope || 150) + 300; return copRefrescar(); }
   if(d.copestv !== undefined){ APP_COP.estF = d.copestv; APP_COP.tope = 150; return copRefrescar(); }
   if(d.copestf){ const w = b.closest('.rqx-skf-w'), pp = w.querySelector('.rqx-skf-pop'); if(pp){ pp.remove(); return; } w.insertAdjacentHTML('beforeend', copEstPop());
