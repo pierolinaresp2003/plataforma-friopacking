@@ -21166,21 +21166,21 @@ function copCuerpo(info, x){ const e = escapeHtml, doc = x.tipo === 'opd' ? 'Ord
   return h + P('Quedamos atentos. Saludos cordiales,') + '<p style="margin:0;"><b>Área de Compras — FRIOPACKING S.A.C.</b></p></div>'; }
 function copCc(info, mod, tipo){ const s = copSup(info.resp), l = COP_MAIL.ocCc.concat(s.correo ? [s.correo] : []).concat(mod === 'lurin' || /LURIN/i.test(sinAcentos(String(APP_COP.m && APP_COP.m.agencia || ''))) ? [COP_MAIL.lurin] : []); return copLista(l).join('; '); }
 function copAsunto(info, tipo){ const p = info.prys[0]; return (tipo === 'opd' ? 'Orden de Pago' : 'Orden de Compra') + ' N° ' + info.oc + ' — FRIOPACKING S.A.C. // ' + appImpNombre(info.prov || '') + (p ? ' // ' + p[0] + (p[1] ? ' // ' + appImpNombre(p[1]) : '') : ''); }
-function copAdjTxt(tipo, mod){ return (tipo === 'opd' ? 'el PDF de la OPD y la cotización del proveedor' : 'el PDF de la OC') + (mod === 'lurin' ? (tipo === 'oc' ? ' (la CARTILLA SSOMA ya va adjunta)' : ' y la CARTILLA SSOMA') : '') + (tipo === 'opd' ? '' : ' (la cotización no va al proveedor: es interna)'); }
+function copAdjTxt(tipo, mod){ return (tipo === 'opd' ? 'el PDF de la OPD y la cotización del proveedor' : 'el PDF de la OC') + (mod === 'lurin' ? (tipo === 'oc' ? ' y la CARTILLA SSOMA (se baja sola al abrir el correo: arrástrala a Outlook)' : ' y la CARTILLA SSOMA') : '') + (tipo === 'opd' ? '' : ' (la cotización no va al proveedor: es interna)'); }
 function copMailAbrir(info, x){ x = x || {}; const e = escapeHtml, tipo = x.tipo || 'oc', mod = x.mod || 'lurin', pv = cotProvDe(info.prov, info.ruc), sup = copSup(info.resp);
   APP_COP.m = { info:info, tipo:tipo, mod:mod, agencia:'', dest:[{ n:sup.n, dni:sup.dni }, {}, {}], opdId:x.opdId || '', enviado:false };
   const to = x.to || (pv && pv.to) || '', sups = copSupLista();
   const f = rsvModal(`<header><div><small>${tipo === 'opd' ? 'Orden de Pago (OPD)' : x.urgente ? 'OC urgente' : 'Orden de Compra'} · correo al proveedor</small><h3>${e(info.oc)} · ${e(appImpNombre(info.prov) || '—')}</h3>
-      <p>Elige la modalidad, revisa el correo (puedes editarlo aquí mismo) y ábrelo en Outlook. En «Entrega en planta Lurín» se baja el correo listo, con la CARTILLA SSOMA adjunta: ábrelo y sale en Outlook para enviar.</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
+      <p>Elige la modalidad, revisa el correo (puedes editarlo aquí mismo) y ábrelo en Outlook: se copia con formato, pega con Ctrl+V y adjunta ${copAdjTxt(tipo, mod)}.</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
     <div class="cop-mods">${Object.keys(COP_MOD).map(function(k){ return `<button type="button" data-copmod="${k}" class="${k === mod ? 'on' : ''}">${COP_MOD[k][0]} ${COP_MOD[k][1]}</button>`; }).join('')}</div>
     <div class="cop-ag" id="copAg"${mod === 'agencia' ? '' : ' hidden'}><label class="rsv-lbl">Agencia<input id="copAgN" list="copAgL" placeholder="Shalom, Olva, CIVA… o escribe otra" autocomplete="off"></label><datalist id="copAgL">${COP_AGENCIAS.map(function(a){ return `<option value="${e(a)}">`; }).join('')}</datalist>
       <div class="cop-dest">${[0, 1, 2].map(function(i){ const d = APP_COP.m.dest[i]; return `<label class="rsv-lbl">Destinatario ${i + 1}<input data-copdn="${i}" list="copSupL" value="${e(d.n || '')}" placeholder="Nombre" autocomplete="off"></label><label class="rsv-lbl">DNI<input data-copdd="${i}" value="${e(d.dni || '')}" inputmode="numeric" placeholder="DNI"></label>`; }).join('')}</div>
       <datalist id="copSupL">${sups.map(function(n){ return `<option value="${e(n)}">`; }).join('')}</datalist></div>
-    <div class="cop-ssoma" id="copSsoma"${mod === 'lurin' && tipo === 'oc' ? '' : ' hidden'}><span id="copSsomaT">📎 Cartilla SSOMA: revisando…</span><label class="rsv-b"><span id="copSsomaB">Subir cartilla</span><input type="file" accept="application/pdf" id="copSsomaF" hidden></label></div>
+    <div class="cop-ssoma" id="copSsoma"${mod === 'lurin' && tipo === 'oc' ? '' : ' hidden'}><span id="copSsomaT">📎 Cartilla SSOMA: revisando…</span><span class="cop-ssb"><button type="button" class="rsv-b" data-copssoma="1" id="copSsomaD" hidden>Bajar</button><label class="rsv-b"><span id="copSsomaB">Subir cartilla</span><input type="file" accept="application/pdf" id="copSsomaF" hidden></label></span></div>
     <div class="cop-rec" id="copRec"${mod === 'recojo' ? '' : ' hidden'}>${/^000\d-/.test(info.oc) ? `<button type="button" class="rsv-b" data-ocrec="${e(info.oc)}">🚚 Llenar ficha de recojo para Almacén</button>` : ''}</div>
     <div class="cop-ff"><label class="rsv-lbl">Para<input id="copTo" value="${e(to)}" placeholder="correo del proveedor"></label><label class="rsv-lbl">CC<input id="copCcI" value="${e(copCc(info, mod, tipo))}"></label></div>
     <label class="rsv-lbl">Asunto<input id="copAs" value="${e(copAsunto(info, tipo))}"></label>
-    ${to ? '' : '<p class="rsv-err">El proveedor no tiene correo en DB Proveedores: escríbelo en «Para».</p>'}
+    ${to ? '' : '<p class="rsv-nota">El proveedor no tiene correo en DB Proveedores: escríbelo en «Para» o complétalo en Outlook.</p>'}
     <div class="cop-prev" id="copPrev" contenteditable="true">${copCuerpo(info, APP_COP.m)}</div>
     <p class="rsv-nota" id="copAdj">Adjunta en Outlook ${copAdjTxt(tipo, mod)}.</p>
     <footer id="copPie">${tipo === 'oc' && /^000\d-\d{7}$/.test(info.oc) ? `<button type="button" class="rsv-b" data-copmarca="${e(info.oc)}">${APP_CORREO.m[info.oc] ? 'Quitar ✓ enviado' : '✓ Ya se envió'}</button>` : ''}<button type="button" class="rsv-b" data-copcopiar="1">📋 Copiar</button><button type="button" class="rsv-b ok" data-copenviar="1">✉ Abrir correo</button></footer>`);
@@ -21191,27 +21191,19 @@ function copMailRehacer(){ const m = APP_COP.m; if(!m) return; const p = documen
   const ag = document.getElementById('copAg'); if(ag) ag.hidden = m.mod !== 'agencia'; const rc = document.getElementById('copRec'); if(rc) rc.hidden = m.mod !== 'recojo';
   const ss = document.getElementById('copSsoma'); if(ss) ss.hidden = !(m.mod === 'lurin' && m.tipo === 'oc'); }
 // Cartilla SSOMA (v594, 27.11.2026, Piero: "adjuntar siempre aquí la cartilla SSOMA… cuando es entrega en Lurín"): se guarda una vez en Supabase (compras/ssoma)
-// y en «Entrega en planta Lurín» el correo se baja como .eml (borrador de Outlook: X-Unsent) con la cartilla ya adjunta. El enlace mailto no permite adjuntos.
+// y en «Entrega en planta Lurín» se baja junto con el correo para arrastrarla a Outlook (el enlace mailto no permite adjuntos; el .eml lo bloqueaba Chrome, v599).
 const COP_SSOMA = 'ssoma/CARTILLA_SSOMA_FP.pdf';
 async function copSsoma(){ if(APP_COP.ssoma) return APP_COP.ssoma; try{ const r = await sbFetch('/storage/v1/object/compras/' + COP_SSOMA); if(!r.ok) return null; APP_COP.ssoma = await r.arrayBuffer(); return APP_COP.ssoma; }catch(err){ return null; } }
 async function copSsomaPintar(){ const t = document.getElementById('copSsomaT'), b = document.getElementById('copSsomaB'); if(!t) return; const x = await copSsoma();
-  t.textContent = x ? '📎 La CARTILLA SSOMA va adjunta sola en el correo.' : '⚠ Falta la CARTILLA SSOMA: súbela una sola vez y queda para todos.'; if(b) b.textContent = x ? 'Cambiar' : 'Subir cartilla'; }
+  t.textContent = x ? '📎 La CARTILLA SSOMA se baja sola al abrir el correo: arrástrala a Outlook.' : '⚠ Falta la CARTILLA SSOMA: súbela una sola vez y queda para todos.'; if(b) b.textContent = x ? 'Cambiar' : 'Subir cartilla';
+  const d = document.getElementById('copSsomaD'); if(d) d.hidden = !x; }
+function copPdfBajar(buf, nombre){ const url = URL.createObjectURL(new Blob([buf], { type:'application/pdf' })), a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); }, 60000); }
 document.addEventListener('change', async function(ev){ const i = ev.target; if(!i || i.id !== 'copSsomaF' || !i.files || !i.files[0]) return; const f = i.files[0];
   if(!/pdf$/i.test(f.type || f.name)) return appToast('La cartilla tiene que ser un PDF.');
   try{ const r = await sbFetch('/storage/v1/object/compras/' + COP_SSOMA, { method:'POST', headers:{ 'Content-Type':'application/pdf', 'x-upsert':'true' }, body:f });
     if(!r.ok){ const j = await r.json().catch(function(){ return {}; }); throw new Error(j.message || j.error || ('error ' + r.status)); }
     APP_COP.ssoma = await f.arrayBuffer(); appToast('✅ Cartilla SSOMA guardada: va adjunta en los correos de entrega en Lurín.'); copSsomaPintar(); }
   catch(err){ appToast('No se pudo subir la cartilla: ' + (err.message || err)); } i.value = ''; });
-function copB64(buf){ const u = buf instanceof Uint8Array ? buf : new Uint8Array(buf); let s = ''; for(let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
-function copB64L(b){ return b.replace(/.{1,76}/g, '$&\r\n'); }
-function copEmlBajar(to, cc, asunto, html, adj, nombre){ const bd = '----=_FP_' + Date.now().toString(36), u8 = function(t){ return new TextEncoder().encode(t); };
-  const dir = function(v){ return String(v || '').split(/[;,]/).map(function(x){ return x.trim(); }).filter(Boolean).join(', '); };
-  const cuerpo = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;">' + html + '</body></html>';
-  let s = 'X-Unsent: 1\r\nTo: ' + dir(to) + '\r\n' + (dir(cc) ? 'Cc: ' + dir(cc) + '\r\n' : '') + 'Subject: =?UTF-8?B?' + copB64(u8(asunto)) + '?=\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="' + bd + '"\r\n\r\n'
-    + '--' + bd + '\r\nContent-Type: text/html; charset="utf-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n' + copB64L(copB64(u8(cuerpo)));
-  adj.forEach(function(a){ s += '--' + bd + '\r\nContent-Type: application/pdf; name="' + a.n + '"\r\nContent-Disposition: attachment; filename="' + a.n + '"\r\nContent-Transfer-Encoding: base64\r\n\r\n' + copB64L(copB64(a.b)); });
-  s += '--' + bd + '--\r\n';
-  const url = URL.createObjectURL(new Blob([s], { type:'message/rfc822' })), a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); }, 60000); }
 // Abre el correo: copia el cuerpo con formato y abre Outlook con Para, CC y asunto (los mismos pasos que la solicitud de cotización).
 async function copAbrirCorreo(to, cc, asunto, html){ const tmp = document.createElement('div'); tmp.innerHTML = html; const texto = tmp.innerText;
   const copiado = await crtCopiarHtml(html, texto).then(function(){ return true; }, function(){ return false; });
@@ -21226,15 +21218,11 @@ function copMailFalta(m){ if(!(m.tipo === 'oc' && m.mod === 'agencia')) return '
   if(!m.agencia) return 'Escribe la agencia.'; if(!rec.length) return 'Pon al menos un destinatario con su DNI.';
   const mal = rec.find(function(p){ return !p.nombre || !/^(\d{8}|[0-9A-Z]{9,12})$/.test(p.dni); }); return mal ? (mal.nombre ? 'Revisa el DNI de ' + mal.nombre + '.' : 'Falta el nombre de quien tiene DNI ' + mal.dni + '.') : ''; }
 async function copMailEnviar(){ const m = APP_COP.m; if(!m) return; const to = document.getElementById('copTo').value.trim(), cc = document.getElementById('copCcI').value, as = document.getElementById('copAs').value, html = document.getElementById('copPrev').innerHTML;
-  if(!/@/.test(to)) return appToast('Escribe el correo del proveedor en «Para».');
+  // Se abre directo en Outlook aunque el proveedor no tenga correo (v599, Piero: "que me deje enviar aun así no haya correo… debería abrir el correo directamente").
   const falta = copMailFalta(m); if(falta) return appToast(falta);
-  let eml = false;
-  if(m.tipo === 'oc' && m.mod === 'lurin'){ const sb = await copSsoma();
-    if(sb){ copEmlBajar(to, cc, as, html, [{ n:'CARTILLA_SSOMA_FRIOPACKING.pdf', b:sb }], ('OC ' + String(m.info.oc).replace(/^000\d-0*/, '') + ' ' + (appImpNombre(m.info.prov) || '')).replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) + '.eml'); eml = true;
-      appToast('📨 Se bajó el correo con la cartilla SSOMA adjunta: ábrelo y sale en Outlook listo para enviar.'); }
-    else appToast('No encuentro la cartilla SSOMA (súbela en esta ventana): el correo se abre sin ella.'); }
-  if(!eml) await copAbrirCorreo(to, cc, as, html);
-  const pie = document.getElementById('copPie'); if(pie) pie.innerHTML = `<span class="cop-ok">${eml ? '📨 Abre el .eml que se bajó (ya lleva la cartilla SSOMA), adjunta el PDF de la OC y envíalo.' : '✉ Correo abierto en Outlook: pega con Ctrl+V y envíalo.'} <b>¿Ya lo enviaste?</b></span><button type="button" class="rsv-b" data-rsvx="1">Todavía no</button><button type="button" class="rsv-b ok" data-copconf="1">✓ Sí, ya lo envié</button>`; }
+  let ss = false; if(m.tipo === 'oc' && m.mod === 'lurin'){ const sb = APP_COP.ssoma || await copSsoma(); if(sb){ copPdfBajar(sb, 'CARTILLA_SSOMA_FRIOPACKING.pdf'); ss = true; } }
+  await copAbrirCorreo(to, cc, as, html);
+  const pie = document.getElementById('copPie'); if(pie) pie.innerHTML = `<span class="cop-ok">✉ Correo abierto en Outlook: pega con Ctrl+V${ss ? ', arrastra la CARTILLA SSOMA que se bajó' : ''} y envíalo. <b>¿Ya lo enviaste?</b></span><button type="button" class="rsv-b" data-rsvx="1">Todavía no</button><button type="button" class="rsv-b ok" data-copconf="1">✓ Sí, ya lo envié</button>`; }
 async function copMailConfirmar(){ const m = APP_COP.m; if(!m) return; const falta = copMailFalta(m); if(falta) return appToast(falta);
   const esOc = m.tipo === 'oc' && /^000\d-\d{7}$/.test(m.info.oc), oc = m.info.oc; m.enviado = true;
   if(m.tipo === 'opd' && m.opdId){ const o = APP_COP.opd.find(function(y){ return y.id === m.opdId; }); if(o && COP_OPD_EST.indexOf(o.estado) < 3) copOpdGuardar(m.opdId, { estado:'Enviada', f_envio:o.f_envio || copHoy() }); }
@@ -21489,10 +21477,10 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   // estado (vencidas, sin aprobar, en camino, por agencia y al final las entregadas); el estado va en la primera columna.
   // Entregadas: todas, no solo las del mes (v586, 27.11.2026, Piero: "¿por qué sale entregada hasta esa fecha? y no todo"); la más reciente primero.
   let L = q ? I : I.filter(function(x){ return x.st !== 'agr' && x.st !== 'ent'; }).concat((D.entAll || []).filter(function(o){ return !ncImp(o.oc); }).map(function(o){ return { st:'ent', oc:o.oc, prov:o.prov, per:o.persona || '', o:o }; }));
-  const ord = { venc:0, sa:1, par:2, cam:3, prc:4, ag:4, agr:5, ent:6, cer:7, anu:8 };
+  const ord = { venc:0, sa:1, par:2, cam:3, prc:4, ag:5, agr:6, ent:7, cer:7, anu:8 };
   L.forEach(function(x){ x.s = copEstDe(x); });
   L = L.slice().sort(function(a, b){ const sa = a.s[0], sb = b.s[0], fin = function(s){ return s === 'ent' || s === 'cer' || s === 'anu'; };
-    return (fin(sa) - fin(sb)) || (fin(sa) ? (b.o.f || 0) - (a.o.f || 0) : (ord[sa] - ord[sb]) || (sa === 'venc' ? (b.o.d || 0) - (a.o.d || 0) : (a.o.f || 9e15) - (b.o.f || 9e15))); });
+    return (ord[sa] - ord[sb]) || (fin(sa) ? (b.o.f || 0) - (a.o.f || 0) : sa === 'venc' ? (b.o.d || 0) - (a.o.d || 0) : (a.o.f || 9e15) - (b.o.f || 9e15)); });
   // Filtro en la columna Estado (v586, 27.11.2026, Piero: "añade un filtro en la columna de estado con el ícono ese para filtrar los estados").
   const cnt = {}; L.forEach(function(x){ const s = x.s[0]; cnt[s] = (cnt[s] || 0) + 1; }); APP_COP.estCnt = cnt; APP_COP.estTot = L.length;
   // Varios a la vez, como en Excel (v591, Piero: "¿qué pasa si quiero filtrar todas menos entregadas?"): se desmarca lo que no se quiere ver.
@@ -21507,22 +21495,32 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   const AVC = ['#b54708', '#4338ca', '#b42318', '#0e7490', '#7c3aed', '#047857', '#be185d'];
   const avR = function(n){ const p = n.split(/\s+/), ini = (p[0].charAt(0) + (p[1] ? p[1].charAt(0) : '')).toUpperCase(); let h = 0; for(let k = 0; k < n.length; k++) h = (h * 31 + n.charCodeAt(k)) >>> 0; return `<i class="ctb-av" style="background:${AVC[h % AVC.length]}">${e(ini)}</i>`; };
   const fila = function(x){ const o = x.o, s = x.s, oc = o.oc, me = APP_COP.meta[oc] || {}, p = pry.get(oc), ent = x.st === 'ent';
-    const cli = ent ? [...(o.clis || [])].slice(0, 2).join(' · ') : [...(o.prys || [])].map(appImpNombre).slice(0, 2).join(' · ');
+    const cli = (ent ? [...(o.clis || [])] : [...(o.prys || [])].map(appImpNombre)).filter(function(c){ return c && !/^stock \/ sin proyecto$/i.test(c); }).slice(0, 2).join(' · ');
     const fm = me.fent_manual ? new Date(me.fent_manual + 'T12:00:00Z') : null, fe = ent ? o.f : fm || o.f;
     const dias = ent ? (o.anul ? 'anulada' : o.atraso != null ? (o.atraso > 0 ? o.atraso + ' d.h. tarde' : 'a tiempo') : '') : !fe ? 'sin fecha' : fm ? 'corregida' : o.d > 0 ? o.d + ' d.h. de atraso' : o.d === 0 ? 'vence hoy' : 'faltan ' + (-o.d) + ' d.h.';
     const mt = monto.get(oc), apr = o.fb ? copF(o.fb) : s[0] === 'sa' ? 'Pendiente' : '—';
     const chip = s[0] === 'ag' || s[0] === 'agr' ? `<button type="button" class="cop-est k-${s[0]}" data-ocag="${e(oc)}" title="Ver o editar el envío por agencia">${s[1]}</button>`
       : s[0] === 'prc' ? `<button type="button" class="cop-est k-${s[0]}" data-ocrec="${e(oc)}" title="Ver la ficha de recojo">${s[1]}</button>` : `<i class="cop-est k-${s[0]}">${s[1]}</i>`;
-    return `<tr class="cop-f k-${s[0]}"><td>${chip}</td>
+    const l = resp.get(oc) || [];
+    return `<tr class="skt-f cop-f k-${s[0]}"><td class="est">${chip}</td>
       <td class="b"><button type="button" class="cop-oc" data-oc="${e(oc)}" title="Ver la OC ${e(oc)}">${e(c0(oc))}</button></td>
-      <td class="prov" title="${e(o.prov || '')}">${e(appImpNombre(o.prov || '—'))}</td><td class="cli">${e(polarCorta(cli || 'Stock / sin proyecto', 46))}${p ? `<small>${e(p[0])}</small>` : ''}</td>
-      <td class="rsp">${(function(){ const l = resp.get(oc) || []; return l.length ? `<span title="${e(l.map(titleCase).join(' · '))}">${avR(l[0])}<b>${e(titleCase(l[0]))}</b>${l.length > 1 ? `<small>+${l.length - 1}</small>` : ''}</span>` : '<small>—</small>'; })()}</td>
-      ${conComp ? `<td class="c">${ncAv(o.persona)}</td>` : ''}<td class="fch">${copF(o.fo)}</td><td class="fch${s[0] === 'sa' ? ' pend' : ''}">${apr}</td>
-      <td class="ent${fm ? ' man' : ''}"><span>${copF(fe)}</span><small>${e(dias)}</small>${ent ? '' : `<button type="button" class="cop-fe" data-copfeb="${e(oc)}" title="${fm ? 'Fecha corregida (Maestro: ' + copF(o.f) + ') · toca para cambiar' : 'Corregir la fecha de entrega (el proveedor la movió)'}">✏</button>`}</td>
+      <td class="prov"><span title="${e(o.prov || '')}">${e(appImpNombre(o.prov || '—'))}</span></td>
+      <td class="pyn"><span title="${e(cli || '')}">${e(cli || 'Stock / sin proyecto')}</span>${p ? `<small class="pry">${e(p[0])}</small>` : ''}</td>
+      <td>${l.length ? `<span class="ctb-sol" title="${e(l.map(titleCase).join(' · '))}">${avR(l[0])}<span>${e(l[0])}${l.length > 1 ? ` <em class="cop-mas">+${l.length - 1}</em>` : ''}</span></span>` : '—'}</td>
+      ${conComp ? `<td class="c">${ncAv(o.persona)}</td>` : ''}<td class="nw">${copF(o.fo)}</td><td class="nw${s[0] === 'sa' ? ' pend' : ''}">${apr}</td>
+      <td class="ent${fm ? ' man' : ''}"><span>${copF(fe)}${ent ? '' : `<button type="button" class="cop-fe" data-copfeb="${e(oc)}" title="${fm ? 'Fecha corregida (Maestro: ' + copF(o.f) + ') · toca para cambiar' : 'Corregir la fecha de entrega (el proveedor la movió)'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>`}</span><small>${e(dias)}</small></td>
       <td class="n">${mt ? copMonto(mt.v, mt.m) : '—'}</td><td class="n">${appN(o.n || 0)}</td>
       <td class="acc"><span class="cop-acc">${copAcc(oc, s[0])}</span></td></tr>`; };
-  return (q ? `<div class="cop-chs"><span class="cop-q">“${e(q)}”: ${appN(L.length)} OC</span></div>` : '')
-    + (L.length || fk ? `<div class="cop-tw"><table class="cop-t"><thead><tr><th><span class="rqx-skf-w cop-estf"><button type="button" class="rqx-skf-b${fk ? ' on' : ''}" data-copestf="1" title="Filtrar por estado">Estado${fk ? ' · ' + (nk - fk) + ' de ' + nk : ''} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span></th><th>OC</th><th>Proveedor</th><th>Cliente / PRY</th><th>Responsable</th>${conComp ? '<th class="c">Comprador</th>' : ''}<th>Emitida</th><th>Aprobada</th><th>Entrega</th><th class="n">Monto s/IGV</th><th class="n">Ítems</th><th class="c">Acciones</th></tr></thead><tbody>${L.length ? L.map(fila).join('') : `<tr><td colspan="${conComp ? 12 : 11}" class="cop-vac">Marca al menos un estado en el filtro.</td></tr>`}</tbody></table></div>${total > tope ? `<button type="button" class="ini-link" data-copmas="1">Ver más (${appN(total - tope)} restantes) ›</button>` : ''}`
+  // Formato de Pendientes (v599, 27.11.2026, Piero: "separa bien las tablas… dale el formato similar a Pendientes"): un bloque por estado con su franja de color.
+  const nCol = conComp ? 12 : 11, G = [];
+  L.forEach(function(x){ const k = x.s[0] === 'cer' ? 'ent' : x.s[0], g = G[G.length - 1]; if(g && g.k === k) g.l.push(x); else G.push({ k:k, l:[x] }); });
+  const GN = { venc:'Vencidas', sa:'Sin aprobar', par:'Llegó parcial', cam:'En camino', prc:'Por recoger', ag:'Por agencia', agr:'Agencia regularizada', ent:'Entregadas', anu:'Anuladas' };
+  const th = `<thead><tr><th><span class="rqx-skf-w cop-estf"><button type="button" class="rqx-skf-b${fk ? ' on' : ''}" data-copestf="1" title="Filtrar por estado">Estado${fk ? ' · ' + (nk - fk) + ' de ' + nk : ''} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></button></span></th>
+    <th>OC</th><th>Proveedor</th><th>Cliente / PRY</th><th>Responsable</th>${conComp ? '<th class="c">Comprador</th>' : ''}<th>Emitida</th><th>Aprobada</th><th>Entrega</th><th class="n">Monto s/IGV</th><th class="n">Ítems</th><th class="c">Acciones</th></tr></thead>`;
+  const cuerpo = G.length ? G.map(function(g){ return `<tbody class="skt-blk ctb-g" style="--fam:${(COP_ESTN[g.k] || ['', '#64748b'])[1]}"><tr class="ctb-gh"><td colspan="${nCol}"><div class="ctb-ghd"><i></i><b>${GN[g.k] || g.k}</b><span>${appN(cnt[g.k] + (g.k === 'ent' ? cnt.cer || 0 : 0) || g.l.length)} OC</span></div></td></tr>${g.l.map(fila).join('')}</tbody>`; }).join('')
+    : `<tbody><tr><td colspan="${nCol}" class="cop-vac">Marca al menos un estado en el filtro.</td></tr></tbody>`;
+  return (q ? `<div class="cop-chs"><span class="cop-q">“${e(q)}”: ${appN(total)} OC</span></div>` : '')
+    + (L.length || fk ? `<div class="skt ctb-w cop-w"><div class="skt-blk ctb-blk"><div class="ctb-scroll"><table class="ctb cop-ctb">${th}${cuerpo}</table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(total)}${total > tope ? ` · <button type="button" class="ini-link" data-copmas="1">Ver más (${appN(total - tope)} restantes) ›</button>` : ''}</div></div></div>`
       : `<div class="ini-vacio">${q ? 'No hay OC con "' + e(q) + '".' : '✅ Nada en este estado.'}${(APP_COP.estOff || []).length ? ' <button type="button" class="ini-link" data-copestv="">Quitar el filtro de estado</button>' : ''}</div>`); }
 function copVisSeg(){ const v = APP_NC.vista || 'mapa', b = function(k, t, extra){ return `<button type="button" data-copvis="${k}" class="${v === k ? 'on' : ''}">${t}${extra || ''}</button>`; };
   return `<div class="rsvm-seg cop-vis">${b('mapa', '🗺 Mapa')}${b('lista', '☰ Lista')}${b('opd', '📄 OPD', ' <b>' + appN(copOpdAbiertas().length) + '</b>')}</div>`; }
@@ -21531,12 +21529,13 @@ function copVista(D){ const e = escapeHtml, I = ncItems(D); copCargar(false);
   return `<div class="cop"><div class="cmp-top ncm-bar"><div class="ncm-izq">${ncModulo(D)}${copVisSeg()}<label class="pmm-q">${ncSvg(NC_ICO.lupa)}<input type="search" id="pcBusca" placeholder="${APP_NC.vista === 'opd' ? 'Buscar OPD, proveedor, proyecto o responsable' : 'Buscar OC, proveedor, producto o cliente'}" value="${e(APP_PC.q || '')}" autocomplete="off"></label>
       ${APP_NC.vista === 'lista' ? ncPerFiltro(I) : ''}<span class="cop-ico">${APP_NC.vista === 'lista' ? INV_XLS_BTN.replace('pc-img-btn inv-xls', 'imx-ib').replace('data-invxls="1"', 'data-pclxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar el status general en Excel') : ''}${copOps(true)}</span></div></div>
     <div id="copTabla">${APP_NC.vista === 'opd' ? copOpdHtml() : copListaHtml(D)}</div></div>`; }
-document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-copvis],[data-copmarca],[data-copconf],[data-copmas],[data-copestf],[data-copestv],[data-copest],[data-copopdf],[data-copmail],[data-coppago],[data-copurg],[data-copurgok],[data-copmod],[data-copcopiar],[data-copenviar],[data-coppagoenv],[data-copopdnueva],[data-copopdsave],[data-copopdrec],[data-coprecsave],[data-copopdenv],[data-copopdpago],[data-copdoc],[data-copfeb]');
+document.addEventListener('click', function(ev){ const b = ev.target.closest && ev.target.closest('[data-copvis],[data-copmarca],[data-copconf],[data-copssoma],[data-copmas],[data-copestf],[data-copestv],[data-copest],[data-copopdf],[data-copmail],[data-coppago],[data-copurg],[data-copurgok],[data-copmod],[data-copcopiar],[data-copenviar],[data-coppagoenv],[data-copopdnueva],[data-copopdsave],[data-copopdrec],[data-coprecsave],[data-copopdenv],[data-copopdpago],[data-copdoc],[data-copfeb]');
   if(!b) return; const d = b.dataset;
   if(d.copvis){ APP_NC.vista = d.copvis; try{ localStorage.setItem('fp-cop-vista', d.copvis); }catch(err){} APP_NC.d = ''; APP_NC.foco = ''; if(d.copvis !== 'mapa') APP_NC.est = ''; return appRenderInicio(); }
   if(d.copest){ APP_COP.est = d.copest; return copRefrescar(); }
   if(d.copmarca){ if(!APP_CORREO.m[d.copmarca]) return copMailConfirmar(); appCorreoToggle({ dataset:{ correo:d.copmarca } }); b.textContent = '✓ Ya se envió'; copRefrescar(); return; }
   if(d.copconf) return copMailConfirmar();
+  if(d.copssoma){ copSsoma().then(function(x){ if(x) copPdfBajar(x, 'CARTILLA_SSOMA_FRIOPACKING.pdf'); else appToast('Todavía no hay cartilla SSOMA guardada.'); }); return; }
   if(d.copmas){ APP_COP.tope = (APP_COP.tope || 150) + 300; return copRefrescar(); }
   if(d.copestv !== undefined){ const k = d.copestv, c = APP_COP.estCnt || {}, K = Object.keys(c); let off = (APP_COP.estOff || []).filter(function(x){ return c[x]; });
     if(!k) off = off.length ? [] : K.slice(); else if(off.indexOf(k) !== -1) off = off.filter(function(x){ return x !== k; }); else off = off.concat([k]);   // "Todos" marca o desmarca todo (v593)
