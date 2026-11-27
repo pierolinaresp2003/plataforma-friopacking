@@ -19941,6 +19941,30 @@ function appOCPresuMapa(){ return appMemo('ocpresu', function(){
     const y = m.get(o.oc) || { usd:0, parts:new Set(), exc:new Set() }; y.usd += o.usd; y.parts.add(p); if(p.pc > 0 && p.usd > p.pc) y.exc.add(p); m.set(o.oc, y); }); }); });
   return m;
 }); }
+// Familias generales de Carolina y Melissa (v578, 27.11.2026, Piero: "agrupa esto en familias generales para carolina y melissa… analiza bien lo que
+// ellas han comprado"). Salen de los 2,168 productos que compraron (CCHECA y MSIHUAIRO): tuberías (PVC, HDPE, PPR, cobre, acero), cables y material
+// eléctrico, EPP y uniformes, paneles y puertas, válvulas, lonas, ferretería, equipos de frío y sus repuestos, planchas y perfiles, control,
+// bombas y tanques, oficina y limpieza, aislamiento y obra civil. Manda la descripción (con qué palabra empieza); si no calza, la familia de Nisira.
+// [familia, regla por la descripción, regla por la familia de Nisira] — gana la primera que calza.
+const SKU_FAM_CC = [
+  ['Cables y material eléctrico', /^(TUBO LED|CONECTOR (JACK|RJ)|ACOPLE GUARDA|(PANELES LATERALES|ZOCALO|CANTONERAS?)\b.*CHAPA DE ACERO|PLACA DE MONTAJE|SELLADOR AIS[A-Z]*LANTE ELE)/],
+  ['EPP, uniformes y seguridad', /^(CASCO|GUANTE|LENTE|GAFA|OREJERA|TAPON (AUDITIVO|DE OIDO)|BARBIQUEJO|ARNES|LINEA DE VIDA|BOTA|BOTIN|ZAPATO|CHALECO|CAMISA|POLO|PANTALON|CASACA|CHOMPA|OVEROL|MAMELUCO|UNIFORME|MASCARILLA|RESPIRADOR|CORTAVIENTO|GORRO|CAPUCHA|BLOQUEADOR|EXTINTOR|BOTIQUIN|CAMILLA|INMOVILIZADOR|COLLARIN CERVICAL|CORREA CON CLIP|BARRA RETRACTIL|CONO\b|CINTA DE SEGURIDAD|MALLA DE SEGURIDAD|SENAL|LETRERO|CACHACO|LAVAOJOS|DUCHA (DE EMERGENCIA|LAVAOJOS)|KIT (DE EMERGENCIA|ANTIDERRAME)|BANDEJA ANTIDERRAME|PEDESTAL)/, /UNIFORME|PROTECCION PERSONAL|EMERGENCIA|SENAL DE SEGURIDAD/],
+  ['Lonas, toldos y cortinas', /^(LONA|TOLDO|CORTINA(?! DE AIRE)|LAMA|PUERTA DE LONA)\b/, /^(LONA|CORTINA)$/],
+  ['Paneles, puertas y ventanas', /^(PANEL(?! (LED|DE CONTROL|HMI|SOLAR|ELECTRICO))|PUERTA(?! DE (GABINETE|TABLERO))|PORTON|VENTANA|CERROJO|CERRADURA|BISAGRA|MANIJA|JALADOR|PICAPORTE|CIERRAPUERTA|BARRA ANTIPANICO|ABRIGO|SELLO (DE )?ANDEN|RAMPA|NIVELADOR|BUMPER|CENTRALITA|CUMBRERA|COBERTURA|T940|CANALETA (FLUVIAL|PLUVIAL|PREPINTADA)|FLASHING|ZOCALO|CONTRAZOCALO|TAPAJUNTA|CANTONERA|CANAL OMEGA|PERFIL.*PANEL|ANGULO SANITARIO|PERFIL SANITARIO)/, /^(PUERTA|VENTANA|PANEL|PART\. DE PUERTA|INSTALACION DE PANEL Y PUERTA|COBERTURA Y ACCESORIO|PART\. DE NIVELADOR|PART\. DE SELLO HERMETICO)$/],
+  ['Válvulas', /^(VALV|VLV\b|ELECTROVALVULA|LLAVE (DE )?(PASO|BOLA|ESFERICA|COMPUERTA|GLOBO)|ELEM(ENTO)?\.? TE|CUERPO VALV|NUCLEO DE VALVULA|ORIFICIO|MALLA \d+ MY|FILTRO (TIPO )?(Y|CANASTA)\b|VISOR|ACTUADOR|PURGADOR|GRIFO)/, /VALVULA/],
+  ['Cables y material eléctrico', /^(CABLE(?! (DE ACERO|ACERADO))|C ?\/|CONDUCTOR|TOXFREE|AFUMEX|N2XOH|NHX|THW|TABLERO|GABINETE|STD\d|INTERRUPTOR|TERMOMAGNETICO|DIFERENCIAL|CONTACTOR|GUARDAMOTOR|RELE|FUSIBLE|BORNE|TERMINAL (DE )?(COBRE|OJO|PIN|PUNTA|COMPRESION)|TOMACORRIENTE|ENCHUFE|CLAVIJA|BANDEJA(?! DE PINTURA| ANTIDERRAME)|ESCALERILLA|CANALETA|TUBO (CONDUIT|EMT|IMC|FLEXIBLE|PVC[ -]?SAP)|CONDUIT|CONDULET|CAJA (DE PASE|OCTOGONAL|RECTANGULAR|ELECTRICA|SUPERFICIAL|METALICA)|LUMINARIA|REFLECTOR|LAMPARA|FOCO|VARIADOR|ARRANCADOR|UPS|ESTABILIZADOR|TRANSFORMADOR|PLC|MODULO|HMI|PANTALLA (INDUSTRIAL|HMI)|VARILLA (DE )?COBRE|POZO A TIERRA|CEMENTO CONDUCTIVO|MATIX|DADO|PULSADOR|SELECTOR|LUZ PILOTO|RIEL (DIN|UNISTRUT)|CANAL UNISTRUT)/, /ELECTRIC|TABLERO|FABRICACION|ACTIVO/],
+  ['Control e instrumentación', /^(PRESOSTATO|TERMOSTATO|CONTROLADOR|SENSOR|SONDA|TRANSMISOR|TRANSDUCTOR|MANOMETRO|TERMOMETRO|VACUOMETRO|FLOW ?SWITCH|FLUJOSTATO|DETECTOR|MONITOR (CONTROLADOR|DE)|REGISTRADOR|DATA ?LOGGER|MEDIDOR|CAUDALIMETRO|TERMOHIGROMETRO|INDICADOR|GATEWAY)/, /CONTROLADOR/],
+  ['Equipos de frío y repuestos', /^(UNIDAD CONDENSADORA|CONDENSADOR(A)?\b|EVAPORADOR|ENFRIADOR|CHILLER|COMPRESOR|VENTILADOR|MOTOVENTILADOR|EXTRACTOR|HELICE|INLET|SPACER|MAX BULLET|SERPENTIN|INTERCAMBIADOR|RESISTENCIA|ACUMULADOR|SEPARADOR (DE )?ACEITE|ANTIVIBRADOR|RECIBIDOR|REGULADOR DE NIVEL|PLATO DE VALVULA|SERVICE KIT|KIT DE (REPARACION|EMPAQUE)|MODULO DE PROTECCION|FILTRO (DE ACEITE|DE MALLA|SECADOR|DESHIDRATADOR|48|DE SUCCION)|NUCLEO|CARCASA PORTAFILTRO|PORTAFILTRO|REFRIGERANTE|GAS R|ACEITE|GLICOL|RODAMIENTO|MOTOR|CORTINA DE AIRE|SPLIT|AIRE ACONDICIONADO|SOPLADOR)/, /UNIDAD CONDENSADORA|EVAPORADOR|ENFRIADOR|COMPRESOR|VENTILADOR|INSUMO|MOTOR|PART\. DE UNIDAD/],
+  ['Bombas, tanques y sanitarios', /^(BOMBA|ELECTROBOMBA|MOTOBOMBA|TANQUE|HIDRONEUMATICO|INODORO|LAVATORIO|URINARIO|SISTEMA P\/ ?TANQUE|REGISTRO ROSCADO|GRIFERIA|DUCHA|SUMIDERO|TRAMPA DE GRASA|JUNTA FLEXIBLE|EQUIPO SULFODOSIFICADOR)/, /BOMBA|TANQUE|SANITARIA|GASIFICAD/],
+  ['Planchas, perfiles y estructuras', /^(PLANCHA(?! (DE )?(POLIESTIRENO|HDPE|ARMAFLEX))|PLNACHA|PLACA|ANGULO|PERFIL|PLATINA|VIGA|CANAL (C|U)\b|BARRA|TUBO (REDONDO|CUADRADO|RECTANGULAR|ESTRUCTURAL)|FIERRO|ACERO CORRUGADO|MALLA ELECTROSOLDADA|VARILLA (LISA|CORRUGADA)|COLUMNA|CORREA)/, /ESTRUCTURA METALICA|ACCESORIO PARA PANEL/],
+  ['Tuberías y accesorios', /^(TUBO|TUBERIA|TUBING|CODO|TEE|YEE?\b|REDUCCION|REDUCTOR|BUSHING|BUJE|TAPON|CAP\b|COPLA|UNION|NIPLE|BRIDA|ADAPTADOR|MANGUITO|CURVA|CRUZ|ABRAZADERA|COLLARIN|SILLETA|EMPAQUE|EMPAQUETADURA|JUNTA|CEMENTO (PVC|CPVC)|PEGAMENTO|SOLDADURA (PVC|LIQUIDA)|LIMPIADOR PVC|ESPIGA|CONECTOR|ACOPLE|MANGUERA|TRAMPA|SOMBRERO|ANILLO|TERMINAL|ROSCA|CONTRATUERCA|PASAMURO|ENTRONQUE|SALIDA|TRANSICION|PORTA ?MANGUERA)/, /TUBERIA/],
+  ['Aislamiento y obra civil', /^(SUMATANE|POLIURETANO|POLIOL|ISOCIANATO|ARMAFLEX|K-?FLEX|AISLA|COQUILLA|CANUELA|LANA (DE )?(VIDRIO|ROCA)|POLIESTIRENO|TECNOPOR|CEMENTO|CONCRETO|ARENA|PIEDRA|MORTERO|GROUT|Z GROUT|ADHESIVO Z|SIKADUR|IMPERMEABILIZANTE|GEOMEMBRANA|DRYWALL|SUPERBOARD|LADRILLO|MADERA|TRIPLAY|PLANCHA (DE )?(HDPE|POLIESTIRENO)|MALLA)/, /AISLAMIENTO|CONSTRUCCION CIVIL|^MALLA$/],
+  ['Ferretería y herramientas', /^(PERNO|TUERCA|ARANDELA|ESPARRAGO|ANCLAJE|TORNILLO|TARUGO|REMACHE|CLAVO|VARILLA ROSCADA|AUTOPERFORANTE|PASADOR|GANCHO|ARGOLLA|CANCAMO|GRILLETE|TEMPLADOR|CADENA|CABLE (DE ACERO|ACERADO)|SOGA|CINTA|SILICONA|SELLADOR|ESPUMA|TEFLON|SIKAFLEX|PINTURA|ESMALTE|THINNER|BROCHA|RODILLO|LIJA|DISCO|BROCA|ELECTRODO|SOLDADURA|HERRAMIENTA|LLAVE|ALICATE|DESARMADOR|MARTILLO|SIERRA|WINCHA|ESCALERA|BALANZA|CARRETILLA)/, /FERRETERIA|HERRAMIENTA/],
+  ['Oficina, tecnología y limpieza', /^(PAPEL|ALCOHOL|BOLSA|JABON|DETERGENTE|LEJIA|DESINFECTANTE|ESCOBA|TRAPEADOR|TOALLA|PLASTICO|STRETCH|FILM|ZUNCHO|CARTON|TELEVISOR|COMPUTADORA|LAPTOP|WORKSTATION|MONITOR\b|IMPRESORA|TONER|LICENCIA|ACT\. LICENCIA|SOFTWARE|MOUSE|TECLADO|DISCO DURO|MEMORIA|CAMARA)/, /OFICINA|LIMPIEZA|EMBALAJE|TECNOLOGIC/]];
+function skuFamCC(r){ if(r._skcc) return r._skcc; const p = sinAcentos(String(r.producto || '')).toUpperCase().replace(/^NO USAR\W+/, '').trim(), f = sinAcentos(String(r.familia || '')).toUpperCase().trim();
+  let c = ''; for(let i = 0; i < SKU_FAM_CC.length && !c; i++) if(SKU_FAM_CC[i][1].test(p)) c = SKU_FAM_CC[i][0];
+  for(let i = 0; i < SKU_FAM_CC.length && !c; i++) if(f && SKU_FAM_CC[i][2] && SKU_FAM_CC[i][2].test(f)) c = SKU_FAM_CC[i][0];
+  c = c || 'Otros productos'; try{ Object.defineProperty(r, '_skcc', { value:c, writable:true, configurable:true }); }catch(err){} return c; }
 // SKU sin OC en tabla para Carolina (v564, 26.11.2026, Piero: "el formato de sku sin oc para carolina debe verse así… solo para carolina"):
 // una fila por SKU con el pedido, quién lo pidió, el proyecto, el código, el requerimiento, si hay stock en tránsito, el estado y la cotización.
 // El más reciente primero. La casilla de la izquierda elige para cotizar (igual que en la vista de siempre); el código abre la ficha del SKU.
@@ -19977,7 +20001,11 @@ function skuTablaCarolina(l){ const e = escapeHtml; cotCargar();
     <th class="ck"><span class="skt-x${todos ? ' on' : ''}" data-clic="1" data-skuselg="1" role="checkbox" aria-checked="${todos}" title="Elegir todos para cotizar"></span></th>
     <th>N° pedido</th><th>Fecha pedido</th><th>Resp. pedido</th><th>Responsable / solicitante</th><th>ID proyecto</th><th>Proyecto</th><th>Código</th><th>Descripción producto</th>
     <th class="n">Cant.</th><th>Unidad</th><th>Requerimiento</th><th>Fecha req.</th><th class="c">En tránsito</th><th>Estado</th><th class="cz">Cotiz.</th></tr></thead>
-    <tbody>${L.map(fila).join('')}</tbody></table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(L.length)}</div></div></div>`; }
+    ${(function(){   // un bloque por familia general (v578): la familia con el pedido más reciente primero; dentro, el más reciente primero
+      const G = new Map(); L.forEach(function(r){ const f = skuFamCC(r); if(!G.has(f)) G.set(f, []); G.get(f).push(r); });
+      return [...G.entries()].sort(function(a, b){ return (a[0] === 'Otros productos') - (b[0] === 'Otros productos'); }).map(function(g){ const on = g[1].every(function(r){ return APP_PC.cot.indexOf(skuKey(r)) !== -1; });
+        return `<tbody class="skt-blk ctb-g" style="--fam:${appColorFamilia(g[0])}"><tr class="ctb-gh"><td class="ck"><span class="skt-x${on ? ' on' : ''}" data-clic="1" data-skuselg="1" role="checkbox" aria-checked="${on}" title="Elegir toda la familia para cotizar"></span></td>
+          <td colspan="15"><div class="ctb-ghd"><i></i><b>${e(g[0])}</b><span>${appN(g[1].length)} SKU</span></div></td></tr>${g[1].map(fila).join('')}</tbody>`; }).join(''); })()}</table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(L.length)}</div></div></div>`; }
 function skuVistaCarolina(){ const yo = String((APP.usuario || {}).correo || '').split('@')[0].toUpperCase(); const L = ['CCHECA', 'MSIHUAIRO']; return L.indexOf(APP_PC.skuPer) !== -1 || (!APP_PC.skuPer && L.indexOf(yo) !== -1); }   // Carolina y Melissa (v566)
 function appPendComprasHtml(soloLista, sinCaras){
   appCorreoCargar(false); appAgCargar(false); rtCargar(false);
@@ -20189,7 +20217,7 @@ function appPendComprasHtml(soloLista, sinCaras){
   if(q){ filas.forEach(function(r){ addCli(cliDe(r), r.tipo === 'oc' ? r.codOrden : r.codPedido); }); entAll.forEach(function(o){ o.clis.forEach(function(n){ addCli(n, o.oc); }); }); }
   const cliSel = q && APP_PC.cli && (soloLista === 'datos' || clis.has(APP_PC.cli)) ? APP_PC.cli : '';
   const pasa = function(r){ if(cliSel) return cliDe(r) === cliSel;
-    return pasaQ(polarNorm([r.codOrden, r.codPedido, r.req, r.idProducto, r.producto, r.proveedor, r.proyecto, r.idProyecto, r.solicitante, r.obs, r.familia, (ncUbi(r.proveedor) || {}).n].join(' '))); };
+    return pasaQ(polarNorm([r.codOrden, r.codPedido, r.req, r.idProducto, r.producto, r.proveedor, r.proyecto, r.idProyecto, r.solicitante, r.obs, r.familia, r.tipo === 'oc' ? '' : skuFamCC(r), (ncUbi(r.proveedor) || {}).n].join(' '))); };
   const opC = function(v, t){ return `<option value="${escapeHtml(v)}"${v === cliSel ? ' selected' : ''}>${escapeHtml(t)}</option>`; };
   const cliFiltro = q ? `<div class="m-filtros pc-cli"><label><span>👥 Cliente</span><select class="ini-select" id="pcCli">${opC('', 'Todo lo que dice "' + APP_PC.q + '"')}${[...clis.entries()].sort(function(a, b){ return a[0].localeCompare(b[0]); }).map(function(x){ return opC(x[0], x[0] + ' · ' + x[1].size); }).join('')}</select></label>`
     + INV_XLS_BTN.replace('data-invxls="1"', 'data-pcxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar en Excel el status de lo filtrado') + '</div>' : '';
@@ -20648,6 +20676,12 @@ function cotProvDe(nom, ruc){ const M = PROVEEDOR_MAIL || {}; if(ruc && M[ruc] &
   Object.keys(M).some(function(x){ const p = M[x]; if(p && p.to && ncK(p.nombre).replace(/ /g, '').indexOf(k) !== -1){ r = Object.assign({ ruc:x }, p); return true; } return false; }); return r; }
 function appCotItems(){ const S = new Set(APP_PC.cot), D = appPendComprasHtml('datos', true); return D.items.filter(function(r){ return S.has(skuKey(r)); })
   .concat((D.osa || []).filter(function(r){ return S.has(cotKey(r)); }).map(function(r){ return Object.assign({}, r, { cantPedido:r.cantOrden != null ? r.cantOrden : r.cantPedido }); })); }
+// Un SKU repetido en la solicitud (varias líneas del mismo código y unidad) sale UNA vez con la cantidad sumada y sus pedidos y PRY juntos (v578, 27.11.2026, Piero).
+function cotJuntar(L){ const M = new Map(), u = function(a, b){ return [...new Set(String(a || '').split(', ').concat(String(b || '').split(', ')).filter(Boolean))].join(', '); };
+  L.forEach(function(r){ const k = String(r.idProducto || r.producto || '').trim() + '|' + String(r.unidad || '').trim().toUpperCase(), x = M.get(k);
+    if(!x) M.set(k, Object.assign({}, r, { cantPedido:r.cantPedido == null ? null : +r.cantPedido }));
+    else { x.cantPedido = (x.cantPedido || 0) + (+r.cantPedido || 0); x.codPedido = u(x.codPedido, r.codPedido); x.idProyecto = u(x.idProyecto, r.idProyecto); } });
+  return [...M.values()]; }
 function appCotAbrir(){ const e = escapeHtml, L = appCotItems(); if(!L.length) return appToast('Elige primero los SKU que quieres cotizar.');
   const cats = [...new Set(L.map(skuCategoria))], P = new Map();
   // 1) Los proveedores de la categoría; 2) a quién se le compró antes cada SKU (Consulta y Nisira).
@@ -20656,9 +20690,9 @@ function appCotAbrir(){ const e = escapeHtml, L = appCotItems(); if(!L.length) r
   [...H.values()].sort(function(a, b){ return b.c - a.c; }).slice(0, 8).forEach(function(h){ const k = ncK(gdCorto(h.n)); if([...P.keys()].some(function(p){ return k.replace(/ /g, '').indexOf(p.replace(/ /g, '')) !== -1; })) return;
     P.set(k, { n:appImpNombre(h.n), ruc:h.ruc, tag:'Ya le compramos ' + h.c + ' de estos SKU', sug:false }); });
   const provs = [...P.values()].map(function(p){ const x = cotProvDe(p.n, p.ruc); return Object.assign(p, { mail:x ? [x.to].concat(x.cc || []).join(',') : '', nom:x && x.nombre ? x.nombre : p.n }); });
-  const it = cats.map(function(c){ const l = L.filter(function(r){ return skuCategoria(r) === c; });
+  const it = cats.map(function(c){ const l = cotJuntar(L.filter(function(r){ return skuCategoria(r) === c; }));
     return `<div class="cot-c"><b>${e(c)}</b>${l.map(function(r){ return `<div><span>${e(r.producto || r.idProducto)}</span><em>${appN(r.cantPedido, 2)} ${e(r.unidad || '')}</em></div>`; }).join('')}</div>`; }).join('');
-  rsvModal(`<header><div><small>Solicitud de cotización</small><h3>${appN(L.length)} SKU · ${e(cats.length === 1 ? cats[0] : cats.length + ' categorías')}</h3><p>Elige a quién enviarla. Va a M. Luján con copia a Compras y al supervisor del requerimiento; los proveedores en copia oculta (no se ven entre ellos). El asunto lleva el código COT para guardar las respuestas.</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
+  rsvModal(`<header><div><small>Solicitud de cotización</small><h3>${appN(cotJuntar(L).length)} SKU · ${e(cats.length === 1 ? cats[0] : cats.length + ' categorías')}</h3><p>Elige a quién enviarla. Va a M. Luján con copia a Compras y al supervisor del requerimiento; los proveedores en copia oculta (no se ven entre ellos). El asunto lleva el código COT para guardar las respuestas.</p></div><button type="button" class="rsv-x" data-rsvx="1" aria-label="Cerrar">×</button></header>
     <div class="cot-its">${it}</div>
     <div class="alt-l cot-pl">${provs.map(function(p, i){ return `<label class="alt-it"><input type="checkbox" data-cotprov="${i}" value="${e(p.mail)}"${p.mail && p.sug ? ' checked' : ''}${p.mail ? '' : ' disabled'}><span class="alt-t"><b>${e(p.nom)}</b><small>${p.mail ? e(p.mail) : 'Sin correo en DB Proveedores · escríbelo abajo'}</small></span><span class="alt-q"><small>${e(p.tag)}</small></span></label>`; }).join('') || '<p class="rsv-nota">No hay proveedores sugeridos para estas categorías: escribe los correos abajo.</p>'}</div>
     <label class="rsv-lbl">Otros correos<input id="cotOtros" placeholder="ventas@proveedor.com, …" autocomplete="off"></label>
@@ -20680,14 +20714,15 @@ async function appCotCorreo(L, cats, bcc){ const e = escapeHtml, cod = function(
   // La tabla se copia en el mismo clic (26.11.2026, Piero: "ahora no deja abrir correo"): si se copiaba después de registrar el COT, Chrome ya
   // no dejaba copiar y el texto iba dentro del enlace mailto, que pasaba el límite de Windows y no abría nada. Por eso el código va en el asunto.
   const nota = 'Al responder, mantener el asunto de este correo (lleva el código COT) y adjuntar la cotización en PDF.';
-  const T = ['Estimados:', '', 'Por favor, su cotización de los siguientes materiales:', ''].concat(L.map(function(r, i){ return (i + 1) + '. ' + (r.producto || r.idProducto) + ' — ' + appN(r.cantPedido, 2) + ' ' + (r.unidad || '') + (r.codPedido ? ' · Pedido ' + cod(r.codPedido) : '') + (r.idProyecto ? ' · ' + r.idProyecto : ''); }))
+  const LJ = cotJuntar(L);
+  const T = ['Estimados:', '', 'Por favor, su cotización de los siguientes materiales:', ''].concat(LJ.map(function(r, i){ return (i + 1) + '. ' + (r.producto || r.idProducto) + ' — ' + appN(r.cantPedido, 2) + ' ' + (r.unidad || '') + (r.codPedido ? ' · Pedido ' + String(r.codPedido).split(', ').map(cod).join(', ') : '') + (r.idProyecto ? ' · ' + r.idProyecto : ''); }))
     .concat(['', 'Indicar precio unitario (sin IGV), moneda, plazo de entrega, validez de la oferta y condiciones de pago.', '', nota, '', 'Saludos cordiales,']);
   const th = function(x){ return '<th bgcolor="#25344a" style="background:#25344a;background-color:#25344a;color:#fefefe;border:1px solid #25344a;padding:5px 8px;font-size:10pt;text-align:left;"><font color="#fefefe"><b>' + x + '</b></font></th>'; }   // #fefefe y no #ffffff: Outlook cambia el blanco puro por el color automático (negro) al pegar (26.11.2026)
   const td = function(x, a){ return '<td style="border:1px solid #c9d2de;padding:4px 8px;font-size:10pt;' + (a ? 'text-align:' + a + ';' : '') + '">' + x + '</td>'; };
   const p = function(x){ return '<p style="margin:0 0 10pt;">' + x + '</p>'; };
   const html = '<div style="font-family:Aptos,Calibri,Arial,sans-serif;font-size:11pt;">' + p('Estimados:') + p('Por favor, su cotización de los siguientes materiales:')
     + '<table style="border-collapse:collapse;margin:0 0 12pt;"><tr>' + th('N°') + th('Código') + th('Descripción') + th('Cantidad') + th('U.M.') + th('Pedido') + th('PRY') + '</tr>'
-    + L.map(function(r, i){ return '<tr>' + td(i + 1, 'center') + td(e(r.idProducto || '')) + td(e(r.producto || '')) + td(appN(r.cantPedido, 2), 'right') + td(e(r.unidad || ''), 'center') + td(e(cod(r.codPedido)), 'center') + td(e(r.idProyecto || ''), 'center') + '</tr>'; }).join('') + '</table>'
+    + LJ.map(function(r, i){ return '<tr>' + td(i + 1, 'center') + td(e(r.idProducto || '')) + td(e(r.producto || '')) + td(appN(r.cantPedido, 2), 'right') + td(e(r.unidad || ''), 'center') + td(e(String(r.codPedido || '').split(', ').map(cod).join(', ')), 'center') + td(e(r.idProyecto || ''), 'center') + '</tr>'; }).join('') + '</table>'
     + p('Indicar <b>precio unitario (sin IGV)</b>, moneda, <b>plazo de entrega</b>, validez de la oferta y condiciones de pago.') + p('Al responder, mantener el asunto de este correo (lleva el código <b>COT</b>) y adjuntar la cotización en PDF.') + '<p style="margin:0;">Saludos cordiales,</p></div>';
   // Un solo COT por solicitud (26.11.2026, Piero: salían 13 COT del mismo ítem): mientras se abre el correo no se registra otro y, si vuelves a
   // tocar "Abrir correo" con los mismos ítems y proveedores, se usa el mismo código.
@@ -20819,7 +20854,8 @@ function cotPrecioRef(cod, ofertas){ cod = String(cod || '').trim();
   return { C:C, fam:fam, tasa:tasa, n:n, esp:esp, nEsp:rec.length, nac:{ v:med(nac), n:nac.length }, imp:{ v:med(imp), n:imp.length }, of:{ v:med(ofertas || []), n:(ofertas || []).length } }; }
 function cotComparativaAbrir(s, cod){ const e = escapeHtml, TC = (TIPO_CAMBIO && TIPO_CAMBIO.USD) || 3.75;
   const usd = function(v){ return v == null || isNaN(v) ? '—' : 'US$ ' + v.toLocaleString('es-PE', { minimumFractionDigits:2, maximumFractionDigits:2 }); };
-  const its = []; (s.items || []).forEach(function(it){ const k = String(it.cod || '').trim(); if(k && !its.some(function(x){ return x.cod === k; })) its.push({ cod:k, desc:it.desc || k, cant:+it.cant || 0, um:it.um || '' }); });
+  // El mismo código en varias líneas (mismo pedido o varios) va en una sola fila con la cantidad SUMADA (v578, 27.11.2026, Piero: "son 4 líneas que se deben juntar").
+  const its = []; (s.items || []).forEach(function(it){ const k = String(it.cod || '').trim(); if(!k) return; const x = its.find(function(y){ return y.cod === k; }); if(x) x.cant += +it.cant || 0; else its.push({ cod:k, desc:it.desc || k, cant:+it.cant || 0, um:it.um || '' }); });
   const um = function(it){ return String(it.um || '').toLowerCase(); }, nomIt = function(it){ const R = cotSpec(it.desc); return R ? 'el ' + cotSpecTxt(R) : polarCorta(it.desc, 30); };
   // Última oferta de cada proveedor por código, solo de esta COT; su PDF es el de la oferta más reciente
   const provK = function(p){ return String(p.ruc || p.proveedor || '').toUpperCase(); }, PV = new Map(), C = new Map();
@@ -20892,7 +20928,7 @@ function cotRegFilas(){ return appMemo('cotReg' + COTD.firma + '|' + getReqRows(
   getReqRows().concat(PEDIDO_SIN_REQ_ROWS || []).forEach(function(r){ if(!r.codPedido || !r.idProducto || !r.codOrden || /anul/i.test(r.estadoOrden || '')) return;
     const k = c0(r.codPedido) + '|' + c0(r.idProducto); if(!OC.has(k)) OC.set(k, { oc:r.codOrden, prov:r.proveedor || '' }); });
   return COTD.sol.filter(function(s){ return s.estado !== 'anulada'; }).map(function(s){
-    const its = []; (s.items || []).forEach(function(it){ const k = c0(it.cod); if(k && !its.some(function(x){ return x.cod === k; })) its.push({ cod:k, desc:it.desc || k, cant:+it.cant || 0, ped:c0(it.ped), pry:c0(it.pry), oc:c0(it.oc) }); });
+    const its = []; (s.items || []).forEach(function(it){ const k = c0(it.cod); if(!k) return; const x = its.find(function(y){ return y.cod === k; }); if(x) x.cant += +it.cant || 0; else its.push({ cod:k, desc:it.desc || k, cant:+it.cant || 0, ped:c0(it.ped), pry:c0(it.pry), oc:c0(it.oc) }); });   // misma cantidad sumada (v578)
     const ocs = its.map(function(it){ return OC.get(it.ped + '|' + it.cod) || (it.oc ? { oc:it.oc, prov:'' } : null); });
     const nOc = ocs.filter(Boolean).length, provOc = [...new Set(ocs.filter(Boolean).map(function(o){ return gdCorto(o.prov) || o.prov; }).filter(Boolean))];
     // Mejor oferta: por producto, la más barata de las que son el mismo producto (si solo hay alternativas, la más barata de ellas)
@@ -20971,7 +21007,7 @@ async function appCotExcel(L){ let EJ; try{ EJ = await appCargarExcelJs(); }catc
   ws.mergeCells(1, 1, 1, H.length); ws.getCell(1, 1).value = 'Solicitud de cotización · Grupo Friopacking'; ws.getCell(1, 1).font = { bold:true, size:15, color:{ argb:'FF25344A' } };
   ws.mergeCells(2, 1, 2, H.length); ws.getCell(2, 1).value = 'Fecha: ' + String(hoy.getDate()).padStart(2, '0') + '/' + String(hoy.getMonth() + 1).padStart(2, '0') + '/' + hoy.getFullYear() + ' · Llenar las columnas en amarillo'; ws.getCell(2, 1).font = { italic:true, size:10, color:{ argb:'FF6B7785' } };
   ws.getRow(4).values = H; ws.getRow(4).eachCell(function(c){ c.fill = fill('FF25344A'); c.font = { bold:true, size:10, color:{ argb:'FFFFFFFF' } }; c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }; }); ws.getRow(4).height = 30;
-  L.slice().sort(function(a, b){ return skuCategoria(a).localeCompare(skuCategoria(b)); }).forEach(function(r, i){ const row = ws.addRow([i + 1, skuCategoria(r), String(r.idProducto || ''), r.producto || '', r.cantPedido != null ? +r.cantPedido : null, r.unidad || '', null, '', null, '']);
+  cotJuntar(L).sort(function(a, b){ return skuCategoria(a).localeCompare(skuCategoria(b)); }).forEach(function(r, i){ const row = ws.addRow([i + 1, skuCategoria(r), String(r.idProducto || ''), r.producto || '', r.cantPedido != null ? +r.cantPedido : null, r.unidad || '', null, '', null, '']);
     row.eachCell({ includeEmpty:true }, function(c, k){ c.font = { size:10 }; c.border = { top:bd, bottom:bd, left:bd, right:bd }; c.alignment = { vertical:'middle', horizontal:[2, 4, 10].indexOf(k) !== -1 ? 'left' : 'center', wrapText:k === 4 }; if(k >= 7) c.fill = fill('FFFFF6D6'); });
     row.getCell(3).numFmt = '@'; row.getCell(5).numFmt = '#,##0.##'; row.getCell(7).numFmt = '#,##0.00'; });
   [5, 26, 15, 56, 10, 7, 16, 9, 13, 28].forEach(function(w, i){ ws.getColumn(i + 1).width = w; });
