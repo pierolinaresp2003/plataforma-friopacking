@@ -21499,7 +21499,9 @@ function copEstDe(x){ const o = x.o; if(x.st === 'ent') return o.anul ? ['anu', 
   // Aprobada pero sin el correo al proveedor: «Pendiente correo»; «En camino» recién con el ✓ correo enviado (v604, Piero).
   return x.st === 'venc' ? ['venc', 'Vencida'] : APP_CORREO.m[o.oc] ? ['cam', 'En camino'] : ['pco', 'Pendiente correo']; }
 const COP_ESTN = { venc:['Vencida', '#d43c3c'], sa:['Sin aprobar', '#d4891a'], pco:['Pendiente correo', '#db2777'], par:['Llegó parcial', '#0e7490'], cam:['En camino', '#2f6fd6'], ag:['Por agencia', '#8a5cd1'], agr:['Agencia regularizada', '#b9a3e3'], prc:['Por recoger', '#0e8a7c'], ent:['Entregada', '#1e8a4f'], cer:['Cerrada', '#64748b'], anu:['Anulada', '#98a2b3'] };
-function copEstPop(){ const c = APP_COP.estCnt || {}, off = APP_COP.estOff || [], K = Object.keys(COP_ESTN).filter(function(k){ return c[k]; }), todos = !K.some(function(k){ return off.indexOf(k) !== -1; });
+// Por defecto sin entregadas ni anuladas (v606, Piero); al buscar se ve todo mientras no se toque el filtro.
+function copEstOff(){ return APP_COP.estOff || (APP_PC.q ? [] : ['ent', 'cer', 'anu']); }
+function copEstPop(){ const c = APP_COP.estCnt || {}, off = copEstOff(), K = Object.keys(COP_ESTN).filter(function(k){ return c[k]; }), todos = !K.some(function(k){ return off.indexOf(k) !== -1; });
   const ck = function(on){ return `<span class="cop-ckb${on ? ' on' : ''}"></span>`; };
   return `<span class="rqx-skf-pop cop-estpop"><button type="button" data-copestv="">${ck(todos)}Todos</button>${K.map(function(k){ const on = off.indexOf(k) === -1;
     return `<button type="button" data-copestv="${k}">${ck(on)}${COP_ESTN[k][0]}</button>`; }).join('')}</span>`; }
@@ -21531,7 +21533,7 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
   // Filtro en la columna Estado (v586, 27.11.2026, Piero: "añade un filtro en la columna de estado con el ícono ese para filtrar los estados").
   const cnt = {}; L.forEach(function(x){ const s = x.s[0]; cnt[s] = (cnt[s] || 0) + 1; }); APP_COP.estCnt = cnt; APP_COP.estTot = L.length;
   // Varios a la vez, como en Excel (v591, Piero: "¿qué pasa si quiero filtrar todas menos entregadas?"): se desmarca lo que no se quiere ver.
-  const off = (APP_COP.estOff || []).filter(function(k){ return cnt[k]; }), fk = off.length, nk = Object.keys(cnt).length; if(fk) L = L.filter(function(x){ return off.indexOf(x.s[0]) === -1; });
+  const off = copEstOff().filter(function(k){ return cnt[k]; }), fk = off.length, nk = Object.keys(cnt).length; if(fk) L = L.filter(function(x){ return off.indexOf(x.s[0]) === -1; });
   const tope = APP_COP.tope || 150, total = L.length; L = L.slice(0, tope);
   // Monto de cada OC (sin IGV, en su moneda) y Comprador solo cuando se ve a todos (v590, 27.11.2026, Piero: "no coloques al comprador cuando se está filtrando su cara").
   const monto = appMemo('copMonto', function(){ const m = new Map(); polarLineasOC().forEach(function(r){ if(!r.codOrden) return; const x = m.get(r.codOrden) || m.set(r.codOrden, { v:0, m:copMon(r.moneda) }).get(r.codOrden); x.v += +r.montoNativo || 0; }); return m; });
@@ -21568,7 +21570,7 @@ function copListaHtml(D){ const e = escapeHtml, I = ncItems(D), q = APP_PC.q, k 
     : `<tbody><tr><td colspan="${nCol}" class="cop-vac">Marca al menos un estado en el filtro.</td></tr></tbody>`;
   return (q ? `<div class="cop-chs"><span class="cop-q">“${e(q)}”: ${appN(total)} OC</span></div>` : '')
     + (L.length || fk ? `<div class="skt ctb-w cop-w"><div class="skt-blk ctb-blk"><div class="ctb-scroll"><table class="ctb cop-ctb">${th}${cuerpo}</table></div><div class="ctb-pie">Mostrando 1–${appN(L.length)} de ${appN(total)}${total > tope ? ` · <button type="button" class="ini-link" data-copmas="1">Ver más (${appN(total - tope)} restantes) ›</button>` : ''}</div></div></div>`
-      : `<div class="ini-vacio">${q ? 'No hay OC con "' + e(q) + '".' : '✅ Nada en este estado.'}${(APP_COP.estOff || []).length ? ' <button type="button" class="ini-link" data-copestv="">Quitar el filtro de estado</button>' : ''}</div>`); }
+      : `<div class="ini-vacio">${q ? 'No hay OC con "' + e(q) + '".' : '✅ Nada en este estado.'}${copEstOff().length ? ' <button type="button" class="ini-link" data-copestv="">Quitar el filtro de estado</button>' : ''}</div>`); }
 function copVisSeg(){ const v = APP_NC.vista || 'mapa', b = function(k, t, extra){ return `<button type="button" data-copvis="${k}" class="${v === k ? 'on' : ''}">${t}${extra || ''}</button>`; };
   return `<div class="rsvm-seg cop-vis">${b('mapa', '🗺 Mapa')}${b('lista', '☰ Lista')}${b('opd', '📄 OPD', ' <b>' + appN(copOpdAbiertas().length) + '</b>')}</div>`; }
 function copOps(corto){ return `<button type="button" class="imx-ib cop-tb${corto ? ' corto' : ''}" data-copurg="1" title="OC urgente: correo de una OC recién emitida en Nisira que aún no está en el Reporte Maestro">⚡${corto ? '' : ' OC urgente'}</button><button type="button" class="imx-ib cop-tb${corto ? ' corto' : ''}" data-copopdnueva="1" title="Solicitar una Orden de Pago (OPD)">📝${corto ? '' : ' Solicitar OPD'}</button>`; }
@@ -21584,7 +21586,7 @@ document.addEventListener('click', function(ev){ const b = ev.target.closest && 
   if(d.copconf) return copMailConfirmar();
   if(d.copssoma){ copSsoma().then(function(x){ if(x) copPdfBajar(x, 'CARTILLA_SSOMA_FRIOPACKING.pdf'); else appToast('Todavía no hay cartilla SSOMA guardada.'); }); return; }
   if(d.copmas){ APP_COP.tope = (APP_COP.tope || 150) + 300; return copRefrescar(); }
-  if(d.copestv !== undefined){ const k = d.copestv, c = APP_COP.estCnt || {}, K = Object.keys(c); let off = (APP_COP.estOff || []).filter(function(x){ return c[x]; });
+  if(d.copestv !== undefined){ const k = d.copestv, c = APP_COP.estCnt || {}, K = Object.keys(c); let off = copEstOff().filter(function(x){ return c[x]; });
     if(!k) off = off.length ? [] : K.slice(); else if(off.indexOf(k) !== -1) off = off.filter(function(x){ return x !== k; }); else off = off.concat([k]);   // "Todos" marca o desmarca todo (v593)
     APP_COP.estOff = off; APP_COP.tope = 150; const abierto = !!b.closest('.cop-estpop'); copRefrescar(); if(abierto) copEstPopAbrir(); return; }
   if(d.copestf){ const pp = b.closest('.rqx-skf-w').querySelector('.rqx-skf-pop'); if(pp){ pp.remove(); return; } copEstPopAbrir(); return; }
