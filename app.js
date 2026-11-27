@@ -20483,9 +20483,9 @@ function ncVista(D, lista){ if(APP_NC.vista === 'lista' || APP_NC.vista === 'opd
   const Z = function(k, t, p){ return `<button type="button" data-nczoom="${k}" title="${t}" aria-label="${t}">${p.charAt(0) === '<' ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>` : `<span class="ncm-zt">${p}</span>`}</button>`; };
   const con = APP_NC.d || APP_NC.est || APP_PC.q || APP_NC.foco;
   return `<div class="imx ncm${con ? ' con' : ''}${APP_NC.d ? ' cond' : ''}"><div class="imx-mw"><div class="cmp-top ncm-bar"><div class="ncm-izq">${ncModulo(D)}${copVisSeg()}<label class="pmm-q">${ncSvg(NC_ICO.lupa)}<input type="search" id="pcBusca" placeholder="Buscar OC, proveedor o distrito" value="${e(APP_PC.q || '')}" autocomplete="off"></label>
-      ${ncPerFiltro(I)}${copOps(true)}
+      ${ncPerFiltro(I)}
       <button type="button" class="imx-ib" data-pcres="1" title="Resumen del comprador en imágenes: reporte de compras, aviso de entrega y pedidos sin OC" aria-label="Resumen del comprador en imágenes">${ncSvg(NC_ICO.res)}</button>
-      ${INV_XLS_BTN.replace('pc-img-btn inv-xls', 'imx-ib').replace('data-invxls="1"', 'data-pclxls="1"').replace('Exportar a Excel lo que se muestra', 'Descargar el status general en Excel: todas las OC nacionales (vencidas, más adelante, por agencia y entregadas) con su distrito y CD')}</div>${NCM.rep || ''}</div>
+</div>${NCM.rep || ''}</div>
     <div class="imx-mapa" id="ncmMapa">${ncMapaHtml(I)}</div>
     <div class="imx-zoom">${Z('in', 'Acercar', '<path d="M12 5v14M5 12h14"/>')}${Z('out', 'Alejar', '<path d="M5 12h14"/>')}${Z('lima', 'Ver Lima Metropolitana', 'Lima')}${Z('pe', 'Ver todo el Perú', 'Perú')}</div>
     <div class="imx-lado" id="ncmLado">${ncLado(I, D, lista)}</div></div></div>`; }
